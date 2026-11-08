@@ -159,10 +159,12 @@ Purpose-directed rather than rule-driven: the dream prompt says what the memory 
 ## 9. Safety boundaries
 
 - Not therapy; no diagnosis; no medical advice; no comparisons.
-- There is no free-text input, so open-ended distress cannot be entered. **Proposal
-  (needs a decision):** after a run of very unpleasant evenings (e.g. 5 of 7), show
-  one **hard-coded** gentle line pointing to real support. Rate-limited, never
-  model-generated.
+- There is no free-text input, so open-ended distress cannot be entered.
+- **Support nudge (decided 2026-11-08, option a):** after a run of very unpleasant
+  evenings (starting threshold 5 of 7), show one **hard-coded** gentle line, e.g.
+  "It's been a heavy week. Talking to someone you trust can help." No links, no
+  crisis framing. At most once every 14 days, never model-generated, and it works
+  with AI off (it reads `DayReflection` facts only).
 - The agent cannot act outside its own outputs: no notifications of its own, and no
   changes to schedules or reminders.
 
@@ -197,7 +199,7 @@ deliberately broken prompt or validator.
 
 ## 13. Open questions
 
-1. The distress pointer in §9: adopt it, and with which threshold and wording?
+None currently open.
 
 Decided 2026-11-08: the memory page is debug-only; the Reader runs on request by
 default, with automatic reading as an opt-in setting.
