@@ -297,7 +297,7 @@ per table.
   the health report flags it.
 - **Every new test must fail against a deliberately broken implementation**
   (AGENTS.md rule); a test that passes either way is deleted.
-- CI: `swift test` for the packages, plus a single `xcodebuild` build of the app.
+- CI: see §15 (Linux for Domain and Core, one macOS app build per pull request).
 
 ## 11. Deliberately not doing
 
@@ -362,3 +362,17 @@ remains an option for an App Store build.
    stays on anyway as a no-regret choice; the store-vs-Developer-ID decision waits
    until public release.
 2. Agent open questions are tracked in [AGENT.md](AGENT.md) §13.
+
+## 15. Project-wide rules (decided 2026-11-08)
+
+- **Bundle identifier:** `io.github.zihao-qi.clew`. It can change freely until Clew
+  has real users; after that, a change needs a data migration, because the sandbox
+  container, Keychain items and notification permission are keyed by it.
+- **No tracking.** No analytics, no phoning home. Any future crash reporting is
+  opt-in.
+- **Localisation and accessibility from the first commit.** All UI text goes in a
+  String Catalog (English first); every control has a VoiceOver label; the menu bar
+  list is fully keyboard-navigable.
+- **CI cost:** `ClewDomain` and `ClewCore` depend only on Foundation and are tested
+  on Linux runners. One macOS job builds the app per pull request (macOS minutes
+  cost 10× on private repos).
