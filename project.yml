@@ -1,0 +1,47 @@
+# XcodeGen config. Generate the project with `xcodegen generate` (brew install xcodegen).
+# Clew.xcodeproj is generated and not committed; this file is the source of truth.
+name: Clew
+options:
+  bundleIdPrefix: io.github.zihao-qi
+  deploymentTarget:
+    macOS: "14.0"
+  developmentLanguage: en
+packages:
+  ClewPackage:
+    path: .
+targets:
+  Clew:
+    type: application
+    platform: macOS
+    productName: Clew
+    sources:
+      - App/Clew
+    dependencies:
+      - package: ClewPackage
+        product: ClewDomain
+      - package: ClewPackage
+        product: ClewCore
+      - package: ClewPackage
+        product: ClewStore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.zihao-qi.clew   # ARCHITECTURE §15
+        PRODUCT_NAME: Clew
+        PRODUCT_MODULE_NAME: ClewApp   # avoids clashing with the ClewCore.Clew type
+        SWIFT_VERSION: "6.0"
+        MARKETING_VERSION: 0.1.0
+        CURRENT_PROJECT_VERSION: 1
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_LSUIElement: YES   # menu bar only, no Dock icon
+        INFOPLIST_KEY_CFBundleDisplayName: Clew
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
+        CODE_SIGN_ENTITLEMENTS: App/Clew/Clew.entitlements
+        ENABLE_APP_SANDBOX: YES   # on from day one (ARCHITECTURE §1); no Accessibility
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "-"   # scripts/install-local.sh signs with a stable local identity
+        SWIFT_EMIT_LOC_STRINGS: YES
+        LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+        ENABLE_USER_SCRIPT_SANDBOXING: YES
+        DEAD_CODE_STRIPPING: YES
+        ENABLE_DEBUG_DYLIB: NO

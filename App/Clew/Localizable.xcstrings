@@ -1,0 +1,79 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%@ %lld/%lld" : {},
+    "%lld" : {},
+    "%lld of %lld" : {},
+    "%lld× a week" : {},
+    "Add" : {},
+    "Add an item" : {},
+    "Add one to %@" : {},
+    "Add to today" : {},
+    "Archive" : {},
+    "Cancel" : {},
+    "Clew" : {},
+    "Clew couldn't open its data. Quit and reopen Clew." : {},
+    "Clew, %lld of %lld done" : {},
+    "Couldn't load today's list." : {},
+    "Daily" : {},
+    "Days" : {},
+    "Edit…" : {},
+    "Give it a name." : {},
+    "Goal" : {},
+    "Habit" : {},
+    "Keep the name under %lld characters." : {},
+    "Kind" : {},
+    "Later" : {},
+    "Later (%lld)" : {},
+    "Later is empty." : {},
+    "Later pile, %lld items. Pick some for today." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Later pile, %lld item. Pick some for today."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Later pile, %lld items. Pick some for today."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Link" : {},
+    "Link (optional)" : {},
+    "Links must start with http:// or https://." : {},
+    "Mark %@ done" : {},
+    "More" : {},
+    "Move to Later" : {},
+    "Name" : {},
+    "Name or link" : {},
+    "Nothing for today." : {},
+    "Open link for %@" : {},
+    "Per week" : {},
+    "Pick 1 to 3 items." : {},
+    "Pick 1–3 for today" : {},
+    "Pick a total between 1 and 100,000." : {},
+    "Pick at least one day." : {},
+    "Quit Clew" : {},
+    "Repeats" : {},
+    "Save" : {},
+    "That can't be done right now." : {},
+    "That didn't save. Try again." : {},
+    "Times a week" : {},
+    "Today" : {},
+    "Total" : {},
+    "Undo" : {},
+    "Undo %@" : {},
+    "Undo +1" : {}
+  },
+  "version" : "1.0"
+}
