@@ -35,14 +35,19 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
    Click it to open today's list. No main window is required.
 2. **Item kinds.**
    - *Once*: done on a chosen day; if not done, it quietly moves to tomorrow.
-   - *Repeating*: daily, chosen weekdays, or N times per week.
+     Saved links in the Later pile behave the same once picked for a day.
+   - *Repeating*: daily, chosen weekdays, or N times per week. Once a weekly
+     target is met, the item leaves Today's list until next Monday, unless you
+     ticked it today.
    - *Counted goal*: a total (e.g. 30 videos). One click is `+1`; click again
      to log more. The bar shows lifetime progress; the item counts as done today
      once you've added at least one.
 3. **Links.** Any item can have a URL. `↗` opens it in the default browser.
-4. **Done in one click.** Click `○` to mark it done (counted goals: +1). A 1–3 rating
-   row then appears inline every time; it's optional and disappears after a few
-   seconds if ignored.
+4. **Done in one click.** Click `○` to mark it done (counted goals: +1). Three small
+   rating dots then appear **inside the same row** every time. The row never changes
+   height and the dots never cover the `+1` target, so rapid ticks can't mis-click.
+   Optional; they fade after a few seconds. Ticked items stay visible until the day
+   rolls over, so undo is always one click away.
 5. **Later pile.** Saving a link (paste into `+ add`, or choose "Later") puts it
    in a hidden pile. Its count is shown, its contents aren't. "Pick 1–3 for today"
    moves items onto the list. Items untouched for 6 weeks get a one-tap
@@ -50,7 +55,8 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
 6. **Gentle reminders** (optional, per item, off by default). One notification at
    a chosen time with **Open / Done / Later** actions. No repeats, no escalation.
 7. **Day summaries** (each optional): morning "6 today" at 9:00, evening "5/6 done"
-   at 21:00, both changeable. Short, friendly, never a list of failures.
+   at 21:00, both changeable. Short, friendly, never a list of failures. A day
+   with no ticks gets an encouraging line instead of "0/6".
 8. **Local data.** A SQLite database (GRDB) in Application Support. One-click JSON
    export. No account, no network.
 9. **Launch at login** (`SMAppService`), toggled in a small Settings window.
@@ -73,7 +79,7 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
   second when it's finished. Levels come from lifetime totals.
 - Browser extension import: YouTube Watch Later (list + watch %, verified feasible
   2026-11-08) and X bookmarks.
-- AI recap and quick-start suggestion (Pi agent via a Clew/Dayflow MCP server).
+- Opt-in AI coach: recap, Later suggestions, quick start (see docs/AGENT.md).
 - Sync with Dayflow (its local JSON API: `GET /api/day`, `PATCH /api/tasks/:id`).
 - iPhone, iCloud sync, Obsidian export.
 

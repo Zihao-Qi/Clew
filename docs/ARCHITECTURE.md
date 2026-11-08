@@ -12,7 +12,7 @@ each one hardens into a constraint that is expensive to retrofit:
 |---|---|
 | Public release, possibly the App Store | App Sandbox **on from day one**; no Accessibility; no spawning user binaries |
 | Browser extension (YouTube Watch Later + watch %, X bookmarks) | Idempotent import keyed by external ID; a local API with auth |
-| AI agent (Pi) through MCP | One command layer every client goes through; attribution of who changed what |
+| Opt-in AI coach (AGENT.md) | One command layer every client goes through; attribution of who changed what; agent kept out of user data |
 | Daruma goals, levels, badges | History kept as facts, so rewards are derived and stable |
 | Dayflow connection | A change feed that sync can resume from |
 | iPhone + iCloud sync | UUID identity, tombstones, and an explicit merge policy per field |
@@ -75,7 +75,8 @@ The core split: **what you intend** is mutable; **what happened** is append-only
 
 - **Definitions** (edited freely, soft-deleted): `Item`, `Reminder`, `Settings`.
 - **Facts** (inserted, never updated in substance; corrected by voiding):
-  `CheckIn`, `Award`. (`ItemProgress` is latest-state; see §4.2.)
+  `CheckIn`, `Plan`, `DayReflection` (v1.2), `Award` (v1.3). (`ItemProgress` is
+  latest-state; see §4.2.)
 
 Everything the UI shows (today's list, the `4/6`, progress bars, levels, recaps)
 is **derived** from definitions + facts by pure Domain functions. This is not
@@ -87,27 +88,37 @@ makes history trustworthy, rewards stable, and sync rules small and explicit (§
 ```
 Item            id (UUID), kind, title, url?, note?, parentId?,
                 schedule (JSON value type), progress (JSON value type),
-                state: active | later | paused | finished | archived,
+                state: active | later | paused | archived,
                 plannedDay?, sortKey, source, externalRef?,
                 createdAt, updatedAt, deletedAt?
 CheckIn         id, itemId, localDay, at (UTC), timeZoneId, amount (default 1),
                 rating? (1–3), ratedAt?, source, voidedAt?, voidReason?
-ItemProgress    itemId (PK), fraction (0–1), observedAt, source   ← latest only, e.g. YouTube watch %
+Plan            id, itemId, localDay, at, source, voidedAt?   ← "picked for today", kept as history
+Reminder        id, itemId, time (local), weekdays, enabled, updatedAt, deletedAt?
+Settings        key (PK), value (JSON), updatedAt
+— later phases —
+ItemProgress    itemId (PK), fraction (0–1), observedAt, source   (v1.1) ← latest only, e.g. YouTube watch %
+ChangeLog       seq (monotonic), entity, entityId, op, at, source  (v1.1) ← for Gateway "changes since" and sync
+DayReflection   localDay (PK), valence (-1…1), bestItemId?, at, updatedAt  (v1.2)
 Award           id = hash(kind, itemId, milestone), kind (e.g. goal.finished),
-                itemId?, localDay, at, ruleVersion
-Reminder        id, itemId, time (local), weekdays, enabled
-ChangeLog       seq (monotonic), entity, entityId, op, at, source
+                itemId?, localDay, at, ruleVersion, voidedAt?  (v1.3)
 ```
 
-- `kind` is `once | habit | goal | link`. *Later pile* = items in state `later`;
-  "pick for today" sets `plannedDay`. One table, no special case.
+- `kind` is `once | habit | goal | link`. SPEC's "Once / Repeating / Counted goal"
+  map to `once | habit | goal`; `link` is a saved link (Later pile items).
+  *Later pile* = items in state `later`. "Pick for today" sets `plannedDay` **and**
+  records a `Plan` fact, so pick history survives later re-planning.
+- **"Finished" is derived, not stored:** a goal is finished when
+  `sum(amount of non-voided CheckIns) >= target`; a once-item when it has a
+  non-voided CheckIn. Undoing the last tick therefore un-finishes it, with no
+  stored state to repair.
 - **Composite progress:** `progress` is `.none`, `.counter(target)` (ML course
-  10/30), or `.children` (the "Watch later" row = done children / all children).
-  A YouTube playlist imported as a course becomes a parent with 30 children,
-  with no new concepts.
-- `source` is `user | notification | extension.youtube | extension.x | agent |
-  dayflow | import`. Every write is attributed; agent-made changes are visible
-  and undoable as a class.
+  10/30), or `.children` (**v1.1**, for imports: the "Watch later" row = done
+  children / all children). A YouTube playlist imported as a course becomes a
+  parent with 30 children, with no new concepts.
+- `source` is `user | notification | extension.youtube | extension.x | dayflow |
+  import`. Every write is attributed. **`agent` is never a source of user data**
+  (ADR-4); agent writes exist only in `AgentOutput`.
 - `(source, externalRef)` is unique, so imports are **idempotent upserts**:
   re-scanning Watch Later never duplicates.
 - Undo is `voidedAt` on the fact, never `DELETE`.
@@ -117,8 +128,9 @@ ChangeLog       seq (monotonic), entity, entityId, op, at, source
 - **Progress is latest-state, not a fact stream.** The extension may report watch %
   often; `ItemProgress` keeps only the newest value per item, so scans never bloat
   the database. Reaching 100% is the one transition that becomes a fact: a
-  `CheckIn` with a deterministic ID derived from `(source, externalRef)`, so
-  re-scans cannot create it twice.
+  `CheckIn`, created only if the item has **no non-voided CheckIn from that source**,
+  so re-scans cannot create it twice. (A deterministic ID was rejected: with
+  monotonic voids, one accidental void would block that item forever.)
 
 ### 4.3 Time (ADR-3)
 
@@ -131,18 +143,39 @@ type, not something recomputed from timestamps later:**
 - **Day rollover hour**: a setting, default **04:00** (decided 2026-11-08). Ticking
   something at 1 a.m. counts for the day you were still living in. Changing the
   setting affects only new facts; stored `LocalDay`s are never rewritten.
-- Weeks start Monday (SPEC decision). "N× per week" is evaluated over the
-  `LocalDay`s of facts, never over UTC ranges.
-- Domain never calls `Date()`. Tests pin clock, zone and DST transitions.
+- Weeks start Monday (SPEC decision), using a **pinned ISO-8601 calendar** in Domain,
+  never `Calendar.current`. In an en_US locale `Calendar.current` starts weeks on
+  Sunday, which would silently move Sunday into the next week. "N× per week" is
+  evaluated over the `LocalDay`s of facts, never over UTC ranges.
+- `LocalDay(of: instant)` = the calendar date of `instant − rolloverHour`, computed
+  with calendar arithmetic in the stored zone, so DST days stay correct.
+- **Reminder times earlier than the rollover hour belong to the previous day.** A
+  01:00 reminder on Monday's item fires at Tuesday 01:00 on the wall clock.
+- Domain never calls `Date()`. Tests pin clock, zone, locale and DST transitions.
 
 ### 4.4 Schedules are values, evaluation is pure
 
 ```swift
-enum Schedule: Codable { case once(LocalDay), daily, weekdays(Set<Weekday>),
+enum Schedule: Codable { case daily, weekdays(Set<Weekday>),
                          timesPerWeek(Int), unscheduled }
 func dueState(item: Item, on day: LocalDay, facts: [CheckIn]) -> DueState
 //   .due, .doneToday, .satisfiedThisWeek, .notDue
 ```
+
+The day an item is meant for lives in **one** place, `Item.plannedDay`. There is no
+`.once(day)` schedule case, which would duplicate it.
+
+**Today's list, precisely:**
+- *once / link* with `plannedDay <= today` and no non-voided CheckIn → `.due`.
+  "Quietly moves to tomorrow" is this rule; no background job rewrites anything.
+- *habit* `daily` / `weekdays` → `.due` on matching days, `.doneToday` once ticked.
+- *habit* `timesPerWeek(n)` → `.due` until it has check-ins on n distinct days this
+  ISO week; then `.satisfiedThisWeek`. A week where n is no longer reachable still
+  shows it as `.due`: doing one is fine, and "behind" is never shown.
+- **Hidden from Today:** `.satisfiedThisWeek` items, unless ticked today.
+- Items ticked today **stay visible until rollover**, so the rating row and undo
+  work, and finishing a goal never makes it vanish under the pointer.
+- The `done/total` title counts exactly the visible items.
 
 Adding a schedule kind later (every N days, monthly) means one enum case plus a
 property test. It needs no schema migration, because the schedule is stored as
@@ -154,8 +187,8 @@ Every mutation is a named command with input validation, one transaction, a
 ChangeLog entry, and an attributed `source`:
 
 `AddItem`, `EditItem`, `CheckIn`, `VoidCheckIn`, `Rate`, `PlanForToday`,
-`MoveToLater`, `ArchiveItem`, `ImportExternal(batch)`, `RecordProgress`,
-`SetReminder`, `Export`.
+`MoveToLater`, `ArchiveItem`, `SetReminder`, `Export`; later
+`ImportExternal(batch)`, `RecordProgress` (v1.1), `Reflect` (v1.2).
 
 Queries are read models: `Today`, `Later(filter)`, `History(range)`,
 `Goal(id)`, `Recap(range)`.
@@ -175,19 +208,36 @@ Queries are read models: `Today`, `Later(filter)`, `History(range)`,
 GRDB `ValueObservation`, so the list updates live when the extension or agent
 writes. Every action is a command; the UI has no business logic.
 
-**Notifications.** This adapter is a **reconciler**, not a scheduler. On any change
-or day rollover it computes the *desired* set of pending notifications from
-reminders + due state, diffs it against what is actually pending, and adds or removes
-the difference. It is idempotent, survives restarts, and respects OS limits on pending
-notifications by keeping a rolling window. Notification actions (Open / Done /
-Later) dispatch the same commands as the UI.
+**Notifications.** This adapter is a **reconciler**, not a scheduler. It computes the
+*desired* set of pending requests for a **rolling 7-day window** from reminders, due
+state and summary settings. It diffs that against what is actually pending, and
+adds, replaces or removes the difference. Requests use stable identifiers, so
+replacing one is idempotent.
+- **When it runs:** at launch, after every command, on the rollover-hour timer, on
+  wake from sleep, and on clock or time-zone change. Timers can be late after sleep
+  or App Nap, so wake and launch are what guarantee correctness; the window means
+  tomorrow is already scheduled even if Clew does nothing overnight.
+- **Summary text is fixed when a request is scheduled**, so future evening summaries
+  are pre-scheduled with a **curated zero-tick line**. On a day's first tick, that
+  day's request is replaced with "k/N done", and replaced again on each later
+  change. A static "0/6 done" can therefore never fire. The morning "N today" is
+  replaced whenever that day's list changes.
+- Notification actions (Open / Done / Later) dispatch the same commands as the UI.
 
 **Gateway (v1.1).** HTTP on `127.0.0.1` only, `/v1` JSON:
 - **port:** a fixed preferred port, falling back through a small fixed range;
-  clients find it by probing `GET /v1/hello` across that range (no secrets returned);
+  clients find it by probing `GET /v1/hello` across that range;
 - **pairing once:** Settings shows a 6-digit code; the extension or `clew-mcp`
-  exchanges it for a scoped bearer token (`read`, `import`, `agent-output`),
-  stored in Keychain on Clew's side. Tokens are revocable per client;
+  exchanges it for a scoped bearer token (`read`, `import`, `agent-output`) **and a
+  per-install secret**. Tokens are stored in Keychain on Clew's side and are
+  revocable per client;
+- **the server proves itself before the client sends a token:** `hello` takes a
+  client nonce and returns `HMAC(secret, nonce)`. A client that cannot verify it
+  sends nothing. Without this, any local process squatting on the port could
+  harvest the token;
+- while the listener is active Clew holds a `ProcessInfo` activity assertion
+  against App Nap (still to be measured in v1.1). The extension cannot launch Clew,
+  so when Clew is unreachable it shows "Open Clew";
 - `Host` header must be `127.0.0.1:<port>` (DNS-rebinding defence);
 - `Origin` allowlist (the extension's ID), no wildcard CORS;
 - request/response schemas live in one JSON Schema file. Swift types and the
@@ -207,16 +257,17 @@ Later) dispatch the same commands as the UI.
   progress itself.
 
 **MCP server (v1.2).** `clew-mcp` is a tiny stdio executable. Its tools map 1:1 onto
-Gateway endpoints (`get_today`, `get_history`, `get_later`, `suggest_plan`,
-`add_to_later`, `recap_data`). It holds no logic, so Pi, Claude Code and anything
-else get identical behaviour. `clew-mcp` itself is not sandboxed, so if Clew is
+Gateway endpoints and are **read-only** (`get_today`, `get_history`, `get_later`,
+`recap_data`), plus writes into `AgentOutput` only (`post_suggestions`, under the
+`agent-output` scope). It has no tool that changes user data (ADR-4). It holds no
+logic, so Pi, Claude Code and anything else get identical behaviour. `clew-mcp` itself is not sandboxed, so if Clew is
 not running it launches it in the background (`open -g -b <bundle id>`) and
 retries once; only then does it report "Clew isn't running". Whether App Nap
 delays a menu bar app's listener is **unverified** and must be measured in v1.1.
 
 **AI agent (v1.2, ADR-5).** Designed in full in [AGENT.md](AGENT.md). In short:
 `clew-agent` is a bundled helper built on Pi's lower two layers (`pi-agent-core`
-+ `pi-ai`), compiled with Bun, shipped as an **optional download**, and spawned
++ `pi-ai`), compiled with Bun, **distribution form pending** (ADR-5), and spawned
 per job by a Swift `AgentRuntime` over stdio. It has no database access: tools are
 answered by Swift with read-only queries, and its JSON outputs are validated by
 Swift before being stored as `AgentOutput`. Clew works fully with it absent.
@@ -254,7 +305,10 @@ was false, because some fact fields change after insert.)
 | `CheckIn.rating` | last writer wins by `ratedAt` |
 | `CheckIn.voidedAt` | monotonic: voided on any device means voided everywhere |
 | Award | deterministic `id = hash(kind, itemId, milestone)`, so two devices earning the same milestone produce one row |
-| Item, Reminder, Settings | last writer wins per field, by `updatedAt` |
+| Plan | union by `id`; void is monotonic |
+| DayReflection | one row per `localDay`; last writer wins by `updatedAt` |
+| Item, Reminder, Settings | **row-level** last writer wins by `updatedAt` (every definition table has `updatedAt` + `deletedAt`). Field-level merge, if two devices editing different fields of one item ever matters, uses CKSyncEngine's server-record conflict callback with stored system fields; decided in v2 |
+| `Award.voidedAt` | monotonic |
 | ItemProgress | newest `observedAt` wins |
 | Deletes | tombstones (`deletedAt`), never hard deletes |
 
@@ -273,6 +327,9 @@ per table.
 - Rules are pure functions over facts: `rules(facts) -> [AwardCandidate]`.
 - When a candidate first appears it is **persisted as an `Award` fact** with
   `ruleVersion`. A later rule change never takes away a badge already earned.
+- **But undo does:** if the CheckIn that triggered an award is voided (e.g. an
+  accidental 30th tick), the award is voided with it, and re-earned on the real
+  30th tick.
 - **Awards are culture-neutral milestones; themes only change how they look.** Stored
   kinds are neutral (`goal.started`, `goal.halfway`, `goal.finished`,
   `total.milestone(n)`). A **RewardTheme** maps each kind to visuals and one
@@ -303,7 +360,8 @@ per table.
 
 - No server, account, or cloud in v1–v1.3.
 - No full event sourcing, CQRS buses, or plugin system.
-- No embedded LLM or API keys in the app.
+- No LLM calls from the app process. AI runs only in the optional `clew-agent`
+  helper (AGENT.md); its credentials live in the Keychain.
 - No Accessibility, CGEvent, or screen reading. If that is ever needed, it goes in a
   separate helper, never in the main app.
 - No multi-process database writers (see ADR-1).
@@ -312,7 +370,9 @@ per table.
 
 | Phase | Ships | New modules |
 |---|---|---|
-| v1 | Menu bar list, once/habit/goal, Later pile, ratings, reminders, summaries, export, backups | Domain, Core, Store, App |
+| v1a | Menu bar list, once/habit/goal, check-in + undo, Later pile (usable on day 1) | Domain, Core, Store, App |
+| v1b | Reminders + summaries (reconciler), launch at login, JSON export | Notifications adapter |
+| v1c | Ratings, "still want this?", rolling backups + staged restore | Backup service |
 | v1.1 | Chrome extension: YouTube Watch Later + progress, X bookmarks | Gateway, extension |
 | v1.2 | Evening question; AI daily coach, Later helper, daily dream; optional Reader | AgentRuntime, clew-agent, AgentOutput; clew-mcp |
 | v1.3 | Daruma goals, levels | Award rules |
@@ -350,6 +410,10 @@ and logins; (c) requiring Node: poor install experience. *Cost:* about 85 MB+ he
 (a compiled Bun hello-world measured 85 MB), mitigated by making it an optional
 download. *Revisit if:* the helper's size or the JIT entitlement blocks distribution.
 Users who run Pi themselves can still connect through `clew-mcp`.
+**⚠ Open (2026-11-08 review):** an "optional download" cannot be written into
+`Clew.app/Contents/Helpers`, because that breaks the app's code signature. A
+downloaded executable also conflicts with App Store rule 2.5.2. The distribution
+form is pending a decision; see AGENT.md §13.
 
 **ADR-6 Localhost HTTP for the extension.** *Alternative:* Chrome Native
 Messaging, which needs a host manifest written into Chrome's own directory (awkward

@@ -30,11 +30,12 @@ your record and says a little, kindly.
   usage `pi-ai` reports per job and refuses jobs that would exceed the cap, falling
   back to the non-AI behaviour.
 - The Later helper without the Reader works from titles, lengths and sources only.
+  Imported titles (YouTube, X) are **untrusted text**; see §4.
 
 ## 3. Runtime
 
 ```
-Clew.app (Swift)                               clew-agent (optional download)
+Clew.app (Swift)                               clew-agent (packaging: §13)
  AgentRuntime ── spawn per job ──stdio──▶  pi-agent-core  +  pi-ai
    │  ◀── toolCall {name,args}                  (loop, hooks)   (providers, login)
    │  ──▶ toolResult  (read-only ClewCore query)
@@ -45,8 +46,8 @@ Clew.app (Swift)                               clew-agent (optional download)
 
 - **clew-agent**: TypeScript on `@earendil-works/pi-agent-core` and `pi-ai`, with
   **exact versions pinned** (1.5.0 at time of writing). Compiled with Bun into one
-  executable, signed, inside `Clew.app/Contents/Helpers`, and installed only when a
-  switch is turned on. It is wrapped behind our own `AgentRuntime` protocol, so it
+  executable and signed. **How it ships is open (§13):** it cannot be downloaded
+  into the signed app bundle afterwards. It is wrapped behind our own `AgentRuntime` protocol, so it
   can be replaced without touching the rest of the app.
 - **Spawned per job, exits after.** No resident process and no database handle.
 - **Protocol:** newline-delimited JSON over stdio, versioned (`proto: 1`).
@@ -70,13 +71,25 @@ never reads the web.
 
 | | **Reader** | **Coach** (planner) |
 |---|---|---|
-| Sees | one item's URL and fetched content | history summaries, memory notes, mood answers, Reader outputs as plain fields |
-| Tools | `fetch_url` (GET, size-capped, text only) | `get_today`, `get_history(range)`, `get_later`, `get_notes` (all read-only) |
+| Sees | one item's URL and fetched content | a **snapshot Swift builds for the job**: history aggregates, memory digest, mood answers, item fields |
+| Tools | `fetch_url` (GET, size-capped, text only) | **none**. Swift already knows each job's inputs, so the Coach gets them up front: fewer turns, fewer tokens, nothing to misuse |
 | Never | sees Clew data, mood, notes | fetches the web |
 | Writes | `Enrichment` for that item | `Recap`, `Suggestions`, `QuickStart`, memory note ops |
 
 Reader output reaches the Coach only as **validated, length-capped fields**
 (summary ≤ 140 chars, minutes, energy, ≤ 3 tags), never as raw page text.
+
+**Untrusted text is broader than web pages.** Imported titles and notes (X
+bookmarks, YouTube titles) and Reader outputs were all written or shaped by
+strangers. Rules:
+- In Coach snapshots, untrusted fields are quoted and tagged `untrusted: true`.
+  They may appear only in short-lived outputs (today's suggestions), which are
+  validated and expire.
+- **The Dream never receives untrusted text.** Its inputs are facts, user-typed
+  titles, kinds, durations, ratings and reflections. Persistent memory therefore
+  cannot be poisoned by a bookmarked tweet.
+- Memory notes are length-capped. A note that reads like an instruction (imperative
+  phrasing aimed at the model) is rejected by the validator.
 
 ## 5. Inputs
 
@@ -124,12 +137,14 @@ Both answers are facts (`DayReflection`), owned by the user, never by the agent.
 ## 7. Output validation (Swift, before anything is stored or shown)
 
 1. JSON matches the job's schema; unknown fields are rejected.
-2. Length caps (above) and language (system language; English first).
+2. Length caps (above) and language (English in v1.2; the system language later, §12).
 3. Every `itemId` exists and is in the allowed set for that job (e.g. Later items only).
 4. **Banned content:** comparisons with other people ("than most", "other
    people", "average user"…), streak or guilt language ("you missed", "broke",
    "failed"), medical or diagnostic terms. This is a word-list check plus a rule in
-   the prompt; a failure drops the output.
+   the prompt; a failure drops the output. **Item titles are masked before the
+   check**, so an item called "Fix broken build" or "Read ADHD paper" never causes a
+   false rejection.
 5. On any failure: use the non-AI fallback, and log the reason, never the content, in debug.
 
 ## 8. Memory (after Anthropic's "components of agent memory")
@@ -199,7 +214,12 @@ deliberately broken prompt or validator.
 
 ## 13. Open questions
 
-None currently open.
+1. **How `clew-agent` ships.** The 2026-11-08 review showed that the planned
+   "optional download into `Contents/Helpers`" breaks the app's code signature, and
+   a downloaded executable conflicts with App Store rule 2.5.2. Options: (a) always
+   bundled, signed at build time (+~85 MB+ for everyone); (b) a separate, signed
+   companion app the user installs to enable AI; (c) drop the Bun helper and call
+   provider HTTP APIs from Swift (smaller, but loses `pi-ai`'s providers and logins).
 
 Decided 2026-11-08: the memory page is debug-only; the Reader runs on request by
 default, with automatic reading as an opt-in setting.
