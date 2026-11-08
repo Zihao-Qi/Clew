@@ -214,11 +214,12 @@ not running it launches it in the background (`open -g -b <bundle id>`) and
 retries once; only then does it report "Clew isn't running". Whether App Nap
 delays a menu bar app's listener is **unverified** and must be measured in v1.1.
 
-**AI agent (v1.2, ADR-5).** The agent is a **client outside the app**, not embedded:
-a sandboxed app cannot launch `pi` with the user's config. A user-level launchd job
-(installed by an opt-in script) runs `pi -p` at the recap times with only the Clew
-MCP tools enabled. It posts the recap back through the Gateway, and the menu bar
-shows it as one short line.
+**AI agent (v1.2, ADR-5).** Designed in full in [AGENT.md](AGENT.md). In short:
+`clew-agent` is a bundled helper built on Pi's lower two layers (`pi-agent-core`
++ `pi-ai`), compiled with Bun, shipped as an **optional download**, and spawned
+per job by a Swift `AgentRuntime` over stdio. It has no database access: tools are
+answered by Swift with read-only queries, and its JSON outputs are validated by
+Swift before being stored as `AgentOutput`. Clew works fully with it absent.
 
 **Dayflow connector (v2).** Outbound only, driven by `ChangeLog.seq` with a stored
 cursor. It sends `X-Dayflow-Mutation-Id` so replays are safe. The mapping (CheckIn
@@ -313,7 +314,7 @@ per table.
 |---|---|---|
 | v1 | Menu bar list, once/habit/goal, Later pile, ratings, reminders, summaries, export, backups | Domain, Core, Store, App |
 | v1.1 | Chrome extension: YouTube Watch Later + progress, X bookmarks | Gateway, extension |
-| v1.2 | AI recap + quick-start suggestions via Pi | clew-mcp, launchd job, Suggestions |
+| v1.2 | Evening question; AI daily coach, Later helper, daily dream; optional Reader | AgentRuntime, clew-agent, AgentOutput; clew-mcp |
 | v1.3 | Daruma goals, levels | Award rules |
 | v2 | Dayflow connector, iPhone + iCloud, Obsidian export | Sync, iOS UI |
 
@@ -340,9 +341,15 @@ agent writes directly, which is faster but risks silent list churn that undermin
 trust. Automatic ingestion (e.g. new Watch Later videos into Later) belongs to
 the *import* path (extension, `import` scope), not the agent.
 
-**ADR-5 Agent runs outside the sandbox, as a client.** *Alternative:* embed an LLM
-client in the app with an API key. That would work in the App Store, but would
-duplicate Pi and pull keys and model choice into Clew.
+**ADR-5 Agent is a bundled helper on Pi's lower layers** (revised 2026-11-08).
+`pi-ai` brings every provider and the ChatGPT login; `pi-agent-core` brings the
+loop and a pre-tool-call hook. *Rejected:* (a) the user's own `pi` CLI via launchd
+(first draft): fine for one power user, too heavy for the public, and the coding
+layer is unwanted; (b) rewriting a provider layer in Swift: loses Pi's providers
+and logins; (c) requiring Node: poor install experience. *Cost:* about 85 MB+ helper
+(a compiled Bun hello-world measured 85 MB), mitigated by making it an optional
+download. *Revisit if:* the helper's size or the JIT entitlement blocks distribution.
+Users who run Pi themselves can still connect through `clew-mcp`.
 
 **ADR-6 Localhost HTTP for the extension.** *Alternative:* Chrome Native
 Messaging, which needs a host manifest written into Chrome's own directory (awkward
@@ -354,4 +361,4 @@ remains an option for an App Store build.
 1. Distribution: Mac App Store is possible but unlikely (2026-11-08). The sandbox
    stays on anyway as a no-regret choice; the store-vs-Developer-ID decision waits
    until public release.
-2. Which agent tasks to build first (§6 AI agent). Under discussion.
+2. Agent open questions are tracked in [AGENT.md](AGENT.md) §13.
