@@ -36,20 +36,21 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
 2. **Item kinds.**
    - *Once*: done on a chosen day; if not done, it quietly moves to tomorrow.
    - *Repeating*: daily, chosen weekdays, or N times per week.
-   - *Counted goal*: a total (e.g. 30 videos). Today's step is `+1` (or a
-     set step). The bar shows lifetime progress; the item counts as done today
-     once you've added at least one step.
+   - *Counted goal*: a total (e.g. 30 videos). One click is `+1`; click again
+     to log more. The bar shows lifetime progress; the item counts as done today
+     once you've added at least one.
 3. **Links.** Any item can have a URL. `↗` opens it in the default browser.
 4. **Done in one click.** Click `○` to mark it done (counted goals: +1). A 1–3 rating
-   row then appears inline; it's optional and dismisses itself.
+   row then appears inline every time; it's optional and disappears after a few
+   seconds if ignored.
 5. **Later pile.** Saving a link (paste into `+ add`, or choose "Later") puts it
    in a hidden pile. Its count is shown, its contents aren't. "Pick 1–3 for today"
    moves items onto the list. Items untouched for 6 weeks get a one-tap
    "still want this?". Saying no counts as a win.
 6. **Gentle reminders** (optional, per item, off by default). One notification at
    a chosen time with **Open / Done / Later** actions. No repeats, no escalation.
-7. **Day summaries** (each optional): morning "6 today", evening "5/6 done".
-   Short, friendly, never a list of failures.
+7. **Day summaries** (each optional): morning "6 today" at 9:00, evening "5/6 done"
+   at 21:00, both changeable. Short, friendly, never a list of failures.
 8. **Local data.** A SQLite database (GRDB) in Application Support. One-click JSON
    export. No account, no network.
 9. **Launch at login** (`SMAppService`), toggled in a small Settings window.
@@ -83,13 +84,16 @@ tests pass. Clew records active days locally (a day with at least one tick) and
 shows them only in Settings. Until that bar is met, the next work is fixing whatever
 stopped daily use, not adding features.
 
-## Open questions
+## Decisions (2026-11-08)
 
-1. Week start: Monday or Sunday? Does "3× per week" reset on that day?
-2. Counted goals: is the default daily step always 1, or set per goal?
-3. Should rating be asked every time, or only for counted goals and Later items?
-4. Which hotkey, if any, opens the list?
-5. Do the morning and evening summary times default to 9:00 and 21:00?
+- Weeks start on **Monday**; "N× per week" items reset then.
+- A counted goal's step is always **+1** per click.
+- The rating row is offered **every time**, and is always skippable.
+- Summary defaults: **9:00** and **21:00**, off until switched on.
+
+## Open question
+
+1. Which global hotkey, if any, opens the list? (v1 can ship without one.)
 
 ## Tech
 
