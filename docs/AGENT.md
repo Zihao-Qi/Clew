@@ -24,7 +24,7 @@ your record and says a little, kindly.
 |---|---|---|
 | **Daily coach** | Evening recap line with encouragement; quick-start hints; daily dream | ~2 calls/day |
 | **Later helper** | "3 that fit tonight" from the Later pile, each with a short reason | ~1 call/day |
-| **Reader** | Opens a link: summary, minutes, energy needed, key points, and help while reading | Most expensive; per item, or automatically for new Later items |
+| **Reader** | Opens a link: summary, minutes, energy needed, key points, and help while reading | Most expensive; **on request per item by default**; automatic for new Later items is an opt-in setting |
 
 - **Monthly token cap** in Settings, with usage shown next to it. Swift totals the
   usage `pi-ai` reports per job and refuses jobs that would exceed the cap, falling
@@ -107,7 +107,7 @@ Both answers are facts (`DayReflection`), owned by the user, never by the agent.
 | **Dream** | right after Recap, daily | memory note ops (§8) |
 | **Later suggestions** | morning, and when Later is opened (cached for the day) | `Suggestions [{itemId, reason ≤ 80}] ≤ 3` |
 | **Quick start** | when an item is opened and has no hint yet | `QuickStart { step ≤ 100 chars }`: a 2-minute first action (from AAHD) |
-| **Read** | on demand, or for new Later items if the Reader is on | `Enrichment { summary, minutes, energy: light/focus, tags, keyPoints? }` |
+| **Read** | on request (default), or for every new Later item if "read automatically" is on | `Enrichment { summary, minutes, energy: light/focus, tags, keyPoints? }` |
 
 **How the Coach decides what to say.** These are the starting rules; tune from feedback.
 - **Adjust the load to the day:** after a less pleasant day, suggest 1 light item,
@@ -151,8 +151,9 @@ Purpose-directed rather than rule-driven: the dream prompt says what the memory 
 *for* (better-fitting, kinder suggestions), not what to record.
 
 - **No approval step.** The memory updates itself.
-- **Visibility:** shown **only in debug mode** for now ("What Clew noticed",
-  read-only). Whether regular users see it is decided before public release.
+- **Visibility:** shown **only in debug mode** ("What Clew noticed", read-only).
+  Regular users do not see it (decided 2026-11-08); "Delete agent data" (§11) still
+  clears it.
 - Notes are agent-owned (`AgentOutput.notes`). Deleting them never touches user facts.
 
 ## 9. Safety boundaries
@@ -197,5 +198,6 @@ deliberately broken prompt or validator.
 ## 13. Open questions
 
 1. The distress pointer in §9: adopt it, and with which threshold and wording?
-2. Should regular users see the memory page? (Decide before public release.)
-3. Should the Reader run automatically on every new Later item, or only on request?
+
+Decided 2026-11-08: the memory page is debug-only; the Reader runs on request by
+default, with automatic reading as an opt-in setting.
