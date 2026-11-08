@@ -267,7 +267,7 @@ delays a menu bar app's listener is **unverified** and must be measured in v1.1.
 
 **AI agent (v1.2, ADR-5).** Designed in full in [AGENT.md](AGENT.md). In short:
 `clew-agent` is a bundled helper built on Pi's lower two layers (`pi-agent-core`
-+ `pi-ai`), compiled with Bun, **distribution form pending** (ADR-5), and spawned
++ `pi-ai`), compiled with Bun, **bundled in the app** (ADR-5), and spawned
 per job by a Swift `AgentRuntime` over stdio. It has no database access: tools are
 answered by Swift with read-only queries, and its JSON outputs are validated by
 Swift before being stored as `AgentOutput`. Clew works fully with it absent.
@@ -407,13 +407,13 @@ loop and a pre-tool-call hook. *Rejected:* (a) the user's own `pi` CLI via launc
 (first draft): fine for one power user, too heavy for the public, and the coding
 layer is unwanted; (b) rewriting a provider layer in Swift: loses Pi's providers
 and logins; (c) requiring Node: poor install experience. *Cost:* about 85 MB+ helper
-(a compiled Bun hello-world measured 85 MB), mitigated by making it an optional
-download. *Revisit if:* the helper's size or the JIT entitlement blocks distribution.
+(a compiled Bun hello-world measured 85 MB), accepted for now. *Revisit if:* the helper's size or the JIT entitlement blocks distribution.
 Users who run Pi themselves can still connect through `clew-mcp`.
-**⚠ Open (2026-11-08 review):** an "optional download" cannot be written into
-`Clew.app/Contents/Helpers`, because that breaks the app's code signature. A
-downloaded executable also conflicts with App Store rule 2.5.2. The distribution
-form is pending a decision; see AGENT.md §13.
+**Packaging (decided 2026-11-08):** the helper is **bundled and signed at build
+time** inside `Contents/Helpers`, for everyone. Review showed that an "optional
+download" into the signed bundle breaks the code signature, and that a downloaded
+executable conflicts with App Store rule 2.5.2. *For the public release, revisit:*
+a separate signed "Clew AI" companion app, so users without AI don't pay the size.
 
 **ADR-6 Localhost HTTP for the extension.** *Alternative:* Chrome Native
 Messaging, which needs a host manifest written into Chrome's own directory (awkward

@@ -35,7 +35,7 @@ your record and says a little, kindly.
 ## 3. Runtime
 
 ```
-Clew.app (Swift)                               clew-agent (packaging: §13)
+Clew.app (Swift)                               clew-agent (bundled helper)
  AgentRuntime ── spawn per job ──stdio──▶  pi-agent-core  +  pi-ai
    │  ◀── toolCall {name,args}                  (loop, hooks)   (providers, login)
    │  ──▶ toolResult  (read-only ClewCore query)
@@ -46,8 +46,8 @@ Clew.app (Swift)                               clew-agent (packaging: §13)
 
 - **clew-agent**: TypeScript on `@earendil-works/pi-agent-core` and `pi-ai`, with
   **exact versions pinned** (1.5.0 at time of writing). Compiled with Bun into one
-  executable and signed. **How it ships is open (§13):** it cannot be downloaded
-  into the signed app bundle afterwards. It is wrapped behind our own `AgentRuntime` protocol, so it
+  executable, **bundled and signed at build time** in `Clew.app/Contents/Helpers`.
+  It ships to everyone, but runs only when a switch is on. It is wrapped behind our own `AgentRuntime` protocol, so it
   can be replaced without touching the rest of the app.
 - **Spawned per job, exits after.** No resident process and no database handle.
 - **Protocol:** newline-delimited JSON over stdio, versioned (`proto: 1`).
@@ -214,12 +214,11 @@ deliberately broken prompt or validator.
 
 ## 13. Open questions
 
-1. **How `clew-agent` ships.** The 2026-11-08 review showed that the planned
-   "optional download into `Contents/Helpers`" breaks the app's code signature, and
-   a downloaded executable conflicts with App Store rule 2.5.2. Options: (a) always
-   bundled, signed at build time (+~85 MB+ for everyone); (b) a separate, signed
-   companion app the user installs to enable AI; (c) drop the Bun helper and call
-   provider HTTP APIs from Swift (smaller, but loses `pi-ai`'s providers and logins).
+None currently open.
+
+Decided 2026-11-08: `clew-agent` is bundled at build time (an optional download
+would break the code signature). Revisit before public release: a separate signed
+"Clew AI" companion app. The memory page stays debug-only.
 
 Decided 2026-11-08: the memory page is debug-only; the Reader runs on request by
 default, with automatic reading as an opt-in setting.
