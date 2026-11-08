@@ -203,6 +203,11 @@ private struct Harness {
         #expect(try h.clew.today().rows.first?.lifetimeAmount == 1)
     }
 
+    @Test func voidingAnUnknownCheckInIsAnError() {
+        let h = Harness()
+        #expect(throws: ClewError.checkInNotFound) { try h.clew.voidCheckIn(id: UUID(), reason: "x") }
+    }
+
     @Test func voidingTwiceIsANoOp() throws {
         let h = Harness()
         let item = try h.clew.addItem(NewItem(title: "x", shape: .habit(.daily)))

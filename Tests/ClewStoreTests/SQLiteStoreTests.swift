@@ -116,8 +116,11 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         let item = sampleItem()
         let c = sampleCheckIn(item)
         let p = Plan(id: UUID(), itemId: item.id, localDay: day("2026-11-11"), at: t0, source: .user)
+        var other = sampleItem()
+        other.id = UUID(uuidString: "00000000-0000-0000-0000-0000000000AA")!
         try store.write { w in
             try w.insert(item)
+            try w.insert(other)
             try w.insert(c)
             try w.insert(p)
         }
@@ -126,7 +129,7 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
 
     @Test(arguments: [
         "localDay = '2026-11-12'", "amount = 3", "at = '2030-01-01 00:00:00.000'",
-        "timeZoneId = 'UTC'", "source = 'dayflow'", "itemId = 'X'",
+        "timeZoneId = 'UTC'", "source = 'dayflow'", "itemId = '00000000-0000-0000-0000-0000000000AA'",
     ])
     func checkInSubstanceCannotChange(_ assignment: String) throws {
         let (store, c, _) = try seeded()
@@ -182,7 +185,7 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         #expect(stored?.voidReason == "undo")
     }
 
-    @Test(arguments: ["localDay = '2026-11-12'", "itemId = 'X'", "at = '2030-01-01 00:00:00.000'", "source = 'dayflow'"])
+    @Test(arguments: ["localDay = '2026-11-12'", "itemId = '00000000-0000-0000-0000-0000000000AA'", "at = '2030-01-01 00:00:00.000'", "source = 'dayflow'"])
     func planSubstanceCannotChange(_ assignment: String) throws {
         let (store, _, p) = try seeded()
         #expect(throws: DatabaseError.self) {

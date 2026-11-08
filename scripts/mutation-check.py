@@ -98,6 +98,9 @@ M = [
  ("D27 ticked any day", D+"Today.swift", "let tickedToday = facts.amount(on: day) > 0", "let tickedToday = facts.recent.contains { !$0.isVoided }", "ClewDomainTests"),
  ("D28 weekday decode", D+"Item.swift", "self = .weekdays(Set(try c.decode([Weekday].self, forKey: .days)))", "self = .weekdays([.monday])", "ClewDomainTests"),
  ("C31 undo returns stale", C+"Clew.swift", "return try w.checkIn(id: last.id)", "return last", "ClewCoreTests"),
+ ("S18 itemId mutable", S+"Schema.swift", "            WHEN NEW.id IS NOT OLD.id OR NEW.itemId IS NOT OLD.itemId\n              OR NEW.localDay IS NOT OLD.localDay OR NEW.at IS NOT OLD.at\n              OR NEW.timeZoneId", "            WHEN NEW.id IS NOT OLD.id\n              OR NEW.localDay IS NOT OLD.localDay OR NEW.at IS NOT OLD.at\n              OR NEW.timeZoneId", "ClewStoreTests"),
+ ("C32 void unknown ok", C+"Clew.swift", "guard let checkIn = try w.checkIn(id: id) else { throw ClewError.checkInNotFound }", "guard let checkIn = try w.checkIn(id: id) else { return }", "ClewCoreTests"),
+ ("D29 rollover absolute", D+"LocalDay.swift", "return calendar.date(from: components) ?? instant.addingTimeInterval(3600)", "return calendar.date(from: DateComponents(year: next.year, month: next.month, day: next.day))!.addingTimeInterval(Double(rolloverHour) * 3600)", "ClewDomainTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

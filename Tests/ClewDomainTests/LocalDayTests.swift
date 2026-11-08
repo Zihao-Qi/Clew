@@ -97,4 +97,11 @@ let newYork = TimeZone(identifier: "America/New_York")!
         let early = nextRollover(after: instant(2026, 11, 10, 2, zone: "America/New_York"), in: newYork, rolloverHour: 4)
         #expect(early == instant(2026, 11, 10, 4, zone: "America/New_York"))
     }
+
+    @Test func nextRolloverOnDSTDaysIsWallClockFour() {
+        // Spring forward (Mar 8): 04:00 EDT is 08:00 UTC, only 3 hours after midnight.
+        #expect(nextRollover(after: utc(2026, 3, 8, 4), in: newYork, rolloverHour: 4) == utc(2026, 3, 8, 8))
+        // Fall back (Nov 1): 04:00 EST is 09:00 UTC, 5 hours after midnight.
+        #expect(nextRollover(after: utc(2026, 11, 1, 5), in: newYork, rolloverHour: 4) == utc(2026, 11, 1, 9))
+    }
 }

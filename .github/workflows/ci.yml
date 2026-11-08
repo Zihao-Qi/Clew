@@ -15,8 +15,8 @@ jobs:
     container: swift:6.2
     steps:
       - uses: actions/checkout@v4
-      - name: Install SQLite headers (GRDB builds with the package)
-        run: apt-get update && apt-get install -y libsqlite3-dev
+      - name: Install SQLite headers (GRDB builds with the package) and time zones
+        run: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y libsqlite3-dev tzdata
       - name: Domain and Core tests
         run: swift test --filter 'ClewDomainTests|ClewCoreTests'
 
