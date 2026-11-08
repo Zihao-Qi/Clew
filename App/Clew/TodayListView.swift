@@ -85,6 +85,14 @@ struct RowView: View {
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
                     .accessibilityLabel(Text("\(row.lifetimeAmount) of \(target)"))
+                // Undo is one click away (SPEC §4), and kept apart from the circle so
+                // rapid +1s cannot hit it by mistake.
+                Button { model.undo(row) } label: { Image(systemName: "minus") }
+                    .buttonStyle(.borderless)
+                    .opacity(row.todayAmount > 0 ? 1 : 0)
+                    .disabled(row.todayAmount == 0)
+                    .accessibilityHidden(row.todayAmount == 0)
+                    .accessibilityLabel(Text("Remove one from \(item.title)"))
             }
 
             if let url = item.url {

@@ -50,7 +50,7 @@ enum Snapshot {
     }
 
     private static func render(_ view: some View, appearance: NSAppearance.Name, to file: URL) {
-        let host = NSHostingView(rootView: view)
+        let host = NSHostingView(rootView: view.background(Color(nsColor: .windowBackgroundColor)))
         host.appearance = NSAppearance(named: appearance)
         let size = host.fittingSize
         let window = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless],
