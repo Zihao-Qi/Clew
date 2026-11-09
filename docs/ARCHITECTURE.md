@@ -95,7 +95,8 @@ CheckIn         id, itemId, localDay, at (UTC), timeZoneId, amount (default 1),
                 rating? (1–3), ratedAt?, source, voidedAt?, voidReason?
 Plan            id, itemId, localDay, at, source, voidedAt?   ← "picked for today", kept as history
 GoalRound       id, itemId, startedAt, localDay, target, source, voidedAt?   ← "next round" of a goal
-Reminder        id, itemId, time (local), weekdays, enabled, updatedAt, deletedAt?
+Reminder        id, itemId, time (hour, minute; local), enabled, updatedAt, deletedAt?
+                ← at most one live reminder per item; it fires on the item's due days
 Settings        key (PK), value (JSON), updatedAt
 — later phases —
 ItemProgress    itemId (PK), fraction (0–1), observedAt, source   (v1.1) ← latest only, e.g. YouTube watch %
@@ -239,7 +240,15 @@ replacing one is idempotent.
   day's request is replaced with "k/N done", and replaced again on each later
   change. A static "0/6 done" can therefore never fire. The morning "N today" is
   replaced whenever that day's list changes.
-- Notification actions (Open / Done / Later) dispatch the same commands as the UI.
+- Notification actions (Open / Done / Later) dispatch the same commands as the UI,
+  with `source = notification`.
+- **Split (v1b):** `NotificationPlanner` (Core, pure, Linux-tested) plans the window
+  and diffs id → fingerprint maps; the app adapter only renders localized text,
+  reads what is pending and applies the difference, touching only `clew.` ids.
+  At most 64 requests are kept (the system's per-app limit), earliest first. The
+  curated zero-tick lines live in the app's String Catalog.
+- **Permission** is asked the first time a summary or reminder is switched on, never
+  at launch. If it is off in System Settings, Settings and the reminder row say so.
 
 **Gateway (v1.1).** HTTP on `127.0.0.1` only, `/v1` JSON:
 - **port:** a fixed preferred port, falling back through a small fixed range;

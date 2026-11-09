@@ -25,6 +25,8 @@ final class FakeStore: ClewStore, @unchecked Sendable {
         var checkIns: [UUID: CheckIn] = [:]
         var plans: [UUID: Plan] = [:]
         var rounds: [UUID: GoalRound] = [:]
+        var reminders: [UUID: Reminder] = [:]
+        var settings: [String: SettingRecord] = [:]
     }
 
     enum FactViolation: Error { case revoid, duplicate, missingItem }
@@ -113,8 +115,25 @@ final class FakeStore: ClewStore, @unchecked Sendable {
                 items: state.items.values.sorted { ($0.createdAt, $0.id.uuidString) < ($1.createdAt, $1.id.uuidString) },
                 checkIns: state.checkIns.values.sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) },
                 plans: state.plans.values.sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) },
-                goalRounds: state.rounds.values.sorted { ($0.startedAt, $0.id.uuidString) < ($1.startedAt, $1.id.uuidString) }
+                goalRounds: state.rounds.values.sorted { ($0.startedAt, $0.id.uuidString) < ($1.startedAt, $1.id.uuidString) },
+                reminders: state.reminders.values.sorted { ($0.updatedAt, $0.id.uuidString) < ($1.updatedAt, $1.id.uuidString) },
+                settings: state.settings.values.sorted { $0.key < $1.key }
             )
+        }
+        func reminders() throws -> [Reminder] {
+            state.reminders.values.filter { $0.deletedAt == nil }.sorted { $0.itemId.uuidString < $1.itemId.uuidString }
+        }
+        func setting(_ key: String) throws -> String? { state.settings[key]?.value }
+        func save(_ reminder: Reminder) throws {
+            guard state.items[reminder.itemId] != nil else { throw FactViolation.missingItem }
+            if reminder.deletedAt == nil,
+               state.reminders.values.contains(where: { $0.itemId == reminder.itemId && $0.deletedAt == nil && $0.id != reminder.id }) {
+                throw FactViolation.duplicate
+            }
+            state.reminders[reminder.id] = reminder
+        }
+        func saveSetting(_ key: String, json: String, updatedAt: Date) throws {
+            state.settings[key] = SettingRecord(key: key, value: json, updatedAt: updatedAt)
         }
 
         func insert(_ item: Item) throws {

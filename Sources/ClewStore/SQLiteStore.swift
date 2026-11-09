@@ -36,7 +36,8 @@ public final class SQLiteStore: ClewStore {
     }
 
     public func observeChanges(_ onChange: @escaping @Sendable () -> Void) -> any StoreObservation {
-        let observation = DatabaseRegionObservation(tracking: Table("item"), Table("checkIn"), Table("plan"), Table("goalRound"))
+        let observation = DatabaseRegionObservation(tracking: Table("item"), Table("checkIn"), Table("plan"), Table("goalRound"),
+                                                     Table("reminder"), Table("settings"))
         let cancellable = observation.start(in: writer, onError: { _ in }, onChange: { _ in onChange() })
         return Observation(cancellable)
     }
@@ -167,7 +168,45 @@ private struct Access: StoreWriter {
             items: try Row.fetchAll(db, sql: "SELECT * FROM item ORDER BY createdAt, id").map(Self.item),
             checkIns: try Row.fetchAll(db, sql: "SELECT * FROM checkIn ORDER BY at, id").map(Self.checkIn),
             plans: try Row.fetchAll(db, sql: "SELECT * FROM plan ORDER BY at, id").map(Self.plan),
-            goalRounds: try Row.fetchAll(db, sql: "SELECT * FROM goalRound ORDER BY startedAt, id").map(Self.goalRound)
+            goalRounds: try Row.fetchAll(db, sql: "SELECT * FROM goalRound ORDER BY startedAt, id").map(Self.goalRound),
+            reminders: try Row.fetchAll(db, sql: "SELECT * FROM reminder ORDER BY updatedAt, id").map(Self.reminder),
+            settings: try Row.fetchAll(db, sql: "SELECT * FROM settings ORDER BY key").map { row in
+                SettingRecord(key: try Self.required(row, "key", table: "settings"),
+                              value: try Self.required(row, "value", table: "settings"),
+                              updatedAt: try Self.required(row, "updatedAt", table: "settings"))
+            }
+        )
+    }
+
+    func reminders() throws -> [Reminder] {
+        try Row.fetchAll(db, sql: "SELECT * FROM reminder WHERE deletedAt IS NULL ORDER BY itemId").map(Self.reminder)
+    }
+
+    func setting(_ key: String) throws -> String? {
+        try String.fetchOne(db, sql: "SELECT value FROM settings WHERE key = ?", arguments: [key])
+    }
+
+    func save(_ r: Reminder) throws {
+        try db.execute(
+            sql: """
+                INSERT INTO reminder (id, itemId, hour, minute, enabled, updatedAt, deletedAt)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET itemId = excluded.itemId, hour = excluded.hour,
+                    minute = excluded.minute, enabled = excluded.enabled, updatedAt = excluded.updatedAt,
+                    deletedAt = excluded.deletedAt
+                """,
+            arguments: [r.id.uuidString, r.itemId.uuidString, r.time.hour, r.time.minute, r.enabled, r.updatedAt,
+                        r.deletedAt]
+        )
+    }
+
+    func saveSetting(_ key: String, json: String, updatedAt: Date) throws {
+        try db.execute(
+            sql: """
+                INSERT INTO settings (key, value, updatedAt) VALUES (?, ?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value, updatedAt = excluded.updatedAt
+                """,
+            arguments: [key, json, updatedAt]
         )
     }
 
@@ -309,6 +348,20 @@ private struct Access: StoreWriter {
         )
     }
 
+    private static func reminder(_ row: Row) throws -> Reminder {
+        let t = "reminder"
+        guard let time = TimeOfDay(hour: try required(row, "hour", table: t), minute: try required(row, "minute", table: t))
+        else { throw StoreError.corruptRow(table: t, column: "hour") }
+        return Reminder(
+            id: try uuid(row, "id", table: t),
+            itemId: try uuid(row, "itemId", table: t),
+            time: time,
+            enabled: try required(row, "enabled", table: t),
+            updatedAt: try required(row, "updatedAt", table: t),
+            deletedAt: row["deletedAt"]
+        )
+    }
+
     private static func plan(_ row: Row) throws -> Plan {
         let t = "plan"
         return Plan(
@@ -321,7 +374,7 @@ private struct Access: StoreWriter {
         )
     }
 
-    private static func required<T: DatabaseValueConvertible>(_ row: Row, _ column: String, table: String) throws -> T {
+    fileprivate static func required<T: DatabaseValueConvertible>(_ row: Row, _ column: String, table: String) throws -> T {
         guard let value: T = row[column] else { throw StoreError.corruptRow(table: table, column: column) }
         return value
     }

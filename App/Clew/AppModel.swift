@@ -30,7 +30,11 @@ final class AppModel {
     /// the list at rollover anyway.
     private(set) var dismissedCelebrations: Set<UUID> = []
 
+    /// True when the user turned Clew's notifications off in System Settings.
+    private(set) var notificationsDenied = false
+
     @ObservationIgnored private var clew: Clew?
+    @ObservationIgnored private var notifications: NotificationsAdapter?
     @ObservationIgnored private var observation: (any StoreObservation)?
     @ObservationIgnored private var rolloverTimer: Timer?
     @ObservationIgnored private var systemObservers: [NSObjectProtocol] = []
@@ -46,8 +50,12 @@ final class AppModel {
         }
     }
 
-    init(clew: Clew?) {
+    /// `notify: false` keeps a model (e.g. the debug snapshot's) away from real notifications.
+    init(clew: Clew?, notify: Bool = true) {
         self.clew = clew
+        if notify, clew != nil {
+            notifications = NotificationsAdapter { [weak self] action in self?.handle(action) }
+        }
         observation = clew?.observeChanges { [weak self] in
             Task { @MainActor in self?.refresh() }
         }
@@ -78,6 +86,57 @@ final class AppModel {
             notice = String(localized: "Couldn't load today's list.")
         }
         scheduleRollover()
+        reconcileNotifications()
+    }
+
+    /// Runs after every refresh: launch, every command, rollover, wake, and clock or
+    /// time-zone change (ARCHITECTURE §6).
+    private func reconcileNotifications() {
+        guard let clew, let notifications, let plan = try? clew.plannedNotifications() else { return }
+        notifications.reconcile(plan)
+    }
+
+    // MARK: - Notifications
+
+    func reminder(for itemId: UUID) -> Reminder? { try? clew?.reminder(forItem: itemId) }
+    func summaries() -> SummarySettings { (try? clew?.summaries()) ?? .defaults }
+
+    @discardableResult
+    func setReminder(_ itemId: UUID, _ time: TimeOfDay?) -> Bool {
+        if time != nil { askForNotifications() }
+        return run { try $0.setReminder(itemId: itemId, time: time) }
+    }
+
+    func setSummaries(_ settings: SummarySettings) {
+        if settings.morningEnabled || settings.eveningEnabled { askForNotifications() }
+        run { try $0.setSummaries(settings) }
+    }
+
+    /// Permission is asked the first time something could notify, never at launch.
+    private func askForNotifications() {
+        guard let notifications else { return }
+        Task {
+            let granted = await notifications.requestPermission()
+            notificationsDenied = !granted
+            if granted { refresh() }
+        }
+    }
+
+    func checkNotificationPermission() {
+        guard let notifications, let clew, (try? clew.wantsNotifications()) == true else {
+            notificationsDenied = false
+            return
+        }
+        Task { notificationsDenied = await notifications.isDenied() }
+    }
+
+    private func handle(_ action: NotificationsAdapter.Action) {
+        switch action {
+        case .done(let id): run { try $0.checkIn(itemId: id, source: .notification) }
+        case .later(let id): run { try $0.moveToLater(itemId: id) }
+        case .open(let id):
+            if let url = today?.rows.first(where: { $0.id == id })?.item.url { open(url) }
+        }
     }
 
     func activeDays() -> ActiveDays? { try? clew?.activeDays() }

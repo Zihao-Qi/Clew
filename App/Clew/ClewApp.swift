@@ -11,6 +11,9 @@ struct ClewApp: App {
         if let link = ProcessInfo.processInfo.environment["CLEW_FETCH_TITLE"] {
             Snapshot.fetchTitleAndExit(link)
         }
+        if ProcessInfo.processInfo.environment["CLEW_RECONCILE_TEST"] != nil {
+            Snapshot.reconcileTestAndExit()
+        }
         if ProcessInfo.processInfo.environment["CLEW_RENDER_PNG"] != nil {
             Snapshot.renderAndExit()
         }

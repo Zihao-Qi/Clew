@@ -1,5 +1,6 @@
 import AppKit
 import ClewCore
+import ClewDomain
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -13,6 +14,7 @@ struct SettingsView: View {
     @State private var loginMessage: String?
     @State private var activeDays: ActiveDays?
     @State private var exportMessage: String?
+    @State private var summaries = SummarySettings.defaults
 
     var body: some View {
         Form {
@@ -27,6 +29,20 @@ struct SettingsView: View {
                         Button("Open Login Items") { LoginItem.openLoginItemsSettings() }
                     }
                 }
+            }
+
+            Section {
+                summaryRow(Text("Morning"), enabled: \.morningEnabled, time: \.morningTime)
+                summaryRow(Text("Evening"), enabled: \.eveningEnabled, time: \.eveningTime)
+                if model.notificationsDenied {
+                    NotificationsOffNotice()
+                }
+            } header: {
+                Text("Summaries")
+            } footer: {
+                Text("Morning: how many are on today's list. Evening: how many are done.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section {
@@ -67,7 +83,27 @@ struct SettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in reload() }
     }
 
+    private func summaryRow(_ label: Text, enabled: WritableKeyPath<SummarySettings, Bool>,
+                            time: WritableKeyPath<SummarySettings, TimeOfDay>) -> some View {
+        HStack {
+            Toggle(isOn: Binding(get: { summaries[keyPath: enabled] }, set: { on in
+                summaries[keyPath: enabled] = on
+                model.setSummaries(summaries)
+            })) { label }
+            Spacer()
+            DatePicker(selection: Binding(get: { summaries[keyPath: time].pickerDate }, set: { date in
+                summaries[keyPath: time] = TimeOfDay(pickerDate: date)
+                model.setSummaries(summaries)
+            }), displayedComponents: .hourAndMinute) { label }
+                .labelsHidden()
+                .disabled(!summaries[keyPath: enabled])
+                .accessibilityLabel(Text("Time"))
+        }
+    }
+
     private func reload() {
+        summaries = model.summaries()
+        model.checkNotificationPermission()
         openAtLogin = LoginItem.isEnabled
         if LoginItem.needsApproval {
             loginMessage = String(localized: "Allow Clew in System Settings › General › Login Items.")

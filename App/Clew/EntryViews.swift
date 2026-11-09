@@ -221,6 +221,9 @@ struct EditView: View {
     @State private var link: String
     @State private var schedule: ScheduleDraft
     @State private var target: Int
+    @State private var remind: Bool
+    @State private var remindAt: TimeOfDay
+    private let existingReminder: Reminder?
 
     init(model: AppModel, item: Item, done: @escaping () -> Void) {
         self.model = model
@@ -230,6 +233,10 @@ struct EditView: View {
         _link = State(initialValue: item.url?.absoluteString ?? "")
         _schedule = State(initialValue: ScheduleDraft(item.schedule))
         _target = State(initialValue: item.progress.target ?? 30)
+        let reminder = model.reminder(for: item.id)
+        existingReminder = reminder
+        _remind = State(initialValue: reminder != nil)
+        _remindAt = State(initialValue: reminder?.time ?? TimeOfDay(hour: 18, minute: 0)!)
     }
 
     private var hasSchedule: Bool { item.kind == .habit || item.kind == .goal }
@@ -247,6 +254,10 @@ struct EditView: View {
             }
             if item.kind == .goal {
                 TargetField(target: $target)
+            }
+            ReminderRow(enabled: $remind, time: $remindAt)
+            if model.notificationsDenied, remind {
+                NotificationsOffNotice()
             }
 
             NoticeView(text: model.notice)
@@ -278,7 +289,12 @@ struct EditView: View {
             schedule: hasSchedule ? schedule.schedule : nil,
             target: item.kind == .goal ? target : nil
         )
-        if model.edit(item.id, edit) { done() }
+        guard model.edit(item.id, edit) else { return }
+        let wanted: TimeOfDay? = remind ? remindAt : nil
+        if wanted != existingReminder?.time {
+            guard model.setReminder(item.id, wanted) else { return }
+        }
+        done()
     }
 }
 
@@ -368,5 +384,49 @@ struct PickView: View {
                 if on { if !picked.contains(id) { picked.append(id) } } else { picked.removeAll { $0 == id } }
             }
         )
+    }
+}
+
+extension TimeOfDay {
+    /// Today at this time, for a DatePicker (display only; Core works with TimeOfDay).
+    var pickerDate: Date {
+        Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: Date()) ?? Date()
+    }
+
+    init(pickerDate date: Date) {
+        let c = Calendar.current.dateComponents([.hour, .minute], from: date)
+        self = TimeOfDay(hour: c.hour ?? 9, minute: c.minute ?? 0) ?? TimeOfDay(hour: 9, minute: 0)!
+    }
+}
+
+/// "Remind me [18:00]": one gentle notification on each day the item is on the list.
+struct ReminderRow: View {
+    @Binding var enabled: Bool
+    @Binding var time: TimeOfDay
+
+    var body: some View {
+        HStack {
+            Toggle("Remind me", isOn: $enabled)
+                .accessibilityLabel(Text("Remind me"))
+            if enabled {
+                DatePicker(selection: Binding(get: { time.pickerDate }, set: { time = TimeOfDay(pickerDate: $0) }),
+                           displayedComponents: .hourAndMinute) { Text("Reminder time") }
+                    .labelsHidden()
+                    .accessibilityLabel(Text("Reminder time"))
+            }
+            Spacer()
+        }
+    }
+}
+
+struct NotificationsOffNotice: View {
+    var body: some View {
+        HStack {
+            Text("Notifications are off for Clew.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            Button("Turn on…") { NotificationsAdapter.openSystemSettings() }
+                .accessibilityLabel(Text("Open notification settings"))
+        }
     }
 }

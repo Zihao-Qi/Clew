@@ -69,6 +69,8 @@ public final class Clew: Sendable {
     private let clock: any Clock
     var storeForQueries: any ClewStore { store }
     var clockForQueries: any Clock { clock }
+    var zonesForQueries: any TimeZoneSource { zones }
+    func newID() -> UUID { makeID() }
     private let zones: any TimeZoneSource
     private let makeID: @Sendable () -> UUID
     /// Day rollover hour (default 04:00, ARCHITECTURE §4.3).

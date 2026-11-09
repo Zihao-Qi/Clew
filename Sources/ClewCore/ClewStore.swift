@@ -37,6 +37,10 @@ public protocol StoreReader {
     func activeDays(from: LocalDay) throws -> Set<LocalDay>
     /// Every row, including soft-deleted items and voided facts, for export.
     func allRecords() throws -> ExportRecords
+    /// Reminders that are not soft-deleted.
+    func reminders() throws -> [Reminder]
+    /// A setting's stored JSON, or nil if never set.
+    func setting(_ key: String) throws -> String?
 }
 
 /// Everything Clew stores, as it is stored.
@@ -45,12 +49,32 @@ public struct ExportRecords: Hashable, Sendable, Codable {
     public var checkIns: [CheckIn]
     public var plans: [Plan]
     public var goalRounds: [GoalRound]
+    public var reminders: [Reminder]
+    public var settings: [SettingRecord]
 
-    public init(items: [Item], checkIns: [CheckIn], plans: [Plan], goalRounds: [GoalRound]) {
+    public init(items: [Item], checkIns: [CheckIn], plans: [Plan], goalRounds: [GoalRound],
+                reminders: [Reminder] = [], settings: [SettingRecord] = []) {
         self.items = items
         self.checkIns = checkIns
         self.plans = plans
         self.goalRounds = goalRounds
+        self.reminders = reminders
+        self.settings = settings
+    }
+
+    private enum CodingKeys: String, CodingKey { case items, checkIns, plans, goalRounds, reminders, settings }
+
+    /// `reminders` and `settings` arrived after the first exports; older files read as empty.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            items: try c.decode([Item].self, forKey: .items),
+            checkIns: try c.decode([CheckIn].self, forKey: .checkIns),
+            plans: try c.decode([Plan].self, forKey: .plans),
+            goalRounds: try c.decode([GoalRound].self, forKey: .goalRounds),
+            reminders: try c.decodeIfPresent([Reminder].self, forKey: .reminders) ?? [],
+            settings: try c.decodeIfPresent([SettingRecord].self, forKey: .settings) ?? []
+        )
     }
 }
 
@@ -63,4 +87,20 @@ public protocol StoreWriter: StoreReader {
     func voidCheckIn(id: UUID, at: Date, reason: String) throws
     func insert(_ plan: Plan) throws
     func insert(_ round: GoalRound) throws
+    /// Inserts, or replaces the row with the same id.
+    func save(_ reminder: Reminder) throws
+    func saveSetting(_ key: String, json: String, updatedAt: Date) throws
+}
+
+/// A row of the `settings` table: a definition with last-writer-wins by `updatedAt`.
+public struct SettingRecord: Hashable, Sendable, Codable {
+    public var key: String
+    public var value: String
+    public var updatedAt: Date
+
+    public init(key: String, value: String, updatedAt: Date) {
+        self.key = key
+        self.value = value
+        self.updatedAt = updatedAt
+    }
 }

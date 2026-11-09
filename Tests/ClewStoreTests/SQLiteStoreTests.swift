@@ -333,6 +333,57 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
     }
 }
 
+@Suite struct ReminderStoreTests {
+    private func reminder(_ item: Item, id: UUID = UUID(), deleted: Bool = false) -> Reminder {
+        Reminder(id: id, itemId: item.id, time: TimeOfDay(hour: 18, minute: 30)!, updatedAt: t0, deletedAt: deleted ? t0 : nil)
+    }
+
+    @Test func oneLiveReminderPerItem_tombstonesDoNotCount() throws {
+        let store = try SQLiteStore.inMemory()
+        let item = sampleItem()
+        let first = reminder(item)
+        try store.write { w in
+            try w.insert(item)
+            try w.save(first)
+        }
+        #expect(throws: DatabaseError.self) { try store.write { try $0.save(reminder(item)) } }
+        var gone = first
+        gone.deletedAt = t0
+        try store.write { try $0.save(gone) } // update by id
+        let second = reminder(item)
+        try store.write { try $0.save(second) }
+        #expect(try store.read { try $0.reminders() } == [second])
+        #expect(throws: DatabaseError.self) { try store.writer.write { try $0.execute(sql: "DELETE FROM reminder") } }
+        #expect(try store.read { try $0.allRecords() }.reminders.count == 2)
+    }
+
+    @Test func settingsUpsertByKey() throws {
+        let store = try SQLiteStore.inMemory()
+        #expect(try store.read { try $0.setting("summaries") } == nil)
+        try store.write { try $0.saveSetting("summaries", json: #"{"a":1}"#, updatedAt: t0) }
+        try store.write { try $0.saveSetting("summaries", json: #"{"a":2}"#, updatedAt: t0.addingTimeInterval(1)) }
+        #expect(try store.read { try $0.setting("summaries") } == #"{"a":2}"#)
+        #expect(try store.read { try $0.allRecords() }.settings == [SettingRecord(key: "summaries", value: #"{"a":2}"#, updatedAt: t0.addingTimeInterval(1))])
+    }
+
+    @Test func exportCarriesRemindersAndSettings_andOldExportsStillDecode() throws {
+        let store = try SQLiteStore.inMemory()
+        let item = sampleItem()
+        try store.write { w in
+            try w.insert(item)
+            try w.save(reminder(item))
+            try w.saveSetting("summaries", json: "{}", updatedAt: t0)
+        }
+        let data = try ExportDocument(exportedAt: t0, records: try store.read { try $0.allRecords() }).encoded()
+        let back = try ExportDocument.decode(data)
+        #expect(back.records.reminders.count == 1 && back.records.settings.count == 1)
+        #expect(try back.encoded() == data)
+        // A v1b-1 export has no reminders or settings keys.
+        let old = #"{"clewExportVersion":1,"exportedAt":"2027-01-15T08:00:00.000Z","records":{"items":[],"checkIns":[],"plans":[],"goalRounds":[]}}"#
+        #expect(try ExportDocument.decode(Data(old.utf8)).records.reminders.isEmpty)
+    }
+}
+
 /// The command layer end to end on the real database.
 @Suite struct CommandsOnSQLiteTests {
     struct Clock: ClewDomain.Clock { let date: Date; func now() -> Date { date } }
