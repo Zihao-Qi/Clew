@@ -204,6 +204,18 @@ M = [
  ("R15 drop before when down", C+"Clew.swift", "        return from < to\n            ? (target, to + 1 < order.count ? order[to + 1] : nil)", "        return from < to\n            ? (to > 0 ? order[to - 1] : nil, target)", "ClewCoreTests"),
  ("R16 no lower bound", C+"Clew.swift", "min(max(translation, list.minY - row.minY), list.maxY - row.maxY)", "max(translation, list.minY - row.minY)", "ClewCoreTests"),
  ("R17 no upper bound", C+"Clew.swift", "min(max(translation, list.minY - row.minY), list.maxY - row.maxY)", "min(translation, list.maxY - row.maxY)", "ClewCoreTests"),
+ ("L1 asks at 43", D+"Facts.swift", "public static let askAfterDays = 42", "public static let askAfterDays = 43", "ClewDomainTests|ClewCoreTests"),
+ ("L2 negative wait", D+"Facts.swift", "max(0, today.ordinal - lastTouched.ordinal)", "today.ordinal - lastTouched.ordinal", "ClewDomainTests"),
+ ("L3 keep ignored", C+"LaterReviews.swift", "let touched = max(item.updatedAt, lastKeep ?? item.updatedAt)", "let touched = item.updatedAt; _ = lastKeep", "ClewCoreTests"),
+ ("L4 created not touched", C+"LaterReviews.swift", "let touched = max(item.updatedAt, lastKeep ?? item.updatedAt)", "let touched = max(item.createdAt, lastKeep ?? item.createdAt)", "ClewCoreTests"),
+ ("L5 wall day", C+"LaterReviews.swift", "let day = LocalDay(of: touched, in: zone, rolloverHour: rolloverHour)", "let day = LocalDay(of: touched, in: zone, rolloverHour: 0)", "ClewCoreTests"),
+ ("L6 let go keeps item", C+"LaterReviews.swift", "            guard decision == .letGo else { return }\n            item.deletedAt = now", "            guard decision == .letGo else { return }\n            _ = item", "ClewCoreTests"),
+ ("L7 let go keeps reminder", C+"LaterReviews.swift", "            if var reminder = try w.reminders().first(where: { $0.itemId == itemId }) {\n                reminder.deletedAt = now", "            if var reminder = try w.reminders().first(where: { $0.itemId == itemId }) {\n                _ = reminder.deletedAt", "ClewCoreTests"),
+ ("L8 review any state", C+"LaterReviews.swift", "            guard item.state == .later else { throw ClewError.notAllowed }\n            try w.insert(LaterReview", "            try w.insert(LaterReview", "ClewCoreTests"),
+ ("S37 keeps counted", S+"SQLiteStore.swift", "SELECT COUNT(*) FROM laterReview WHERE decision = 'letGo' AND voidedAt IS NULL", "SELECT COUNT(*) FROM laterReview WHERE voidedAt IS NULL", "ClewStoreTests"),
+ ("S38 voided counted", S+"SQLiteStore.swift", "SELECT COUNT(*) FROM laterReview WHERE decision = 'letGo' AND voidedAt IS NULL", "SELECT COUNT(*) FROM laterReview WHERE decision = 'letGo'", "ClewStoreTests"),
+ ("S39 review mutable", S+"Schema.swift", "WHEN NEW.id IS NOT OLD.id OR NEW.itemId IS NOT OLD.itemId OR NEW.decision IS NOT OLD.decision\n              OR NEW.at IS NOT OLD.at", "WHEN NEW.id IS NOT OLD.id OR NEW.itemId IS NOT OLD.itemId\n              OR NEW.at IS NOT OLD.at", "ClewStoreTests"),
+ ("S40 review deletable", S+"Schema.swift", "CREATE TRIGGER laterReview_no_delete BEFORE DELETE ON laterReview\n            BEGIN", "CREATE TRIGGER laterReview_no_delete BEFORE DELETE ON laterReview WHEN 0\n            BEGIN", "ClewStoreTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

@@ -148,9 +148,16 @@ final class AppModel {
 
     func exportData() -> Data? { try? clew?.exportDocument().encoded() }
 
-    func laterItems() -> [Item] {
-        (try? clew?.laterItems()) ?? []
+    func laterPile() -> [LaterEntry] { (try? clew?.laterPile()) ?? [] }
+    func lettingGoCount() -> Int { (try? clew?.lettingGoCount()) ?? 0 }
+    func keepLater(_ id: UUID) { run { try $0.keepLater(itemId: id) } }
+
+    /// Letting go is a win (SPEC §5), and the line says so.
+    func letGo(_ id: UUID) {
+        guard run({ try $0.letGo(itemId: id) }) else { return }
+        showConfirmation(String(localized: "Let go — that's a win too."))
     }
+
 
     // MARK: - Commands
 
@@ -191,7 +198,10 @@ final class AppModel {
 
     /// Later is hidden, so say where the item went (SPEC §5).
     func confirmSavedToLater() {
-        let text = String(localized: "Saved to Later (\(laterCount))")
+        showConfirmation(String(localized: "Saved to Later (\(laterCount))"))
+    }
+
+    private func showConfirmation(_ text: String) {
         confirmation = text
         confirmationTask?.cancel()
         confirmationTask = Task { [weak self] in

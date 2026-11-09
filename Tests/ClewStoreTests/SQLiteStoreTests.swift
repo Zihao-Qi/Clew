@@ -384,6 +384,36 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
     }
 }
 
+@Suite struct LaterReviewStoreTests {
+    private func review(_ item: Item, _ decision: LaterReview.Decision) -> LaterReview {
+        LaterReview(id: UUID(), itemId: item.id, decision: decision, at: t0, localDay: day("2026-11-09"), source: .user)
+    }
+
+    @Test func reviewsAreFactsAndOnlyLiveLetGosCount() throws {
+        let store = try SQLiteStore.inMemory()
+        let a = sampleItem(.link, state: .later), b = sampleItem(.link, state: .later)
+        let gone = review(a, .letGo), kept = review(b, .keep), voided = review(b, .letGo)
+        try store.write { w in
+            try w.insert(a)
+            try w.insert(b)
+            for r in [gone, kept, voided] { try w.insert(r) }
+        }
+        try store.writer.write { try $0.execute(sql: "UPDATE laterReview SET voidedAt = ? WHERE id = ?", arguments: [t0, voided.id.uuidString]) }
+        #expect(try store.read { try $0.letGoCount() } == 1)
+        #expect(try store.read { try $0.laterReviews(itemIds: [b.id]) }.map(\.id) == [kept.id])
+        for assignment in ["decision = 'keep'", "at = '2030-01-01 00:00:00.000'", "localDay = '2026-11-10'", "source = 'dayflow'"] {
+            #expect(throws: DatabaseError.self) {
+                try store.writer.write { try $0.execute(sql: "UPDATE laterReview SET \(assignment) WHERE id = ?", arguments: [gone.id.uuidString]) }
+            }
+        }
+        #expect(throws: DatabaseError.self) { try store.writer.write { try $0.execute(sql: "DELETE FROM laterReview") } }
+        #expect(throws: DatabaseError.self) {
+            try store.writer.write { try $0.execute(sql: "UPDATE laterReview SET voidedAt = NULL WHERE id = ?", arguments: [voided.id.uuidString]) }
+        }
+        #expect(try store.read { try $0.allRecords() }.laterReviews.count == 3)
+    }
+}
+
 /// The command layer end to end on the real database.
 @Suite struct CommandsOnSQLiteTests {
     struct Clock: ClewDomain.Clock { let date: Date; func now() -> Date { date } }

@@ -13,6 +13,7 @@ struct SettingsView: View {
     @State private var openAtLogin = LoginItem.isEnabled
     @State private var loginMessage: String?
     @State private var activeDays: ActiveDays?
+    @State private var letGoCount = 0
     @State private var exportMessage: String?
     @State private var summaries = SummarySettings.defaults
 
@@ -54,8 +55,13 @@ struct SettingsView: View {
                 } label: {
                     Text("Active days")
                 }
+                LabeledContent {
+                    Text(verbatim: "\(letGoCount)").monospacedDigit()
+                } label: {
+                    Text("Let go from Later")
+                }
             } footer: {
-                Text("A day with at least one tick.")
+                Text("A day with at least one tick. Letting go of what you no longer want counts as a win.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -114,6 +120,7 @@ struct SettingsView: View {
             loginMessage = String(localized: "Allow Clew in System Settings › General › Login Items.")
         }
         activeDays = model.activeDays()
+        letGoCount = model.lettingGoCount()
     }
 
     private func setOpenAtLogin(_ on: Bool) {

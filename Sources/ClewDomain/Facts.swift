@@ -84,3 +84,43 @@ public struct Plan: Hashable, Sendable, Identifiable, Codable {
         self.voidedAt = voidedAt
     }
 }
+
+/// "Still want this?" for a Later item that waited 6+ weeks (SPEC §5): the user kept it
+/// (its 6 weeks start again) or let it go (a win, not a failure; the item is removed).
+public struct LaterReview: Hashable, Sendable, Identifiable, Codable {
+    public enum Decision: String, Codable, Sendable { case keep, letGo }
+
+    public let id: UUID
+    public let itemId: UUID
+    public let decision: Decision
+    public let at: Date
+    public let localDay: LocalDay
+    public let source: Source
+    public var voidedAt: Date?
+
+    public init(id: UUID, itemId: UUID, decision: Decision, at: Date, localDay: LocalDay, source: Source,
+                voidedAt: Date? = nil) {
+        self.id = id
+        self.itemId = itemId
+        self.decision = decision
+        self.at = at
+        self.localDay = localDay
+        self.source = source
+        self.voidedAt = voidedAt
+    }
+}
+
+/// How long a Later item has waited, and whether to ask "still want this?".
+public enum LaterAge {
+    /// SPEC §5: items untouched for 6 weeks get a one-tap "still want this?".
+    public static let askAfterDays = 42
+
+    /// Days since the item was last touched: saved, edited, moved to Later, or kept.
+    public static func daysWaiting(lastTouched: LocalDay, today: LocalDay) -> Int {
+        max(0, today.ordinal - lastTouched.ordinal)
+    }
+
+    public static func asksStillWant(daysWaiting: Int) -> Bool {
+        daysWaiting >= askAfterDays
+    }
+}

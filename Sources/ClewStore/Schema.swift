@@ -8,7 +8,36 @@ enum Schema {
         migrator.registerMigration("v1", migrate: v1)
         migrator.registerMigration("v2-rounds-titleOrigin", migrate: v2)
         migrator.registerMigration("v3-reminders-settings", migrate: v3)
+        migrator.registerMigration("v4-later-reviews", migrate: v4)
         return migrator
+    }
+
+    /// "Still want this?" answers: a fact (never updated in substance, never deleted).
+    private static func v4(_ db: Database) throws {
+        try db.execute(sql: """
+            CREATE TABLE laterReview (
+                id        TEXT PRIMARY KEY NOT NULL,
+                itemId    TEXT NOT NULL REFERENCES item(id),
+                decision  TEXT NOT NULL CHECK (decision IN ('keep', 'letGo')),
+                at        DATETIME NOT NULL,
+                localDay  TEXT NOT NULL,
+                source    TEXT NOT NULL,
+                voidedAt  DATETIME
+            );
+            CREATE INDEX laterReview_item ON laterReview(itemId);
+
+            CREATE TRIGGER laterReview_no_delete BEFORE DELETE ON laterReview
+            BEGIN SELECT RAISE(ABORT, 'facts are never deleted'); END;
+
+            CREATE TRIGGER laterReview_substance_immutable BEFORE UPDATE ON laterReview
+            WHEN NEW.id IS NOT OLD.id OR NEW.itemId IS NOT OLD.itemId OR NEW.decision IS NOT OLD.decision
+              OR NEW.at IS NOT OLD.at OR NEW.localDay IS NOT OLD.localDay OR NEW.source IS NOT OLD.source
+            BEGIN SELECT RAISE(ABORT, 'fact substance is immutable'); END;
+
+            CREATE TRIGGER laterReview_void_monotonic BEFORE UPDATE ON laterReview
+            WHEN OLD.voidedAt IS NOT NULL AND NEW.voidedAt IS NOT OLD.voidedAt
+            BEGIN SELECT RAISE(ABORT, 'voids are monotonic'); END;
+            """)
     }
 
     /// Reminders and settings: definitions (row-level last writer wins by updatedAt;
