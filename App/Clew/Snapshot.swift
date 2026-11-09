@@ -184,7 +184,7 @@ enum Snapshot {
         let now = clock.date
         for daysAgo in stride(from: 70, through: 1, by: -1) where daysAgo % 3 != 0 && daysAgo % 7 != 5 {
             clock.date = now.addingTimeInterval(-Double(daysAgo) * 86_400)
-            for _ in 0..<(daysAgo % 4 == 0 ? 3 : 1) { try? clew.checkIn(itemId: course.id) }
+            for _ in 0..<(daysAgo % 4 == 0 ? 3 : 1) { _ = try? clew.checkIn(itemId: course.id) }
         }
         clock.date = now
         try clew.startNextRound(itemId: course.id)

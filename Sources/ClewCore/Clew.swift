@@ -365,13 +365,30 @@ public final class Clew: Sendable {
         }
     }
 
-    /// The row a dragged row is over: the one (other than itself) whose vertical span
-    /// holds the dragged row's centre after moving `offset` points. `spans` are each
-    /// visible row's (minY, maxY), top to bottom.
-    public static func rowUnderDrag(dragged: UUID, offset: Double, spans: [(id: UUID, minY: Double, maxY: Double)]) -> UUID? {
-        guard let own = spans.first(where: { $0.id == dragged }) else { return nil }
-        let y = (own.minY + own.maxY) / 2 + offset
-        return spans.first { $0.id != dragged && $0.minY <= y && y < $0.maxY }?.id
+    /// Where a dragged row would land: the index of the row (in the list as it was when
+    /// the drag began) under the pointer. Above the first row is 0, below the last is
+    /// the last index. `spans` are each row's (minY, maxY), top to bottom.
+    public static func dragSlot(pointerY: Double, spans: [(minY: Double, maxY: Double)]) -> Int? {
+        guard let first = spans.first, let last = spans.last else { return nil }
+        if pointerY < first.minY { return 0 }
+        if pointerY >= last.maxY { return spans.count - 1 }
+        return spans.firstIndex { $0.minY <= pointerY && pointerY < $0.maxY }
+    }
+
+    /// Keeps a dragged row inside the list: it may move up until its top meets the first
+    /// row's top, and down until its bottom meets the last row's bottom (never over the
+    /// footer).
+    public static func clampDrag(translation: Double, row: (minY: Double, maxY: Double),
+                                 list: (minY: Double, maxY: Double)) -> Double {
+        min(max(translation, list.minY - row.minY), list.maxY - row.maxY)
+    }
+
+    /// How far row `index` slides while the row at `from` is dragged to slot `to`: the
+    /// rows in between make room by the dragged row's height, the rest stay put.
+    public static func dragShift(index: Int, from: Int, to: Int, draggedHeight: Double) -> Double {
+        if from < to, index > from, index <= to { return -draggedHeight }
+        if to < from, index >= to, index < from { return draggedHeight }
+        return 0
     }
 
     /// Where a dragged row lands when dropped onto `target` in `order` (today's visible
