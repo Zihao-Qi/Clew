@@ -5,8 +5,30 @@ import Foundation
 /// stranger; it is only ever shown as a title, and recorded as `.fetched`.
 public enum PageTitle {
     public static func extract(fromHTML html: String) -> String? {
+        let metas = metaContents(html)
+        let titleTag = groups(#"<title[^>]*>([\s\S]*?)</title>"#, in: html).first?.first
+        for candidate in [metas["og:title"], metas["twitter:title"], metas["title"], titleTag] {
+            if let raw = candidate, let title = QuickEntry.cleanTitle(decodeEntities(raw)) {
+                return title
+            }
+        }
+        return nil
+    }
+
+    /// Whether a page read so far already holds a complete `<meta property="og:title">`
+    /// with a usable value, so the fetcher can stop. `</head>` is no signal: YouTube
+    /// playlist pages have one inside a script about 50 KB before their real title.
+    public static func hasOpenGraphTitle(_ prefix: Data) -> Bool {
+        guard prefix.range(of: Data("og:title".utf8)) != nil else { return false } // cheap pre-check
+        let html = String(decoding: prefix, as: UTF8.self)
+        return metaContents(html)["og:title"].flatMap { QuickEntry.cleanTitle(decodeEntities($0)) } != nil
+    }
+
+    /// `property`/`name` → `content` of every complete `<meta>` tag; the first wins.
+    /// Quoted values may contain `>`.
+    private static func metaContents(_ html: String) -> [String: String] {
         var metas: [String: String] = [:]
-        for tag in matches(#"<meta\s[^>]*>"#, in: html) {
+        for tag in matches(#"<meta\s(?:[^>"']|"[^"]*"|'[^']*')*>"#, in: html) {
             var attributes: [String: String] = [:]
             for pair in groups(#"([a-zA-Z][\w:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')"#, in: tag) {
                 attributes[pair[0].lowercased()] = pair[1].isEmpty ? pair[2] : pair[1]
@@ -16,13 +38,7 @@ public enum PageTitle {
             else { continue }
             metas[key] = content
         }
-        let titleTag = groups(#"<title[^>]*>([\s\S]*?)</title>"#, in: html).first?.first
-        for candidate in [metas["og:title"], metas["twitter:title"], metas["title"], titleTag] {
-            if let raw = candidate, let title = QuickEntry.cleanTitle(decodeEntities(raw)) {
-                return title
-            }
-        }
-        return nil
+        return metas
     }
 
     static func decodeEntities(_ text: String) -> String {

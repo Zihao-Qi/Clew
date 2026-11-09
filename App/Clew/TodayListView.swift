@@ -21,7 +21,8 @@ struct TodayListView: View {
                     .padding(.vertical, 20)
             }
 
-            NoticeView(text: model.notice)
+            NoticeView(text: model.notice ?? model.confirmation)
+                .animation(.easeOut(duration: 0.4), value: model.notice ?? model.confirmation)
 
             Divider()
 
@@ -137,26 +138,28 @@ struct RowView: View {
                     .accessibilityHidden(row.todayAmount == 0)
                     .accessibilityLabel(Text("Remove one from \(item.title)"))
             }
-
-            if let url = item.url {
-                Button { model.open(url) } label: { Image(systemName: "arrow.up.right") }
-                    .buttonStyle(.borderless)
-                    .accessibilityLabel(Text("Open link for \(item.title)"))
-            }
         }
     }
 
-    /// With a link, the title itself opens it too.
+    /// A linked title opens its link; a small link mark says so (SPEC §3).
     @ViewBuilder private var titleView: some View {
         let text = Text(item.title)
             .lineLimit(1)
             .truncationMode(.tail)
             .foregroundStyle(row.isDone ? .secondary : .primary)
         if let url = item.url {
-            Button { model.open(url) } label: { text }
-                .buttonStyle(.plain)
-                .help(url.absoluteString)
-                .accessibilityLabel(Text("Open \(item.title)"))
+            Button { model.open(url) } label: {
+                HStack(spacing: 4) {
+                    text
+                    Image(systemName: "link")
+                        .imageScale(.small)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .buttonStyle(.plain)
+            .modifier(LinkPointer())
+            .help(url.absoluteString)
+            .accessibilityLabel(Text("Open \(item.title)"))
         } else {
             text.accessibilityAddTraits(row.isDone ? .isSelected : [])
         }
@@ -169,12 +172,24 @@ struct RowView: View {
     }
 }
 
+/// The pointing-hand cursor over a link (macOS 15+; older systems keep the tooltip).
+struct LinkPointer: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 15.0, *) {
+            content.pointerStyle(.link)
+        } else {
+            content
+        }
+    }
+}
+
 struct NoticeView: View {
     let text: String?
 
     var body: some View {
         if let text {
             Text(text)
+                .transition(.opacity)
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12)

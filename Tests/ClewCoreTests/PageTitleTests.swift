@@ -1,3 +1,4 @@
+import Foundation
 import ClewCore
 import Testing
 
@@ -33,5 +34,30 @@ import Testing
     @Test func noTitleIsNil() {
         #expect(PageTitle.extract(fromHTML: "<html><body>hi</body></html>") == nil)
         #expect(PageTitle.extract(fromHTML: "") == nil)
+    }
+}
+
+@Suite struct ReadEnoughTests {
+    @Test func aStrayHeadEndIsNotEnoughButACompleteOgTitleIs() {
+        // YouTube playlist shape: a "</head>" inside a script, then the real tags later.
+        let early = Data(#"<script>var s = "</head>";</script>"#.utf8)
+        #expect(!PageTitle.hasOpenGraphTitle(early))
+        let partial = early + Data(#"<meta property="og:title" content="CS224N"#.utf8)
+        #expect(!PageTitle.hasOpenGraphTitle(partial))
+        #expect(PageTitle.hasOpenGraphTitle(partial + Data(#"">"#.utf8)))
+    }
+
+    @Test func ogTitleTextOutsideAMetaTagIsNotEnough() {
+        #expect(!PageTitle.hasOpenGraphTitle(Data(#"<script>var x = "og:title"; if (a > b) {}</script>"#.utf8)))
+        #expect(!PageTitle.hasOpenGraphTitle(Data(#"<div class="og:title">x</div>"#.utf8)))
+        #expect(!PageTitle.hasOpenGraphTitle(Data(#"<meta property="og:title" content="  ">"#.utf8)))
+    }
+
+    @Test func aGreaterThanInsideTheTitleDoesNotEndTheTag() {
+        let partial = Data(#"<meta property="og:title" content="A > B"#.utf8)
+        #expect(!PageTitle.hasOpenGraphTitle(partial))
+        let full = #"<meta property="og:title" content="A > B">"#
+        #expect(PageTitle.hasOpenGraphTitle(Data(full.utf8)))
+        #expect(PageTitle.extract(fromHTML: full) == "A > B")
     }
 }

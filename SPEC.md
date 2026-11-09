@@ -21,8 +21,8 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
  ─────────────────────────────────────
  ✓ Exercise
  ✓ Apply to 1 job
- ○ ML course      ███████░░░░░░  10/30  −  ↗
- ○ Watch later    ████████░░░░    2/3   ↗
+ ○ ML course 🔗   ███████░░░░░░  10/30  −
+ ○ Watch later 🔗 ████████░░░░    2/3
  ✓ Read 1 article
  ○ Stretch
  ─────────────────────────────────────
@@ -46,18 +46,19 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
      *Next round* (same total, from zero), *Raise target*, or *Done* (it leaves the
      list after the day). Every round stays in the history; the Daruma's second eye
      comes in v1.3.
-3. **Links.** Any item can have a URL. `↗` or the title opens it in the default
-   browser. Pasting a link into `+ add` fills in the page's title, which you can
-   edit before saving.
+3. **Links.** Any item can have a URL. Clicking its title (marked with a small link
+   symbol) opens it in the default browser. Pasting a link into `+ add` fills in
+   the page's title, which you can edit before saving.
 4. **Done in one click.** Click `○` to mark it done (counted goals: +1). Three small
    rating dots then appear **inside the same row** every time. The row never changes
    height and the dots never cover the `+1` target, so rapid ticks can't mis-click.
    Optional; they fade after a few seconds. Ticked items stay visible until the day
    rolls over, so undo is always one click away.
-5. **Later pile.** Saving a link (paste into `+ add`, or choose "Later") puts it
-   in a hidden pile. Its count is shown, its contents aren't. "Pick 1–3 for today"
-   moves items onto the list. Items untouched for 6 weeks get a one-tap
-   "still want this?". Saying no counts as a win. Any item can be deleted (in Later:
+5. **Later pile.** Choosing "Later" in `+ add` puts an item (a link or not) in a
+   hidden pile, and a short line confirms it ("Saved to Later (13)"). A pasted link
+   goes to Today like anything else unless Later is chosen. The pile's count is
+   shown, its contents aren't. "Pick 1–3 for today" moves items onto the list.
+   Items untouched for 6 weeks get a one-tap "still want this?". Saying no counts as a win. Any item can be deleted (in Later:
    `×`; on Today: right-click). Delete hides it for good; its history is kept.
 6. **Gentle reminders** (optional, per item, off by default). One notification at
    a chosen time with **Open / Done / Later** actions. No repeats, no escalation.
@@ -105,6 +106,8 @@ stopped daily use, not adding features.
 - The rating row is offered **every time**, and is always skippable.
 - Counted goals have rounds; reaching the total stops counting until the user picks
   next round, a higher target, or done (2026-11-08, after first use).
+- A pasted link goes to Today by default, not Later; `↗` is replaced by a clickable
+  title with a link mark (2026-11-08, after first use).
 - Pasted links get their page title fetched (2026-11-08, after first use); this is
   the app's only network use.
 - The menu bar title is an icon plus `done/total`, not the word "Clew" (2026-11-08, v1a).
