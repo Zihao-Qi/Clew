@@ -115,8 +115,10 @@ struct SettingsView: View {
         .sheet(isPresented: $showingRestore) {
             RestoreSheet(entries: backupList) { entry in
                 showingRestore = false
-                restoreMessage = model.restore(entry)
-                reload()
+                Task {
+                    restoreMessage = await model.restore(entry)
+                    reload()
+                }
             } cancel: {
                 showingRestore = false
             }

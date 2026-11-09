@@ -37,7 +37,7 @@ final class AppModel {
     /// Set only for the real database (not for previews or the debug snapshot).
     @ObservationIgnored private var store: SQLiteStore?
     @ObservationIgnored private(set) var backups: Backups?
-    @ObservationIgnored private var backingUp = false
+    @ObservationIgnored private var backupTask: Task<Void, Never>?
     @ObservationIgnored private var notifications: NotificationsAdapter?
     @ObservationIgnored private var observation: (any StoreObservation)?
     @ObservationIgnored private var rolloverTimer: Timer?
@@ -112,12 +112,11 @@ final class AppModel {
 
     /// Once a day, off the main thread: launch, rollover, wake and every refresh check.
     private func backUpIfNeeded() {
-        guard let store, let backups, let clew, !backingUp else { return }
-        backingUp = true
+        guard let store, let backups, let clew, backupTask == nil else { return }
         let today = clew.currentDay()
-        Task.detached(priority: .utility) {
+        backupTask = Task.detached(priority: .utility) { [weak self] in
             _ = try? backups.backUpIfNeeded(store, today: today)
-            await MainActor.run { [weak self] in self?.backingUp = false }
+            await MainActor.run { self?.backupTask = nil }
         }
     }
 
@@ -126,7 +125,10 @@ final class AppModel {
     /// Restore: a safety copy of the current data, then the chosen backup is staged and
     /// checked, the database is closed, swapped and reopened. Nothing is swapped under
     /// an open database. Returns a sentence for the user.
-    func restore(_ entry: Backups.Entry) -> String {
+    func restore(_ entry: Backups.Entry) async -> String {
+        // A backup still running would finish after the swap and save the old data as
+        // today's backup; wait for it first.
+        await backupTask?.value
         guard let store, let backups, let clew else { return String(localized: "Restore isn't available.") }
         do {
             try backups.stageRestore(entry, current: store, today: clew.currentDay())

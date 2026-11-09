@@ -75,6 +75,18 @@ private struct Sandbox {
         #expect(box.backups.list().filter(\.isSafetyCopy).count == 2)
     }
 
+    @Test func safetyCopiesNeverOverwriteEachOther() throws {
+        let box = Sandbox()
+        let store = try SQLiteStore.open(at: box.db)
+        _ = try box.clew(store).addItem(NewItem(title: "A", shape: .habit(.daily)))
+        let today = day("2026-11-09")
+        var made: [String] = []
+        for _ in 0..<6 { made.append(try box.backups.safetyCopy(store, today: today).lastPathComponent) }
+        #expect(Set(made).count == 6)                                   // six distinct names
+        let kept = box.backups.list().filter(\.isSafetyCopy).map(\.url.lastPathComponent)
+        #expect(kept == Array(made.suffix(3).reversed()))               // the newest three, newest first
+    }
+
     @Test func aDamagedBackupIsRefusedAndNothingChanges() throws {
         let box = Sandbox()
         let store = try SQLiteStore.open(at: box.db)

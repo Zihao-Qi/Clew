@@ -229,6 +229,7 @@ M = [
  ("B10 damaged blocks launch", S+"SQLiteStore.swift", "        } catch BackupError.damaged {\n            // The staged copy was bad and has been discarded; the current data stays.\n        }", "        }", "ClewStoreTests"),
  ("B11 uncompressed", S+"Backups.swift", "try Self.compress(try Data(contentsOf: raw)).write(to: target, options: .atomic)", "try Data(contentsOf: raw).write(to: target, options: .atomic)", "ClewStoreTests"),
  ("B12 any name listed", S+"Backups.swift", "        return rest.hasPrefix(\"-before-restore\") ? (day, true) : nil", "        return (day, true)", "ClewStoreTests"),
+ ("B13 count-based names", S+"Backups.swift", "let n = (used.max() ?? 0) + 1", "let n = list().filter { $0.isSafetyCopy && $0.day == today }.count + 1 + 0 * used.count", "ClewStoreTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

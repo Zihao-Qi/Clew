@@ -153,12 +153,12 @@ enum Snapshot {
             _ = model.add(NewItem(title: "B", shape: .habit(.daily)))
             print("before restore:", titles())
             guard let backup = first.first else { print("FAIL: no backup"); exit(1) }
-            print("restore →", model.restore(backup))
+            print("restore →", await model.restore(backup))
             print("after restore:", titles())
             _ = model.add(NewItem(title: "C", shape: .habit(.daily)))   // the reopened database works
             print("after adding C:", titles())
             if let safety = model.backupList().first(where: \.isSafetyCopy) {
-                print("undo →", model.restore(safety))
+                print("undo →", await model.restore(safety))
                 print("after undo:", titles())
             }
             print("backups now:", model.backupList().map(\.url.lastPathComponent))

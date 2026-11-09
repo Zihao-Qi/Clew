@@ -49,7 +49,7 @@ public final class Backups: Sendable {
         .sorted { ($0.day, $0.isSafetyCopy ? 1 : 0, $0.url.lastPathComponent) > ($1.day, $1.isSafetyCopy ? 1 : 0, $1.url.lastPathComponent) }
     }
 
-    /// `clew-2026-11-09.backup` or `clew-2026-11-09-before-restore-<n>.backup`.
+    /// `clew-2026-11-09.backup` or `clew-2026-11-09-before-restore-007.backup`.
     static func parse(_ name: String) -> (LocalDay, Bool)? {
         guard name.hasPrefix("clew-"), name.hasSuffix(".backup") else { return nil }
         let core = name.dropFirst("clew-".count).dropLast(".backup".count)
@@ -74,8 +74,11 @@ public final class Backups: Sendable {
     /// A copy taken just before a restore.
     @discardableResult
     func safetyCopy(_ store: SQLiteStore, today: LocalDay) throws -> URL {
-        let n = list().filter { $0.isSafetyCopy && $0.day == today }.count + 1
-        let url = try backUp(store, name: "clew-\(today)-before-restore-\(n).backup")
+        // Numbered past the highest ever kept (not "how many today + 1": older copies
+        // are pruned, so a count could repeat a name and overwrite a copy).
+        let used = list().filter(\.isSafetyCopy).compactMap { Int($0.url.deletingPathExtension().lastPathComponent.split(separator: "-").last ?? "") }
+        let n = (used.max() ?? 0) + 1
+        let url = try backUp(store, name: String(format: "clew-%@-before-restore-%03d.backup", today.description, n))
         let safety = list().filter(\.isSafetyCopy)
         for old in safety.dropFirst(Self.safetyCopiesKept) { try? FileManager.default.removeItem(at: old.url) }
         return url
