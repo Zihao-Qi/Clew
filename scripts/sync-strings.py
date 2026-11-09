@@ -5,7 +5,7 @@ AGENTS.md rule 8: all UI text lives in the String Catalog. Xcode's IDE syncs the
 catalog on build, but command-line builds do not, so this script does it from the
 .stringsdata files a build leaves in DerivedData.
 
-  scripts/sync-strings.py <derived-data>          add missing keys, mark unused ones stale
+  scripts/sync-strings.py <derived-data>          add missing keys, drop unused ones
   scripts/sync-strings.py <derived-data> --check  exit 1 if any extracted key is missing
 """
 import json
@@ -50,16 +50,22 @@ def main() -> None:
 
     for key in missing:
         strings[key] = {}
+    unused = [k for k in strings if k not in keys]
+    for key in unused:
+        # English is the only language so far, so an unused key carries nothing worth
+        # keeping; once translations exist, mark it stale instead of dropping it.
+        if strings[key].get("localizations", {}).keys() - {"en"}:
+            strings[key]["extractionState"] = "stale"
+        else:
+            del strings[key]
     for key, entry in strings.items():
         if key in keys:
             entry.pop("extractionState", None)
             if keys[key]:
                 entry["comment"] = keys[key]
-        else:
-            entry["extractionState"] = "stale"
     catalog["strings"] = dict(sorted(strings.items()))
     CATALOG.write_text(json.dumps(catalog, indent=2, ensure_ascii=False, separators=(",", " : ")) + "\n")
-    print(f"Added {len(missing)} keys; catalog has {len(strings)}.")
+    print(f"Added {len(missing)} keys, dropped {len([k for k in unused if k not in strings])} unused; catalog has {len(strings)}.")
 
 
 if __name__ == "__main__":

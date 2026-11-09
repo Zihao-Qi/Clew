@@ -20,6 +20,11 @@ public struct ItemStats: Hashable, Sendable {
     /// was rated (rating dots are off by default).
     public let feltCounts: [Int: Int]
 
+    /// The details line's order: best first, only ratings that were given.
+    public var feltHighFirst: [(rating: Int, count: Int)] {
+        stride(from: 5, through: 1, by: -1).compactMap { r in feltCounts[r].map { (r, $0) } }
+    }
+
     /// - Parameters:
     ///   - checkIns: the item's check-ins (voided ones are ignored).
     ///   - rounds: the item's goal rounds (voided ones are ignored).

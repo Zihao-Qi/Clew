@@ -51,6 +51,17 @@ private func tick(_ i: Item, _ d: String, _ amount: Int = 1, voided: Bool = fals
         #expect(s.feltCounts == [5: 1])
     }
 
+    @Test func feltLineListsEveryGivenRatingBestFirst() {
+        let h = habit()
+        let ratings = [5, 4, 4, 2, 5, 5, 1]
+        let ticks = ratings.enumerated().map { i, r -> CheckIn in
+            var t = tick(h, String(format: "2026-11-%02d", i + 1)); t.rating = r; return t
+        }
+        let s = ItemStats(item: h, checkIns: ticks, rounds: [], currentRoundAmount: 0, today: today)
+        #expect(s.feltHighFirst.map(\.rating) == [5, 4, 2, 1])
+        #expect(s.feltHighFirst.map(\.count) == [3, 2, 1, 1])
+    }
+
     @Test func goalRoundsFinishedCountsPastRoundsAndAReachedCurrentOne() {
         let g = goal(3)
         let r = GoalRound(id: UUID(), itemId: g.id, startedAt: t0, localDay: today, target: 3, source: .user)

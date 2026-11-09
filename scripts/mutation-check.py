@@ -241,6 +241,8 @@ M = [
  ("G9 four points", C+"Ratings.swift", "public static let ratingScale = 1...5", "public static let ratingScale = 1...4", "ClewCoreTests"),
  ("G10 six allowed", S+"Schema.swift", "rating      INTEGER CHECK (rating BETWEEN 1 AND 5),", "rating      INTEGER CHECK (rating BETWEEN 1 AND 6),", "ClewStoreTests"),
  ("G11 felt ignores 4-5", D+"ItemStats.swift", ".filter { (1...5).contains($0) }", ".filter { (1...3).contains($0) }", "ClewDomainTests"),
+ ("G12 felt three-point order", D+"ItemStats.swift", "stride(from: 5, through: 1, by: -1).compactMap", "[3, 2, 1].compactMap", "ClewDomainTests"),
+ ("G13 felt worst first", D+"ItemStats.swift", "stride(from: 5, through: 1, by: -1).compactMap", "stride(from: 1, through: 5, by: 1).compactMap", "ClewDomainTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

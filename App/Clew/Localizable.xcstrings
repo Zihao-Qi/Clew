@@ -10,9 +10,6 @@
     "%lld weeks" : {},
     "%lld/%lld done" : {},
     "%lld× a week" : {},
-    "A day with at least one tick." : {
-      "extractionState" : "stale"
-    },
     "A day with at least one tick. Letting go of what you no longer want counts as a win." : {},
     "A fresh start is waiting tomorrow." : {},
     "Active days" : {},
@@ -22,9 +19,6 @@
     "Add to today" : {},
     "All time" : {},
     "Allow Clew in System Settings › General › Login Items." : {},
-    "Archive" : {
-      "extractionState" : "stale"
-    },
     "Back to today's list" : {},
     "Backups" : {},
     "Be gentle with yourself tonight." : {},
@@ -100,9 +94,6 @@
     "Link (optional)" : {},
     "Links must start with http:// or https://." : {},
     "Mark %@ done" : {},
-    "More" : {
-      "extractionState" : "stale"
-    },
     "Morning" : {},
     "Morning: how many are on today's list. Evening: how many are done." : {},
     "Move Down" : {},
@@ -116,9 +107,6 @@
     "Notifications are off for Clew." : {},
     "Once" : {},
     "Open" : {},
-    "Open %@" : {
-      "extractionState" : "stale"
-    },
     "Open Login Items" : {},
     "Open at login" : {},
     "Open link for %@" : {},
@@ -155,9 +143,6 @@
     "Saved to Later (%lld)" : {},
     "Saved." : {},
     "Settings" : {},
-    "Settings…" : {
-      "extractionState" : "stale"
-    },
     "Some days are for resting." : {},
     "Start a next round of %@" : {},
     "Still want this?" : {},
@@ -168,7 +153,6 @@
     "The backup from %@ replaces today's list and history. Your current data is saved first." : {},
     "This item is gone." : {},
     "This round" : {},
-    "Three dots for how it felt: meh, fine, great. Optional; they fade by themselves." : {},
     "Time" : {},
     "Times a week" : {},
     "Today" : {},
@@ -179,7 +163,6 @@
     "Undo %@" : {},
     "Undo +1" : {},
     "Your current data is saved as a backup first, so a restore can be undone." : {},
-    "fine" : {},
     "good" : {},
     "great" : {},
     "meh" : {},

@@ -58,9 +58,8 @@ struct DetailView: View {
                 .foregroundStyle(.secondary)
             if !d.stats.feltCounts.isEmpty {
                 // Counts only, never a score.
-                Text(verbatim: String(localized: "Felt:") + " " + [3, 2, 1].compactMap { n in
-                    d.stats.feltCounts[n].map { "\(RatingDots.word(n)) \($0)" }
-                }.joined(separator: " · "))
+                Text(verbatim: String(localized: "Felt:") + " " + d.stats.feltHighFirst.map { "\(RatingDots.word($0.rating)) \($0.count)" }
+                    .joined(separator: " · "))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
