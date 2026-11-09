@@ -25,6 +25,12 @@ struct ClewApp: App {
             MenuBarLabel(today: model.today)
         }
         .menuBarExtraStyle(.window)
+
+        Window(Text("Clew Settings"), id: SettingsView.windowID) {
+            SettingsView(model: model)
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
     }
 }
 

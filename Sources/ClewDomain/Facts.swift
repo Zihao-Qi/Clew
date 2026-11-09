@@ -4,7 +4,7 @@ import Foundation
 /// deleted (ADR-2). The only fields changed after insert are `rating`/`ratedAt`
 /// (last writer wins by `ratedAt`) and `voidedAt`/`voidReason` (monotonic), per
 /// ARCHITECTURE §4.2 and §8.
-public struct CheckIn: Hashable, Sendable, Identifiable {
+public struct CheckIn: Hashable, Sendable, Identifiable, Codable {
     public let id: UUID
     public let itemId: UUID
     /// Computed once at creation from the injected clock, zone and rollover hour.
@@ -44,7 +44,7 @@ public struct CheckIn: Hashable, Sendable, Identifiable {
 /// `startedAt` belong to earlier rounds, so the bar starts from zero while every
 /// check-in, and every finished round, stays in the history (for rewards, v1.3).
 /// Round 1 has no row; it starts when the goal is created.
-public struct GoalRound: Hashable, Sendable, Identifiable {
+public struct GoalRound: Hashable, Sendable, Identifiable, Codable {
     public let id: UUID
     public let itemId: UUID
     public let startedAt: Date
@@ -67,7 +67,7 @@ public struct GoalRound: Hashable, Sendable, Identifiable {
 }
 
 /// "Picked for today", kept as history so pick history survives later re-planning.
-public struct Plan: Hashable, Sendable, Identifiable {
+public struct Plan: Hashable, Sendable, Identifiable, Codable {
     public let id: UUID
     public let itemId: UUID
     public let localDay: LocalDay

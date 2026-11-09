@@ -277,6 +277,62 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
     }
 }
 
+@Suite struct ExportOnSQLiteTests {
+    struct Clock: ClewDomain.Clock { let date: Date; func now() -> Date { date } }
+    struct Zone: TimeZoneSource { func current() -> TimeZone { TimeZone(identifier: "Asia/Tokyo")! } }
+
+    /// ARCHITECTURE §7: a complete and lossless round trip of definitions and facts.
+    @Test func exportRoundTripsEveryRowLosslessly() throws {
+        let store = try SQLiteStore.inMemory()
+        let clew = Clew(store: store, clock: Clock(date: t0.addingTimeInterval(0.123)), zones: Zone())
+        let goal = try clew.addItem(NewItem(title: "Goal \"quoted\" / ünïcode", titleOrigin: .fetched,
+                                            url: URL(string: "https://example.com/a?b=1&c=2"),
+                                            shape: .goal(target: 2, schedule: .weekdays([.monday, .sunday]))))
+        let later = try clew.addItem(NewItem(title: "Later", shape: .later))
+        let habit = try clew.addItem(NewItem(title: "Habit", shape: .habit(.timesPerWeek(3))))
+        try clew.checkIn(itemId: goal.id)
+        try clew.checkIn(itemId: goal.id)
+        try clew.startNextRound(itemId: goal.id)
+        try clew.planForToday(itemIds: [later.id])
+        try clew.checkIn(itemId: habit.id)
+        try clew.undoToday(itemId: habit.id)
+        try clew.deleteItem(itemId: habit.id)
+
+        let stored = try store.read { try $0.allRecords() }
+        #expect(stored.items.count == 3 && stored.checkIns.count == 3 && stored.plans.count == 1 && stored.goalRounds.count == 1)
+        let doc = try clew.exportDocument()
+        let data = try doc.encoded()
+        let back = try ExportDocument.decode(data)
+        // Lossless at the database's precision (milliseconds): the export is exactly the
+        // stored rows, and decoding it loses nothing the export wrote.
+        #expect(try ExportDocument(exportedAt: doc.exportedAt, records: stored).encoded() == data)
+        #expect(try back.encoded() == data)
+        #expect(back.records.items.map(\.id) == stored.items.map(\.id))
+        let voidedBack: [Bool] = back.records.checkIns.map { $0.voidedAt != nil }
+        let voidedStored: [Bool] = stored.checkIns.map { $0.voidedAt != nil }
+        #expect(voidedBack == voidedStored && voidedStored.contains(true))
+        let text = String(decoding: data, as: UTF8.self)
+        #expect(text.contains(#""titleOrigin" : "fetched""#))
+        #expect(text.contains(#""deletedAt" : "2027-01-15T08:00:00.123Z""#))
+        #expect(text.contains(#""clewExportVersion" : 1"#))
+        #expect(text.contains(#""exportedAt" : "2027-01-15T08:00:00.123Z""#))
+    }
+
+    @Test func activeDaysIgnoreVoidedCheckIns() throws {
+        let store = try SQLiteStore.inMemory()
+        let item = sampleItem()
+        let kept = sampleCheckIn(item, "2026-11-10")
+        let voided = sampleCheckIn(item, "2026-11-11")
+        let old = sampleCheckIn(item, "2026-11-01")
+        try store.write { w in
+            try w.insert(item)
+            for c in [kept, voided, old] { try w.insert(c) }
+            try w.voidCheckIn(id: voided.id, at: t0, reason: "undo")
+        }
+        #expect(try store.read { try $0.activeDays(from: day("2026-11-02")) } == [day("2026-11-10")])
+    }
+}
+
 /// The command layer end to end on the real database.
 @Suite struct CommandsOnSQLiteTests {
     struct Clock: ClewDomain.Clock { let date: Date; func now() -> Date { date } }

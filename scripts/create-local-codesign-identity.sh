@@ -13,8 +13,9 @@ fi
 
 if security find-certificate -c "${IDENTITY_NAME}" "${KEYCHAIN}" >/dev/null 2>&1; then
   cat >&2 <<EOF
-A certificate named "${IDENTITY_NAME}" already exists, but it is not valid for code signing.
-Remove or rename that certificate in Keychain Access, then rerun this script.
+A certificate named "${IDENTITY_NAME}" exists, but macOS does not trust it for code signing.
+To use it: open Keychain Access, double-click "${IDENTITY_NAME}", open Trust, set
+"Code Signing" to "Always Trust", close the window (enter your password), and rerun.
 EOF
   exit 1
 fi

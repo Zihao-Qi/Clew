@@ -138,6 +138,16 @@ M = [
  ("C53 blank og ok", C+"PageTitle.swift", "return metaContents(html)[\"og:title\"].flatMap { QuickEntry.cleanTitle(decodeEntities($0)) } != nil", "return metaContents(html)[\"og:title\"] != nil", "ClewCoreTests"),
  ("C54 gt ends tag", C+"PageTitle.swift", "#\"<meta\\s(?:[^>\"']|\"[^\"]*\"|'[^']*')*>\"#", "#\"<meta\\s[^>]*>\"#", "ClewCoreTests"),
  ("C55 head stop", C+"PageTitle.swift", "guard prefix.range(of: Data(\"og:title\".utf8)) != nil else { return false }", "if prefix.range(of: Data(\"</head>\".utf8)) != nil { return true }", "ClewCoreTests"),
+ ("E1 voided active", S+"SQLiteStore.swift", "SELECT DISTINCT localDay FROM checkIn WHERE voidedAt IS NULL AND localDay >= ?", "SELECT DISTINCT localDay FROM checkIn WHERE localDay >= ?", "ClewStoreTests"),
+ ("E2 seven is eight", C+"Export.swift", "last7: inWindow.filter { $0 >= today.adding(days: -6) }.count", "last7: inWindow.filter { $0 >= today.adding(days: -7) }.count", "ClewCoreTests"),
+ ("E3 fourteen is fifteen", C+"Export.swift", "try $0.activeDays(from: today.adding(days: -13))", "try $0.activeDays(from: today.adding(days: -14))", "ClewCoreTests"),
+ ("E4 future counted", C+"Export.swift", "let inWindow = days.filter { $0 <= today }", "let inWindow = days", "ClewCoreTests"),
+ ("E5 no deleted items", S+"SQLiteStore.swift", "SELECT * FROM item ORDER BY createdAt, id", "SELECT * FROM item WHERE deletedAt IS NULL ORDER BY createdAt, id", "ClewStoreTests"),
+ ("E6 no voided facts", S+"SQLiteStore.swift", "SELECT * FROM checkIn ORDER BY at, id", "SELECT * FROM checkIn WHERE voidedAt IS NULL ORDER BY at, id", "ClewStoreTests"),
+ ("E7 no rounds", S+"SQLiteStore.swift", "goalRounds: try Row.fetchAll(db, sql: \"SELECT * FROM goalRound ORDER BY startedAt, id\").map(Self.goalRound)", "goalRounds: []", "ClewStoreTests"),
+ ("E8 any version", C+"Export.swift", "guard document.clewExportVersion == currentVersion else {", "guard document.clewExportVersion > 0 else {", "ClewCoreTests"),
+ ("E9 seconds only", C+"Export.swift", "f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]", "f.formatOptions = [.withInternetDateTime]", "ClewStoreTests"),
+ ("E10 wall clock", C+"Export.swift", "return ExportDocument(exportedAt: clockForQueries.now(), records: records)", "return ExportDocument(exportedAt: Date(), records: records)", "ClewCoreTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

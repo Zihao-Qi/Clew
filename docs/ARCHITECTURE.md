@@ -307,7 +307,10 @@ evidence-integrity rules.
   stages the chosen backup, and relaunches. On launch, before the pool opens, a
   pending restore is applied and verified (`PRAGMA integrity_check`).
 - **Export:** versioned JSON (`clewExportVersion: 1`) of definitions + facts,
-  which is a complete and lossless round-trip. Markdown daily notes (Obsidian) are
+  including soft-deleted items and voided facts, which is a complete and lossless
+  round-trip at the database's millisecond precision (times are ISO 8601 UTC with
+  milliseconds). Settings › Export… writes it through a save panel
+  (`com.apple.security.files.user-selected.read-write`). Markdown daily notes (Obsidian) are
   a separate read model.
 
 ## 8. Sync readiness (iPhone + iCloud, v2)

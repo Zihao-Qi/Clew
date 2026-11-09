@@ -4,6 +4,7 @@ import SwiftUI
 struct TodayListView: View {
     let model: AppModel
     @Binding var screen: Screen
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -35,6 +36,12 @@ struct TodayListView: View {
                     .keyboardShortcut("l")
                     .accessibilityLabel(Text("Later pile, \(model.laterCount) items. Pick some for today."))
                 Menu {
+                    Button("Settings…") {
+                        openWindow(id: SettingsView.windowID)
+                        NSApp.activate(ignoringOtherApps: true)
+                    }
+                    .keyboardShortcut(",")
+                    Divider()
                     Button("Quit Clew") { NSApplication.shared.terminate(nil) }
                         .keyboardShortcut("q")
                 } label: {

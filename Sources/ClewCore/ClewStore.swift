@@ -33,6 +33,25 @@ public protocol StoreReader {
     func plans(itemId: UUID) throws -> [Plan]
     func goalRounds(itemId: UUID) throws -> [GoalRound]
     func maxSortKey() throws -> Double?
+    /// Days that have at least one non-voided check-in, from `from` onward.
+    func activeDays(from: LocalDay) throws -> Set<LocalDay>
+    /// Every row, including soft-deleted items and voided facts, for export.
+    func allRecords() throws -> ExportRecords
+}
+
+/// Everything Clew stores, as it is stored.
+public struct ExportRecords: Hashable, Sendable, Codable {
+    public var items: [Item]
+    public var checkIns: [CheckIn]
+    public var plans: [Plan]
+    public var goalRounds: [GoalRound]
+
+    public init(items: [Item], checkIns: [CheckIn], plans: [Plan], goalRounds: [GoalRound]) {
+        self.items = items
+        self.checkIns = checkIns
+        self.plans = plans
+        self.goalRounds = goalRounds
+    }
 }
 
 public protocol StoreWriter: StoreReader {
