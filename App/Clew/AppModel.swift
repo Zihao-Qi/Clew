@@ -64,8 +64,13 @@ final class AppModel {
     func refresh() {
         guard let clew else { return }
         do {
-            today = try clew.today()
+            let list = try clew.today()
+            today = list
             laterCount = try clew.laterCount()
+            // A closed congratulation stays closed only while that goal stays reached, so
+            // reaching a raised target or a next round congratulates again.
+            let reached = Set(list.rows.filter(\.isGoalReached).map(\.id))
+            dismissedCelebrations.formIntersection(reached)
         } catch {
             notice = String(localized: "Couldn't load today's list.")
         }

@@ -217,8 +217,8 @@ GRDB `ValueObservation`, so the list updates live when the extension or agent
 writes. Every action is a command; the UI has no business logic.
 
 **Title fetcher.** The app's only network use (entitlement
-`com.apple.security.network.client`): when a link is pasted into `+ add`, one GET of
-that URL with an ephemeral session (no cookies, no cache), `text/html` only, at most
+`com.apple.security.network.client`): when a link is pasted into `+ add`, one load of
+that URL (following http(s) redirects) with an ephemeral session (no cookies, no cache), `text/html` only, at most
 3 MB, stopping at `</head>`. `PageTitle` (Core, pure) reads `og:title`, then
 `twitter:title`, `<meta name="title">`, `<title>`. LinkPresentation was rejected: it
 returns only the artist for YouTube music videos.

@@ -228,13 +228,20 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         #expect(try store.read { try $0.goalRounds(itemId: goal.id) }.map(\.id) == [r1.id, r2.id])
     }
 
-    @Test(arguments: ["target = 99", "startedAt = '2030-01-01 00:00:00.000'", "source = 'dayflow'", "localDay = '2026-11-12'"])
+    @Test(arguments: [
+        "target = 99", "startedAt = '2030-01-01 00:00:00.000'", "source = 'dayflow'", "localDay = '2026-11-12'",
+        // A real second item and a fresh id, so no foreign key or uniqueness rule can be what stops it.
+        "itemId = '00000000-0000-0000-0000-0000000000BB'", "id = '00000000-0000-0000-0000-0000000000CC'",
+    ])
     func goalRoundsAreFacts(_ assignment: String) throws {
         let store = try SQLiteStore.inMemory()
         let goal = sampleItem()
+        var other = sampleItem()
+        other.id = UUID(uuidString: "00000000-0000-0000-0000-0000000000BB")!
         let round = GoalRound(id: UUID(), itemId: goal.id, startedAt: t0, localDay: day("2026-11-11"), target: 30, source: .user)
         try store.write { w in
             try w.insert(goal)
+            try w.insert(other)
             try w.insert(round)
         }
         #expect(throws: DatabaseError.self) {
@@ -293,6 +300,12 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         #expect(today.rows[0].progressAmount == 2)
         #expect(try clew.laterCount() == 0)
         #expect(try store.read { try $0.plans(itemId: link.id) }.count == 1)
+
+        // Delete is a tombstone on the real database too: the row and its facts remain.
+        try clew.deleteItem(itemId: goal.id)
+        #expect(try clew.today().rows.map(\.id) == [habit.id, link.id])
+        #expect(try store.read { try $0.item(id: goal.id) }?.deletedAt == t0)
+        #expect(try store.read { try $0.checkIns(itemIds: [goal.id], from: day("2000-01-01")) }.count == 2)
     }
 }
 

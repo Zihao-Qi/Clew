@@ -131,6 +131,9 @@ M = [
  ('S26 observe no rounds', S+'SQLiteStore.swift', ', Table("goalRound"))', ')', 'ClewStoreTests'),
  ('S27 default fetched', S+'Schema.swift', "titleOrigin TEXT NOT NULL DEFAULT 'typed'", "titleOrigin TEXT NOT NULL DEFAULT 'fetched'", 'ClewStoreTests'),
  ('S28 rounds desc', S+'SQLiteStore.swift', 'SELECT * FROM goalRound WHERE itemId = ? ORDER BY startedAt"', 'SELECT * FROM goalRound WHERE itemId = ? ORDER BY startedAt DESC"', 'ClewStoreTests'),
+ ("S29 round itemId mutable", S+"Schema.swift", "            WHEN NEW.id IS NOT OLD.id OR NEW.itemId IS NOT OLD.itemId\n              OR NEW.startedAt", "            WHEN NEW.id IS NOT OLD.id\n              OR NEW.startedAt", "ClewStoreTests"),
+ ("S30 round id mutable", S+"Schema.swift", "            WHEN NEW.id IS NOT OLD.id OR NEW.itemId IS NOT OLD.itemId\n              OR NEW.startedAt", "            WHEN NEW.itemId IS NOT OLD.itemId\n              OR NEW.startedAt", "ClewStoreTests"),
+ ("C51 delete hard", C+"Clew.swift", "            item.deletedAt = now\n            item.updatedAt = now\n            try w.update(item)", "            item.state = .archived\n            item.updatedAt = now\n            try w.update(item)", "ClewStoreTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

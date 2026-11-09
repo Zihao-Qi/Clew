@@ -66,7 +66,7 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
    with no ticks gets an encouraging line instead of "0/6".
 8. **Local data.** A SQLite database (GRDB) in Application Support. One-click JSON
    export. No account. The only network use is fetching a pasted link's title: one
-   GET of that page, no cookies, nothing else sent.
+   load of that page (and its redirects), no cookies, nothing else sent.
 9. **Launch at login** (`SMAppService`), toggled in a small Settings window.
 
 ## Design rules (from ADHD/CBT practice)
