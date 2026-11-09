@@ -264,7 +264,9 @@ replacing one is idempotent.
 - **the server proves itself before the client sends a token:** `hello` takes a
   client nonce (and the client id) and returns `HMAC-SHA256(secret, nonce)`. A
   client that cannot verify it sends nothing; an answer without a proof means "Clew
-  no longer knows this browser" (pair again). Pairing itself has no proof: it is a
+  no longer knows this browser" (pair again). The client never follows redirects
+  (`redirect: "error"`), so a squatter cannot bounce `hello` to the real Clew and
+  then receive the token on its own port. Pairing itself has no proof: it is a
   one-time, user-attended step;
 - **the listener runs only while a browser is paired or a code is shown**, and while
   it runs Clew holds a `ProcessInfo` activity (`userInitiatedAllowingIdleSystemSleep`)
@@ -276,7 +278,7 @@ replacing one is idempotent.
   (`chrome-extension://jonldjbmjcdehoffcnkeobpapjkoebga`, from the manifest `key`);
   no wildcard CORS. Bodies up to 4 MB, `Content-Length` only, JSON only;
 - while a restore swaps the database, imports get `503` and the client retries on
-  its next scan;
+  its next scan; the swap first waits for an import already running to finish;
 - **contract:** example requests and responses live in `Contract/v1/*.json`. Swift
   tests decode and re-encode each one unchanged and check that the import example's
   response is the Gateway's real answer; the extension's tests run its validators
@@ -289,8 +291,10 @@ replacing one is idempotent.
 The URL is built from the id (YouTube: exactly 11 of `A–Z a–z 0–9 _ -`), never taken
 from the client; titles are cleaned, cut to 200 characters and stored as `fetched`
 (untrusted). A title the user edited is never overwritten. A scan counts as the
-**whole list** only when the page's own count equals the entries read and no entry
-was malformed; only then are Later items from that source that left the list, and
+**whole list** only when the page's own count, the rows on the page and the entries
+read all agree, no entry was malformed, and the list is not empty (a "No videos" page
+also shows when signed out or broken, so an empty read is never trusted: emptying
+Watch Later entirely leaves the Later pile as it is). Only then are Later items from that source that left the list, and
 were never done, let go (a `LaterReview` with the import's source, so Settings'
 "let go" count, which counts the user's own, skips it). An item let go that way
 comes back if it reappears (its let-go is voided); anything the user deleted or let
@@ -302,7 +306,8 @@ go stays gone; items on Today or done are never touched.
   Verified on 2026-11-08: `ytd-playlist-video-renderer` for Watch Later rows and
   `.ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment` (style width %)
   for progress. The older resume-playback selector matched nothing. The list's own
-  count ("12 videos", "No videos") is read from the playlist header; a count in
+  count ("12 videos", "No videos") is read from the playlist header (byline and
+  sidebar, both seen on the real page 2026-11-09; no broader fallback); a count in
   another language is not read, so nothing is ever removed then.
 - **Health report, not silence:** every scan posts `{found, parsed, selectorVersion}`.
   If rows are found but not all read, an entry is rejected, or the page's count says

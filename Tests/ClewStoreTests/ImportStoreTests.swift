@@ -25,7 +25,7 @@ struct ParisZone: TimeZoneSource { func current() -> TimeZone { TimeZone(identif
     }
     private func batch(_ refs: [String]) -> ImportBatch {
         ImportBatch(source: .extensionYouTube, entries: refs.map { ExternalEntry(externalRef: $0, title: "v \($0)") },
-                    listTotal: refs.count)
+                    listTotal: refs.count, scan: ScanReport(found: refs.count, parsed: refs.count, selectorVersion: "t"))
     }
 
     @Test func leaveAndComeBackRoundTripsThroughSQLite() throws {
@@ -38,7 +38,8 @@ struct ParisZone: TimeZoneSource { func current() -> TimeZone { TimeZone(identif
         #expect(try clew.laterCount() == 2)
         // The let-go was voided through the monotonic-void trigger.
         let reviews = try store.read { try $0.allRecords() }.laterReviews
-        #expect(reviews.count == 1 && reviews[0].voidedAt != nil)
+        try #require(reviews.count == 1)
+        #expect(reviews[0].voidedAt != nil)
         #expect(throws: (any Error).self) {
             try store.write { try $0.voidLaterReview(id: reviews[0].id, at: Date()) }
         }

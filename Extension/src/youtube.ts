@@ -4,18 +4,19 @@
 
 import type { ExternalEntry, ImportRequest } from "./contract";
 
-export const SELECTOR_VERSION = "youtube-2026-11-09";
+export const SELECTOR_VERSION = "youtube-2026-11-09b";
 
 export const SELECTORS = {
   /** One per video in the list. */
   row: "ytd-playlist-video-renderer",
   /** Inside a row: the title link, href `/watch?v=<id>&list=WL&index=<n>`. */
   titleLink: "a#video-title",
-  /** Text holding the list's own count, e.g. "12 videos" or "No videos". */
+  /** Text holding the list's own count, e.g. "12 videos" or "No videos". Only
+   * selectors seen on the real page (2026-11-09): a broad guess could pick up some
+   * other "3 videos" and make a partial page look whole. */
   count: [
     "ytd-playlist-byline-renderer yt-formatted-string.byline-item",
     "ytd-playlist-header-renderer .metadata-stats yt-formatted-string",
-    "yt-page-header-view-model yt-content-metadata-view-model span",
     "ytd-playlist-sidebar-primary-info-renderer #stats yt-formatted-string",
   ],
 } as const;

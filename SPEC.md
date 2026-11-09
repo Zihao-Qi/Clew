@@ -123,7 +123,7 @@ stopped daily use, not adding features.
   video in YouTube's Watch Later to the **Later pile** as a saved link, when the Watch
   Later page is opened. A video removed from Watch Later leaves the Later pile too,
   but only if it is still untouched there (not on Today, never done), and only when
-  the page showed the whole list; it comes back if re-added. What the user deleted or
+  the page showed the whole list (never from an empty list); it comes back if re-added. What the user deleted or
   let go stays gone. These automatic removals are not counted as the user's "let go".
   Pairing: Settings › Browser shows a 6-digit code.
 - Watch progress (v1.1, next): read while watching, sent on pause, seek, tab switch,

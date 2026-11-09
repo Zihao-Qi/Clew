@@ -34,6 +34,9 @@ export class GatewayError extends Error {
 }
 
 const PROBE_TIMEOUT_MS = 1500;
+/** Never follow redirects: a squatter could bounce `hello` to the real Clew, get its
+ * proof, and then receive the token on its own port. */
+const NO_REDIRECTS = { redirect: "error" } as const;
 
 export function base64url(bytes: Uint8Array): string {
   let s = "";
@@ -70,6 +73,7 @@ export class Gateway {
       let hello: unknown;
       try {
         const r = await this.fetchFn(`http://127.0.0.1:${port}/v1/hello?${query}`, {
+          ...NO_REDIRECTS,
           signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
         });
         if (!r.ok) continue;
@@ -91,6 +95,7 @@ export class Gateway {
   async pair(code: string, name: string): Promise<Pairing> {
     const port = await this.find();
     const r = await this.fetchFn(`http://127.0.0.1:${port}/v1/pair`, {
+      ...NO_REDIRECTS,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code, name }),
@@ -106,6 +111,7 @@ export class Gateway {
   async importList(pairing: Pairing, request: ImportRequest): Promise<{ response: ImportResponse; port: number }> {
     const port = await this.find(pairing);
     const r = await this.fetchFn(`http://127.0.0.1:${port}/v1/import`, {
+      ...NO_REDIRECTS,
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${pairing.token}` },
       body: JSON.stringify(request),

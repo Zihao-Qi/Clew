@@ -288,7 +288,14 @@ M = [
  ("W19 no fallback port", W+"Listener.swift", "        for port in ports {\n", "        for port in ports.prefix(1) {\n", "ClewGatewayTests"),
  ("W20 json not required", W+"Gateway.swift", "request.headers[\"content-type\"]?.lowercased().hasPrefix(\"application/json\") == true", "true", "ClewGatewayTests"),
  ("W21 no CORS", W+"Gateway.swift", "        if let origin { cors = [(\"Access-Control-Allow-Origin\", origin), (\"Vary\", \"Origin\")] }\n", "", "ClewGatewayTests"),
- ("W22 busy ignored", W+"Gateway.swift", "    public func use(_ clew: Clew?) { lock.withLock { currentClew = clew } }", "    public func use(_ clew: Clew?) { lock.withLock { if let clew { currentClew = clew } } }", "ClewGatewayTests"),
+ ("W22 busy ignored", W+"Gateway.swift", "importLock.withLock { lock.withLock { currentClew = clew } }", "importLock.withLock { lock.withLock { if let clew { currentClew = clew } } }", "ClewGatewayTests"),
+ # Review of v1.1 step 1 (Gemini 3.8): each fix must be pinned by a test.
+ ("X22 rows not checked", C+"Imports.swift", "result.complete = scanAgrees && ", "result.complete = ", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X23 no scan trusted", C+"Imports.swift", "$0.parsed == batch.entries.count } ?? false", "$0.parsed == batch.entries.count } ?? true", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X24 found ignored", C+"Imports.swift", "$0.found == $0.parsed && ", "", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X25 empty trusted", C+"Imports.swift", "scanAgrees && !entries.isEmpty && ", "scanAgrees && ", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("W23 swap doesn't wait", W+"Gateway.swift", "importLock.withLock { lock.withLock { currentClew = clew } }", "lock.withLock { currentClew = clew }", "ClewGatewayTests"),
+ ("W24 stop is a no-op", W+"Listener.swift", "            listener?.cancel()\n", "", "ClewGatewayTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

@@ -25,6 +25,7 @@ M = [
  ("E13 found = parsed", E+"youtube.ts", "scan: { found: rows.length, parsed:", "scan: { found: entries.length, parsed:"),
  ("E14 total guessed", E+"youtube.ts", "...(total === undefined ? {} : { listTotal: total }),", "listTotal: total ?? entries.length,"),
  ("E15 title attr only", E+"youtube.ts", "(link?.getAttribute(\"title\") || link?.textContent || \"\")", "(link?.getAttribute(\"title\") || \"\")"),
+ ("E17 redirects followed", E+"gateway.ts", "{ redirect: \"error\" }", "{ redirect: \"follow\" }"),
  ("E16 checks lax", E+"contract.ts", "[\"added\", \"renamed\", \"restored\", \"letGo\", \"skipped\"].every((k) => isInt(r[k]))", "true"),
 ]
 results = []

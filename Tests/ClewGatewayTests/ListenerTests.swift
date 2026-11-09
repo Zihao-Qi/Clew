@@ -30,6 +30,21 @@ import Testing
         #expect(refused == 421)
     }
 
+    @Test func stopClosesThePort() async throws {
+        let first = GatewayListener(gateway: try gateway(), ports: 49391...49391)
+        try await first.start()
+        first.stop()
+        // The same single port is free again (cancel completes asynchronously).
+        let second = GatewayListener(gateway: try gateway(), ports: 49391...49391)
+        var port: UInt16?
+        for _ in 0..<20 where port == nil {
+            port = try? await second.start()
+            if port == nil { try await Task.sleep(for: .milliseconds(100)) }
+        }
+        defer { second.stop() }
+        #expect(port == 49391)
+    }
+
     @Test func fallsBackToTheNextFreePort() async throws {
         let first = GatewayListener(gateway: try gateway(), ports: 49381...49381)
         let taken = try await first.start()

@@ -20,11 +20,14 @@ public struct ImportBatch: Hashable, Sendable {
     public var source: Source
     public var entries: [ExternalEntry]
     public var listTotal: Int?
+    /// What the scraper saw on the page. Without it the batch is never the whole list.
+    public var scan: ScanReport?
 
-    public init(source: Source, entries: [ExternalEntry], listTotal: Int?) {
+    public init(source: Source, entries: [ExternalEntry], listTotal: Int?, scan: ScanReport? = nil) {
         self.source = source
         self.entries = entries
         self.listTotal = listTotal
+        self.scan = scan
     }
 }
 
@@ -80,9 +83,12 @@ extension Clew {
             else { result.skipped += 1; continue }
             if seen.insert(ref).inserted { entries.append((ref, title, url)) }
         }
-        // The whole list only if the site's count and the parsed entries agree, and
-        // nothing was malformed: a broken scraper must never cause removals.
-        result.complete = batch.listTotal == entries.count && result.skipped == 0
+        // The whole list only if the site's count, the rows on the page and the parsed
+        // entries all agree, nothing was malformed, and the list is not empty: a broken
+        // scraper must never cause removals. An empty read is never trusted, since "No
+        // videos" also shows on a signed-out or failed page.
+        let scanAgrees = batch.scan.map { $0.found == $0.parsed && $0.parsed == batch.entries.count } ?? false
+        result.complete = scanAgrees && !entries.isEmpty && batch.listTotal == entries.count && result.skipped == 0
 
         let now = clockForQueries.now()
         let day = currentDay()

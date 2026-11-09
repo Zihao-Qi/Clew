@@ -28,6 +28,9 @@ public final class Gateway: @unchecked Sendable {
     private let now: @Sendable () -> Date
     private let allowedOrigins: Set<String>
     private let lock = NSLock()
+    /// Held for the whole of an import, and by `use(_:)`: swapping the command layer
+    /// waits for an import already running against the old one (restore, AppModel).
+    private let importLock = NSLock()
     private var port: UInt16 = 0
     private var pairing: (code: String, expiresAt: Date, attemptsLeft: Int)?
     private var paired: [PairedClient]
@@ -50,8 +53,11 @@ public final class Gateway: @unchecked Sendable {
     public func listening(on port: UInt16) { lock.withLock { self.port = port } }
 
     /// Swaps the command layer, e.g. around a restore (nil while the database is closed:
-    /// imports are answered with 503 and the client retries later).
-    public func use(_ clew: Clew?) { lock.withLock { currentClew = clew } }
+    /// imports are answered with 503 and the client retries later). Returns only after
+    /// any import still running against the old one has finished.
+    public func use(_ clew: Clew?) {
+        importLock.withLock { lock.withLock { currentClew = clew } }
+    }
     private var clew: Clew? { lock.withLock { currentClew } }
     public var listeningPort: UInt16 { lock.withLock { port } }
 
@@ -173,23 +179,33 @@ public final class Gateway: @unchecked Sendable {
         guard let body = try? JSONDecoder().decode(API.ImportRequest.self, from: request.body) else {
             return failure(400, "bad request")
         }
-        guard let clew else { return failure(503, "Clew is busy; try again") }
-        do {
-            let result = try clew.importExternal(ImportBatch(source: body.source, entries: body.entries,
-                                                             listTotal: body.listTotal))
-            let needsUpdate = body.scan.needsUpdate(listTotal: body.listTotal, result: result)
-            let report = ImportReport(at: now(), source: body.source, listTotal: body.listTotal, scan: body.scan,
-                                      result: result, needsUpdate: needsUpdate)
-            lock.withLock { reports[body.source] = report }
-            changed()
-            return json(200, API.ImportResponse(result: result, needsUpdate: needsUpdate,
-                                                laterCount: (try? clew.laterCount()) ?? 0))
-        } catch ClewError.notAllowed {
-            return failure(400, "source not importable")
-        } catch ClewError.tooManyEntries {
-            return failure(413, "too many entries")
-        } catch {
-            return failure(500, "import failed")
+        let response: HTTPResponse = importLock.withLock {
+            guard let clew else { return failure(503, "Clew is busy; try again") }
+            do {
+                let result = try clew.importExternal(ImportBatch(source: body.source, entries: body.entries,
+                                                                 listTotal: body.listTotal, scan: body.scan))
+                let needsUpdate = body.scan.needsUpdate(listTotal: body.listTotal, result: result)
+                let report = ImportReport(at: now(), source: body.source, listTotal: body.listTotal, scan: body.scan,
+                                          result: result, needsUpdate: needsUpdate)
+                lock.withLock { reports[body.source] = report }
+                return json(200, API.ImportResponse(result: result, needsUpdate: needsUpdate,
+                                                    laterCount: (try? clew.laterCount()) ?? 0))
+            } catch {
+                return importFailure(error)
+            }
+        }
+        if response.status == 200 { changed() }
+        return response
+    }
+
+    private func importFailure(_ error: any Error) -> HTTPResponse {
+        switch error {
+        case ClewError.notAllowed:
+            failure(400, "source not importable")
+        case ClewError.tooManyEntries:
+            failure(413, "too many entries")
+        default:
+            failure(500, "import failed")
         }
     }
 

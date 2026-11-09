@@ -16,7 +16,14 @@ function network(servers: Partial<Record<number, Server>>) {
     calls.push({ url, init });
     const server = servers[Number(url.port)];
     if (!server) throw new TypeError("connection refused");
-    return server(url, init);
+    const r = await server(url, init);
+    // Like fetch: follows a redirect unless told not to.
+    const location = r.headers.get("Location");
+    if (r.status >= 300 && r.status < 400 && location) {
+      if (init?.redirect === "error") throw new TypeError("redirect refused");
+      return fetchFn(new URL(location, url).toString(), init);
+    }
+    return r;
   };
   return { fetchFn, calls };
 }
@@ -58,6 +65,18 @@ describe("finding Clew", () => {
     expect(port).toBe(PORTS[2]);
     const withToken = net.calls.filter((c) => (c.init?.headers as Record<string, string> | undefined)?.Authorization);
     expect(withToken.map((c) => Number(c.url.port))).toEqual([PORTS[2]]);
+  });
+
+  test("a squatter can't borrow the real Clew's proof by redirecting to it", async () => {
+    // It bounces every request to the real Clew; following that would prove the
+    // squatter's port and send it the token.
+    const relay: Server = (url) =>
+      new Response(null, { status: 307, headers: { Location: `http://127.0.0.1:${PORTS[1]}${url.pathname}${url.search}` } });
+    const net = network({ [PORTS[0]]: relay, [PORTS[1]]: clew });
+    const { port } = await new Gateway(net.fetchFn).importList(pairing, scan);
+    expect(port).toBe(PORTS[1]);
+    const withToken = net.calls.filter((c) => (c.init?.headers as Record<string, string> | undefined)?.Authorization);
+    expect(withToken.map((c) => Number(c.url.port))).toEqual([PORTS[1]]);
   });
 
   test("the proof is HMAC-SHA256 of this request's nonce", async () => {

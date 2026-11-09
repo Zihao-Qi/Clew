@@ -17,6 +17,21 @@ final class Now: @unchecked Sendable {
     func advance(_ s: TimeInterval) { lock.withLock { value += s } }
 }
 
+/// A clock that, once armed, stops the next reader until released.
+final class GateClock: ClewDomain.Clock, @unchecked Sendable {
+    let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
+    private let source: Now
+    private let lock = NSLock()
+    private var armed = false
+    init(_ source: Now) { self.source = source }
+    func arm() { lock.withLock { armed = true } }
+    func now() -> Date {
+        let stop = lock.withLock { () -> Bool in defer { armed = false }; return armed }
+        if stop { entered.signal(); release.wait() }
+        return source.get()
+    }
+}
+
 struct UTCZone: TimeZoneSource { func current() -> TimeZone { TimeZone(identifier: "UTC")! } }
 struct SystemClockForTests: ClewDomain.Clock { let source: Now; func now() -> Date { source.get() } }
 
@@ -214,7 +229,29 @@ struct SystemClockForTests: ClewDomain.Clock { let source: Now; func now() -> Da
         #expect(hello.proof == nil)
     }
 
-    @Test func importWaitsWhileTheDatabaseIsSwapped() throws {
+    @Test func swappingTheDatabaseWaitsForARunningImport() throws {
+        let paired = try pairClient()
+        let gate = GateClock(Now())
+        gateway.use(Clew(store: store, clock: gate, zones: UTCZone()))
+        let body = try JSONSerialization.data(withJSONObject: importBody(["aaaaaaaaaaa"], total: 1))
+        let req = HTTPRequest(method: "POST", path: "/v1/import", headers: [
+            "host": "127.0.0.1:\(port)", "authorization": "Bearer \(paired.token)", "content-type": "application/json",
+        ], body: body)
+        let gateway = self.gateway
+        gate.arm()
+        let imported = DispatchSemaphore(value: 0), swapped = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async { _ = gateway.handle(req); imported.signal() }
+        defer { gate.release.signal() }                         // never leave the import stuck
+        // The import is inside Clew now (bounded, so a broken Gateway fails, not hangs).
+        try #require(gate.entered.wait(timeout: .now() + 5) == .success)
+        DispatchQueue.global().async { gateway.use(nil); swapped.signal() }
+        #expect(swapped.wait(timeout: .now() + 0.3) == .timedOut)   // the swap waits for it
+        gate.release.signal()
+        #expect(imported.wait(timeout: .now() + 5) == .success)
+        #expect(swapped.wait(timeout: .now() + 5) == .success)
+    }
+
+    @Test func importsAreRefusedWhileTheDatabaseIsClosed() throws {
         let paired = try pairClient()
         gateway.use(nil)
         #expect(request("POST", "/v1/import", body: importBody(["aaaaaaaaaaa"], total: 1), token: paired.token).status == 503)
