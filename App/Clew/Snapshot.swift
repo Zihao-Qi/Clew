@@ -114,6 +114,31 @@ enum Snapshot {
         }
     }
 
+    /// `CLEW_DROP_TEST=1`: three rows; calls the drop logic the drag gesture uses.
+    static func startDropTest() {
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1))
+            do {
+                let clew = Clew(store: try SQLiteStore.inMemory(), clock: SystemClock(), zones: SystemTimeZone())
+                for t in ["A", "B", "C"] { _ = try clew.addItem(NewItem(title: t, shape: .habit(.daily))) }
+                let model = AppModel(clew: clew, notify: false)
+                @MainActor func order() -> String { model.today!.rows.map(\.item.title).joined() }
+                print("start:", order())
+                let rows = model.today!.rows
+                print("drop() A onto C returned", model.drop(rows[0].id, onto: rows[2]), "→", order())
+                print("drop() C onto A returned", model.drop(model.today!.rows[2].id, onto: model.today!.rows[0]), "→", order())
+
+                // A real drag can't be simulated: SwiftUI checks the actual mouse-button state,
+                // which posted events don't change. Row targeting is unit-tested in Core
+                // (Clew.rowUnderDrag); the drag itself is checked by hand.
+                exit(0)
+            } catch {
+                print("drop test failed:", error)
+                exit(1)
+            }
+        }
+    }
+
     static func renderAndExit() -> Never {
         let dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("ClewSnapshots")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

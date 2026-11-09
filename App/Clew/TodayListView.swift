@@ -1,3 +1,4 @@
+import ClewCore
 import ClewDomain
 import SwiftUI
 
@@ -5,7 +6,23 @@ struct TodayListView: View {
     let model: AppModel
     @Binding var screen: Screen
     @Environment(\.openWindow) private var openWindow
-    @State private var dropTarget: UUID?
+    /// Reordering with a plain drag gesture inside the list. SwiftUI's draggable /
+    /// dropDestination never delivered the drop in the menu bar panel (reported in use).
+    @State private var dragging: UUID?
+    @State private var dragOffset: CGFloat = 0
+    @State private var rowFrames: [UUID: CGRect] = [:]
+
+    private static let listSpace = "todayList"
+
+    /// The row the dragged row is over right now (pure logic in Core, tested there).
+    private func target(in rows: [TodayRow]) -> TodayRow? {
+        guard let dragging else { return nil }
+        let spans = rows.compactMap { row in
+            rowFrames[row.id].map { (id: row.id, minY: Double($0.minY), maxY: Double($0.maxY)) }
+        }
+        let id = Clew.rowUnderDrag(dragged: dragging, offset: Double(dragOffset), spans: spans)
+        return rows.first { $0.id == id }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -15,16 +32,30 @@ struct TodayListView: View {
                         RowView(row: row, model: model, onEdit: { screen = .edit(row.item, back: .list) },
                                 onOpen: { screen = .detail(row.id) },
                                 canMoveUp: index > 0, canMoveDown: index < rows.count - 1,
-                                isDropTarget: dropTarget == row.id)
-                            .draggable(row.id.uuidString)
-                            .dropDestination(for: String.self) { ids, _ in
-                                guard let dragged = ids.first.flatMap(UUID.init(uuidString:)) else { return false }
-                                return model.drop(dragged, onto: row)
-                            } isTargeted: { over in
-                                if over { dropTarget = row.id } else if dropTarget == row.id { dropTarget = nil }
-                            }
+                                isDropTarget: target(in: rows)?.id == row.id)
+                            .background(GeometryReader { g in
+                                Color.clear.preference(key: RowFrames.self,
+                                                       value: [row.id: g.frame(in: .named(Self.listSpace))])
+                            })
+                            .offset(y: dragging == row.id ? dragOffset : 0)
+                            .zIndex(dragging == row.id ? 1 : 0)
+                            .shadow(color: .black.opacity(dragging == row.id ? 0.18 : 0), radius: 6, y: 2)
+                            .gesture(
+                                DragGesture(minimumDistance: 4, coordinateSpace: .named(Self.listSpace))
+                                    .onChanged { value in
+                                        dragging = row.id
+                                        dragOffset = value.translation.height
+                                    }
+                                    .onEnded { _ in
+                                        if let goal = target(in: rows) { model.drop(row.id, onto: goal) }
+                                        dragging = nil
+                                        dragOffset = 0
+                                    }
+                            )
                     }
                 }
+                .coordinateSpace(name: Self.listSpace)
+                .onPreferenceChange(RowFrames.self) { rowFrames = $0 }
                 .padding(.vertical, 6)
             } else {
                 Text("Nothing for today.")
@@ -240,5 +271,13 @@ struct NoticeView: View {
                 .padding(.horizontal, 12)
                 .padding(.bottom, 6)
         }
+    }
+}
+
+/// Each row's frame in the list, for working out where a dragged row is.
+private struct RowFrames: PreferenceKey {
+    static let defaultValue: [UUID: CGRect] = [:]
+    static func reduce(value: inout [UUID: CGRect], nextValue: () -> [UUID: CGRect]) {
+        value.merge(nextValue()) { $1 }
     }
 }

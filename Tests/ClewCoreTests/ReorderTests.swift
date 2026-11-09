@@ -88,6 +88,24 @@ import Testing
         _ = c
     }
 
+    @Test func theRowUnderADragIsTheOneHoldingItsCentre() {
+        let ids = (0..<3).map { _ in UUID() }
+        // Rows 30 pt tall at 0–30, 30–60, 60–100 (the last one taller, like a celebration row).
+        let spans = [(id: ids[0], minY: 0.0, maxY: 30.0), (id: ids[1], minY: 30.0, maxY: 60.0),
+                     (id: ids[2], minY: 60.0, maxY: 100.0)]
+        // Row 0's centre is 15; dragging 50 down puts it at 65, inside row 2.
+        #expect(Clew.rowUnderDrag(dragged: ids[0], offset: 50, spans: spans) == ids[2])
+        #expect(Clew.rowUnderDrag(dragged: ids[0], offset: 20, spans: spans) == ids[1])
+        // Not far enough to leave its own row: no target.
+        #expect(Clew.rowUnderDrag(dragged: ids[0], offset: 10, spans: spans) == nil)
+        // Up from row 2 (centre 80) by 70 → 10, inside row 0; past the top → none.
+        #expect(Clew.rowUnderDrag(dragged: ids[2], offset: -70, spans: spans) == ids[0])
+        #expect(Clew.rowUnderDrag(dragged: ids[2], offset: -200, spans: spans) == nil)
+        // Exactly on a boundary belongs to the lower row.
+        #expect(Clew.rowUnderDrag(dragged: ids[0], offset: 15, spans: spans) == ids[1])
+        #expect(Clew.rowUnderDrag(dragged: UUID(), offset: 0, spans: spans) == nil)
+    }
+
     @Test func nonsenseMovesAreRejected() throws {
         let (a, b, _) = try three()
         #expect(throws: ClewError.notAllowed) { try clew.moveItem(id: a.id, after: b.id, before: a.id) }

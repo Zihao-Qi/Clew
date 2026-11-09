@@ -196,6 +196,9 @@ M = [
  ("I8 not monday", D+"ItemStats.swift", "let firstMonday = today.weekStart.adding(days: -7 * (weeks - 1))", "let firstMonday = today.adding(days: -7 * (weeks - 1))", "ClewDomainTests"),
  ("I9 deleted details", C+"Details.swift", "guard let item = try r.item(id: itemId), item.deletedAt == nil else { return nil }", "guard let item = try r.item(id: itemId) else { return nil }", "ClewCoreTests"),
  ("I10 lifetime as round", C+"Details.swift", "let progress = try r.progressAmounts(itemIds: [itemId])[itemId] ?? 0", "let progress = checkIns.reduce(0) { $0 + $1.amount }", "ClewCoreTests"),
+ ("R10 drag uses top edge", C+"Clew.swift", "let y = (own.minY + own.maxY) / 2 + offset", "let y = own.minY + offset", "ClewCoreTests"),
+ ("R11 drag targets itself", C+"Clew.swift", "return spans.first { $0.id != dragged && $0.minY <= y && y < $0.maxY }?.id", "return spans.first { $0.minY <= y && y < $0.maxY }?.id", "ClewCoreTests"),
+ ("R12 boundary upper", C+"Clew.swift", "return spans.first { $0.id != dragged && $0.minY <= y && y < $0.maxY }?.id", "return spans.first { $0.id != dragged && $0.minY < y && y <= $0.maxY }?.id", "ClewCoreTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

@@ -365,6 +365,15 @@ public final class Clew: Sendable {
         }
     }
 
+    /// The row a dragged row is over: the one (other than itself) whose vertical span
+    /// holds the dragged row's centre after moving `offset` points. `spans` are each
+    /// visible row's (minY, maxY), top to bottom.
+    public static func rowUnderDrag(dragged: UUID, offset: Double, spans: [(id: UUID, minY: Double, maxY: Double)]) -> UUID? {
+        guard let own = spans.first(where: { $0.id == dragged }) else { return nil }
+        let y = (own.minY + own.maxY) / 2 + offset
+        return spans.first { $0.id != dragged && $0.minY <= y && y < $0.maxY }?.id
+    }
+
     /// Where a dragged row lands when dropped onto `target` in `order` (today's visible
     /// ids): it takes the target's place, so coming from above it goes after the target
     /// and from below it goes before. Nil when the drop changes nothing.
