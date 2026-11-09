@@ -72,6 +72,12 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            Section {
+                Button("Quit Clew") { NSApplication.shared.terminate(nil) }
+                    .keyboardShortcut("q")
+                    .accessibilityLabel(Text("Quit Clew"))
+            }
         }
         .formStyle(.grouped)
         .frame(width: 400)
@@ -91,13 +97,11 @@ struct SettingsView: View {
                 model.setSummaries(summaries)
             })) { label }
             Spacer()
-            DatePicker(selection: Binding(get: { summaries[keyPath: time].pickerDate }, set: { date in
-                summaries[keyPath: time] = TimeOfDay(pickerDate: date)
+            TimePicker(time: Binding(get: { summaries[keyPath: time] }, set: { newTime in
+                summaries[keyPath: time] = newTime
                 model.setSummaries(summaries)
-            }), displayedComponents: .hourAndMinute) { label }
-                .labelsHidden()
+            }), isEnabled: summaries[keyPath: enabled])
                 .fixedSize()
-                .disabled(!summaries[keyPath: enabled])
                 .accessibilityLabel(Text("Time"))
         }
     }

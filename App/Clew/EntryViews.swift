@@ -409,10 +409,8 @@ struct ReminderRow: View {
             Toggle("Remind me", isOn: $enabled)
                 .accessibilityLabel(Text("Remind me"))
             if enabled {
-                DatePicker(selection: Binding(get: { time.pickerDate }, set: { time = TimeOfDay(pickerDate: $0) }),
-                           displayedComponents: .hourAndMinute) { Text("Reminder time") }
-                    .labelsHidden()
-                    .fixedSize() // its full width, so "6:00 PM" is never cut off
+                TimePicker(time: $time)
+                    .fixedSize()
                     .accessibilityLabel(Text("Reminder time"))
             }
             Spacer()

@@ -91,6 +91,10 @@ enum Snapshot {
                                      shape: .today))
         for _ in 0..<10 { try clew.checkIn(itemId: course.id) }
         try clew.setReminder(itemId: course.id, time: TimeOfDay(hour: 18, minute: 0))
+        var summaries = SummarySettings.defaults
+        summaries.morningEnabled = true
+        summaries.eveningEnabled = true
+        try clew.setSummaries(summaries)
         let pushups = try clew.addItem(NewItem(title: "Push-ups", shape: .goal(target: 3, schedule: .daily)))
         for _ in 0..<3 { try clew.checkIn(itemId: pushups.id) }
         try clew.checkIn(itemId: exercise.id)
