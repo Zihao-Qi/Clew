@@ -8,6 +8,8 @@ public enum ClewError: Error, Equatable, Sendable {
     case invalidTarget
     case invalidSchedule
     case pickCount
+    /// A counted goal has reached its target: start a next round or raise it first.
+    case goalReached
     case itemNotFound
     case checkInNotFound
     /// The command does not apply to this item in its current kind or state.
@@ -27,11 +29,13 @@ public enum NewItemShape: Hashable, Sendable {
 
 public struct NewItem: Hashable, Sendable {
     public var title: String
+    public var titleOrigin: TitleOrigin
     public var url: URL?
     public var shape: NewItemShape
 
-    public init(title: String, url: URL? = nil, shape: NewItemShape) {
+    public init(title: String, titleOrigin: TitleOrigin = .typed, url: URL? = nil, shape: NewItemShape) {
         self.title = title
+        self.titleOrigin = titleOrigin
         self.url = url
         self.shape = shape
     }
@@ -98,10 +102,11 @@ public final class Clew: Sendable {
             let items = try r.items(inStates: [.active])
             let ids = items.map(\.id)
             let recent = Dictionary(grouping: try r.checkIns(itemIds: ids, from: day.weekStart), by: \.itemId)
-            let lifetime = try r.lifetimeAmounts(itemIds: ids)
+            let progress = try r.progressAmounts(itemIds: ids)
+            let rounds = try r.roundStarts(itemIds: ids)
             var facts: [UUID: ItemFacts] = [:]
             for id in ids {
-                facts[id] = ItemFacts(recent: recent[id] ?? [], lifetimeAmount: lifetime[id] ?? 0)
+                facts[id] = ItemFacts(recent: recent[id] ?? [], progressAmount: progress[id] ?? 0, roundStart: rounds[id])
             }
             return todayList(items: items, facts: facts, on: day)
         }
@@ -146,7 +151,8 @@ public final class Clew: Sendable {
 
         return try store.write { w in
             let item = Item(
-                id: makeID(), kind: kind, title: title, url: url, schedule: schedule, progress: progress,
+                id: makeID(), kind: kind, title: title, titleOrigin: new.titleOrigin, url: url,
+                schedule: schedule, progress: progress,
                 state: state, plannedDay: planned, sortKey: (try w.maxSortKey() ?? 0) + 1, source: source,
                 createdAt: now, updatedAt: now
             )
@@ -174,6 +180,7 @@ public final class Clew: Sendable {
                 item.schedule = try Self.validSchedule(s)
                 item.progress = .counter(target: try Self.validTarget(t))
             }
+            if title != item.title { item.titleOrigin = .typed }
             item.title = title
             item.url = url
             item.updatedAt = now
@@ -183,7 +190,8 @@ public final class Clew: Sendable {
     }
 
     /// One click on `○`. Once-items and habits record at most one check-in per day,
-    /// so a double click is harmless. A counted goal records `+1` every time.
+    /// so a double click is harmless. A counted goal records `+1` every time until
+    /// its target is reached; then the user chooses a next round or a higher target.
     @discardableResult
     public func checkIn(itemId: UUID, source: Source = .user) throws -> CheckIn {
         let now = clock.now()
@@ -192,12 +200,16 @@ public final class Clew: Sendable {
         return try store.write { w in
             guard let item = try w.item(id: itemId), item.deletedAt == nil else { throw ClewError.itemNotFound }
             guard item.state == .active else { throw ClewError.notAllowed }
-            if item.kind != .goal {
+            if let target = item.progress.target {
+                if (try w.progressAmounts(itemIds: [itemId])[itemId] ?? 0) >= target {
+                    throw ClewError.goalReached
+                }
+            } else {
                 if let existing = try w.checkIns(itemIds: [itemId], from: day).first(where: { $0.localDay == day }) {
                     return existing
                 }
                 if item.kind == .once || item.kind == .link,
-                   (try w.lifetimeAmounts(itemIds: [itemId])[itemId] ?? 0) > 0 {
+                   (try w.progressAmounts(itemIds: [itemId])[itemId] ?? 0) > 0 {
                     throw ClewError.notAllowed // already done on an earlier day
                 }
             }
@@ -211,13 +223,15 @@ public final class Clew: Sendable {
     }
 
     /// Undo: voids the most recent of today's check-ins for the item. For a goal that
-    /// is one `+1`. Returns nil if there was nothing to undo today.
+    /// is one `+1` of the current round. Returns nil if there was nothing to undo today.
     @discardableResult
     public func undoToday(itemId: UUID) throws -> CheckIn? {
         let now = clock.now()
         let day = currentDay()
         return try store.write { w in
-            let todays = try w.checkIns(itemIds: [itemId], from: day).filter { $0.localDay == day }
+            let roundStart = try w.roundStarts(itemIds: [itemId])[itemId]
+            let todays = try w.checkIns(itemIds: [itemId], from: day)
+                .filter { c in c.localDay == day && (roundStart.map { c.at >= $0 } ?? true) }
             guard let last = todays.max(by: { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) }) else {
                 return nil
             }
@@ -268,10 +282,41 @@ public final class Clew: Sendable {
         try store.write { w in
             guard var item = try w.item(id: itemId), item.deletedAt == nil else { throw ClewError.itemNotFound }
             guard item.kind == .once || item.kind == .link, item.state == .active,
-                  (try w.lifetimeAmounts(itemIds: [itemId])[itemId] ?? 0) == 0
+                  (try w.progressAmounts(itemIds: [itemId])[itemId] ?? 0) == 0
             else { throw ClewError.notAllowed }
             item.state = .later
             item.plannedDay = nil
+            item.updatedAt = now
+            try w.update(item)
+        }
+    }
+
+    /// "Next round" after a counted goal reached its target: the bar starts again
+    /// from zero with the same target. Earlier rounds stay in the history.
+    @discardableResult
+    public func startNextRound(itemId: UUID, source: Source = .user) throws -> GoalRound {
+        let now = clock.now()
+        let day = currentDay()
+        return try store.write { w in
+            guard let item = try w.item(id: itemId), item.deletedAt == nil else { throw ClewError.itemNotFound }
+            guard item.state == .active, let target = item.progress.target,
+                  (try w.progressAmounts(itemIds: [itemId])[itemId] ?? 0) >= target
+            else { throw ClewError.notAllowed }
+            let round = GoalRound(id: makeID(), itemId: itemId, startedAt: now, localDay: day, target: target,
+                                  source: source)
+            try w.insert(round)
+            return round
+        }
+    }
+
+    /// Delete: a tombstone (`deletedAt`), never a hard delete. The item disappears
+    /// everywhere; its check-ins and plans stay in the history (ARCHITECTURE §8).
+    public func deleteItem(itemId: UUID) throws {
+        let now = clock.now()
+        try store.write { w in
+            guard var item = try w.item(id: itemId) else { throw ClewError.itemNotFound }
+            guard item.deletedAt == nil else { return }
+            item.deletedAt = now
             item.updatedAt = now
             try w.update(item)
         }

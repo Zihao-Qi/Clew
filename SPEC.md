@@ -40,9 +40,15 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
      target is met, the item leaves Today's list until next Monday, unless you
      ticked it today.
    - *Counted goal*: a total (e.g. 30 videos). One click is `+1`; click again
-     to log more. The bar shows lifetime progress; the item counts as done today
-     once you've added at least one.
-3. **Links.** Any item can have a URL. `↗` opens it in the default browser.
+     to log more. The bar shows progress in the current round; the item counts as
+     done today once you've added at least one. **Reaching the total means the goal
+     is reached:** Clew congratulates you and counting stops until you choose
+     *Next round* (same total, from zero), *Raise target*, or *Done* (it leaves the
+     list after the day). Every round stays in the history; the Daruma's second eye
+     comes in v1.3.
+3. **Links.** Any item can have a URL. `↗` or the title opens it in the default
+   browser. Pasting a link into `+ add` fills in the page's title, which you can
+   edit before saving.
 4. **Done in one click.** Click `○` to mark it done (counted goals: +1). Three small
    rating dots then appear **inside the same row** every time. The row never changes
    height and the dots never cover the `+1` target, so rapid ticks can't mis-click.
@@ -51,14 +57,16 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
 5. **Later pile.** Saving a link (paste into `+ add`, or choose "Later") puts it
    in a hidden pile. Its count is shown, its contents aren't. "Pick 1–3 for today"
    moves items onto the list. Items untouched for 6 weeks get a one-tap
-   "still want this?". Saying no counts as a win.
+   "still want this?". Saying no counts as a win. Any item can be deleted (in Later:
+   `×`; on Today: right-click). Delete hides it for good; its history is kept.
 6. **Gentle reminders** (optional, per item, off by default). One notification at
    a chosen time with **Open / Done / Later** actions. No repeats, no escalation.
 7. **Day summaries** (each optional): morning "6 today" at 9:00, evening "5/6 done"
    at 21:00, both changeable. Short, friendly, never a list of failures. A day
    with no ticks gets an encouraging line instead of "0/6".
 8. **Local data.** A SQLite database (GRDB) in Application Support. One-click JSON
-   export. No account, no network.
+   export. No account. The only network use is fetching a pasted link's title: one
+   load of that page (and its redirects), no cookies, nothing else sent.
 9. **Launch at login** (`SMAppService`), toggled in a small Settings window.
 
 ## Design rules (from ADHD/CBT practice)
@@ -95,6 +103,10 @@ stopped daily use, not adding features.
 - Weeks start on **Monday**; "N× per week" items reset then.
 - A counted goal's step is always **+1** per click.
 - The rating row is offered **every time**, and is always skippable.
+- Counted goals have rounds; reaching the total stops counting until the user picks
+  next round, a higher target, or done (2026-11-08, after first use).
+- Pasted links get their page title fetched (2026-11-08, after first use); this is
+  the app's only network use.
 - The menu bar title is an icon plus `done/total`, not the word "Clew" (2026-11-08, v1a).
 - A counted goal's undo is a small `−` beside its count, shown only after a `+1` today;
   it removes the last `+1`. It sits apart from the circle so rapid ticks can't hit it

@@ -80,8 +80,8 @@ Reader output reaches the Coach only as **validated, length-capped fields**
 (summary ≤ 140 chars, minutes, energy, ≤ 3 tags), never as raw page text.
 
 **Untrusted text is broader than web pages.** Imported titles and notes (X
-bookmarks, YouTube titles) and Reader outputs were all written or shaped by
-strangers. Rules:
+bookmarks, YouTube titles), titles fetched for pasted links (`titleOrigin =
+fetched`) and Reader outputs were all written or shaped by strangers. Rules:
 - In Coach snapshots, untrusted fields are quoted and tagged `untrusted: true`.
   They may appear only in short-lived outputs (today's suggestions), which are
   validated and expire.

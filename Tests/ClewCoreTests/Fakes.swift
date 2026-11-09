@@ -24,6 +24,7 @@ final class FakeStore: ClewStore, @unchecked Sendable {
         var items: [UUID: Item] = [:]
         var checkIns: [UUID: CheckIn] = [:]
         var plans: [UUID: Plan] = [:]
+        var rounds: [UUID: GoalRound] = [:]
     }
 
     enum FactViolation: Error { case revoid, duplicate, missingItem }
@@ -74,13 +75,31 @@ final class FakeStore: ClewStore, @unchecked Sendable {
                 .filter { ids.contains($0.itemId) && $0.localDay >= from && !$0.isVoided }
                 .sorted { $0.at < $1.at }
         }
-        func lifetimeAmounts(itemIds: [UUID]) throws -> [UUID: Int] {
+        func roundStarts(itemIds: [UUID]) throws -> [UUID: Date] {
+            let ids = Set(itemIds)
+            var result: [UUID: Date] = [:]
+            for r in state.rounds.values where ids.contains(r.itemId) && r.voidedAt == nil {
+                result[r.itemId] = max(result[r.itemId] ?? r.startedAt, r.startedAt)
+            }
+            return result
+        }
+        func progressAmounts(itemIds: [UUID]) throws -> [UUID: Int] {
+            let starts = try roundStarts(itemIds: itemIds)
             let ids = Set(itemIds)
             var result: [UUID: Int] = [:]
             for c in state.checkIns.values where ids.contains(c.itemId) && !c.isVoided {
+                if let start = starts[c.itemId], c.at < start { continue }
                 result[c.itemId, default: 0] += c.amount
             }
             return result
+        }
+        func goalRounds(itemId: UUID) throws -> [GoalRound] {
+            state.rounds.values.filter { $0.itemId == itemId }.sorted { $0.startedAt < $1.startedAt }
+        }
+        func insert(_ round: GoalRound) throws {
+            guard state.rounds[round.id] == nil else { throw FactViolation.duplicate }
+            guard state.items[round.itemId] != nil else { throw FactViolation.missingItem }
+            state.rounds[round.id] = round
         }
         func plans(itemId: UUID) throws -> [Plan] {
             state.plans.values.filter { $0.itemId == itemId }.sorted { $0.at < $1.at }

@@ -24,6 +24,14 @@ import Testing
         #expect(long.title.count == 80 && long.title.hasSuffix("…"))
     }
 
+    @Test func fetchedTitlesAreTidiedAndCapped() {
+        #expect(QuickEntry.cleanTitle("  Attention\n is   all you need ") == "Attention is all you need")
+        #expect(QuickEntry.cleanTitle(" \n\t ") == nil)
+        let long = QuickEntry.cleanTitle(String(repeating: "a", count: 500))
+        #expect(long?.count == 200 && long?.hasSuffix("…") == true)
+        #expect(QuickEntry.cleanTitle(String(repeating: "a", count: 200))?.count == 200)
+    }
+
     @Test func nonWebSchemesAreJustText() {
         #expect(QuickEntry.parse("file:///etc/passwd").url == nil)
         #expect(QuickEntry.parse("javascript:alert(1)").url == nil)

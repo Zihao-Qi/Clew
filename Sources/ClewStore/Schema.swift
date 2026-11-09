@@ -6,7 +6,40 @@ enum Schema {
     static var migrator: DatabaseMigrator {
         var migrator = DatabaseMigrator()
         migrator.registerMigration("v1", migrate: v1)
+        migrator.registerMigration("v2-rounds-titleOrigin", migrate: v2)
         return migrator
+    }
+
+    /// Goal rounds (a fact), and where each item's title came from.
+    private static func v2(_ db: Database) throws {
+        try db.execute(sql: """
+            ALTER TABLE item ADD COLUMN titleOrigin TEXT NOT NULL DEFAULT 'typed'
+                CHECK (titleOrigin IN ('typed', 'fetched'));
+
+            CREATE TABLE goalRound (
+                id         TEXT PRIMARY KEY NOT NULL,
+                itemId     TEXT NOT NULL REFERENCES item(id),
+                startedAt  DATETIME NOT NULL,
+                localDay   TEXT NOT NULL,
+                target     INTEGER NOT NULL CHECK (target >= 1),
+                source     TEXT NOT NULL,
+                voidedAt   DATETIME
+            );
+            CREATE INDEX goalRound_item ON goalRound(itemId, startedAt);
+
+            CREATE TRIGGER goalRound_no_delete BEFORE DELETE ON goalRound
+            BEGIN SELECT RAISE(ABORT, 'facts are never deleted'); END;
+
+            CREATE TRIGGER goalRound_substance_immutable BEFORE UPDATE ON goalRound
+            WHEN NEW.id IS NOT OLD.id OR NEW.itemId IS NOT OLD.itemId
+              OR NEW.startedAt IS NOT OLD.startedAt OR NEW.localDay IS NOT OLD.localDay
+              OR NEW.target IS NOT OLD.target OR NEW.source IS NOT OLD.source
+            BEGIN SELECT RAISE(ABORT, 'fact substance is immutable'); END;
+
+            CREATE TRIGGER goalRound_void_monotonic BEFORE UPDATE ON goalRound
+            WHEN OLD.voidedAt IS NOT NULL AND NEW.voidedAt IS NOT OLD.voidedAt
+            BEGIN SELECT RAISE(ABORT, 'voids are monotonic'); END;
+            """)
     }
 
     private static func v1(_ db: Database) throws {

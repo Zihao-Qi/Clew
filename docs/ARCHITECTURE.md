@@ -75,7 +75,7 @@ The core split: **what you intend** is mutable; **what happened** is append-only
 
 - **Definitions** (edited freely, soft-deleted): `Item`, `Reminder`, `Settings`.
 - **Facts** (inserted, never updated in substance; corrected by voiding):
-  `CheckIn`, `Plan`, `DayReflection` (v1.2), `Award` (v1.3). (`ItemProgress` is
+  `CheckIn`, `Plan`, `GoalRound`, `DayReflection` (v1.2), `Award` (v1.3). (`ItemProgress` is
   latest-state; see §4.2.)
 
 Everything the UI shows (today's list, the `4/6`, progress bars, levels, recaps)
@@ -86,7 +86,7 @@ makes history trustworthy, rewards stable, and sync rules small and explicit (§
 ### 4.2 Entities
 
 ```
-Item            id (UUID), kind, title, url?, note?, parentId?,
+Item            id (UUID), kind, title, titleOrigin: typed | fetched, url?, note?, parentId?,
                 schedule (JSON value type), progress (JSON value type),
                 state: active | later | paused | archived,
                 plannedDay?, sortKey, source, externalRef?,
@@ -94,6 +94,7 @@ Item            id (UUID), kind, title, url?, note?, parentId?,
 CheckIn         id, itemId, localDay, at (UTC), timeZoneId, amount (default 1),
                 rating? (1–3), ratedAt?, source, voidedAt?, voidReason?
 Plan            id, itemId, localDay, at, source, voidedAt?   ← "picked for today", kept as history
+GoalRound       id, itemId, startedAt, localDay, target, source, voidedAt?   ← "next round" of a goal
 Reminder        id, itemId, time (local), weekdays, enabled, updatedAt, deletedAt?
 Settings        key (PK), value (JSON), updatedAt
 — later phases —
@@ -108,10 +109,16 @@ Award           id = hash(kind, itemId, milestone), kind (e.g. goal.finished),
   map to `once | habit | goal`; `link` is a saved link (Later pile items).
   *Later pile* = items in state `later`. "Pick for today" sets `plannedDay` **and**
   records a `Plan` fact, so pick history survives later re-planning.
-- **"Finished" is derived, not stored:** a goal is finished when
-  `sum(amount of non-voided CheckIns) >= target`; a once-item when it has a
-  non-voided CheckIn. Undoing the last tick therefore un-finishes it, with no
-  stored state to repair.
+- **"Finished" is derived, not stored:** a goal is reached when
+  `sum(amount of non-voided CheckIns since the current round started) >= target`;
+  a once-item when it has a non-voided CheckIn. Undoing the last tick therefore
+  un-finishes it, with no stored state to repair.
+- **Goal rounds:** round 1 starts at creation and has no row. "Next round" inserts a
+  `GoalRound`; the current round is the latest non-voided one, and check-ins before
+  its `startedAt` belong to earlier rounds. Lifetime totals still count every
+  check-in. A reached goal accepts no `+1` until a next round or a higher target.
+- **`titleOrigin`:** `fetched` when the title came from the web page (stranger-written,
+  untrusted for the agent, AGENT §4); editing the title makes it `typed`.
 - **Composite progress:** `progress` is `.none`, `.counter(target)` (ML course
   10/30), or `.children` (**v1.1**, for imports: the "Watch later" row = done
   children / all children). A YouTube playlist imported as a course becomes a
@@ -187,7 +194,8 @@ Every mutation is a named command with input validation, one transaction, a
 ChangeLog entry, and an attributed `source`:
 
 `AddItem`, `EditItem`, `CheckIn`, `VoidCheckIn`, `Rate`, `PlanForToday`,
-`MoveToLater`, `ArchiveItem`, `SetReminder`, `Export`; later
+`MoveToLater`, `StartNextRound`, `DeleteItem` (tombstone), `ArchiveItem`,
+`SetReminder`, `Export`; later
 `ImportExternal(batch)`, `RecordProgress` (v1.1), `Reflect` (v1.2).
 
 Queries are read models: `Today`, `Later(filter)`, `History(range)`,
@@ -207,6 +215,13 @@ Queries are read models: `Today`, `Later(filter)`, `History(range)`,
 **Menu bar UI.** `MenuBarExtra` (window style). It observes the `Today` read model through
 GRDB `ValueObservation`, so the list updates live when the extension or agent
 writes. Every action is a command; the UI has no business logic.
+
+**Title fetcher.** The app's only network use (entitlement
+`com.apple.security.network.client`): when a link is pasted into `+ add`, one load of
+that URL (following http(s) redirects) with an ephemeral session (no cookies, no cache), `text/html` only, at most
+3 MB, stopping at `</head>`. `PageTitle` (Core, pure) reads `og:title`, then
+`twitter:title`, `<meta name="title">`, `<title>`. LinkPresentation was rejected: it
+returns only the artist for YouTube music videos.
 
 **Notifications.** This adapter is a **reconciler**, not a scheduler. It computes the
 *desired* set of pending requests for a **rolling 7-day window** from reminders, due
@@ -306,6 +321,7 @@ was false, because some fact fields change after insert.)
 | `CheckIn.voidedAt` | monotonic: voided on any device means voided everywhere |
 | Award | deterministic `id = hash(kind, itemId, milestone)`, so two devices earning the same milestone produce one row |
 | Plan | union by `id`; void is monotonic |
+| GoalRound | union by `id`; void is monotonic; the current round is the latest non-voided `startedAt` |
 | DayReflection | one row per `localDay`; last writer wins by `updatedAt` |
 | Item, Reminder, Settings | **row-level** last writer wins by `updatedAt` (every definition table has `updatedAt` + `deletedAt`). Field-level merge, if two devices editing different fields of one item ever matters, uses CKSyncEngine's server-record conflict callback with stored system fields; decided in v2 |
 | `Award.voidedAt` | monotonic |

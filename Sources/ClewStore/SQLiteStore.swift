@@ -36,7 +36,7 @@ public final class SQLiteStore: ClewStore {
     }
 
     public func observeChanges(_ onChange: @escaping @Sendable () -> Void) -> any StoreObservation {
-        let observation = DatabaseRegionObservation(tracking: Table("item"), Table("checkIn"), Table("plan"))
+        let observation = DatabaseRegionObservation(tracking: Table("item"), Table("checkIn"), Table("plan"), Table("goalRound"))
         let cancellable = observation.start(in: writer, onError: { _ in }, onChange: { _ in onChange() })
         return Observation(cancellable)
     }
@@ -87,14 +87,39 @@ private struct Access: StoreWriter {
         ).map(Self.checkIn)
     }
 
-    func lifetimeAmounts(itemIds: [UUID]) throws -> [UUID: Int] {
+    func roundStarts(itemIds: [UUID]) throws -> [UUID: Date] {
         guard !itemIds.isEmpty else { return [:] }
         let rows = try Row.fetchAll(
             db,
             sql: """
-                SELECT itemId, SUM(amount) AS total FROM checkIn
+                SELECT itemId, MAX(startedAt) AS start FROM goalRound
                 WHERE itemId IN (\(Self.marks(itemIds.count))) AND voidedAt IS NULL
                 GROUP BY itemId
+                """,
+            arguments: StatementArguments(itemIds.map(\.uuidString))
+        )
+        var result: [UUID: Date] = [:]
+        for row in rows {
+            result[try Self.uuid(row, "itemId", table: "goalRound")] = row["start"]
+        }
+        return result
+    }
+
+    func progressAmounts(itemIds: [UUID]) throws -> [UUID: Int] {
+        guard !itemIds.isEmpty else { return [:] }
+        // Dates are stored as UTC "yyyy-MM-dd HH:mm:ss.SSS" text, which sorts in time order.
+        let rows = try Row.fetchAll(
+            db,
+            sql: """
+                SELECT c.itemId, SUM(c.amount) AS total
+                FROM checkIn c
+                LEFT JOIN (
+                    SELECT itemId, MAX(startedAt) AS start FROM goalRound
+                    WHERE voidedAt IS NULL GROUP BY itemId
+                ) r ON r.itemId = c.itemId
+                WHERE c.itemId IN (\(Self.marks(itemIds.count))) AND c.voidedAt IS NULL
+                  AND (r.start IS NULL OR c.at >= r.start)
+                GROUP BY c.itemId
                 """,
             arguments: StatementArguments(itemIds.map(\.uuidString))
         )
@@ -110,6 +135,22 @@ private struct Access: StoreWriter {
             .map(Self.plan)
     }
 
+    func goalRounds(itemId: UUID) throws -> [GoalRound] {
+        try Row.fetchAll(db, sql: "SELECT * FROM goalRound WHERE itemId = ? ORDER BY startedAt",
+                         arguments: [itemId.uuidString]).map(Self.goalRound)
+    }
+
+    func insert(_ g: GoalRound) throws {
+        try db.execute(
+            sql: """
+                INSERT INTO goalRound (id, itemId, startedAt, localDay, target, source, voidedAt)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+            arguments: [g.id.uuidString, g.itemId.uuidString, g.startedAt, g.localDay.description, g.target,
+                        g.source.rawValue, g.voidedAt]
+        )
+    }
+
     func maxSortKey() throws -> Double? {
         try Double.fetchOne(db, sql: "SELECT MAX(sortKey) FROM item")
     }
@@ -118,8 +159,8 @@ private struct Access: StoreWriter {
         try db.execute(
             sql: """
                 INSERT INTO item (id, kind, title, url, note, parentId, schedule, progress, state, plannedDay,
-                                  sortKey, source, externalRef, createdAt, updatedAt, deletedAt)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                  sortKey, source, externalRef, createdAt, updatedAt, deletedAt, titleOrigin)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
             arguments: try Self.itemArguments(item)
         )
@@ -132,7 +173,7 @@ private struct Access: StoreWriter {
             sql: """
                 UPDATE item SET id = ?, kind = ?, title = ?, url = ?, note = ?, parentId = ?, schedule = ?,
                     progress = ?, state = ?, plannedDay = ?, sortKey = ?, source = ?, externalRef = ?,
-                    createdAt = ?, updatedAt = ?, deletedAt = ?
+                    createdAt = ?, updatedAt = ?, deletedAt = ?, titleOrigin = ?
                 WHERE id = ?
                 """,
             arguments: args
@@ -191,6 +232,7 @@ private struct Access: StoreWriter {
             i.id.uuidString, i.kind.rawValue, i.title, i.url?.absoluteString, i.note, i.parentId?.uuidString,
             try json(i.schedule), try json(i.progress), i.state.rawValue, i.plannedDay?.description,
             i.sortKey, i.source.rawValue, i.externalRef, i.createdAt, i.updatedAt, i.deletedAt,
+            i.titleOrigin.rawValue,
         ]
     }
 
@@ -200,6 +242,7 @@ private struct Access: StoreWriter {
             id: try uuid(row, "id", table: t),
             kind: try raw(row, "kind", table: t),
             title: try required(row, "title", table: t),
+            titleOrigin: try raw(row, "titleOrigin", table: t),
             url: (row["url"] as String?).flatMap(URL.init(string:)),
             note: row["note"],
             parentId: try optionalUUID(row, "parentId", table: t),
@@ -230,6 +273,19 @@ private struct Access: StoreWriter {
             source: try raw(row, "source", table: t),
             voidedAt: row["voidedAt"],
             voidReason: row["voidReason"]
+        )
+    }
+
+    private static func goalRound(_ row: Row) throws -> GoalRound {
+        let t = "goalRound"
+        return GoalRound(
+            id: try uuid(row, "id", table: t),
+            itemId: try uuid(row, "itemId", table: t),
+            startedAt: try required(row, "startedAt", table: t),
+            localDay: try day(row, "localDay", table: t),
+            target: try required(row, "target", table: t),
+            source: try raw(row, "source", table: t),
+            voidedAt: row["voidedAt"]
         )
     }
 

@@ -111,7 +111,7 @@ private struct Harness {
         let goal = try h.clew.addItem(NewItem(title: "ML course", shape: .goal(target: 30, schedule: .daily)))
         for _ in 0..<3 { try h.clew.checkIn(itemId: goal.id) }
         let row = try #require(try h.clew.today().rows.first)
-        #expect(row.lifetimeAmount == 3)
+        #expect(row.progressAmount == 3)
         #expect(row.isDone)
     }
 
@@ -156,7 +156,7 @@ private struct Harness {
         h.clock.set(local(2026, 11, 11, 10)) // Wednesday
         let today = try h.clew.today()
         #expect(today.rows.map(\.id) == [goal.id]) // weekly target met on Mon + Tue
-        #expect(today.rows.first?.lifetimeAmount == 2) // ticks from last week count
+        #expect(today.rows.first?.progressAmount == 2) // ticks from last week count
     }
 
     @Test func unfinishedOnceItemShowsUpTomorrow() throws {
@@ -191,7 +191,7 @@ private struct Harness {
         h.clock.set(local(2026, 11, 11, 11))
         let last = try h.clew.checkIn(itemId: goal.id)
         #expect(try h.clew.undoToday(itemId: goal.id)?.id == last.id)
-        #expect(try h.clew.today().rows.first?.lifetimeAmount == 1)
+        #expect(try h.clew.today().rows.first?.progressAmount == 1)
     }
 
     @Test func undoDoesNotReachIntoEarlierDays() throws {
@@ -200,7 +200,7 @@ private struct Harness {
         try h.clew.checkIn(itemId: goal.id)
         h.clock.set(local(2026, 11, 12, 10))
         #expect(try h.clew.undoToday(itemId: goal.id) == nil)
-        #expect(try h.clew.today().rows.first?.lifetimeAmount == 1)
+        #expect(try h.clew.today().rows.first?.progressAmount == 1)
     }
 
     @Test func voidingAnUnknownCheckInIsAnError() {
@@ -272,6 +272,111 @@ private struct Harness {
         h.clock.set(local(2026, 11, 11, 11))
         let new = try h.clew.addItem(NewItem(title: "new", shape: .later))
         #expect(try h.clew.laterItems().map(\.id) == [new.id, old.id])
+    }
+}
+
+@Suite struct GoalRoundCommandTests {
+    private func reachedGoal(_ h: Harness, target: Int = 2) throws -> Item {
+        let goal = try h.clew.addItem(NewItem(title: "g", shape: .goal(target: target, schedule: .daily)))
+        for _ in 0..<target { try h.clew.checkIn(itemId: goal.id) }
+        return goal
+    }
+
+    @Test func reachingTheTargetStopsCountingAndStaysVisible() throws {
+        let h = Harness()
+        let goal = try reachedGoal(h)
+        #expect(throws: ClewError.goalReached) { try h.clew.checkIn(itemId: goal.id) }
+        let row = try #require(try h.clew.today().rows.first)
+        #expect(row.progressAmount == 2 && row.isGoalReached && row.isDone)
+        // The next day it has left the list.
+        h.clock.set(local(2026, 11, 12, 10))
+        #expect(try h.clew.today().rows.isEmpty)
+    }
+
+    @Test func nextRoundStartsFromZeroAndKeepsHistory() throws {
+        let h = Harness()
+        let goal = try reachedGoal(h)
+        h.clock.set(local(2026, 11, 11, 11))
+        let round = try h.clew.startNextRound(itemId: goal.id)
+        #expect(round.target == 2 && round.localDay == day("2026-11-11") && round.startedAt == local(2026, 11, 11, 11))
+        var row = try #require(try h.clew.today().rows.first)
+        #expect(row.progressAmount == 0 && row.state == .due)
+        h.clock.set(local(2026, 11, 11, 12))
+        try h.clew.checkIn(itemId: goal.id)
+        row = try #require(try h.clew.today().rows.first)
+        #expect(row.progressAmount == 1 && row.todayAmount == 1)
+        #expect(h.store.state.checkIns.count == 3) // round 1 is still in the history
+    }
+
+    @Test func nextRoundOnlyAfterTheTargetIsReached() throws {
+        let h = Harness()
+        let goal = try h.clew.addItem(NewItem(title: "g", shape: .goal(target: 5, schedule: .daily)))
+        try h.clew.checkIn(itemId: goal.id)
+        #expect(throws: ClewError.notAllowed) { try h.clew.startNextRound(itemId: goal.id) }
+        let habit = try h.clew.addItem(NewItem(title: "h", shape: .habit(.daily)))
+        try h.clew.checkIn(itemId: habit.id)
+        #expect(throws: ClewError.notAllowed) { try h.clew.startNextRound(itemId: habit.id) }
+        #expect(h.store.state.rounds.isEmpty)
+    }
+
+    @Test func raisingTheTargetLetsCountingContinue() throws {
+        let h = Harness()
+        let goal = try reachedGoal(h)
+        try h.clew.editItem(id: goal.id, ItemEdit(title: "g", url: nil, schedule: .daily, target: 4))
+        try h.clew.checkIn(itemId: goal.id)
+        let row = try #require(try h.clew.today().rows.first)
+        #expect(row.progressAmount == 3 && !row.isGoalReached)
+    }
+
+    @Test func undoAfterANextRoundNeverReachesIntoTheLastRound() throws {
+        let h = Harness()
+        let goal = try reachedGoal(h)
+        h.clock.set(local(2026, 11, 11, 11))
+        try h.clew.startNextRound(itemId: goal.id)
+        #expect(try h.clew.undoToday(itemId: goal.id) == nil)
+        #expect(h.store.state.checkIns.values.allSatisfy { !$0.isVoided })
+    }
+}
+
+@Suite struct DeleteTests {
+    @Test func deleteIsATombstoneThatKeepsHistory() throws {
+        let h = Harness()
+        let habit = try h.clew.addItem(NewItem(title: "h", shape: .habit(.daily)))
+        let later = try h.clew.addItem(NewItem(title: "l", shape: .later))
+        try h.clew.checkIn(itemId: habit.id)
+        h.clock.set(local(2026, 11, 11, 12))
+        try h.clew.deleteItem(itemId: habit.id)
+        try h.clew.deleteItem(itemId: later.id)
+        #expect(try h.clew.today().rows.isEmpty)
+        #expect(try h.clew.laterCount() == 0)
+        #expect(h.store.state.items[habit.id]?.deletedAt == local(2026, 11, 11, 12))
+        #expect(h.store.state.items[habit.id]?.updatedAt == local(2026, 11, 11, 12))
+        #expect(h.store.state.checkIns.count == 1)
+        #expect(throws: ClewError.itemNotFound) { try h.clew.checkIn(itemId: habit.id) }
+    }
+
+    @Test func deletingTwiceKeepsTheFirstTime() throws {
+        let h = Harness()
+        let item = try h.clew.addItem(NewItem(title: "x", shape: .later))
+        try h.clew.deleteItem(itemId: item.id)
+        h.clock.set(local(2026, 11, 11, 13))
+        try h.clew.deleteItem(itemId: item.id)
+        #expect(h.store.state.items[item.id]?.deletedAt == local(2026, 11, 11, 10))
+        #expect(throws: ClewError.itemNotFound) { try h.clew.deleteItem(itemId: UUID()) }
+    }
+}
+
+@Suite struct TitleOriginTests {
+    @Test func fetchedTitleIsMarkedUntilTheUserChangesIt() throws {
+        let h = Harness()
+        let item = try h.clew.addItem(NewItem(title: "A talk", titleOrigin: .fetched,
+                                              url: URL(string: "https://youtu.be/x"), shape: .later))
+        #expect(item.titleOrigin == .fetched)
+        let sameTitle = try h.clew.editItem(id: item.id, ItemEdit(title: "A talk", url: URL(string: "https://youtu.be/y")))
+        #expect(sameTitle.titleOrigin == .fetched)
+        let renamed = try h.clew.editItem(id: item.id, ItemEdit(title: "My talk", url: nil))
+        #expect(renamed.titleOrigin == .typed)
+        #expect(try h.clew.addItem(NewItem(title: "t", shape: .today)).titleOrigin == .typed)
     }
 }
 
