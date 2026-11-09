@@ -59,6 +59,23 @@ private func local(_ m: Int, _ d: Int, _ h: Int = 10) -> Date {
         #expect(review.decision == .letGo && review.localDay == LocalDay(string: "2026-11-09") && review.source == .user)
     }
 
+    /// Reordering Today (even a full renumber) never restarts a Later item's 6 weeks.
+    @Test func reorderingTodayLeavesLaterItemsUntouched() throws {
+        let a = try clew.addItem(NewItem(title: "a", shape: .habit(.daily)))
+        let b = try clew.addItem(NewItem(title: "b", shape: .habit(.daily)))
+        // Saved after a and b, so a full renumber would have to change its sort key.
+        let waiting = try clew.addItem(NewItem(title: "waiting", shape: .later))
+        clock.set(local(11, 9))
+        var below = b.id
+        for i in 0..<60 {                                  // enough to force a renumber
+            let x = try clew.addItem(NewItem(title: "x\(i)", shape: .habit(.daily)))
+            try clew.moveItem(id: x.id, after: a.id, before: below)
+            below = x.id
+        }
+        #expect(store.state.items[waiting.id]?.updatedAt == local(9, 28))
+        #expect(try clew.laterPile().first?.asksStillWant == true)
+    }
+
     @Test func onlyLaterItemsCanBeReviewed() throws {
         let today = try clew.addItem(NewItem(title: "t", shape: .today))
         #expect(throws: ClewError.notAllowed) { try clew.keepLater(itemId: today.id) }

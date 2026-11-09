@@ -216,6 +216,7 @@ M = [
  ("S38 voided counted", S+"SQLiteStore.swift", "SELECT COUNT(*) FROM laterReview WHERE decision = 'letGo' AND voidedAt IS NULL", "SELECT COUNT(*) FROM laterReview WHERE decision = 'letGo'", "ClewStoreTests"),
  ("S39 review mutable", S+"Schema.swift", "WHEN NEW.id IS NOT OLD.id OR NEW.itemId IS NOT OLD.itemId OR NEW.decision IS NOT OLD.decision\n              OR NEW.at IS NOT OLD.at", "WHEN NEW.id IS NOT OLD.id OR NEW.itemId IS NOT OLD.itemId\n              OR NEW.at IS NOT OLD.at", "ClewStoreTests"),
  ("S40 review deletable", S+"Schema.swift", "CREATE TRIGGER laterReview_no_delete BEFORE DELETE ON laterReview\n            BEGIN", "CREATE TRIGGER laterReview_no_delete BEFORE DELETE ON laterReview WHEN 0\n            BEGIN", "ClewStoreTests"),
+ ("L9 renumber touches later", C+"Clew.swift", "        let all = try w.items(inStates: [.active])", "        let all = try w.items(inStates: Set(ItemState.allCases))", "ClewCoreTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

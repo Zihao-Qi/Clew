@@ -356,7 +356,9 @@ public final class Clew: Sendable {
     }
 
     private static func renumber(_ w: any StoreWriter, now: Date) throws {
-        let all = try w.items(inStates: Set(ItemState.allCases))
+        // Only the active list: Later items get a fresh place when picked, and touching
+        // their updatedAt would restart their "still want this?" 6 weeks.
+        let all = try w.items(inStates: [.active])
             .sorted { ($0.sortKey, $0.createdAt, $0.id.uuidString) < ($1.sortKey, $1.createdAt, $1.id.uuidString) }
         for (index, var other) in all.enumerated() where other.sortKey != Double(index + 1) {
             other.sortKey = Double(index + 1)
