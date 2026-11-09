@@ -17,7 +17,9 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Open at login", isOn: Binding(get: { openAtLogin }, set: setOpenAtLogin))
+                // An explicit closure, not `set: setOpenAtLogin`: Swift 6.3 crashes generating the
+                // isolated thunk for the method reference.
+                Toggle("Open at login", isOn: Binding(get: { openAtLogin }, set: { setOpenAtLogin($0) }))
                 if let loginMessage {
                     HStack {
                         Text(loginMessage).font(.callout).foregroundStyle(.secondary)
