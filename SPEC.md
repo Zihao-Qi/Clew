@@ -17,11 +17,11 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
 ## v1 in one picture
 
 ```
- Clew  4/6                      ← menu bar title
+ ☑︎  4/6                        ← menu bar title (icon + done/total)
  ─────────────────────────────────────
  ✓ Exercise
  ✓ Apply to 1 job
- ○ ML course      ███████░░░░░░  10/30  ↗
+ ○ ML course      ███████░░░░░░  10/30  −  ↗
  ○ Watch later    ████████░░░░    2/3   ↗
  ✓ Read 1 article
  ○ Stretch
@@ -95,6 +95,10 @@ stopped daily use, not adding features.
 - Weeks start on **Monday**; "N× per week" items reset then.
 - A counted goal's step is always **+1** per click.
 - The rating row is offered **every time**, and is always skippable.
+- The menu bar title is an icon plus `done/total`, not the word "Clew" (2026-11-08, v1a).
+- A counted goal's undo is a small `−` beside its count, shown only after a `+1` today;
+  it removes the last `+1`. It sits apart from the circle so rapid ticks can't hit it
+  (2026-11-08, v1a).
 - Summary defaults: **9:00** and **21:00**, off until switched on.
 
 ## Open question
