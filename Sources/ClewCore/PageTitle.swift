@@ -25,6 +25,14 @@ public enum PageTitle {
         return nil
     }
 
+    /// Whether a page read so far already holds a complete `og:title` tag, so the
+    /// fetcher can stop. `</head>` is no signal: YouTube playlist pages have one inside
+    /// a script about 50 KB before their real title.
+    public static func hasOpenGraphTitle(_ prefix: Data) -> Bool {
+        guard let tag = prefix.range(of: Data("og:title".utf8)) else { return false }
+        return prefix[tag.upperBound...].contains(UInt8(ascii: ">"))
+    }
+
     static func decodeEntities(_ text: String) -> String {
         guard text.contains("&") else { return text }
         let named = ["amp": "&", "lt": "<", "gt": ">", "quot": "\"", "apos": "'", "nbsp": " "]

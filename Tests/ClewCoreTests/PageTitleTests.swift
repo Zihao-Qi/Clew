@@ -1,3 +1,4 @@
+import Foundation
 import ClewCore
 import Testing
 
@@ -33,5 +34,16 @@ import Testing
     @Test func noTitleIsNil() {
         #expect(PageTitle.extract(fromHTML: "<html><body>hi</body></html>") == nil)
         #expect(PageTitle.extract(fromHTML: "") == nil)
+    }
+}
+
+@Suite struct ReadEnoughTests {
+    @Test func aStrayHeadEndIsNotEnoughButACompleteOgTitleIs() {
+        // YouTube playlist shape: a "</head>" inside a script, then the real tags later.
+        let early = Data(#"<script>var s = "</head>";</script>"#.utf8)
+        #expect(!PageTitle.hasOpenGraphTitle(early))
+        let partial = early + Data(#"<meta property="og:title" content="CS224N"#.utf8)
+        #expect(!PageTitle.hasOpenGraphTitle(partial))
+        #expect(PageTitle.hasOpenGraphTitle(partial + Data(#"">"#.utf8)))
     }
 }

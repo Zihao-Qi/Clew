@@ -4,7 +4,7 @@ import Foundation
 /// The app's only network use (SPEC §8): one page load of a link the user just pasted
 /// (following its http(s) redirects, e.g. youtu.be), to read its title. No cookies, no
 /// cache, text/html only, at most 3 MB (YouTube's og:title sits ~800 KB in), stopping
-/// early at `</head>`.
+/// early once `og:title` has been read.
 enum TitleFetcher {
     static let maxBytes = 3_000_000
 
@@ -29,11 +29,10 @@ enum TitleFetcher {
             else { return nil }
             var data = Data()
             data.reserveCapacity(256_000)
-            let headEnds = [Data("</head>".utf8), Data("</HEAD>".utf8), Data("</Head>".utf8)]
             for try await byte in bytes {
                 data.append(byte)
                 if data.count >= maxBytes { break }
-                if data.count % 65_536 == 0, headEnds.contains(where: { data.range(of: $0) != nil }) { break }
+                if data.count % 65_536 == 0, PageTitle.hasOpenGraphTitle(data) { break }
             }
             return PageTitle.extract(fromHTML: String(decoding: data, as: UTF8.self))
         } catch {

@@ -134,6 +134,8 @@ M = [
  ("S29 round itemId mutable", S+"Schema.swift", "            WHEN NEW.id IS NOT OLD.id OR NEW.itemId IS NOT OLD.itemId\n              OR NEW.startedAt", "            WHEN NEW.id IS NOT OLD.id\n              OR NEW.startedAt", "ClewStoreTests"),
  ("S30 round id mutable", S+"Schema.swift", "            WHEN NEW.id IS NOT OLD.id OR NEW.itemId IS NOT OLD.itemId\n              OR NEW.startedAt", "            WHEN NEW.itemId IS NOT OLD.itemId\n              OR NEW.startedAt", "ClewStoreTests"),
  ("C51 delete hard", C+"Clew.swift", "            item.deletedAt = now\n            item.updatedAt = now\n            try w.update(item)", "            item.state = .archived\n            item.updatedAt = now\n            try w.update(item)", "ClewStoreTests"),
+ ("C52 stop at head", C+"PageTitle.swift", "guard let tag = prefix.range(of: Data(\"og:title\".utf8)) else { return false }", "guard let tag = prefix.range(of: Data(\"</head>\".utf8)) else { return false }", "ClewCoreTests"),
+ ("C53 stop mid-tag", C+"PageTitle.swift", "return prefix[tag.upperBound...].contains(UInt8(ascii: \">\"))", "return !tag.isEmpty", "ClewCoreTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

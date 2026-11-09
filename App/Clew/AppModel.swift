@@ -23,6 +23,9 @@ final class AppModel {
     private(set) var fatalMessage: String?
     /// A short, transient message for a rejected action.
     var notice: String?
+    /// A short confirmation that fades by itself, e.g. "Saved to Later (13)".
+    private(set) var confirmation: String?
+    @ObservationIgnored private var confirmationTask: Task<Void, Never>?
     /// Goals whose "goal reached" line was closed with Done. UI-only; the goal leaves
     /// the list at rollover anyway.
     private(set) var dismissedCelebrations: Set<UUID> = []
@@ -99,6 +102,18 @@ final class AppModel {
     func delete(_ id: UUID) { run { try $0.deleteItem(itemId: id) } }
     func nextRound(_ row: TodayRow) { run { try $0.startNextRound(itemId: row.id) } }
     func dismissCelebration(_ row: TodayRow) { dismissedCelebrations.insert(row.id) }
+
+    /// Later is hidden, so say where the item went (SPEC §5).
+    func confirmSavedToLater() {
+        let text = String(localized: "Saved to Later (\(laterCount))")
+        confirmation = text
+        confirmationTask?.cancel()
+        confirmationTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled, self?.confirmation == text else { return }
+            self?.confirmation = nil
+        }
+    }
 
     /// The page title for a pasted link, or nil.
     func fetchTitle(for url: URL) async -> String? {

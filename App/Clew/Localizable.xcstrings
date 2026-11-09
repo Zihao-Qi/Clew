@@ -10,7 +10,9 @@
     "Add an item" : {},
     "Add one to %@" : {},
     "Add to today" : {},
-    "Archive" : {},
+    "Archive" : {
+      "extractionState" : "stale"
+    },
     "Cancel" : {},
     "Clew" : {},
     "Clew couldn't open its data. Quit and reopen Clew." : {},
@@ -78,6 +80,7 @@
     "Remove one from %@" : {},
     "Repeats" : {},
     "Save" : {},
+    "Saved to Later (%lld)" : {},
     "Start a next round of %@" : {},
     "That can't be done right now." : {},
     "That didn't save. Try again." : {},

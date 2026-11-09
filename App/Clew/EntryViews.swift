@@ -114,7 +114,6 @@ struct AddView: View {
 
     @State private var text = ""
     @State private var kind: AddKind = .today
-    @State private var kindChosenByUser = false
     @State private var schedule = ScheduleDraft()
     @State private var target = 30
     /// The title fetched for the pasted link, if any; it is put into the field so it
@@ -139,7 +138,7 @@ struct AddView: View {
             }
             .onChange(of: text) { textChanged() }
 
-            Picker(selection: Binding(get: { kind }, set: { kind = $0; kindChosenByUser = true })) {
+            Picker(selection: $kind) {
                 Text("Today").tag(AddKind.today)
                 Text("Habit").tag(AddKind.habit)
                 Text("Goal").tag(AddKind.goal)
@@ -174,12 +173,8 @@ struct AddView: View {
     }
 
     private func textChanged() {
+        // A link is added to Today like anything else; Later only when chosen (SPEC §5).
         let parsed = QuickEntry.parse(text)
-        // SPEC §5: a pasted link goes to Later unless you chose otherwise.
-        if !kindChosenByUser {
-            let isLinkOnly = parsed.isBareLink || (parsed.url != nil && parsed.title == fetchedTitle)
-            kind = isLinkOnly ? .later : .today
-        }
         if parsed.isBareLink, let url = parsed.url {
             fetchTitle(url, typed: text)
         }
@@ -212,6 +207,7 @@ struct AddView: View {
         let origin: TitleOrigin = parsed.title == fetchedTitle ? .fetched : .typed
         if model.add(NewItem(title: parsed.title, titleOrigin: origin, url: parsed.url, shape: shape)) {
             done()
+            if kind == .later { model.confirmSavedToLater() }
         }
     }
 }
