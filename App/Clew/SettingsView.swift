@@ -96,6 +96,7 @@ struct SettingsView: View {
                 model.setSummaries(summaries)
             }), displayedComponents: .hourAndMinute) { label }
                 .labelsHidden()
+                .fixedSize()
                 .disabled(!summaries[keyPath: enabled])
                 .accessibilityLabel(Text("Time"))
         }

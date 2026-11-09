@@ -90,6 +90,7 @@ enum Snapshot {
         _ = try clew.addItem(NewItem(title: "A very long item title that should truncate nicely in the row",
                                      shape: .today))
         for _ in 0..<10 { try clew.checkIn(itemId: course.id) }
+        try clew.setReminder(itemId: course.id, time: TimeOfDay(hour: 18, minute: 0))
         let pushups = try clew.addItem(NewItem(title: "Push-ups", shape: .goal(target: 3, schedule: .daily)))
         for _ in 0..<3 { try clew.checkIn(itemId: pushups.id) }
         try clew.checkIn(itemId: exercise.id)
@@ -117,7 +118,13 @@ enum Snapshot {
         defer { window.orderOut(nil) }
         guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { return }
         host.cacheDisplay(in: host.bounds, to: rep)
-        try? rep.representation(using: .png, properties: [:])?.write(to: file)
+        guard let png = rep.representation(using: .png, properties: [:]) else { return }
+        try? png.write(to: file)
+        // The container is protected from other apps (the terminal included), so
+        // CLEW_RENDER_PNG=stdout also prints each image for the developer to decode.
+        if ProcessInfo.processInfo.environment["CLEW_RENDER_PNG"] == "stdout" {
+            print("PNG \(file.lastPathComponent) \(png.base64EncodedString())")
+        }
     }
 }
 #endif

@@ -412,6 +412,7 @@ struct ReminderRow: View {
                 DatePicker(selection: Binding(get: { time.pickerDate }, set: { time = TimeOfDay(pickerDate: $0) }),
                            displayedComponents: .hourAndMinute) { Text("Reminder time") }
                     .labelsHidden()
+                    .fixedSize() // its full width, so "6:00 PM" is never cut off
                     .accessibilityLabel(Text("Reminder time"))
             }
             Spacer()
