@@ -311,11 +311,17 @@ evidence-integrity rules.
   release adds a fixture DB from the previous version, and a test migrates
   *every* historical fixture to head.
 - **Rolling backups** with the SQLite online backup API: daily copies, keeping 14
-  daily and 8 weekly.
+  daily and, from older ones, the newest of each of 8 weeks (22 at most;
+  `BackupRetention`, pure). Each copy is switched to a single-file journal and
+  LZFSE-compressed (about 4× smaller), in `Backups/` beside the database.
 - **Restore is staged, never live.** Swapping the file under an open `DatabasePool`
   (with its `-wal`/`-shm` files) risks corruption. So Restore writes a safety copy,
-  stages the chosen backup, and relaunches. On launch, before the pool opens, a
-  pending restore is applied and verified (`PRAGMA integrity_check`).
+  stages the chosen backup and verifies it (`PRAGMA integrity_check` and Clew's
+  tables), then **closes the pool**, swaps the file and reopens, inside the running
+  app (v1c: same guarantee as a relaunch, without one). `SQLiteStore.open` also
+  applies a staged restore before any connection opens, so a restore interrupted by
+  a quit completes at the next launch; a damaged staged file is discarded and the
+  current data opens.
 - **Export:** versioned JSON (`clewExportVersion: 1`) of definitions + facts,
   including soft-deleted items and voided facts, which is a complete and lossless
   round-trip at the database's millisecond precision (times are ISO 8601 UTC with

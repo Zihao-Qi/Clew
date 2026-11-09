@@ -12,9 +12,22 @@ public final class SQLiteStore: ClewStore {
     let writer: any DatabaseWriter
 
     /// Opens (creating if needed) the database at `url` in WAL mode and migrates it.
+    /// A staged restore is applied first, before any connection is open (ARCHITECTURE §7).
     public static func open(at url: URL) throws -> SQLiteStore {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        do {
+            try Backups.applyPendingRestore(databaseURL: url)
+        } catch BackupError.damaged {
+            // The staged copy was bad and has been discarded; the current data stays.
+        }
         return try SQLiteStore(writer: DatabasePool(path: url.path))
+    }
+
+    /// Closes every connection. The store cannot be used afterwards; a restore swaps the
+    /// file only after this.
+    public func close() throws {
+        if let pool = writer as? DatabasePool { try pool.close() }
+        if let queue = writer as? DatabaseQueue { try queue.close() }
     }
 
     /// An empty in-memory database, for tests.
