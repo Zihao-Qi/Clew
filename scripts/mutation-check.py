@@ -186,6 +186,16 @@ M = [
  ("R7 drop self", C+"Clew.swift", "guard dragged != target, let from = order.firstIndex(of: dragged),", "guard let from = order.firstIndex(of: dragged),", "ClewCoreTests"),
  ("R8 neighbour touched", C+"Clew.swift", "            item.updatedAt = now\n            try w.update(item)\n        }\n    }\n\n    private static func renumber", "            item.updatedAt = now\n            try w.update(item)\n            if let above, var n = try w.item(id: above) { n.updatedAt = now; try w.update(n) }\n        }\n    }\n\n    private static func renumber", "ClewCoreTests"),
  ("R9 no renumber", C+"Clew.swift", "                    try Self.renumber(w, now: now)\n", "", "ClewCoreTests"),
+ ("I1 voided counted", D+"ItemStats.swift", "let live = checkIns.filter { !$0.isVoided && $0.localDay <= today }", "let live = checkIns.filter { $0.localDay <= today }", "ClewDomainTests"),
+ ("I2 future counted", D+"ItemStats.swift", "let live = checkIns.filter { !$0.isVoided && $0.localDay <= today }", "let live = checkIns.filter { !$0.isVoided }", "ClewDomainTests"),
+ ("I3 thirty-one days", D+"ItemStats.swift", "daysLast30 = days.filter { $0 > today.adding(days: -30) }.count", "daysLast30 = days.filter { $0 >= today.adding(days: -30) }.count", "ClewDomainTests"),
+ ("I4 rolling week", D+"ItemStats.swift", "daysThisWeek = days.filter { $0.isInSameWeek(as: today) }.count", "daysThisWeek = days.filter { $0 > today.adding(days: -7) }.count", "ClewDomainTests"),
+ ("I5 voided rounds", D+"ItemStats.swift", "let earlier = rounds.filter { $0.voidedAt == nil }.count", "let earlier = rounds.count", "ClewDomainTests"),
+ ("I6 current not counted", D+"ItemStats.swift", "roundsFinished = earlier + (currentRoundAmount >= target ? 1 : 0)", "roundsFinished = earlier", "ClewDomainTests"),
+ ("I7 future cells", D+"ItemStats.swift", "return day <= today ? day : nil", "return day", "ClewDomainTests"),
+ ("I8 not monday", D+"ItemStats.swift", "let firstMonday = today.weekStart.adding(days: -7 * (weeks - 1))", "let firstMonday = today.adding(days: -7 * (weeks - 1))", "ClewDomainTests"),
+ ("I9 deleted details", C+"Details.swift", "guard let item = try r.item(id: itemId), item.deletedAt == nil else { return nil }", "guard let item = try r.item(id: itemId) else { return nil }", "ClewCoreTests"),
+ ("I10 lifetime as round", C+"Details.swift", "let progress = try r.progressAmounts(itemIds: [itemId])[itemId] ?? 0", "let progress = checkIns.reduce(0) { $0 + $1.amount }", "ClewCoreTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

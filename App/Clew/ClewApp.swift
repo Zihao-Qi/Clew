@@ -14,6 +14,13 @@ struct ClewApp: App {
         if ProcessInfo.processInfo.environment["CLEW_RECONCILE_TEST"] != nil {
             Snapshot.reconcileTestAndExit()
         }
+        if ProcessInfo.processInfo.environment["CLEW_CLICK_TEST"] != nil {
+            // Mouse events need the real event loop, so the app starts (with no data and no
+            // notifications) and the test runs once it is up.
+            _model = State(initialValue: AppModel(clew: nil, notify: false))
+            Snapshot.startClickTest()
+            return
+        }
         if ProcessInfo.processInfo.environment["CLEW_RENDER_PNG"] != nil {
             Snapshot.renderAndExit()
         }
@@ -54,7 +61,11 @@ struct MenuBarLabel: View {
 
 enum Screen: Equatable {
     case list, add, pick
-    case edit(Item)
+    case detail(UUID)
+    /// `back` is where Save or Cancel returns to: the list or that item's details.
+    case edit(Item, back: Back)
+
+    enum Back: Equatable { case list, detail }
 }
 
 struct RootView: View {
@@ -75,7 +86,12 @@ struct RootView: View {
                 case .list: TodayListView(model: model, screen: $screen)
                 case .add: AddView(model: model) { screen = .list }
                 case .pick: PickView(model: model) { screen = .list }
-                case .edit(let item): EditView(model: model, item: item) { screen = .list }
+                case .detail(let id):
+                    DetailView(model: model, itemId: id,
+                               onEdit: { screen = .edit($0, back: .detail) },
+                               onBack: { screen = .list })
+                case .edit(let item, let back):
+                    EditView(model: model, item: item) { screen = back == .detail ? .detail(item.id) : .list }
                 }
             }
         }
