@@ -1,6 +1,7 @@
 import AppKit
 import ClewCore
 import ClewDomain
+import ClewStore
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -16,6 +17,9 @@ struct SettingsView: View {
     @State private var letGoCount = 0
     @State private var exportMessage: String?
     @State private var summaries = SummarySettings.defaults
+    @State private var backupList: [Backups.Entry] = []
+    @State private var showingRestore = false
+    @State private var restoreMessage: String?
 
     var body: some View {
         Form {
@@ -80,12 +84,43 @@ struct SettingsView: View {
             }
 
             Section {
+                LabeledContent {
+                    Text(verbatim: backupList.first(where: { !$0.isSafetyCopy }).map { Self.dayText($0.day) }
+                         ?? String(localized: "Not yet"))
+                } label: {
+                    Text("Last backup")
+                }
+                HStack {
+                    Button("Restore…") { showingRestore = true }
+                        .disabled(backupList.isEmpty)
+                    if let restoreMessage {
+                        Text(restoreMessage).font(.callout).foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("Backups")
+            } footer: {
+                Text("Clew keeps a copy every day on this Mac: the last 14 days and 8 weeks before that.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
                 Button("Quit Clew") { NSApplication.shared.terminate(nil) }
                     .keyboardShortcut("q")
                     .accessibilityLabel(Text("Quit Clew"))
             }
         }
         .formStyle(.grouped)
+        .sheet(isPresented: $showingRestore) {
+            RestoreSheet(entries: backupList) { entry in
+                showingRestore = false
+                restoreMessage = model.restore(entry)
+                reload()
+            } cancel: {
+                showingRestore = false
+            }
+        }
         .frame(width: 400)
         .fixedSize(horizontal: false, vertical: true)
         // A menu bar app shows no window at launch, so macOS must not restore this one
@@ -120,6 +155,7 @@ struct SettingsView: View {
             loginMessage = String(localized: "Allow Clew in System Settings › General › Login Items.")
         }
         activeDays = model.activeDays()
+        backupList = model.backupList()
         letGoCount = model.lettingGoCount()
     }
 
@@ -144,6 +180,62 @@ struct SettingsView: View {
             exportMessage = String(localized: "Saved.")
         } catch {
             exportMessage = String(localized: "Export failed. Try again.")
+        }
+    }
+}
+
+extension SettingsView {
+    /// "Mon, Nov 9" in the user's language.
+    static func dayText(_ day: LocalDay) -> String {
+        var c = DateComponents()
+        (c.year, c.month, c.day, c.hour) = (day.year, day.month, day.day, 12)
+        guard let date = Calendar.current.date(from: c) else { return day.description }
+        return date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+    }
+}
+
+/// Pick a backup to restore; each asks once before replacing today's data.
+private struct RestoreSheet: View {
+    let entries: [Backups.Entry]
+    let restore: (Backups.Entry) -> Void
+    let cancel: () -> Void
+    @State private var confirming: Backups.Entry?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Restore a backup").font(.headline).accessibilityAddTraits(.isHeader)
+            Text("Your current data is saved as a backup first, so a restore can be undone.")
+                .font(.callout).foregroundStyle(.secondary)
+            List(entries) { entry in
+                HStack {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(verbatim: SettingsView.dayText(entry.day))
+                        if entry.isSafetyCopy {
+                            Text("Saved before a restore").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                    Button("Restore") { confirming = entry }
+                        .accessibilityLabel(Text("Restore the backup from \(SettingsView.dayText(entry.day))"))
+                }
+            }
+            .frame(height: 260)
+            HStack {
+                Spacer()
+                Button("Cancel", action: cancel).keyboardShortcut(.cancelAction)
+            }
+        }
+        .padding(16)
+        .frame(width: 380)
+        .confirmationDialog(
+            Text("Replace your current data with this backup?"),
+            isPresented: Binding(get: { confirming != nil }, set: { if !$0 { confirming = nil } }),
+            presenting: confirming
+        ) { entry in
+            Button("Restore", role: .destructive) { restore(entry) }
+            Button("Cancel", role: .cancel) {}
+        } message: { entry in
+            Text("The backup from \(SettingsView.dayText(entry.day)) replaces today's list and history. Your current data is saved first.")
         }
     }
 }

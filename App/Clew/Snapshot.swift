@@ -139,6 +139,36 @@ enum Snapshot {
         }
     }
 
+    /// `CLEW_RESTORE_TEST=1`: the app model's real restore path on a temporary
+    /// database (never the user's): back up, change, restore, then undo the restore.
+    static func restoreTestAndExit() -> Never {
+        Task { @MainActor in
+            let dir = FileManager.default.temporaryDirectory.appendingPathComponent("clew-restore-test-\(UUID().uuidString)")
+            let model = AppModel(databaseAt: dir.appendingPathComponent("clew.sqlite"), notify: false)
+            @MainActor func titles() -> String { (model.today?.rows ?? []).map(\.item.title).joined(separator: ",") }
+            _ = model.add(NewItem(title: "A", shape: .habit(.daily)))
+            try? await Task.sleep(for: .milliseconds(500))         // the daily backup runs in the background
+            let first = model.backupList()
+            print("backups after launch:", first.map(\.url.lastPathComponent))
+            _ = model.add(NewItem(title: "B", shape: .habit(.daily)))
+            print("before restore:", titles())
+            guard let backup = first.first else { print("FAIL: no backup"); exit(1) }
+            print("restore →", model.restore(backup))
+            print("after restore:", titles())
+            _ = model.add(NewItem(title: "C", shape: .habit(.daily)))   // the reopened database works
+            print("after adding C:", titles())
+            if let safety = model.backupList().first(where: \.isSafetyCopy) {
+                print("undo →", model.restore(safety))
+                print("after undo:", titles())
+            }
+            print("backups now:", model.backupList().map(\.url.lastPathComponent))
+            try? FileManager.default.removeItem(at: dir)
+            exit(0)
+        }
+        RunLoop.main.run()
+        exit(1)
+    }
+
     static func renderAndExit() -> Never {
         let dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("ClewSnapshots")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

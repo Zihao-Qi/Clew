@@ -34,6 +34,10 @@ final class AppModel {
     private(set) var notificationsDenied = false
 
     @ObservationIgnored private var clew: Clew?
+    /// Set only for the real database (not for previews or the debug snapshot).
+    @ObservationIgnored private var store: SQLiteStore?
+    @ObservationIgnored private(set) var backups: Backups?
+    @ObservationIgnored private var backingUp = false
     @ObservationIgnored private var notifications: NotificationsAdapter?
     @ObservationIgnored private var observation: (any StoreObservation)?
     @ObservationIgnored private var rolloverTimer: Timer?
@@ -42,8 +46,22 @@ final class AppModel {
     /// The live app: the database in the sandbox container.
     convenience init() {
         do {
-            let store = try SQLiteStore.open(at: Self.databaseURL())
-            self.init(clew: Clew(store: store, clock: SystemClock(), zones: SystemTimeZone()))
+            self.init(databaseAt: try Self.databaseURL())
+        } catch {
+            self.init(clew: nil)
+            fatalMessage = String(localized: "Clew couldn't open its data. Quit and reopen Clew.")
+        }
+    }
+
+    /// The real app's model for the database at `url` (the debug restore test passes a
+    /// temporary one).
+    convenience init(databaseAt url: URL, notify: Bool = true) {
+        do {
+            let store = try SQLiteStore.open(at: url)
+            self.init(clew: Clew(store: store, clock: SystemClock(), zones: SystemTimeZone()), notify: notify)
+            self.store = store
+            self.backups = Backups(databaseURL: url)
+            refresh() // now with backups attached: makes today's backup if needed
         } catch {
             self.init(clew: nil)
             fatalMessage = String(localized: "Clew couldn't open its data. Quit and reopen Clew.")
@@ -87,6 +105,52 @@ final class AppModel {
         }
         scheduleRollover()
         reconcileNotifications()
+        backUpIfNeeded()
+    }
+
+    // MARK: - Backups (ARCHITECTURE §7)
+
+    /// Once a day, off the main thread: launch, rollover, wake and every refresh check.
+    private func backUpIfNeeded() {
+        guard let store, let backups, let clew, !backingUp else { return }
+        backingUp = true
+        let today = clew.currentDay()
+        Task.detached(priority: .utility) {
+            _ = try? backups.backUpIfNeeded(store, today: today)
+            await MainActor.run { [weak self] in self?.backingUp = false }
+        }
+    }
+
+    func backupList() -> [Backups.Entry] { backups?.list() ?? [] }
+
+    /// Restore: a safety copy of the current data, then the chosen backup is staged and
+    /// checked, the database is closed, swapped and reopened. Nothing is swapped under
+    /// an open database. Returns a sentence for the user.
+    func restore(_ entry: Backups.Entry) -> String {
+        guard let store, let backups, let clew else { return String(localized: "Restore isn't available.") }
+        do {
+            try backups.stageRestore(entry, current: store, today: clew.currentDay())
+        } catch {
+            return String(localized: "That backup is damaged, so nothing was changed.")
+        }
+        observation?.cancel()
+        observation = nil
+        self.clew = nil
+        self.store = nil
+        do {
+            try store.close()
+            let reopened = try SQLiteStore.open(at: backups.databaseURL)
+            let fresh = Clew(store: reopened, clock: SystemClock(), zones: SystemTimeZone())
+            self.store = reopened
+            self.clew = fresh
+            observation = fresh.observeChanges { [weak self] in Task { @MainActor in self?.refresh() } }
+            refresh()
+            let date = SettingsView.dayText(entry.day)
+            return String(localized: "Restored the backup from \(date). Your data from before is saved as a backup too.")
+        } catch {
+            fatalMessage = String(localized: "Clew couldn't open its data. Quit and reopen Clew.")
+            return String(localized: "Restore failed. Quit and reopen Clew.")
+        }
     }
 
     /// Runs after every refresh: launch, every command, rollover, wake, and clock or

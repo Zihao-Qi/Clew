@@ -78,6 +78,9 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
     Delete. No streak counts.
 11. **Your order.** Drag rows to reorder them (or Move Up / Move Down). Ticking never
     moves a row. Sorting rules wait until manual order isn't enough.
+12. **Backups.** A compressed copy every day on this Mac (the last 14 days, plus 8
+    weeks before that). Settings › Restore… brings one back; the current data is
+    saved first, so a restore can be undone.
 
 ## Design rules (from ADHD/CBT practice)
 

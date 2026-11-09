@@ -217,6 +217,18 @@ M = [
  ("S39 review mutable", S+"Schema.swift", "WHEN NEW.id IS NOT OLD.id OR NEW.itemId IS NOT OLD.itemId OR NEW.decision IS NOT OLD.decision\n              OR NEW.at IS NOT OLD.at", "WHEN NEW.id IS NOT OLD.id OR NEW.itemId IS NOT OLD.itemId\n              OR NEW.at IS NOT OLD.at", "ClewStoreTests"),
  ("S40 review deletable", S+"Schema.swift", "CREATE TRIGGER laterReview_no_delete BEFORE DELETE ON laterReview\n            BEGIN", "CREATE TRIGGER laterReview_no_delete BEFORE DELETE ON laterReview WHEN 0\n            BEGIN", "ClewStoreTests"),
  ("L9 renumber touches later", C+"Clew.swift", "        let all = try w.items(inStates: [.active])", "        let all = try w.items(inStates: Set(ItemState.allCases))", "ClewCoreTests"),
+ ("B1 weeklies overlap", C+"Backups.swift", "let older = past.filter { $0 <= cutoff }", "let older = past", "ClewCoreTests"),
+ ("B2 fifteen dailies", C+"Backups.swift", "let cutoff = today.adding(days: -daily)", "let cutoff = today.adding(days: -daily - 1)", "ClewCoreTests"),
+ ("B3 oldest per week", C+"Backups.swift", "Dictionary(grouping: older, by: \\.weekStart).compactMapValues { $0.max() }", "Dictionary(grouping: older, by: \\.weekStart).compactMapValues { $0.min() }", "ClewCoreTests"),
+ ("B4 future kept", C+"Backups.swift", "let past = Set(days.filter { $0 <= today })", "let past = Set(days)", "ClewCoreTests"),
+ ("B5 twice a day", S+"Backups.swift", "guard !list().contains(where: { $0.day == today && !$0.isSafetyCopy }) else { return nil }", "_ = today", "ClewStoreTests"),
+ ("B6 no prune", S+"Backups.swift", "        for entry in dailies where !keep.contains(entry.day) {\n            try FileManager.default.removeItem(at: entry.url)", "        for entry in dailies where !keep.contains(entry.day) {\n            _ = entry", "ClewStoreTests"),
+ ("B7 no safety copy", S+"Backups.swift", "        try safetyCopy(store, today: today)\n", "", "ClewStoreTests"),
+ ("B8 no health check", S+"Backups.swift", "        guard Self.isHealthyClewDatabase(pendingRestoreURL) else {\n            try? FileManager.default.removeItem(at: pendingRestoreURL)\n            throw BackupError.damaged\n        }", "", "ClewStoreTests"),
+ ("B9 restore not applied", S+"SQLiteStore.swift", "            try Backups.applyPendingRestore(databaseURL: url)\n", "", "ClewStoreTests"),
+ ("B10 damaged blocks launch", S+"SQLiteStore.swift", "        } catch BackupError.damaged {\n            // The staged copy was bad and has been discarded; the current data stays.\n        }", "        }", "ClewStoreTests"),
+ ("B11 uncompressed", S+"Backups.swift", "try Self.compress(try Data(contentsOf: raw)).write(to: target, options: .atomic)", "try Data(contentsOf: raw).write(to: target, options: .atomic)", "ClewStoreTests"),
+ ("B12 any name listed", S+"Backups.swift", "        return rest.hasPrefix(\"-before-restore\") ? (day, true) : nil", "        return (day, true)", "ClewStoreTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0
