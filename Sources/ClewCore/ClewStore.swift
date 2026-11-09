@@ -41,6 +41,10 @@ public protocol StoreReader {
     func reminders() throws -> [Reminder]
     /// A setting's stored JSON, or nil if never set.
     func setting(_ key: String) throws -> String?
+    /// Non-voided "still want this?" answers for these items.
+    func laterReviews(itemIds: [UUID]) throws -> [LaterReview]
+    /// How many items were let go (non-voided), all time.
+    func letGoCount() throws -> Int
 }
 
 /// Everything Clew stores, as it is stored.
@@ -51,18 +55,22 @@ public struct ExportRecords: Hashable, Sendable, Codable {
     public var goalRounds: [GoalRound]
     public var reminders: [Reminder]
     public var settings: [SettingRecord]
+    public var laterReviews: [LaterReview]
 
     public init(items: [Item], checkIns: [CheckIn], plans: [Plan], goalRounds: [GoalRound],
-                reminders: [Reminder] = [], settings: [SettingRecord] = []) {
+                reminders: [Reminder] = [], settings: [SettingRecord] = [], laterReviews: [LaterReview] = []) {
         self.items = items
         self.checkIns = checkIns
         self.plans = plans
         self.goalRounds = goalRounds
         self.reminders = reminders
         self.settings = settings
+        self.laterReviews = laterReviews
     }
 
-    private enum CodingKeys: String, CodingKey { case items, checkIns, plans, goalRounds, reminders, settings }
+    private enum CodingKeys: String, CodingKey {
+        case items, checkIns, plans, goalRounds, reminders, settings, laterReviews
+    }
 
     /// `reminders` and `settings` arrived after the first exports; older files read as empty.
     public init(from decoder: any Decoder) throws {
@@ -73,7 +81,8 @@ public struct ExportRecords: Hashable, Sendable, Codable {
             plans: try c.decode([Plan].self, forKey: .plans),
             goalRounds: try c.decode([GoalRound].self, forKey: .goalRounds),
             reminders: try c.decodeIfPresent([Reminder].self, forKey: .reminders) ?? [],
-            settings: try c.decodeIfPresent([SettingRecord].self, forKey: .settings) ?? []
+            settings: try c.decodeIfPresent([SettingRecord].self, forKey: .settings) ?? [],
+            laterReviews: try c.decodeIfPresent([LaterReview].self, forKey: .laterReviews) ?? []
         )
     }
 }
@@ -90,6 +99,7 @@ public protocol StoreWriter: StoreReader {
     /// Inserts, or replaces the row with the same id.
     func save(_ reminder: Reminder) throws
     func saveSetting(_ key: String, json: String, updatedAt: Date) throws
+    func insert(_ review: LaterReview) throws
 }
 
 /// A row of the `settings` table: a definition with last-writer-wins by `updatedAt`.

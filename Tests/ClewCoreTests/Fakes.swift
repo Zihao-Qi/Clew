@@ -27,6 +27,7 @@ final class FakeStore: ClewStore, @unchecked Sendable {
         var rounds: [UUID: GoalRound] = [:]
         var reminders: [UUID: Reminder] = [:]
         var settings: [String: SettingRecord] = [:]
+        var laterReviews: [UUID: LaterReview] = [:]
     }
 
     enum FactViolation: Error { case revoid, duplicate, missingItem }
@@ -117,13 +118,26 @@ final class FakeStore: ClewStore, @unchecked Sendable {
                 plans: state.plans.values.sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) },
                 goalRounds: state.rounds.values.sorted { ($0.startedAt, $0.id.uuidString) < ($1.startedAt, $1.id.uuidString) },
                 reminders: state.reminders.values.sorted { ($0.updatedAt, $0.id.uuidString) < ($1.updatedAt, $1.id.uuidString) },
-                settings: state.settings.values.sorted { $0.key < $1.key }
+                settings: state.settings.values.sorted { $0.key < $1.key },
+                laterReviews: state.laterReviews.values.sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) }
             )
         }
         func reminders() throws -> [Reminder] {
             state.reminders.values.filter { $0.deletedAt == nil }.sorted { $0.itemId.uuidString < $1.itemId.uuidString }
         }
         func setting(_ key: String) throws -> String? { state.settings[key]?.value }
+        func laterReviews(itemIds: [UUID]) throws -> [LaterReview] {
+            let ids = Set(itemIds)
+            return state.laterReviews.values.filter { ids.contains($0.itemId) && $0.voidedAt == nil }.sorted { $0.at < $1.at }
+        }
+        func letGoCount() throws -> Int {
+            state.laterReviews.values.filter { $0.decision == .letGo && $0.voidedAt == nil }.count
+        }
+        func insert(_ review: LaterReview) throws {
+            guard state.laterReviews[review.id] == nil else { throw FactViolation.duplicate }
+            guard state.items[review.itemId] != nil else { throw FactViolation.missingItem }
+            state.laterReviews[review.id] = review
+        }
         func save(_ reminder: Reminder) throws {
             guard state.items[reminder.itemId] != nil else { throw FactViolation.missingItem }
             if reminder.deletedAt == nil,

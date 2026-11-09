@@ -201,7 +201,11 @@ enum Snapshot {
         for _ in 0..<3 { try clew.checkIn(itemId: pushups.id) }
         try clew.checkIn(itemId: exercise.id)
         try clew.checkIn(itemId: job.id)
-        for title in ["Talk on attention", "Rust ownership article", "Interview prep video"] {
+        // A Later item saved 7 weeks ago, so the picker asks "still want this?".
+        clock.date = now.addingTimeInterval(-49 * 86_400)
+        _ = try clew.addItem(NewItem(title: "Rust ownership article", url: URL(string: "https://medium.com/x"), shape: .later))
+        clock.date = now
+        for title in ["Talk on attention", "Interview prep video"] {
             _ = try clew.addItem(NewItem(title: title, url: URL(string: "https://youtube.com/watch?v=x"), shape: .later))
         }
     }

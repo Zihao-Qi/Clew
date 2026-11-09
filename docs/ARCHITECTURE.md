@@ -75,7 +75,7 @@ The core split: **what you intend** is mutable; **what happened** is append-only
 
 - **Definitions** (edited freely, soft-deleted): `Item`, `Reminder`, `Settings`.
 - **Facts** (inserted, never updated in substance; corrected by voiding):
-  `CheckIn`, `Plan`, `GoalRound`, `DayReflection` (v1.2), `Award` (v1.3). (`ItemProgress` is
+  `CheckIn`, `Plan`, `GoalRound`, `LaterReview`, `DayReflection` (v1.2), `Award` (v1.3). (`ItemProgress` is
   latest-state; see §4.2.)
 
 Everything the UI shows (today's list, the `4/6`, progress bars, levels, recaps)
@@ -95,6 +95,7 @@ CheckIn         id, itemId, localDay, at (UTC), timeZoneId, amount (default 1),
                 rating? (1–3), ratedAt?, source, voidedAt?, voidReason?
 Plan            id, itemId, localDay, at, source, voidedAt?   ← "picked for today", kept as history
 GoalRound       id, itemId, startedAt, localDay, target, source, voidedAt?   ← "next round" of a goal
+LaterReview     id, itemId, decision: keep | letGo, at, localDay, source, voidedAt?   ← "still want this?"
 Reminder        id, itemId, time (hour, minute; local), enabled, updatedAt, deletedAt?
                 ← at most one live reminder per item; it fires on the item's due days
 Settings        key (PK), value (JSON), updatedAt
@@ -336,6 +337,7 @@ was false, because some fact fields change after insert.)
 | Award | deterministic `id = hash(kind, itemId, milestone)`, so two devices earning the same milestone produce one row |
 | Plan | union by `id`; void is monotonic |
 | GoalRound | union by `id`; void is monotonic; the current round is the latest non-voided `startedAt` |
+| LaterReview | union by `id`; void is monotonic |
 | DayReflection | one row per `localDay`; last writer wins by `updatedAt` |
 | Item, Reminder, Settings | **row-level** last writer wins by `updatedAt` (every definition table has `updatedAt` + `deletedAt`). Field-level merge, if two devices editing different fields of one item ever matters, uses CKSyncEngine's server-record conflict callback with stored system fields; decided in v2 |
 | `Award.voidedAt` | monotonic |

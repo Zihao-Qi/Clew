@@ -305,7 +305,7 @@ struct PickView: View {
     let model: AppModel
     let done: () -> Void
 
-    @State private var items: [Item] = []
+    @State private var items: [LaterEntry] = []
     @State private var picked: [UUID] = []
 
     var body: some View {
@@ -327,7 +327,7 @@ struct PickView: View {
                     .frame(height: 280)
             }
 
-            NoticeView(text: model.notice)
+            NoticeView(text: model.notice ?? model.confirmation)
 
             HStack {
                 Spacer()
@@ -341,30 +341,48 @@ struct PickView: View {
             }
         }
         .padding(12)
-        .onAppear { items = model.laterItems() }
+        .onAppear { items = model.laterPile() }
     }
 
     private var pickList: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            ForEach(items) { item in
-                HStack(spacing: 8) {
-                    Toggle(isOn: binding(for: item.id)) {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(item.title).lineLimit(1)
-                            if let host = item.url?.host {
-                                Text(verbatim: host).font(.caption).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(items) { entry in
+                let item = entry.item
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Toggle(isOn: binding(for: item.id)) {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(item.title).lineLimit(1)
+                                let host = item.url?.host
+                                if host != nil || entry.asksStillWant {
+                                    Text(verbatim: [host, entry.asksStillWant ? Self.weeks(entry.daysWaiting) : nil]
+                                        .compactMap { $0 }.joined(separator: " · "))
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
                             }
                         }
-                    }
-                    .toggleStyle(.checkbox)
-                    .disabled(!picked.contains(item.id) && picked.count >= Clew.maxPicks)
-                    .accessibilityLabel(Text(item.title))
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                        .toggleStyle(.checkbox)
+                        .disabled(!picked.contains(item.id) && picked.count >= Clew.maxPicks)
+                        .accessibilityLabel(Text(item.title))
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Button { delete(item) } label: { Image(systemName: "xmark") }
-                        .buttonStyle(.borderless)
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel(Text("Delete \(item.title)"))
+                        Button { delete(item) } label: { Image(systemName: "xmark") }
+                            .buttonStyle(.borderless)
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel(Text("Delete \(item.title)"))
+                    }
+                    // SPEC §5: waited 6+ weeks untouched. Saying no counts as a win.
+                    if entry.asksStillWant {
+                        HStack(spacing: 8) {
+                            Text("Still want this?").font(.caption).foregroundStyle(.secondary)
+                            Button("Keep") { keep(item) }
+                                .accessibilityLabel(Text("Keep \(item.title)"))
+                            Button("Let go") { letGo(item) }
+                                .accessibilityLabel(Text("Let go of \(item.title)"))
+                        }
+                        .controlSize(.small)
+                        .padding(.leading, 22)
+                    }
                 }
                 .contextMenu {
                     Button("Delete", role: .destructive) { delete(item) }
@@ -374,10 +392,26 @@ struct PickView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// "7 weeks", in the user's language.
+    static func weeks(_ days: Int) -> String {
+        String(localized: "\(days / 7) weeks")
+    }
+
+    private func keep(_ item: Item) {
+        model.keepLater(item.id)
+        items = model.laterPile()
+    }
+
+    private func letGo(_ item: Item) {
+        model.letGo(item.id)
+        picked.removeAll { $0 == item.id }
+        items = model.laterPile()
+    }
+
     private func delete(_ item: Item) {
         model.delete(item.id)
         picked.removeAll { $0 == item.id }
-        items = model.laterItems()
+        items = model.laterPile()
     }
 
     private func binding(for id: UUID) -> Binding<Bool> {

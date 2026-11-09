@@ -58,7 +58,8 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
    hidden pile, and a short line confirms it ("Saved to Later (13)"). A pasted link
    goes to Today like anything else unless Later is chosen. The pile's count is
    shown, its contents aren't. "Pick 1–3 for today" moves items onto the list.
-   Items untouched for 6 weeks get a one-tap "still want this?". Saying no counts as a win. Any item can be deleted (in Later:
+   Items untouched for 6 weeks get a "still want this?" in the Later picker, with
+   **Keep** (its 6 weeks start again) or **Let go** (removed; Settings counts it). Saying no counts as a win. Any item can be deleted (in Later:
    `×`; on Today: right-click). Delete hides it for good; its history is kept.
 6. **Gentle reminders** (optional, per item, off by default). One notification at
    a chosen time on each day the item is on Today and not done yet, with **Done**,
@@ -112,6 +113,9 @@ stopped daily use, not adding features.
 - Weeks start on **Monday**; "N× per week" items reset then.
 - A counted goal's step is always **+1** per click.
 - The rating row is offered **every time**, and is always skippable.
+- "Still want this?" lives only in the Later picker; untouched = not saved, edited,
+  moved to Later or kept for 42 days. Rating dots are built off by default, as a
+  Settings switch (2026-11-09).
 - Clicking a row opens its details; the link mark, not the title, opens a link.
   Goal bars align in one column. Rows can be dragged to reorder (2026-11-08, after use).
 - Reminders fire on every day the item is on Today until done, once per day; "Later"

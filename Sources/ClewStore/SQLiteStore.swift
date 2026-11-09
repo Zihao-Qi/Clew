@@ -37,7 +37,7 @@ public final class SQLiteStore: ClewStore {
 
     public func observeChanges(_ onChange: @escaping @Sendable () -> Void) -> any StoreObservation {
         let observation = DatabaseRegionObservation(tracking: Table("item"), Table("checkIn"), Table("plan"), Table("goalRound"),
-                                                     Table("reminder"), Table("settings"))
+                                                     Table("reminder"), Table("settings"), Table("laterReview"))
         let cancellable = observation.start(in: writer, onError: { _ in }, onChange: { _ in onChange() })
         return Observation(cancellable)
     }
@@ -174,7 +174,28 @@ private struct Access: StoreWriter {
                 SettingRecord(key: try Self.required(row, "key", table: "settings"),
                               value: try Self.required(row, "value", table: "settings"),
                               updatedAt: try Self.required(row, "updatedAt", table: "settings"))
-            }
+            },
+            laterReviews: try Row.fetchAll(db, sql: "SELECT * FROM laterReview ORDER BY at, id").map(Self.laterReview)
+        )
+    }
+
+    func laterReviews(itemIds: [UUID]) throws -> [LaterReview] {
+        guard !itemIds.isEmpty else { return [] }
+        return try Row.fetchAll(
+            db, sql: "SELECT * FROM laterReview WHERE voidedAt IS NULL AND itemId IN (\(Self.marks(itemIds.count))) ORDER BY at",
+            arguments: StatementArguments(itemIds.map(\.uuidString))
+        ).map(Self.laterReview)
+    }
+
+    func letGoCount() throws -> Int {
+        try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM laterReview WHERE decision = 'letGo' AND voidedAt IS NULL") ?? 0
+    }
+
+    func insert(_ r: LaterReview) throws {
+        try db.execute(
+            sql: "INSERT INTO laterReview (id, itemId, decision, at, localDay, source, voidedAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            arguments: [r.id.uuidString, r.itemId.uuidString, r.decision.rawValue, r.at, r.localDay.description,
+                        r.source.rawValue, r.voidedAt]
         )
     }
 
@@ -359,6 +380,19 @@ private struct Access: StoreWriter {
             enabled: try required(row, "enabled", table: t),
             updatedAt: try required(row, "updatedAt", table: t),
             deletedAt: row["deletedAt"]
+        )
+    }
+
+    private static func laterReview(_ row: Row) throws -> LaterReview {
+        let t = "laterReview"
+        return LaterReview(
+            id: try uuid(row, "id", table: t),
+            itemId: try uuid(row, "itemId", table: t),
+            decision: try raw(row, "decision", table: t),
+            at: try required(row, "at", table: t),
+            localDay: try day(row, "localDay", table: t),
+            source: try raw(row, "source", table: t),
+            voidedAt: row["voidedAt"]
         )
     }
 
