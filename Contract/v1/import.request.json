@@ -1,0 +1,9 @@
+{
+  "source": "extension.youtube",
+  "listTotal": 2,
+  "entries": [
+    {"externalRef": "aaaaaaaaaaa", "title": "First video"},
+    {"externalRef": "bbbbbbbbbbb", "title": "Second video"}
+  ],
+  "scan": {"found": 2, "parsed": 2, "selectorVersion": "youtube-2026-11-09"}
+}

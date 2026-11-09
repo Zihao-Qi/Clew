@@ -5,6 +5,7 @@ import PackageDescription
 //   ClewDomain  -> Foundation only
 //   ClewCore    -> ClewDomain
 //   ClewStore   -> ClewCore, GRDB
+//   ClewGateway -> ClewCore (the local API, v1.1; Apple platforms only)
 // Never add a dependency to ClewDomain or ClewCore.
 let package = Package(
     name: "Clew",
@@ -13,6 +14,7 @@ let package = Package(
         .library(name: "ClewDomain", targets: ["ClewDomain"]),
         .library(name: "ClewCore", targets: ["ClewCore"]),
         .library(name: "ClewStore", targets: ["ClewStore"]),
+        .library(name: "ClewGateway", targets: ["ClewGateway"]),
     ],
     dependencies: [
         .package(url: "https://github.com/groue/GRDB.swift", exact: "7.11.1"),
@@ -24,8 +26,10 @@ let package = Package(
             "ClewCore",
             .product(name: "GRDB", package: "GRDB.swift"),
         ]),
+        .target(name: "ClewGateway", dependencies: ["ClewCore"]),
         .testTarget(name: "ClewDomainTests", dependencies: ["ClewDomain"]),
         .testTarget(name: "ClewCoreTests", dependencies: ["ClewCore"]),
         .testTarget(name: "ClewStoreTests", dependencies: ["ClewStore"]),
+        .testTarget(name: "ClewGatewayTests", dependencies: ["ClewGateway", "ClewStore"]),
     ]
 )

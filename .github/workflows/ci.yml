@@ -20,6 +20,24 @@ jobs:
       - name: Domain and Core tests
         run: swift test --filter 'ClewDomainTests|ClewCoreTests'
 
+  extension:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Extension
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - run: bun install --frozen-lockfile
+      - name: Type check
+        run: bunx tsc --noEmit
+      - name: Tests (scrapers against saved pages, Gateway client, shared contract)
+        run: bun test
+      - name: Build the unpacked extension
+        run: bun run build
+
   macos:
     runs-on: macos-latest
     steps:

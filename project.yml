@@ -23,6 +23,8 @@ targets:
         product: ClewCore
       - package: ClewPackage
         product: ClewStore
+      - package: ClewPackage
+        product: ClewGateway
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.zihao-qi.clew   # ARCHITECTURE §15

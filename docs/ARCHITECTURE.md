@@ -61,7 +61,7 @@ dependencies make the layering a **compile error** rather than a lint rule:
 | `ClewDomain` | Foundation only | Entities, `LocalDay`, schedule evaluation, progress, achievement rules. Pure functions; `Clock` and `Calendar` are injected. |
 | `ClewCore` | Domain | Use cases (commands + queries), validation, attribution, the `ClewStore` *protocol*, the `Notifier` *protocol*. |
 | `ClewStore` | Core, GRDB | GRDB implementation: schema, migrations, change feed, backups, observation. |
-| `ClewGateway` (v1.1) | Core | Local HTTP API `/v1`, auth, schema-versioned JSON. |
+| `ClewGateway` (v1.1) | Core | Local HTTP API `/v1`, pairing and auth, the loopback listener (Network). Apple platforms only (CryptoKit). |
 | `ClewApp` (app target) | all | SwiftUI `MenuBarExtra`, notifications adapter, settings, composition root. |
 | `clew-mcp` (v1.2, executable) | none of the above | Thin stdio MCP server that calls the Gateway. |
 
@@ -251,37 +251,68 @@ replacing one is idempotent.
 - **Permission** is asked the first time a summary or reminder is switched on, never
   at launch. If it is off in System Settings, Settings and the reminder row say so.
 
-**Gateway (v1.1).** HTTP on `127.0.0.1` only, `/v1` JSON:
-- **port:** a fixed preferred port, falling back through a small fixed range;
-  clients find it by probing `GET /v1/hello` across that range;
-- **pairing once:** Settings shows a 6-digit code; the extension or `clew-mcp`
-  exchanges it for a scoped bearer token (`read`, `import`, `agent-output`) **and a
-  per-install secret**. Tokens are stored in Keychain on Clew's side and are
-  revocable per client;
+**Gateway (v1.1, `ClewGateway`; built 2026-11-09).** HTTP/1.1 on `127.0.0.1` only,
+`/v1` JSON, one request per connection:
+- **port:** the first free port of **39271–39275**; clients probe `GET /v1/hello`
+  across that range, trying the last port that answered first;
+- **pairing once:** Settings › Browser shows a 6-digit code, valid 5 minutes and 5
+  tries, single use. `POST /v1/pair` exchanges it for a client id, a scoped bearer
+  token and a per-client secret. The extension gets the `import` scope only (`read`
+  and `agent-output` arrive with their endpoints). Clew keeps the clients **in the
+  login Keychain** (one item; tokens only as SHA-256 hashes), never in the database,
+  so exports and backups never carry them. Settings lists paired browsers with Remove;
 - **the server proves itself before the client sends a token:** `hello` takes a
-  client nonce and returns `HMAC(secret, nonce)`. A client that cannot verify it
-  sends nothing. Without this, any local process squatting on the port could
-  harvest the token;
-- while the listener is active Clew holds a `ProcessInfo` activity assertion
-  against App Nap (still to be measured in v1.1). The extension cannot launch Clew,
-  so when Clew is unreachable it shows "Open Clew";
-- `Host` header must be `127.0.0.1:<port>` (DNS-rebinding defence);
-- `Origin` allowlist (the extension's ID), no wildcard CORS;
-- request/response schemas live in one JSON Schema file. Swift types and the
-  extension's TypeScript types are generated from it, with contract tests on both sides.
-- Sandbox entitlement: `com.apple.security.network.server` (localhost).
+  client nonce (and the client id) and returns `HMAC-SHA256(secret, nonce)`. A
+  client that cannot verify it sends nothing; an answer without a proof means "Clew
+  no longer knows this browser" (pair again). Pairing itself has no proof: it is a
+  one-time, user-attended step;
+- **the listener runs only while a browser is paired or a code is shown**, and while
+  it runs Clew holds a `ProcessInfo` activity (`userInitiatedAllowingIdleSystemSleep`)
+  against App Nap. Whether App Nap would delay replies without it is still
+  unmeasured. The extension cannot launch Clew, so when Clew is unreachable it says
+  "Open Clew";
+- `Host` must be exactly `127.0.0.1:<port>` (DNS-rebinding defence; `localhost` is
+  refused); an `Origin`, if present, must be the extension's fixed ID
+  (`chrome-extension://jonldjbmjcdehoffcnkeobpapjkoebga`, from the manifest `key`);
+  no wildcard CORS. Bodies up to 4 MB, `Content-Length` only, JSON only;
+- while a restore swaps the database, imports get `503` and the client retries on
+  its next scan;
+- **contract:** example requests and responses live in `Contract/v1/*.json`. Swift
+  tests decode and re-encode each one unchanged and check that the import example's
+  response is the Gateway's real answer; the extension's tests run its validators
+  and request builders against the same files, and both sides check one fixed HMAC
+  vector. *Changed from the plan* (JSON Schema plus generated types): a code
+  generator was more machinery than six small messages need; revisit if the API grows.
+- Sandbox entitlement: `com.apple.security.network.server`.
 
-**Browser extension (v1.1, separate TypeScript project).** Chrome MV3.
-- **Scrapers are quarantined:** one module per site, with selectors in a single
-  table. Tests run against saved HTML snapshots. Verified on 2026-11-08:
-  `ytd-playlist-video-renderer` for Watch Later rows and
+**Import rules (`ImportExternal`, Core).** Idempotent by `(source, externalRef)`.
+The URL is built from the id (YouTube: exactly 11 of `A–Z a–z 0–9 _ -`), never taken
+from the client; titles are cleaned, cut to 200 characters and stored as `fetched`
+(untrusted). A title the user edited is never overwritten. A scan counts as the
+**whole list** only when the page's own count equals the entries read and no entry
+was malformed; only then are Later items from that source that left the list, and
+were never done, let go (a `LaterReview` with the import's source, so Settings'
+"let go" count, which counts the user's own, skips it). An item let go that way
+comes back if it reappears (its let-go is voided); anything the user deleted or let
+go stays gone; items on Today or done are never touched.
+
+**Browser extension (v1.1, `Extension/`, TypeScript, built with Bun).** Chrome MV3.
+- **Scrapers are quarantined:** one module per site (`src/youtube.ts`), with selectors
+  in a single table and a `SELECTOR_VERSION`. Tests run against saved HTML snapshots.
+  Verified on 2026-11-08: `ytd-playlist-video-renderer` for Watch Later rows and
   `.ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment` (style width %)
-  for progress. The older resume-playback selector matched nothing.
+  for progress. The older resume-playback selector matched nothing. The list's own
+  count ("12 videos", "No videos") is read from the playlist header; a count in
+  another language is not read, so nothing is ever removed then.
 - **Health report, not silence:** every scan posts `{found, parsed, selectorVersion}`.
-  If a page that should have items parses zero, Clew shows "YouTube import needs
-  an update" instead of importing nothing.
-- Sends `ImportExternal` batches and `RecordProgress`. It does not compute
-  progress itself.
+  If rows are found but not all read, an entry is rejected, or the page's count says
+  it has items while none were read, Clew shows "YouTube import needs an update"
+  (list footer and Settings) and removes nothing.
+- The content script scans when the Watch Later page opens (YouTube is a single-page
+  app: `yt-navigate-finish`) and again as more rows load; the service worker is the
+  only part that talks to Clew, and skips an identical scan within a minute.
+- Sends `ImportExternal` batches now; `RecordProgress` comes with watch progress. It
+  does not compute progress itself.
 
 **MCP server (v1.2).** `clew-mcp` is a tiny stdio executable. Its tools map 1:1 onto
 Gateway endpoints and are **read-only** (`get_today`, `get_history`, `get_later`,
@@ -386,8 +417,8 @@ per table.
   random facts, e.g. "timesPerWeek(n) is never `.due` after n check-ins that
   week") and DST/time-zone fixtures.
 - **Store:** migration-from-every-fixture test; backup → restore round-trip.
-- **Gateway:** contract tests generated from the shared schema; auth/Host/Origin
-  negative tests.
+- **Gateway:** contract tests against the shared examples in `Contract/v1`;
+  auth/Host/Origin negative tests; listener tests over real loopback sockets.
 - **Extension:** HTML-snapshot scraper tests; a broken-selector test asserting
   the health report flags it.
 - **Every new test must fail against a deliberately broken implementation**

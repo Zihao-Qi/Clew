@@ -14,6 +14,8 @@ public enum ClewError: Error, Equatable, Sendable {
     case checkInNotFound
     /// The command does not apply to this item in its current kind or state.
     case notAllowed
+    /// An import batch is larger than any list the site offers.
+    case tooManyEntries(max: Int)
 }
 
 /// What the user chose in `+ add`. Each case is a valid shape, so invalid

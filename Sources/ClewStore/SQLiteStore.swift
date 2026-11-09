@@ -201,7 +201,18 @@ private struct Access: StoreWriter {
     }
 
     func letGoCount() throws -> Int {
-        try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM laterReview WHERE decision = 'letGo' AND voidedAt IS NULL") ?? 0
+        try Int.fetchOne(db, sql: """
+            SELECT COUNT(*) FROM laterReview WHERE decision = 'letGo' AND voidedAt IS NULL AND source = 'user'
+            """) ?? 0
+    }
+
+    func items(source: Source) throws -> [Item] {
+        try Row.fetchAll(db, sql: "SELECT * FROM item WHERE source = ?", arguments: [source.rawValue]).map(Self.item)
+    }
+
+    func voidLaterReview(id: UUID, at: Date) throws {
+        // The trigger rejects re-voiding.
+        try db.execute(sql: "UPDATE laterReview SET voidedAt = ? WHERE id = ?", arguments: [at, id.uuidString])
     }
 
     func insert(_ r: LaterReview) throws {

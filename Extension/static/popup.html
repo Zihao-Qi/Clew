@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Clew</title>
+<style>
+  :root { color-scheme: light dark; font: 13px -apple-system, system-ui, sans-serif; }
+  body { margin: 0; padding: 14px; width: 260px; }
+  h1 { font-size: 14px; margin: 0 0 8px; }
+  p { margin: 6px 0; color: GrayText; }
+  input { font: 20px ui-monospace, monospace; letter-spacing: 4px; width: 9ch; padding: 4px 6px; }
+  button { font: inherit; margin-top: 8px; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+  <h1>Clew</h1>
+  <section id="unpaired" hidden>
+    <p id="pairHint"></p>
+    <form id="pairForm" class="row">
+      <label for="code" id="codeLabel" hidden></label>
+      <input id="code" inputmode="numeric" autocomplete="off" pattern="[0-9 ]{6,7}" maxlength="7" required>
+      <button id="pairButton" type="submit"></button>
+    </form>
+    <p id="pairError" role="alert"></p>
+  </section>
+  <section id="paired" hidden>
+    <p id="statusLine" role="status"></p>
+    <div class="row">
+      <button id="openWatchLater" type="button"></button>
+      <button id="forget" type="button"></button>
+    </div>
+  </section>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
