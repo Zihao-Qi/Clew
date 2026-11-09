@@ -95,6 +95,7 @@ enum Snapshot {
         summaries.morningEnabled = true
         summaries.eveningEnabled = true
         try clew.setSummaries(summaries)
+        _ = try clew.addItem(NewItem(title: "Read papers", shape: .goal(target: 30, schedule: .daily)))
         let pushups = try clew.addItem(NewItem(title: "Push-ups", shape: .goal(target: 3, schedule: .daily)))
         for _ in 0..<3 { try clew.checkIn(itemId: pushups.id) }
         try clew.checkIn(itemId: exercise.id)

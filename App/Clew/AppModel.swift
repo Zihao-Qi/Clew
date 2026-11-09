@@ -163,6 +163,24 @@ final class AppModel {
     }
 
     func undo(_ row: TodayRow) { run { try $0.undoToday(itemId: row.id) } }
+
+    /// Drop `dragged` onto `target`: it takes the target's place. Coming from above it
+    /// lands after the target; from below, before it.
+    @discardableResult
+    func drop(_ dragged: UUID, onto target: TodayRow) -> Bool {
+        guard let order = today?.rows.map(\.id),
+              let (above, below) = Clew.dropNeighbours(dragged: dragged, onto: target.id, in: order)
+        else { return false }
+        return run { try $0.moveItem(id: dragged, after: above, before: below) }
+    }
+
+    /// Move Up / Move Down: one place in today's list.
+    func move(_ row: TodayRow, by step: Int) {
+        guard let rows = today?.rows, let index = rows.firstIndex(where: { $0.id == row.id }) else { return }
+        let target = index + step
+        guard rows.indices.contains(target) else { return }
+        drop(row.id, onto: rows[target])
+    }
     func moveToLater(_ row: TodayRow) { run { try $0.moveToLater(itemId: row.id) } }
     func delete(_ id: UUID) { run { try $0.deleteItem(itemId: id) } }
     func nextRound(_ row: TodayRow) { run { try $0.startNextRound(itemId: row.id) } }

@@ -5,13 +5,23 @@ struct TodayListView: View {
     let model: AppModel
     @Binding var screen: Screen
     @Environment(\.openWindow) private var openWindow
+    @State private var dropTarget: UUID?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let rows = model.today?.rows, !rows.isEmpty {
                 VStack(spacing: 0) {
-                    ForEach(rows) { row in
-                        RowView(row: row, model: model) { screen = .edit(row.item) }
+                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                        RowView(row: row, model: model, onEdit: { screen = .edit(row.item) },
+                                canMoveUp: index > 0, canMoveDown: index < rows.count - 1,
+                                isDropTarget: dropTarget == row.id)
+                            .draggable(row.id.uuidString)
+                            .dropDestination(for: String.self) { ids, _ in
+                                guard let dragged = ids.first.flatMap(UUID.init(uuidString:)) else { return false }
+                                return model.drop(dragged, onto: row)
+                            } isTargeted: { over in
+                                if over { dropTarget = row.id } else if dropTarget == row.id { dropTarget = nil }
+                            }
                     }
                 }
                 .padding(.vertical, 6)
@@ -57,6 +67,12 @@ struct RowView: View {
     let row: TodayRow
     let model: AppModel
     let onEdit: () -> Void
+    var canMoveUp = false
+    var canMoveDown = false
+    /// A dragged row is hovering over this one.
+    var isDropTarget = false
+
+    @State private var hovering = false
 
     private var item: Item { row.item }
 
@@ -69,7 +85,18 @@ struct RowView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
+        .background {
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.primary.opacity(hovering ? 0.06 : 0))
+                .padding(.horizontal, 6)
+        }
+        .overlay(alignment: .top) {
+            if isDropTarget {
+                Rectangle().fill(Color.accentColor).frame(height: 2).padding(.horizontal, 12)
+            }
+        }
         .contentShape(Rectangle())
+        .onHover { hovering = $0 }
         .contextMenu {
             if row.todayAmount > 0 {
                 if item.kind == .goal {
@@ -82,6 +109,10 @@ struct RowView: View {
             if (item.kind == .once || item.kind == .link), row.progressAmount == 0 {
                 Button("Move to Later") { model.moveToLater(row) }
             }
+            Divider()
+            // The keyboard and VoiceOver way to reorder (dragging needs a pointer).
+            Button("Move Up") { model.move(row, by: -1) }.disabled(!canMoveUp)
+            Button("Move Down") { model.move(row, by: 1) }.disabled(!canMoveDown)
             Divider()
             Button("Delete", role: .destructive) { model.delete(row.id) }
         }
@@ -122,22 +153,27 @@ struct RowView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             if let target = item.progress.target {
-                ProgressView(value: Double(min(row.progressAmount, target)), total: Double(target))
-                    .progressViewStyle(.linear)
-                    .frame(width: 64)
-                    .accessibilityHidden(true)
-                Text(verbatim: "\(row.progressAmount)/\(target)")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .accessibilityLabel(Text("\(row.progressAmount) of \(target)"))
-                // Undo is one click away (SPEC §4), and kept apart from the circle so
-                // rapid +1s cannot hit it by mistake.
-                Button { model.undo(row) } label: { Image(systemName: "minus") }
-                    .buttonStyle(.borderless)
-                    .opacity(row.todayAmount > 0 ? 1 : 0)
-                    .disabled(row.todayAmount == 0)
-                    .accessibilityHidden(row.todayAmount == 0)
-                    .accessibilityLabel(Text("Remove one from \(item.title)"))
+                // Fixed widths, so every goal's bar starts in the same column.
+                HStack(spacing: 4) {
+                    ProgressView(value: Double(min(row.progressAmount, target)), total: Double(target))
+                        .progressViewStyle(.linear)
+                        .frame(width: 64)
+                        .accessibilityHidden(true)
+                    Text(verbatim: "\(row.progressAmount)/\(target)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(minWidth: Self.countWidth, alignment: .trailing)
+                        .accessibilityLabel(Text("\(row.progressAmount) of \(target)"))
+                    // Undo is one click away (SPEC §4), and kept apart from the circle so
+                    // rapid +1s cannot hit it by mistake. Its slot is kept so columns align.
+                    Button { model.undo(row) } label: { Image(systemName: "minus").imageScale(.small) }
+                        .buttonStyle(.borderless)
+                        .frame(width: Self.undoWidth)
+                        .opacity(row.todayAmount > 0 ? 1 : 0)
+                        .disabled(row.todayAmount == 0)
+                        .accessibilityHidden(row.todayAmount == 0)
+                        .accessibilityLabel(Text("Remove one from \(item.title)"))
+                }
             }
         }
     }
@@ -165,6 +201,10 @@ struct RowView: View {
             text.accessibilityAddTraits(row.isDone ? .isSelected : [])
         }
     }
+
+    /// Fits "999/999" in the caption font; larger counts widen only their own row.
+    static let countWidth: CGFloat = 40
+    static let undoWidth: CGFloat = 12
 
     private var tapLabel: Text {
         if row.isGoalReached { return Text("\(item.title), goal reached") }

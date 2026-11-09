@@ -318,6 +318,45 @@ public final class Clew: Sendable {
         }
     }
 
+    /// Manual order: puts the item between two neighbours (either may be nil at the
+    /// ends of the list) by giving it a sort key between theirs. Only this item's row
+    /// changes; nothing else is renumbered.
+    public func moveItem(id: UUID, after above: UUID?, before below: UUID?) throws {
+        let now = clock.now()
+        try store.write { w in
+            guard var item = try w.item(id: id), item.deletedAt == nil else { throw ClewError.itemNotFound }
+            func key(_ neighbour: UUID?) throws -> Double? {
+                guard let neighbour else { return nil }
+                guard neighbour != id, let other = try w.item(id: neighbour), other.deletedAt == nil else {
+                    throw ClewError.notAllowed
+                }
+                return other.sortKey
+            }
+            let low = try key(above), high = try key(below)
+            switch (low, high) {
+            case let (low?, high?):
+                guard low < high else { throw ClewError.notAllowed }
+                item.sortKey = (low + high) / 2
+            case let (low?, nil): item.sortKey = low + 1
+            case let (nil, high?): item.sortKey = high - 1
+            case (nil, nil): return
+            }
+            item.updatedAt = now
+            try w.update(item)
+        }
+    }
+
+    /// Where a dragged row lands when dropped onto `target` in `order` (today's visible
+    /// ids): it takes the target's place, so coming from above it goes after the target
+    /// and from below it goes before. Nil when the drop changes nothing.
+    public static func dropNeighbours(dragged: UUID, onto target: UUID, in order: [UUID]) -> (after: UUID?, before: UUID?)? {
+        guard dragged != target, let from = order.firstIndex(of: dragged),
+              let to = order.firstIndex(of: target) else { return nil }
+        return from < to
+            ? (target, to + 1 < order.count ? order[to + 1] : nil)
+            : (to > 0 ? order[to - 1] : nil, target)
+    }
+
     /// Delete: a tombstone (`deletedAt`), never a hard delete. The item disappears
     /// everywhere; its check-ins and plans stay in the history (ARCHITECTURE §8).
     public func deleteItem(itemId: UUID) throws {
