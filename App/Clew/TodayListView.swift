@@ -86,17 +86,16 @@ struct RowView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
         .background {
+            // A dropped row takes this row's place, above or below depending on where it
+            // came from, so the whole row lights up rather than a line on one side.
             RoundedRectangle(cornerRadius: 6)
-                .fill(Color.primary.opacity(hovering ? 0.06 : 0))
+                .fill(isDropTarget ? Color.accentColor.opacity(0.18) : Color.primary.opacity(hovering ? 0.06 : 0))
                 .padding(.horizontal, 6)
-        }
-        .overlay(alignment: .top) {
-            if isDropTarget {
-                Rectangle().fill(Color.accentColor).frame(height: 2).padding(.horizontal, 12)
-            }
         }
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
+        .accessibilityAction(named: Text("Move Up")) { if canMoveUp { model.move(row, by: -1) } }
+        .accessibilityAction(named: Text("Move Down")) { if canMoveDown { model.move(row, by: 1) } }
         .contextMenu {
             if row.todayAmount > 0 {
                 if item.kind == .goal {
@@ -202,8 +201,9 @@ struct RowView: View {
         }
     }
 
-    /// Fits "999/999" in the caption font; larger counts widen only their own row.
-    static let countWidth: CGFloat = 40
+    /// "999/999" measures 41.7 pt in the caption font; larger counts widen only their
+    /// own row.
+    static let countWidth: CGFloat = 44
     static let undoWidth: CGFloat = 12
 
     private var tapLabel: Text {

@@ -30,6 +30,10 @@ import Testing
         clock.set(Date(timeIntervalSince1970: 1_800_000_060))
         try clew.moveItem(id: c.id, after: a.id, before: b.id) // both neighbours exist
         #expect(store.state.items[a.id] == a && store.state.items[b.id] == b)
+        // A second move into the new, non-integer gap still touches nothing else.
+        let movedFirst = try #require(store.state.items[c.id])
+        try clew.moveItem(id: b.id, after: a.id, before: c.id)
+        #expect(store.state.items[c.id] == movedFirst && store.state.items[a.id] == a)
         #expect(store.state.items[c.id]?.updatedAt == Date(timeIntervalSince1970: 1_800_000_060))
     }
 
@@ -66,6 +70,22 @@ import Testing
         let (above, below) = try #require(Clew.dropNeighbours(dragged: a.id, onto: c.id, in: order))
         try clew.moveItem(id: a.id, after: above, before: below)
         #expect(try clew.today().rows.map(\.id) == [b.id, c.id, a.id])
+    }
+
+    /// Halving one gap runs out of Double precision after about 50 moves; the list is
+    /// then renumbered and the order still holds.
+    @Test func eightyMovesIntoTheSameGapStillKeepOrder() throws {
+        let (a, b, c) = try three()
+        var below = b.id
+        for i in 0..<80 {
+            let x = try clew.addItem(NewItem(title: "x\(i)", shape: .habit(.daily)))
+            try clew.moveItem(id: x.id, after: a.id, before: below) // right after a, as the UI would
+            below = x.id
+        }
+        let titles = try clew.today().rows.map(\.item.title)
+        #expect(titles == ["a"] + (0..<80).reversed().map { "x\($0)" } + ["b", "c"])
+        #expect(Set(store.state.items.values.map(\.sortKey)).count == store.state.items.count)
+        _ = c
     }
 
     @Test func nonsenseMovesAreRejected() throws {

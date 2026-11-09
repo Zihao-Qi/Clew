@@ -336,13 +336,32 @@ public final class Clew: Sendable {
             switch (low, high) {
             case let (low?, high?):
                 guard low < high else { throw ClewError.notAllowed }
-                item.sortKey = (low + high) / 2
+                let middle = (low + high) / 2
+                if low < middle, middle < high {
+                    item.sortKey = middle
+                } else {
+                    // Out of floating-point room (about 50 moves into one gap): renumber
+                    // every item 1, 2, 3… in its current order, then place this one.
+                    try Self.renumber(w, now: now)
+                    let fresh = try w.item(id: above!)!.sortKey
+                    item.sortKey = fresh + 0.5
+                }
             case let (low?, nil): item.sortKey = low + 1
             case let (nil, high?): item.sortKey = high - 1
             case (nil, nil): return
             }
             item.updatedAt = now
             try w.update(item)
+        }
+    }
+
+    private static func renumber(_ w: any StoreWriter, now: Date) throws {
+        let all = try w.items(inStates: Set(ItemState.allCases))
+            .sorted { ($0.sortKey, $0.createdAt, $0.id.uuidString) < ($1.sortKey, $1.createdAt, $1.id.uuidString) }
+        for (index, var other) in all.enumerated() where other.sortKey != Double(index + 1) {
+            other.sortKey = Double(index + 1)
+            other.updatedAt = now
+            try w.update(other)
         }
     }
 
