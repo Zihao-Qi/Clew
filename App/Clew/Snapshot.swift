@@ -4,6 +4,7 @@ import ClewCore
 import ClewDomain
 import ClewStore
 import SwiftUI
+import UserNotifications
 
 /// Development only: render each screen to a PNG with sample data, then exit.
 /// `CLEW_RENDER_PNG=1 Clew.app/Contents/MacOS/Clew` writes into the container's tmp
@@ -22,13 +23,46 @@ enum Snapshot {
         exit(1)
     }
 
+    /// `CLEW_RECONCILE_TEST=1`: checks the adapter against the real notification
+    /// center with far-future requests (year 2030, never shown), then removes them.
+    static func reconcileTestAndExit() -> Never {
+        Task { @MainActor in
+            let adapter = NotificationsAdapter { _ in }
+            let fire = Date(timeIntervalSince1970: 1_900_000_000)
+            func plan(_ titles: [String]) -> [PlannedNotification] {
+                titles.enumerated().map { i, t in
+                    PlannedNotification(id: "clew.selftest.\(i)", fireAt: fire.addingTimeInterval(Double(i) * 60),
+                                        content: .reminder(itemId: UUID(uuidString: "00000000-0000-0000-0000-00000000000\(i)")!,
+                                                           title: t, canOpen: false, canMoveToLater: true))
+                }
+            }
+            let settings = await UNUserNotificationCenter.current().notificationSettings()
+            print("authorization:", settings.authorizationStatus.rawValue, "(2 = authorized)")
+            let before = await adapter.pendingIds().filter { !$0.hasPrefix("clew.selftest") }
+            await adapter.applyNow(plan(["a", "b", "c"]))
+            print("1 add:", adapter.lastChange.added, "remove:", adapter.lastChange.removed)
+            await adapter.applyNow(plan(["a", "b", "c"]))
+            print("2 same plan → add:", adapter.lastChange.added, "remove:", adapter.lastChange.removed)
+            await adapter.applyNow(plan(["a", "B", "c"]))
+            print("3 one title changed → add:", adapter.lastChange.added, "remove:", adapter.lastChange.removed)
+            print("  pending:", await adapter.pendingIds().filter { $0.hasPrefix("clew.selftest") })
+            await adapter.applyNow([])
+            print("4 empty plan → remove:", adapter.lastChange.removed)
+            let after = await adapter.pendingIds()
+            print("  left:", after.filter { $0.hasPrefix("clew.selftest") }, "others untouched:", before.allSatisfy(after.contains) || before.isEmpty)
+            exit(0)
+        }
+        RunLoop.main.run()
+        exit(1)
+    }
+
     static func renderAndExit() -> Never {
         let dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("ClewSnapshots")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         do {
             let clew = Clew(store: try SQLiteStore.inMemory(), clock: SystemClock(), zones: SystemTimeZone())
             try seed(clew)
-            let model = AppModel(clew: clew)
+            let model = AppModel(clew: clew, notify: false)
             let editing = try clew.today().rows[2].item
             for (name, screen) in [("list", Screen.list), ("add", .add), ("pick", .pick), ("edit", .edit(editing))] {
                 for appearance in [NSAppearance.Name.aqua, .darkAqua] {
@@ -56,6 +90,11 @@ enum Snapshot {
         _ = try clew.addItem(NewItem(title: "A very long item title that should truncate nicely in the row",
                                      shape: .today))
         for _ in 0..<10 { try clew.checkIn(itemId: course.id) }
+        try clew.setReminder(itemId: course.id, time: TimeOfDay(hour: 18, minute: 0))
+        var summaries = SummarySettings.defaults
+        summaries.morningEnabled = true
+        summaries.eveningEnabled = true
+        try clew.setSummaries(summaries)
         let pushups = try clew.addItem(NewItem(title: "Push-ups", shape: .goal(target: 3, schedule: .daily)))
         for _ in 0..<3 { try clew.checkIn(itemId: pushups.id) }
         try clew.checkIn(itemId: exercise.id)
@@ -83,7 +122,13 @@ enum Snapshot {
         defer { window.orderOut(nil) }
         guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { return }
         host.cacheDisplay(in: host.bounds, to: rep)
-        try? rep.representation(using: .png, properties: [:])?.write(to: file)
+        guard let png = rep.representation(using: .png, properties: [:]) else { return }
+        try? png.write(to: file)
+        // The container is protected from other apps (the terminal included), so
+        // CLEW_RENDER_PNG=stdout also prints each image for the developer to decode.
+        if ProcessInfo.processInfo.environment["CLEW_RENDER_PNG"] == "stdout" {
+            print("PNG \(file.lastPathComponent) \(png.base64EncodedString())")
+        }
     }
 }
 #endif

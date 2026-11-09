@@ -35,22 +35,16 @@ struct TodayListView: View {
                 Button { screen = .pick } label: { Text("Later (\(model.laterCount))") }
                     .keyboardShortcut("l")
                     .accessibilityLabel(Text("Later pile, \(model.laterCount) items. Pick some for today."))
-                Menu {
-                    Button("Settings…") {
-                        openWindow(id: SettingsView.windowID)
-                        NSApp.activate(ignoringOtherApps: true)
-                    }
-                    .keyboardShortcut(",")
-                    Divider()
-                    Button("Quit Clew") { NSApplication.shared.terminate(nil) }
-                        .keyboardShortcut("q")
+                // One click straight to Settings; Quit lives there.
+                Button {
+                    openWindow(id: SettingsView.windowID)
+                    NSApp.activate(ignoringOtherApps: true)
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    Image(systemName: "gearshape")
                 }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .accessibilityLabel(Text("More"))
+                .keyboardShortcut(",")
+                .help(Text("Settings"))
+                .accessibilityLabel(Text("Settings"))
             }
             .buttonStyle(.borderless)
             .padding(.horizontal, 12)

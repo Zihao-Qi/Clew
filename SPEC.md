@@ -61,7 +61,9 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
    Items untouched for 6 weeks get a one-tap "still want this?". Saying no counts as a win. Any item can be deleted (in Later:
    `×`; on Today: right-click). Delete hides it for good; its history is kept.
 6. **Gentle reminders** (optional, per item, off by default). One notification at
-   a chosen time with **Open / Done / Later** actions. No repeats, no escalation.
+   a chosen time on each day the item is on Today and not done yet, with **Done**,
+   **Later** (once-items and links only: moves it to the Later pile) and **Open**
+   (only when it has a link). No repeats within a day, no escalation.
 7. **Day summaries** (each optional): morning "6 today" at 9:00, evening "5/6 done"
    at 21:00, both changeable. Short, friendly, never a list of failures. A day
    with no ticks gets an encouraging line instead of "0/6".
@@ -104,6 +106,9 @@ stopped daily use, not adding features.
 - Weeks start on **Monday**; "N× per week" items reset then.
 - A counted goal's step is always **+1** per click.
 - The rating row is offered **every time**, and is always skippable.
+- Reminders fire on every day the item is on Today until done, once per day; "Later"
+  moves a once-item or link to the Later pile; "Open" appears only for links
+  (2026-11-08, v1b).
 - Counted goals have rounds; reaching the total stops counting until the user picks
   next round, a higher target, or done (2026-11-08, after first use).
 - A pasted link goes to Today by default, not Later; `↗` is replaced by a clickable

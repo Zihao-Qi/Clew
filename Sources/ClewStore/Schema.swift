@@ -7,7 +7,35 @@ enum Schema {
         var migrator = DatabaseMigrator()
         migrator.registerMigration("v1", migrate: v1)
         migrator.registerMigration("v2-rounds-titleOrigin", migrate: v2)
+        migrator.registerMigration("v3-reminders-settings", migrate: v3)
         return migrator
+    }
+
+    /// Reminders and settings: definitions (row-level last writer wins by updatedAt;
+    /// reminders are tombstoned, never deleted).
+    private static func v3(_ db: Database) throws {
+        try db.execute(sql: """
+            CREATE TABLE reminder (
+                id         TEXT PRIMARY KEY NOT NULL,
+                itemId     TEXT NOT NULL REFERENCES item(id),
+                hour       INTEGER NOT NULL CHECK (hour BETWEEN 0 AND 23),
+                minute     INTEGER NOT NULL CHECK (minute BETWEEN 0 AND 59),
+                enabled    BOOLEAN NOT NULL,
+                updatedAt  DATETIME NOT NULL,
+                deletedAt  DATETIME
+            );
+            -- One live reminder per item (SPEC §6: one notification at a chosen time).
+            CREATE UNIQUE INDEX reminder_item ON reminder(itemId) WHERE deletedAt IS NULL;
+
+            CREATE TRIGGER reminder_no_delete BEFORE DELETE ON reminder
+            BEGIN SELECT RAISE(ABORT, 'reminders are soft-deleted, never deleted'); END;
+
+            CREATE TABLE settings (
+                key        TEXT PRIMARY KEY NOT NULL,
+                value      TEXT NOT NULL,   -- JSON
+                updatedAt  DATETIME NOT NULL
+            );
+            """)
     }
 
     /// Goal rounds (a fact), and where each item's title came from.

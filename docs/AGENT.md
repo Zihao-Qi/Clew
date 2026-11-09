@@ -130,7 +130,8 @@ Both answers are facts (`DayReflection`), owned by the user, never by the agent.
 - **Autonomy (motivational interviewing):** offer, don't instruct. "Maybe…",
   "If you feel like it…".
 - **Savour:** name the item you said felt best, or the highest-rated one.
-- **Zero-tick days use curated lines, not the model:** a hard-coded, rotating,
+- **Zero-tick days use curated lines, not the model** (shipped in v1b for the
+  evening summary, `NotificationsAdapter.kindLines`): a hard-coded, rotating,
   non-repeating set ("Rest is part of the plan." / "Tomorrow's list is ready when
   you are."). This is safer on a hard day, costs nothing, and works with AI off.
 
