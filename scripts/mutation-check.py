@@ -196,6 +196,14 @@ M = [
  ("I8 not monday", D+"ItemStats.swift", "let firstMonday = today.weekStart.adding(days: -7 * (weeks - 1))", "let firstMonday = today.adding(days: -7 * (weeks - 1))", "ClewDomainTests"),
  ("I9 deleted details", C+"Details.swift", "guard let item = try r.item(id: itemId), item.deletedAt == nil else { return nil }", "guard let item = try r.item(id: itemId) else { return nil }", "ClewCoreTests"),
  ("I10 lifetime as round", C+"Details.swift", "let progress = try r.progressAmounts(itemIds: [itemId])[itemId] ?? 0", "let progress = checkIns.reduce(0) { $0 + $1.amount }", "ClewCoreTests"),
+ ("R10 slot boundary up", C+"Clew.swift", "return spans.firstIndex { $0.minY <= pointerY && pointerY < $0.maxY }", "return spans.firstIndex { $0.minY < pointerY && pointerY <= $0.maxY }", "ClewCoreTests"),
+ ("R11 slot outside nil", C+"Clew.swift", "        if pointerY < first.minY { return 0 }\n", "", "ClewCoreTests"),
+ ("R12 below list nil", C+"Clew.swift", "        if pointerY >= last.maxY { return spans.count - 1 }\n", "", "ClewCoreTests"),
+ ("R13 shift includes self", C+"Clew.swift", "if from < to, index > from, index <= to { return -draggedHeight }", "if from < to, index >= from, index <= to { return -draggedHeight }", "ClewCoreTests"),
+ ("R14 shift wrong way", C+"Clew.swift", "if to < from, index >= to, index < from { return draggedHeight }", "if to < from, index >= to, index < from { return -draggedHeight }", "ClewCoreTests"),
+ ("R15 drop before when down", C+"Clew.swift", "        return from < to\n            ? (target, to + 1 < order.count ? order[to + 1] : nil)", "        return from < to\n            ? (to > 0 ? order[to - 1] : nil, target)", "ClewCoreTests"),
+ ("R16 no lower bound", C+"Clew.swift", "min(max(translation, list.minY - row.minY), list.maxY - row.maxY)", "max(translation, list.minY - row.minY)", "ClewCoreTests"),
+ ("R17 no upper bound", C+"Clew.swift", "min(max(translation, list.minY - row.minY), list.maxY - row.maxY)", "min(translation, list.maxY - row.maxY)", "ClewCoreTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

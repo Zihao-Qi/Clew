@@ -1,3 +1,4 @@
+import ClewCore
 import ClewDomain
 import SwiftUI
 
@@ -5,7 +6,64 @@ struct TodayListView: View {
     let model: AppModel
     @Binding var screen: Screen
     @Environment(\.openWindow) private var openWindow
-    @State private var dropTarget: UUID?
+    /// Reordering with a plain drag gesture inside the list (SwiftUI's draggable /
+    /// dropDestination never delivered the drop in the menu bar panel). The dragged row
+    /// follows the pointer; the rows in between slide aside live; release lands it in
+    /// the gap. The slot and shift math is in Core (Clew.dragSlot / dragShift), tested.
+    @State private var dragging: UUID?
+    @State private var dragTranslation: CGFloat = 0
+    @State private var dragSlot: Int?
+    @State private var rowFrames: [UUID: CGRect] = [:]
+    /// Row frames frozen when a drag begins, so slots are measured against the list as
+    /// it was, not against rows that are sliding.
+    @State private var dragFrames: [CGRect] = []
+
+    private static let listSpace = "todayList"
+
+    private func offset(for row: TodayRow, at index: Int, in rows: [TodayRow]) -> CGFloat {
+        guard let dragging, let from = rows.firstIndex(where: { $0.id == dragging }) else { return 0 }
+        if row.id == dragging { return dragTranslation }
+        let height = Double(dragFrames.indices.contains(from) ? dragFrames[from].height : 0)
+        return CGFloat(Clew.dragShift(index: index, from: from, to: dragSlot ?? from, draggedHeight: height))
+    }
+
+    private func drag(_ row: TodayRow, in rows: [TodayRow]) -> some Gesture {
+        DragGesture(minimumDistance: 3, coordinateSpace: .named(Self.listSpace))
+            .onChanged { value in
+                if dragging == nil {
+                    dragFrames = rows.map { rowFrames[$0.id] ?? .zero }
+                    dragging = row.id
+                }
+                // Kept inside the rows: never over the footer (Add, Later, Settings).
+                let from = rows.firstIndex(where: { $0.id == row.id }) ?? 0
+                if let first = dragFrames.first, let last = dragFrames.last, dragFrames.indices.contains(from) {
+                    let own = dragFrames[from]
+                    dragTranslation = CGFloat(Clew.clampDrag(
+                        translation: Double(value.translation.height),
+                        row: (minY: Double(own.minY), maxY: Double(own.maxY)),
+                        list: (minY: Double(first.minY), maxY: Double(last.maxY))))
+                } else {
+                    dragTranslation = value.translation.height
+                }
+                let spans = dragFrames.map { (minY: Double($0.minY), maxY: Double($0.maxY)) }
+                let slot = Clew.dragSlot(pointerY: Double(value.location.y), spans: spans)
+                if slot != dragSlot {
+                    withAnimation(.easeOut(duration: 0.15)) { dragSlot = slot }
+                }
+            }
+            .onEnded { _ in
+                var t = Transaction()
+                t.disablesAnimations = true
+                withTransaction(t) {
+                    if let from = rows.firstIndex(where: { $0.id == row.id }), let to = dragSlot, to != from {
+                        model.drop(row.id, onto: rows[to])
+                    }
+                    dragging = nil
+                    dragTranslation = 0
+                    dragSlot = nil
+                }
+            }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -15,16 +73,19 @@ struct TodayListView: View {
                         RowView(row: row, model: model, onEdit: { screen = .edit(row.item, back: .list) },
                                 onOpen: { screen = .detail(row.id) },
                                 canMoveUp: index > 0, canMoveDown: index < rows.count - 1,
-                                isDropTarget: dropTarget == row.id)
-                            .draggable(row.id.uuidString)
-                            .dropDestination(for: String.self) { ids, _ in
-                                guard let dragged = ids.first.flatMap(UUID.init(uuidString:)) else { return false }
-                                return model.drop(dragged, onto: row)
-                            } isTargeted: { over in
-                                if over { dropTarget = row.id } else if dropTarget == row.id { dropTarget = nil }
-                            }
+                                isDragged: dragging == row.id)
+                            .background(GeometryReader { g in
+                                Color.clear.preference(key: RowFrames.self,
+                                                       value: [row.id: g.frame(in: .named(Self.listSpace))])
+                            })
+                            .offset(y: offset(for: row, at: index, in: rows))
+                            .zIndex(dragging == row.id ? 1 : 0)
+                            .shadow(color: .black.opacity(dragging == row.id ? 0.18 : 0), radius: 6, y: 2)
+                            .gesture(drag(row, in: rows))
                     }
                 }
+                .coordinateSpace(name: Self.listSpace)
+                .onPreferenceChange(RowFrames.self) { rowFrames = $0 }
                 .padding(.vertical, 6)
             } else {
                 Text("Nothing for today.")
@@ -71,8 +132,9 @@ struct RowView: View {
     let onOpen: () -> Void
     var canMoveUp = false
     var canMoveDown = false
-    /// A dragged row is hovering over this one.
-    var isDropTarget = false
+    /// This row is being dragged: it gets a solid background so rows sliding under it
+    /// don't show through.
+    var isDragged = false
 
     @State private var hovering = false
 
@@ -88,11 +150,16 @@ struct RowView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
         .background {
-            // A dropped row takes this row's place, above or below depending on where it
-            // came from, so the whole row lights up rather than a line on one side.
-            RoundedRectangle(cornerRadius: 6)
-                .fill(isDropTarget ? Color.accentColor.opacity(0.18) : Color.primary.opacity(hovering ? 0.06 : 0))
-                .padding(.horizontal, 6)
+            if isDragged {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color(nsColor: .windowBackgroundColor))
+                    .overlay(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.12)))
+                    .padding(.horizontal, 6)
+            } else {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.primary.opacity(hovering ? 0.06 : 0))
+                    .padding(.horizontal, 6)
+            }
         }
         // The whole row, margins included, opens the details; the circle, link mark,
         // − and celebration buttons are buttons and keep their own clicks.
@@ -240,5 +307,13 @@ struct NoticeView: View {
                 .padding(.horizontal, 12)
                 .padding(.bottom, 6)
         }
+    }
+}
+
+/// Each row's frame in the list, for working out where a dragged row is.
+private struct RowFrames: PreferenceKey {
+    static let defaultValue: [UUID: CGRect] = [:]
+    static func reduce(value: inout [UUID: CGRect], nextValue: () -> [UUID: CGRect]) {
+        value.merge(nextValue()) { $1 }
     }
 }

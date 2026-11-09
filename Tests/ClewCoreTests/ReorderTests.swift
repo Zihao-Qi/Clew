@@ -88,6 +88,51 @@ import Testing
         _ = c
     }
 
+    @Test func theSlotIsTheRowUnderThePointer() {
+        // Rows at 0–30, 30–60, 60–100 (the last taller, like a celebration row).
+        let spans = [(minY: 0.0, maxY: 30.0), (minY: 30.0, maxY: 60.0), (minY: 60.0, maxY: 100.0)]
+        #expect(Clew.dragSlot(pointerY: 5, spans: spans) == 0)
+        #expect(Clew.dragSlot(pointerY: 29.9, spans: spans) == 0)
+        #expect(Clew.dragSlot(pointerY: 30, spans: spans) == 1)   // a boundary belongs below
+        #expect(Clew.dragSlot(pointerY: 99, spans: spans) == 2)
+        #expect(Clew.dragSlot(pointerY: -40, spans: spans) == 0)  // above the list
+        #expect(Clew.dragSlot(pointerY: 400, spans: spans) == 2)  // below the list
+        #expect(Clew.dragSlot(pointerY: 10, spans: []) == nil)
+    }
+
+    @Test func aDraggedRowStaysInsideTheList() {
+        let list = (minY: 0.0, maxY: 100.0)
+        let middle = (minY: 30.0, maxY: 60.0)
+        #expect(Clew.clampDrag(translation: 10, row: middle, list: list) == 10)
+        #expect(Clew.clampDrag(translation: 80, row: middle, list: list) == 40)    // bottom meets 100
+        #expect(Clew.clampDrag(translation: -80, row: middle, list: list) == -30)  // top meets 0
+        let last = (minY: 60.0, maxY: 100.0)
+        #expect(Clew.clampDrag(translation: 25, row: last, list: list) == 0)       // already at the bottom
+    }
+
+    @Test func rowsInBetweenMakeRoomTheOthersStay() {
+        // Dragging row 1 (30 pt) down to slot 3 in five rows: rows 2 and 3 move up.
+        #expect((0..<5).map { Clew.dragShift(index: $0, from: 1, to: 3, draggedHeight: 30) } == [0, 0, -30, -30, 0])
+        // Dragging row 3 up to slot 0: rows 0, 1, 2 move down.
+        #expect((0..<5).map { Clew.dragShift(index: $0, from: 3, to: 0, draggedHeight: 30) } == [30, 30, 30, 0, 0])
+        // Not moved yet: nothing shifts.
+        #expect((0..<5).map { Clew.dragShift(index: $0, from: 2, to: 2, draggedHeight: 30) } == [0, 0, 0, 0, 0])
+    }
+
+    /// The preview and the drop agree: dropping on the slot's row gives the order the
+    /// shifted rows showed.
+    @Test func theDropLandsWhereThePreviewShowedIt() throws {
+        let ids = (0..<5).map { _ in UUID() }
+        for (from, to) in [(1, 3), (3, 0), (0, 4), (4, 1)] {
+            var preview = ids
+            preview.insert(preview.remove(at: from), at: to)
+            let (after, before) = try #require(Clew.dropNeighbours(dragged: ids[from], onto: ids[to], in: ids))
+            let landed = preview.firstIndex(of: ids[from])!
+            #expect(after == (landed > 0 ? preview[landed - 1] : nil))
+            #expect(before == (landed + 1 < preview.count ? preview[landed + 1] : nil))
+        }
+    }
+
     @Test func nonsenseMovesAreRejected() throws {
         let (a, b, _) = try three()
         #expect(throws: ClewError.notAllowed) { try clew.moveItem(id: a.id, after: b.id, before: a.id) }
