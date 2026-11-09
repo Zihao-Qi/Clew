@@ -143,6 +143,9 @@ final class AppModel {
 
     func activeDays() -> ActiveDays? { try? clew?.activeDays() }
 
+    /// Read fresh on every render; the details page is small.
+    func details(for itemId: UUID) -> ItemDetails? { (try? clew?.details(itemId: itemId)) ?? nil }
+
     func exportData() -> Data? { try? clew?.exportDocument().encoded() }
 
     func laterItems() -> [Item] {

@@ -46,9 +46,9 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
      *Next round* (same total, from zero), *Raise target*, or *Done* (it leaves the
      list after the day). Every round stays in the history; the Daruma's second eye
      comes in v1.3.
-3. **Links.** Any item can have a URL. Clicking its title (marked with a small link
-   symbol) opens it in the default browser. Pasting a link into `+ add` fills in
-   the page's title, which you can edit before saving.
+3. **Links.** Any item can have a URL. The small link mark after its title opens
+   it in the default browser. Pasting a link into `+ add` fills in the page's title,
+   which you can edit before saving.
 4. **Done in one click.** Click `○` to mark it done (counted goals: +1). Three small
    rating dots then appear **inside the same row** every time. The row never changes
    height and the dots never cover the `+1` target, so rapid ticks can't mis-click.
@@ -71,6 +71,12 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
    export. No account. The only network use is fetching a pasted link's title: one
    load of that page (and its redirects), no cookies, nothing else sent.
 9. **Launch at login** (`SMAppService`), toggled in a small Settings window.
+10. **Task details.** Clicking a row opens its details: a 16-week heatmap (done days
+    filled, other days a quiet gray, never red), days done this week / in the last
+    30 days / all time (goals: this round, rounds done, all-time total), and Edit /
+    Delete. No streak counts.
+11. **Your order.** Drag rows to reorder them (or Move Up / Move Down). Ticking never
+    moves a row. Sorting rules wait until manual order isn't enough.
 
 ## Design rules (from ADHD/CBT practice)
 
@@ -106,6 +112,8 @@ stopped daily use, not adding features.
 - Weeks start on **Monday**; "N× per week" items reset then.
 - A counted goal's step is always **+1** per click.
 - The rating row is offered **every time**, and is always skippable.
+- Clicking a row opens its details; the link mark, not the title, opens a link.
+  Goal bars align in one column. Rows can be dragged to reorder (2026-11-08, after use).
 - Reminders fire on every day the item is on Today until done, once per day; "Later"
   moves a once-item or link to the Later pile; "Open" appears only for links
   (2026-11-08, v1b).

@@ -60,11 +60,13 @@ enum Snapshot {
         let dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("ClewSnapshots")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         do {
-            let clew = Clew(store: try SQLiteStore.inMemory(), clock: SystemClock(), zones: SystemTimeZone())
-            try seed(clew)
+            let clock = MovableClock()
+            let clew = Clew(store: try SQLiteStore.inMemory(), clock: clock, zones: SystemTimeZone())
+            try seed(clew, clock: clock)
             let model = AppModel(clew: clew, notify: false)
             let editing = try clew.today().rows[2].item
-            for (name, screen) in [("list", Screen.list), ("add", .add), ("pick", .pick), ("edit", .edit(editing))] {
+            for (name, screen) in [("list", Screen.list), ("add", .add), ("pick", .pick),
+                                   ("edit", .edit(editing, back: .list)), ("detail", .detail(editing.id))] {
                 for appearance in [NSAppearance.Name.aqua, .darkAqua] {
                     let file = dir.appendingPathComponent("\(name)-\(appearance == .aqua ? "light" : "dark").png")
                     render(RootView(model: model, screen: screen), appearance: appearance, to: file)
@@ -81,7 +83,13 @@ enum Snapshot {
         }
     }
 
-    private static func seed(_ clew: Clew) throws {
+    /// A clock the snapshot can move into the past to seed history.
+    final class MovableClock: Clock, @unchecked Sendable {
+        var date = Date()
+        func now() -> Date { date }
+    }
+
+    private static func seed(_ clew: Clew, clock: MovableClock) throws {
         let exercise = try clew.addItem(NewItem(title: "Exercise", shape: .habit(.daily)))
         let job = try clew.addItem(NewItem(title: "Apply to 1 job", shape: .today))
         let course = try clew.addItem(NewItem(title: "ML course", url: URL(string: "https://course.example"),
@@ -89,6 +97,14 @@ enum Snapshot {
         _ = try clew.addItem(NewItem(title: "Stretch", shape: .habit(.timesPerWeek(3))))
         _ = try clew.addItem(NewItem(title: "A very long item title that should truncate nicely in the row",
                                      shape: .today))
+        // Some history for the details heatmap: a few days a week over ten weeks.
+        let now = clock.date
+        for daysAgo in stride(from: 70, through: 1, by: -1) where daysAgo % 3 != 0 && daysAgo % 7 != 5 {
+            clock.date = now.addingTimeInterval(-Double(daysAgo) * 86_400)
+            for _ in 0..<(daysAgo % 4 == 0 ? 3 : 1) { try? clew.checkIn(itemId: course.id) }
+        }
+        clock.date = now
+        try clew.startNextRound(itemId: course.id)
         for _ in 0..<10 { try clew.checkIn(itemId: course.id) }
         try clew.setReminder(itemId: course.id, time: TimeOfDay(hour: 18, minute: 0))
         var summaries = SummarySettings.defaults

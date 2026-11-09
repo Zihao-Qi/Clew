@@ -12,7 +12,8 @@ struct TodayListView: View {
             if let rows = model.today?.rows, !rows.isEmpty {
                 VStack(spacing: 0) {
                     ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                        RowView(row: row, model: model, onEdit: { screen = .edit(row.item) },
+                        RowView(row: row, model: model, onEdit: { screen = .edit(row.item, back: .list) },
+                                onOpen: { screen = .detail(row.id) },
                                 canMoveUp: index > 0, canMoveDown: index < rows.count - 1,
                                 isDropTarget: dropTarget == row.id)
                             .draggable(row.id.uuidString)
@@ -67,6 +68,7 @@ struct RowView: View {
     let row: TodayRow
     let model: AppModel
     let onEdit: () -> Void
+    let onOpen: () -> Void
     var canMoveUp = false
     var canMoveDown = false
     /// A dragged row is hovering over this one.
@@ -104,6 +106,7 @@ struct RowView: View {
                     Button("Undo") { model.undo(row) }
                 }
             }
+            Button("Details", action: onOpen)
             Button("Edit…", action: onEdit)
             if (item.kind == .once || item.kind == .link), row.progressAmount == 0 {
                 Button("Move to Later") { model.moveToLater(row) }
@@ -150,6 +153,8 @@ struct RowView: View {
 
             titleView
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .onTapGesture(perform: onOpen)
 
             if let target = item.progress.target {
                 // Fixed widths, so every goal's bar starts in the same column.
@@ -177,27 +182,25 @@ struct RowView: View {
         }
     }
 
-    /// A linked title opens its link; a small link mark says so (SPEC §3).
-    @ViewBuilder private var titleView: some View {
-        let text = Text(item.title)
-            .lineLimit(1)
-            .truncationMode(.tail)
-            .foregroundStyle(row.isDone ? .secondary : .primary)
-        if let url = item.url {
-            Button { model.open(url) } label: {
-                HStack(spacing: 4) {
-                    text
-                    Image(systemName: "link")
-                        .imageScale(.small)
-                        .foregroundStyle(.tertiary)
+    /// Clicking the title (or anywhere in the row's free space) opens the details; the
+    /// link mark is the button that opens the link (SPEC §3).
+    private var titleView: some View {
+        HStack(spacing: 4) {
+            Text(item.title)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .foregroundStyle(row.isDone ? .secondary : .primary)
+                .accessibilityAddTraits(row.isDone ? .isSelected : [])
+                .accessibilityAction(named: Text("Details"), onOpen)
+            if let url = item.url {
+                Button { model.open(url) } label: {
+                    Image(systemName: "link").imageScale(.small).foregroundStyle(.secondary)
                 }
+                .buttonStyle(.borderless)
+                .modifier(LinkPointer())
+                .help(url.absoluteString)
+                .accessibilityLabel(Text("Open link for \(item.title)"))
             }
-            .buttonStyle(.plain)
-            .modifier(LinkPointer())
-            .help(url.absoluteString)
-            .accessibilityLabel(Text("Open \(item.title)"))
-        } else {
-            text.accessibilityAddTraits(row.isDone ? .isSelected : [])
         }
     }
 

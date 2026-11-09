@@ -86,6 +86,9 @@ struct ScheduleEditor: View {
     static func shortName(_ day: Weekday) -> String {
         Calendar.current.veryShortStandaloneWeekdaySymbols[symbolIndex(day)]
     }
+    static func shortWeekdayName(_ day: Weekday) -> String {
+        Calendar.current.shortStandaloneWeekdaySymbols[symbolIndex(day)]
+    }
     static func fullName(_ day: Weekday) -> String {
         Calendar.current.standaloneWeekdaySymbols[symbolIndex(day)]
     }
