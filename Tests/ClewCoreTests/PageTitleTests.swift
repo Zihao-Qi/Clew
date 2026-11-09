@@ -46,4 +46,18 @@ import Testing
         #expect(!PageTitle.hasOpenGraphTitle(partial))
         #expect(PageTitle.hasOpenGraphTitle(partial + Data(#"">"#.utf8)))
     }
+
+    @Test func ogTitleTextOutsideAMetaTagIsNotEnough() {
+        #expect(!PageTitle.hasOpenGraphTitle(Data(#"<script>var x = "og:title"; if (a > b) {}</script>"#.utf8)))
+        #expect(!PageTitle.hasOpenGraphTitle(Data(#"<div class="og:title">x</div>"#.utf8)))
+        #expect(!PageTitle.hasOpenGraphTitle(Data(#"<meta property="og:title" content="  ">"#.utf8)))
+    }
+
+    @Test func aGreaterThanInsideTheTitleDoesNotEndTheTag() {
+        let partial = Data(#"<meta property="og:title" content="A > B"#.utf8)
+        #expect(!PageTitle.hasOpenGraphTitle(partial))
+        let full = #"<meta property="og:title" content="A > B">"#
+        #expect(PageTitle.hasOpenGraphTitle(Data(full.utf8)))
+        #expect(PageTitle.extract(fromHTML: full) == "A > B")
+    }
 }

@@ -22,6 +22,7 @@ struct TodayListView: View {
             }
 
             NoticeView(text: model.notice ?? model.confirmation)
+                .animation(.easeOut(duration: 0.4), value: model.notice ?? model.confirmation)
 
             Divider()
 
@@ -188,6 +189,7 @@ struct NoticeView: View {
     var body: some View {
         if let text {
             Text(text)
+                .transition(.opacity)
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12)

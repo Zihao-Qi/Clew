@@ -5,17 +5,7 @@ import Foundation
 /// stranger; it is only ever shown as a title, and recorded as `.fetched`.
 public enum PageTitle {
     public static func extract(fromHTML html: String) -> String? {
-        var metas: [String: String] = [:]
-        for tag in matches(#"<meta\s[^>]*>"#, in: html) {
-            var attributes: [String: String] = [:]
-            for pair in groups(#"([a-zA-Z][\w:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')"#, in: tag) {
-                attributes[pair[0].lowercased()] = pair[1].isEmpty ? pair[2] : pair[1]
-            }
-            guard let key = (attributes["property"] ?? attributes["name"])?.lowercased(),
-                  let content = attributes["content"], metas[key] == nil
-            else { continue }
-            metas[key] = content
-        }
+        let metas = metaContents(html)
         let titleTag = groups(#"<title[^>]*>([\s\S]*?)</title>"#, in: html).first?.first
         for candidate in [metas["og:title"], metas["twitter:title"], metas["title"], titleTag] {
             if let raw = candidate, let title = QuickEntry.cleanTitle(decodeEntities(raw)) {
@@ -25,12 +15,30 @@ public enum PageTitle {
         return nil
     }
 
-    /// Whether a page read so far already holds a complete `og:title` tag, so the
-    /// fetcher can stop. `</head>` is no signal: YouTube playlist pages have one inside
-    /// a script about 50 KB before their real title.
+    /// Whether a page read so far already holds a complete `<meta property="og:title">`
+    /// with a usable value, so the fetcher can stop. `</head>` is no signal: YouTube
+    /// playlist pages have one inside a script about 50 KB before their real title.
     public static func hasOpenGraphTitle(_ prefix: Data) -> Bool {
-        guard let tag = prefix.range(of: Data("og:title".utf8)) else { return false }
-        return prefix[tag.upperBound...].contains(UInt8(ascii: ">"))
+        guard prefix.range(of: Data("og:title".utf8)) != nil else { return false } // cheap pre-check
+        let html = String(decoding: prefix, as: UTF8.self)
+        return metaContents(html)["og:title"].flatMap { QuickEntry.cleanTitle(decodeEntities($0)) } != nil
+    }
+
+    /// `property`/`name` → `content` of every complete `<meta>` tag; the first wins.
+    /// Quoted values may contain `>`.
+    private static func metaContents(_ html: String) -> [String: String] {
+        var metas: [String: String] = [:]
+        for tag in matches(#"<meta\s(?:[^>"']|"[^"]*"|'[^']*')*>"#, in: html) {
+            var attributes: [String: String] = [:]
+            for pair in groups(#"([a-zA-Z][\w:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')"#, in: tag) {
+                attributes[pair[0].lowercased()] = pair[1].isEmpty ? pair[2] : pair[1]
+            }
+            guard let key = (attributes["property"] ?? attributes["name"])?.lowercased(),
+                  let content = attributes["content"], metas[key] == nil
+            else { continue }
+            metas[key] = content
+        }
+        return metas
     }
 
     static func decodeEntities(_ text: String) -> String {

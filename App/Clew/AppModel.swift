@@ -140,6 +140,7 @@ final class AppModel {
         do {
             _ = try command(clew)
             notice = nil
+            confirmation = nil
             refresh()
             return true
         } catch let error as ClewError {

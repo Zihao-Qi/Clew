@@ -120,7 +120,7 @@ M = [
  ('C47 no entities', C+'PageTitle.swift', 'guard text.contains("&") else { return text }', 'return text', 'ClewCoreTests'),
  ('C48 hex as decimal', C+'PageTitle.swift', 'UInt32(name.dropFirst(2), radix: 16)', 'UInt32(name.dropFirst(2), radix: 10)', 'ClewCoreTests'),
  ('C49 blank og wins', C+'PageTitle.swift', 'if let raw = candidate, let title = QuickEntry.cleanTitle(decodeEntities(raw)) {', 'if let raw = candidate, let title = Optional(decodeEntities(raw)) {', 'ClewCoreTests'),
- ('C50 empty not nil', C+'PageTitle.swift', '        }\n        return nil\n    }\n\n    static func decodeEntities', '        }\n        return ""\n    }\n\n    static func decodeEntities', 'ClewCoreTests'),
+ ('C50 empty not nil', C+'PageTitle.swift', '        }\n        return nil\n    }\n\n    /// Whether a page read so far', '        }\n        return ""\n    }\n\n    /// Whether a page read so far', 'ClewCoreTests'),
  ('S19 rounds ignored', S+'SQLiteStore.swift', '\n                  AND (r.start IS NULL OR c.at >= r.start)', '', 'ClewStoreTests'),
  ('S20 voided round start', S+'SQLiteStore.swift', 'SELECT itemId, MAX(startedAt) AS start FROM goalRound\n                WHERE itemId IN (\\(Self.marks(itemIds.count))) AND voidedAt IS NULL', 'SELECT itemId, MAX(startedAt) AS start FROM goalRound\n                WHERE itemId IN (\\(Self.marks(itemIds.count)))', 'ClewStoreTests'),
  ('S21 voided round progress', S+'SQLiteStore.swift', '                    WHERE voidedAt IS NULL GROUP BY itemId', '                    GROUP BY itemId', 'ClewStoreTests'),
@@ -134,8 +134,10 @@ M = [
  ("S29 round itemId mutable", S+"Schema.swift", "            WHEN NEW.id IS NOT OLD.id OR NEW.itemId IS NOT OLD.itemId\n              OR NEW.startedAt", "            WHEN NEW.id IS NOT OLD.id\n              OR NEW.startedAt", "ClewStoreTests"),
  ("S30 round id mutable", S+"Schema.swift", "            WHEN NEW.id IS NOT OLD.id OR NEW.itemId IS NOT OLD.itemId\n              OR NEW.startedAt", "            WHEN NEW.itemId IS NOT OLD.itemId\n              OR NEW.startedAt", "ClewStoreTests"),
  ("C51 delete hard", C+"Clew.swift", "            item.deletedAt = now\n            item.updatedAt = now\n            try w.update(item)", "            item.state = .archived\n            item.updatedAt = now\n            try w.update(item)", "ClewStoreTests"),
- ("C52 stop at head", C+"PageTitle.swift", "guard let tag = prefix.range(of: Data(\"og:title\".utf8)) else { return false }", "guard let tag = prefix.range(of: Data(\"</head>\".utf8)) else { return false }", "ClewCoreTests"),
- ("C53 stop mid-tag", C+"PageTitle.swift", "return prefix[tag.upperBound...].contains(UInt8(ascii: \">\"))", "return !tag.isEmpty", "ClewCoreTests"),
+ ("C52 any og text", C+"PageTitle.swift", "return metaContents(html)[\"og:title\"].flatMap { QuickEntry.cleanTitle(decodeEntities($0)) } != nil", "return html.contains(\">\")", "ClewCoreTests"),
+ ("C53 blank og ok", C+"PageTitle.swift", "return metaContents(html)[\"og:title\"].flatMap { QuickEntry.cleanTitle(decodeEntities($0)) } != nil", "return metaContents(html)[\"og:title\"] != nil", "ClewCoreTests"),
+ ("C54 gt ends tag", C+"PageTitle.swift", "#\"<meta\\s(?:[^>\"']|\"[^\"]*\"|'[^']*')*>\"#", "#\"<meta\\s[^>]*>\"#", "ClewCoreTests"),
+ ("C55 head stop", C+"PageTitle.swift", "guard prefix.range(of: Data(\"og:title\".utf8)) != nil else { return false }", "if prefix.range(of: Data(\"</head>\".utf8)) != nil { return true }", "ClewCoreTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

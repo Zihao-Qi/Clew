@@ -32,7 +32,8 @@ enum TitleFetcher {
             for try await byte in bytes {
                 data.append(byte)
                 if data.count >= maxBytes { break }
-                if data.count % 65_536 == 0, PageTitle.hasOpenGraphTitle(data) { break }
+                // Checked every 256 KB: the check parses the whole prefix once og:title appears.
+                if data.count % 262_144 == 0, PageTitle.hasOpenGraphTitle(data) { break }
             }
             return PageTitle.extract(fromHTML: String(decoding: data, as: UTF8.self))
         } catch {
