@@ -8,6 +8,14 @@ import Testing
     let clock = TestClock(Date(timeIntervalSince1970: 1_800_000_000))
     var clew: Clew { Clew(store: store, clock: clock, zones: FixedZone("UTC")) }
 
+    @Test func goalsAreRatedOnHoverOnlySoTheirCountStaysVisible() throws {
+        let goal = try clew.addItem(NewItem(title: "g", shape: .goal(target: 30, schedule: .daily)))
+        let habit = try clew.addItem(NewItem(title: "h", shape: .habit(.daily)))
+        let once = try clew.addItem(NewItem(title: "o", shape: .today))
+        #expect(!Clew.hintsRatingAfterTick(goal))
+        #expect(Clew.hintsRatingAfterTick(habit) && Clew.hintsRatingAfterTick(once))
+    }
+
     @Test func offByDefaultAndSwitchable() throws {
         #expect(try !clew.ratingsEnabled())
         try clew.setRatingsEnabled(true)

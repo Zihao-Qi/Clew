@@ -12,6 +12,13 @@ extension Clew {
         }
     }
 
+    /// Whether a tick shows the rating dots by itself for a moment. Not for counted
+    /// goals: their dots would cover the bar and count the user is watching while
+    /// ticking +1s; goals are rated by hovering the bar (decided 2026-11-09).
+    public static func hintsRatingAfterTick(_ item: Item) -> Bool {
+        item.progress.target == nil
+    }
+
     public func setRatingsEnabled(_ on: Bool) throws {
         let now = clockForQueries.now()
         try storeForQueries.write { try $0.saveSetting(Self.ratingsKey, json: on ? "true" : "false", updatedAt: now) }

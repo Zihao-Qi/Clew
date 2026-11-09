@@ -234,7 +234,7 @@ final class AppModel {
         if row.item.kind == .goal || !row.isDone {
             var tick: CheckIn?
             guard run({ tick = try $0.checkIn(itemId: row.id) }), tick != nil else { return }
-            offerRating(itemId: row.id)
+            if Clew.hintsRatingAfterTick(row.item) { offerRating(itemId: row.id) }
         } else {
             run { try $0.undoToday(itemId: row.id) }
             if ratingPrompt?.itemId == row.id { ratingPrompt = nil }

@@ -53,7 +53,8 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
    dots are switched on (Settings, off by default), five small dots (how it felt:
    rough, meh, okay, good, great) then appear at the right end **of the same row**
    as a hint, fading if unused; hovering there later shows them again to rate or
-   change today's rating. On goals they take the bar's place; `−` stays. The row never changes
+   change today's rating. Counted goals show no hint (it would hide the count while
+   ticking): hover their bar to rate; the dots take the bar's place and `−` stays. The row never changes
    height and the dots never cover the `+1` target, so rapid ticks can't mis-click.
    Optional; they fade after a few seconds. Ticked items stay visible until the day
    rolls over, so undo is always one click away.

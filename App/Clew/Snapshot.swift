@@ -113,26 +113,44 @@ enum Snapshot {
                     print(String(format: "%-12@ x=%3.0f → details %+d, today's +1s %+d, links opened %+d", name as NSString, x,
                                  details - before.0, row().todayAmount - before.1, opened.count - before.2)); fflush(stdout)
                 }
-                // Rating dots (on): a +1 shows five dots over the bar; the fifth records
-                // "great"; − still undoes and clears them; unrated, they fade after ~4 s.
+                // Rating dots on. A goal's +1 shows no dots, so the count stays visible
+                // while ticking (goals are rated on hover, which can't be simulated).
                 model.setRatingsEnabled(true)
                 model.refresh()
+                let countBefore = row().progressAmount
                 try await click(22)
-                print("dots shown after a +1:", model.ratingPrompt != nil)
-                try await click(308)                 // the fifth dot, just left of "−"
-                let rated = row().lastTickToday?.rating
-                print("rated:", rated.map(String.init) ?? "none",
-                      "| details felt:", (try? clew.details(itemId: goal.id))?.stats.feltCounts ?? [:])
-                try await Task.sleep(for: .seconds(2))
-                print("dots gone after rating:", model.ratingPrompt == nil)
                 try await click(22)
-                let before = row().todayAmount
-                try await click(322)                 // "−" while the dots show
-                print("− still undoes while dots show:", row().todayAmount == before - 1,
-                      "| dots cleared by undo:", model.ratingPrompt == nil)
-                try await click(22)
+                print("goal: no dots after +1s:", model.ratingPrompt == nil,
+                      "| count grew by 2:", row().progressAmount == countBefore + 2)
+                // A habit's tick shows the hint; its fifth dot records "great"; unrated, they fade.
+                let habit = try clew.addItem(NewItem(title: "Stretch", shape: .habit(.daily)))
+                model.refresh()
+                let habitHost = NSHostingView(rootView: LiveRow(model: model, onOpen: {}, itemId: habit.id).frame(width: 340))
+                let habitWindow = NSWindow(contentRect: NSRect(x: -10_000, y: -9_000, width: 340, height: size.height),
+                                           styleMask: [.titled], backing: .buffered, defer: false)
+                habitWindow.contentView = habitHost
+                habitWindow.makeKeyAndOrderFront(nil)
+                try await Task.sleep(for: .milliseconds(400))
+                @MainActor func clickHabit(_ x: CGFloat) async throws {
+                    let p = habitHost.convert(NSPoint(x: x, y: size.height / 2), to: nil)
+                    for (i, type) in [NSEvent.EventType.leftMouseDown, .leftMouseUp].enumerated() {
+                        let e = NSEvent.mouseEvent(with: type, location: p, modifierFlags: [],
+                                                   timestamp: ProcessInfo.processInfo.systemUptime + Double(i) * 0.06,
+                                                   windowNumber: habitWindow.windowNumber, context: nil, eventNumber: i,
+                                                   clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0)!
+                        NSApp.postEvent(e, atStart: false)
+                    }
+                    try await Task.sleep(for: .milliseconds(300))
+                }
+                @MainActor func habitRow() -> TodayRow? { model.today?.rows.first { $0.id == habit.id } }
+                try await clickHabit(22)
+                print("habit: dots shown after a tick:", model.ratingPrompt?.itemId == habit.id)
+                try await clickHabit(321)             // the fifth dot at the right end
+                print("habit: rated:", habitRow()?.lastTickToday?.rating.map(String.init) ?? "none")
+                try await clickHabit(22)              // undo the tick
+                try await clickHabit(22)              // tick again, leave it unrated
                 try await Task.sleep(for: .milliseconds(4500))
-                print("dots gone 4.5 s after an unrated +1:", model.ratingPrompt == nil)
+                print("habit: dots gone 4.5 s after an unrated tick:", model.ratingPrompt == nil)
                 exit(0)
             } catch {
                 print("click test failed:", error)
@@ -144,8 +162,9 @@ enum Snapshot {
     private struct LiveRow: View {
         let model: AppModel
         let onOpen: () -> Void
+        var itemId: UUID? = nil
         var body: some View {
-            if let row = model.today?.rows.first {
+            if let row = itemId.flatMap({ id in model.today?.rows.first { $0.id == id } }) ?? model.today?.rows.first {
                 RowView(row: row, model: model, onEdit: {}, onOpen: onOpen)
             }
         }
