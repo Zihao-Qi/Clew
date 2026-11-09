@@ -130,7 +130,7 @@ enum Snapshot {
 
                 // A real drag can't be simulated: SwiftUI checks the actual mouse-button state,
                 // which posted events don't change. Row targeting is unit-tested in Core
-                // (Clew.rowUnderDrag); the drag itself is checked by hand.
+                // (Clew.dragSlot, dragShift, clampDrag); the drag itself is checked by hand.
                 exit(0)
             } catch {
                 print("drop test failed:", error)
