@@ -215,9 +215,12 @@ final class AppModel {
     @discardableResult
     func pick(_ ids: [UUID]) -> Bool { run { try $0.planForToday(itemIds: ids) } }
 
+    /// Replaced only by the debug click test, so it never opens a browser.
+    @ObservationIgnored var urlOpener: @MainActor (URL) -> Void = { NSWorkspace.shared.open($0) }
+
     func open(_ url: URL) {
         // Core only accepts http(s) URLs, so nothing but a web page can open here.
-        NSWorkspace.shared.open(url)
+        urlOpener(url)
     }
 
     @discardableResult

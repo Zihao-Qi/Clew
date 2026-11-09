@@ -56,6 +56,64 @@ enum Snapshot {
         exit(1)
     }
 
+    /// `CLEW_CLICK_TEST=1`: real mouse clicks on one goal row in an off-screen window;
+    /// prints what each click did. In-memory data; opens nothing.
+    static func startClickTest() {
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1)) // let NSApplication start its event loop
+            do {
+                let clew = Clew(store: try SQLiteStore.inMemory(), clock: SystemClock(), zones: SystemTimeZone())
+                let goal = try clew.addItem(NewItem(title: "ML course", url: URL(string: "https://course.example"),
+                                                    shape: .goal(target: 30, schedule: .daily)))
+                try clew.checkIn(itemId: goal.id)
+                try clew.checkIn(itemId: goal.id)
+                let model = AppModel(clew: clew, notify: false)
+                var opened: [URL] = []
+                model.urlOpener = { opened.append($0) }
+                var details = 0
+                @MainActor func row() -> TodayRow { model.today!.rows[0] }
+                let host = NSHostingView(rootView: RowView(row: row(), model: model, onEdit: {}, onOpen: { details += 1 })
+                    .frame(width: 340))
+                let size = host.fittingSize
+                let window = NSWindow(contentRect: NSRect(x: -10_000, y: -10_000, width: size.width, height: size.height),
+                                      styleMask: [.titled], backing: .buffered, defer: false)
+                window.contentView = host
+                window.makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
+                print("window up", size); fflush(stdout)
+                try await Task.sleep(for: .milliseconds(400))
+
+                @MainActor func click(_ x: CGFloat, y: CGFloat = size.height / 2) async throws {
+                    let p = host.convert(NSPoint(x: x, y: y), to: nil)
+                    for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                        let e = NSEvent.mouseEvent(with: type, location: p, modifierFlags: [], timestamp: 0,
+                                                   windowNumber: window.windowNumber, context: nil, eventNumber: 0,
+                                                   clickCount: 1, pressure: 1)!
+                        NSApp.postEvent(e, atStart: false) // the queue, so a button's tracking loop sees mouseUp
+                    }
+                    try await Task.sleep(for: .milliseconds(250))
+                }
+                let titleWidth = ("ML course" as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: NSFont.systemFontSize)]).width
+                let spots: [(String, CGFloat)] = [
+                    ("circle", 22), ("title", 60), ("link mark", 44 + titleWidth + 4 + 7),
+                    ("blank space", 175), ("bar", 230), ("count", 290), ("minus", 322),
+                    ("left margin", 4), ("right margin", 336),
+                ]
+                for (name, x) in spots + [("top padding", 150), ("bottom padding", 150)] {
+                    let y: CGFloat = name == "top padding" ? size.height - 2 : name == "bottom padding" ? 2 : size.height / 2
+                    let before = (details, row().todayAmount, opened.count)
+                    try await click(x, y: y)
+                    print(String(format: "%-12@ x=%3.0f → details %+d, today's +1s %+d, links opened %+d", name as NSString, x,
+                                 details - before.0, row().todayAmount - before.1, opened.count - before.2)); fflush(stdout)
+                }
+                exit(0)
+            } catch {
+                print("click test failed:", error)
+                exit(1)
+            }
+        }
+    }
+
     static func renderAndExit() -> Never {
         let dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("ClewSnapshots")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

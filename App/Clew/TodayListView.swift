@@ -94,7 +94,10 @@ struct RowView: View {
                 .fill(isDropTarget ? Color.accentColor.opacity(0.18) : Color.primary.opacity(hovering ? 0.06 : 0))
                 .padding(.horizontal, 6)
         }
+        // The whole row, margins included, opens the details; the circle, link mark,
+        // − and celebration buttons are buttons and keep their own clicks.
         .contentShape(Rectangle())
+        .onTapGesture(perform: onOpen)
         .onHover { hovering = $0 }
         .accessibilityAction(named: Text("Move Up")) { if canMoveUp { model.move(row, by: -1) } }
         .accessibilityAction(named: Text("Move Down")) { if canMoveDown { model.move(row, by: 1) } }
@@ -153,8 +156,6 @@ struct RowView: View {
 
             titleView
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-                .onTapGesture(perform: onOpen)
 
             if let target = item.progress.target {
                 // Fixed widths, so every goal's bar starts in the same column.
