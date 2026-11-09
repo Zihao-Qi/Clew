@@ -26,6 +26,13 @@ public enum Source: String, Codable, Sendable, CaseIterable {
     case `import`
 }
 
+/// Where an item's title came from. A fetched title was written by a stranger, so the
+/// future AI coach treats it as untrusted text (AGENT.md §4).
+public enum TitleOrigin: String, Codable, Sendable, CaseIterable {
+    case typed
+    case fetched
+}
+
 /// How an item's progress is measured. Stored as versioned JSON.
 public enum ProgressSpec: Hashable, Sendable {
     case none
@@ -53,6 +60,7 @@ public struct Item: Hashable, Sendable, Identifiable {
     public var id: UUID
     public var kind: ItemKind
     public var title: String
+    public var titleOrigin: TitleOrigin
     public var url: URL?
     public var note: String?
     public var parentId: UUID?
@@ -68,7 +76,7 @@ public struct Item: Hashable, Sendable, Identifiable {
     public var deletedAt: Date?
 
     public init(
-        id: UUID, kind: ItemKind, title: String, url: URL? = nil, note: String? = nil,
+        id: UUID, kind: ItemKind, title: String, titleOrigin: TitleOrigin = .typed, url: URL? = nil, note: String? = nil,
         parentId: UUID? = nil, schedule: Schedule, progress: ProgressSpec, state: ItemState,
         plannedDay: LocalDay? = nil, sortKey: Double, source: Source, externalRef: String? = nil,
         createdAt: Date, updatedAt: Date, deletedAt: Date? = nil
@@ -76,6 +84,7 @@ public struct Item: Hashable, Sendable, Identifiable {
         self.id = id
         self.kind = kind
         self.title = title
+        self.titleOrigin = titleOrigin
         self.url = url
         self.note = note
         self.parentId = parentId

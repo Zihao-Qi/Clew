@@ -30,6 +30,15 @@ public enum QuickEntry {
         return Parsed(title: title, url: url, isBareLink: false)
     }
 
+    /// A title fetched from a web page, made fit for a row: whitespace collapsed,
+    /// capped at `Clew.maxTitleLength`. Nil if nothing is left.
+    public static func cleanTitle(_ raw: String) -> String? {
+        let words = raw.split(whereSeparator: \.isWhitespace)
+        guard !words.isEmpty else { return nil }
+        let title = words.joined(separator: " ")
+        return title.count > Clew.maxTitleLength ? String(title.prefix(Clew.maxTitleLength - 1)) + "…" : title
+    }
+
     static func webURL(_ word: String) -> URL? {
         guard let url = URL(string: word), let scheme = url.scheme?.lowercased(),
               scheme == "http" || scheme == "https", let host = url.host, !host.isEmpty

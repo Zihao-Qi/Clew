@@ -23,6 +23,9 @@ final class AppModel {
     private(set) var fatalMessage: String?
     /// A short, transient message for a rejected action.
     var notice: String?
+    /// Goals whose "goal reached" line was closed with Done. UI-only; the goal leaves
+    /// the list at rollover anyway.
+    private(set) var dismissedCelebrations: Set<UUID> = []
 
     @ObservationIgnored private var clew: Clew?
     @ObservationIgnored private var observation: (any StoreObservation)?
@@ -88,7 +91,14 @@ final class AppModel {
 
     func undo(_ row: TodayRow) { run { try $0.undoToday(itemId: row.id) } }
     func moveToLater(_ row: TodayRow) { run { try $0.moveToLater(itemId: row.id) } }
-    func archive(_ row: TodayRow) { run { try $0.archive(itemId: row.id) } }
+    func delete(_ id: UUID) { run { try $0.deleteItem(itemId: id) } }
+    func nextRound(_ row: TodayRow) { run { try $0.startNextRound(itemId: row.id) } }
+    func dismissCelebration(_ row: TodayRow) { dismissedCelebrations.insert(row.id) }
+
+    /// The page title for a pasted link, or nil.
+    func fetchTitle(for url: URL) async -> String? {
+        await TitleFetcher.title(for: url)
+    }
 
     @discardableResult
     func add(_ new: NewItem) -> Bool { run { try $0.addItem(new) } }
@@ -129,6 +139,7 @@ final class AppModel {
         case .invalidTarget: String(localized: "Pick a total between 1 and 100,000.")
         case .invalidSchedule: String(localized: "Pick at least one day.")
         case .pickCount: String(localized: "Pick 1 to 3 items.")
+        case .goalReached: String(localized: "Goal reached! Start a next round or raise the target.")
         case .itemNotFound, .checkInNotFound, .notAllowed: String(localized: "That can't be done right now.")
         }
     }

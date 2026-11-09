@@ -18,7 +18,7 @@ private func tick(_ item: Item, _ d: String, amount: Int = 1, voided: Bool = fal
 }
 
 private func facts(_ ticks: [CheckIn]) -> ItemFacts {
-    ItemFacts(recent: ticks, lifetimeAmount: ticks.filter { !$0.isVoided }.reduce(0) { $0 + $1.amount })
+    ItemFacts(recent: ticks, progressAmount: ticks.filter { !$0.isVoided }.reduce(0) { $0 + $1.amount })
 }
 
 @Suite struct DueStateTests {
@@ -103,6 +103,30 @@ private func facts(_ ticks: [CheckIn]) -> ItemFacts {
     }
 }
 
+@Suite struct GoalRoundTests {
+    let wed = day("2026-11-11")
+
+    @Test func ticksBeforeTheRoundStartDoNotCountToday() {
+        let g = item(.goal, schedule: .daily, progress: .counter(target: 3))
+        // Reached 3/3 this morning (at t0), then started a next round an hour later.
+        let morning = tick(g, "2026-11-11", amount: 3)
+        let f = ItemFacts(recent: [morning], progressAmount: 0, roundStart: t0.addingTimeInterval(3600))
+        #expect(dueState(item: g, on: wed, facts: f) == .due)
+        let row = todayList(items: [g], facts: [g.id: f], on: wed).rows[0]
+        #expect(row.todayAmount == 0)
+        #expect(!row.isGoalReached)
+    }
+
+    @Test func goalIsReachedAtItsTarget() {
+        let g = item(.goal, schedule: .daily, progress: .counter(target: 3))
+        let f = facts([tick(g, "2026-11-10", amount: 2), tick(g, "2026-11-11")])
+        let row = todayList(items: [g], facts: [g.id: f], on: wed).rows[0]
+        #expect(row.isGoalReached && row.isDone)
+        let short = facts([tick(g, "2026-11-11", amount: 2)])
+        #expect(!todayList(items: [g], facts: [g.id: short], on: wed).rows[0].isGoalReached)
+    }
+}
+
 @Suite struct TodayListTests {
     let wed = day("2026-11-11")
 
@@ -138,7 +162,7 @@ private func facts(_ ticks: [CheckIn]) -> ItemFacts {
         let g = item(.goal, schedule: .daily, progress: .counter(target: 30))
         let f = facts([tick(g, "2026-11-09", amount: 9), tick(g, "2026-11-11"), tick(g, "2026-11-11", voided: true)])
         let row = todayList(items: [g], facts: [g.id: f], on: wed).rows[0]
-        #expect(row.lifetimeAmount == 10)
+        #expect(row.progressAmount == 10)
         #expect(row.todayAmount == 1)
     }
 }

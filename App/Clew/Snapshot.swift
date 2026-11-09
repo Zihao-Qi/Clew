@@ -10,6 +10,18 @@ import SwiftUI
 /// folder and prints the path. It never opens the real database.
 @MainActor
 enum Snapshot {
+    /// `CLEW_FETCH_TITLE=<url>`: fetch one title through the sandboxed app and print it.
+    static func fetchTitleAndExit(_ link: String) -> Never {
+        Task { @MainActor in
+            let model = AppModel(clew: nil)
+            let title = await model.fetchTitle(for: URL(string: link)!)
+            print("title:", title ?? "<nil>")
+            exit(title == nil ? 1 : 0)
+        }
+        RunLoop.main.run()
+        exit(1)
+    }
+
     static func renderAndExit() -> Never {
         let dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("ClewSnapshots")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -42,6 +54,8 @@ enum Snapshot {
         _ = try clew.addItem(NewItem(title: "A very long item title that should truncate nicely in the row",
                                      shape: .today))
         for _ in 0..<10 { try clew.checkIn(itemId: course.id) }
+        let pushups = try clew.addItem(NewItem(title: "Push-ups", shape: .goal(target: 3, schedule: .daily)))
+        for _ in 0..<3 { try clew.checkIn(itemId: pushups.id) }
         try clew.checkIn(itemId: exercise.id)
         try clew.checkIn(itemId: job.id)
         for title in ["Talk on attention", "Rust ownership article", "Interview prep video"] {

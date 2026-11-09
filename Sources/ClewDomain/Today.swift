@@ -14,22 +14,31 @@ public struct ItemFacts: Hashable, Sendable {
     /// This item's check-ins from (at least) the Monday of the evaluated day's ISO week
     /// onward. Voided check-ins may be included; they are ignored.
     public var recent: [CheckIn]
-    /// Sum of `amount` over all non-voided check-ins, all time.
-    public var lifetimeAmount: Int
+    /// Sum of `amount` over non-voided check-ins that count toward progress: since
+    /// `roundStart` for a goal in a later round, otherwise all time.
+    public var progressAmount: Int
+    /// When the goal's current round began (the latest `GoalRound`); nil for round 1
+    /// and for every non-goal. Check-ins before it belong to earlier rounds.
+    public var roundStart: Date?
 
-    public init(recent: [CheckIn], lifetimeAmount: Int) {
+    public init(recent: [CheckIn], progressAmount: Int, roundStart: Date? = nil) {
         self.recent = recent
-        self.lifetimeAmount = lifetimeAmount
+        self.progressAmount = progressAmount
+        self.roundStart = roundStart
     }
 
-    public static let empty = ItemFacts(recent: [], lifetimeAmount: 0)
+    public static let empty = ItemFacts(recent: [], progressAmount: 0)
+
+    private var counted: some Sequence<CheckIn> {
+        recent.lazy.filter { c in !c.isVoided && (roundStart.map { c.at >= $0 } ?? true) }
+    }
 
     func amount(on day: LocalDay) -> Int {
-        recent.lazy.filter { !$0.isVoided && $0.localDay == day }.reduce(0) { $0 + $1.amount }
+        counted.filter { $0.localDay == day }.reduce(0) { $0 + $1.amount }
     }
 
     func distinctDays(inWeekOf day: LocalDay) -> Int {
-        Set(recent.lazy.filter { !$0.isVoided && $0.localDay.isInSameWeek(as: day) }.map(\.localDay)).count
+        Set(counted.filter { $0.localDay.isInSameWeek(as: day) }.map(\.localDay)).count
     }
 }
 
@@ -44,14 +53,15 @@ public func dueState(item: Item, on day: LocalDay, facts: ItemFacts) -> DueState
         // earlier day is due today. Nothing rewrites `plannedDay`.
         guard let planned = item.plannedDay, planned <= day else { return .notDue }
         if tickedToday { return .doneToday }
-        return facts.lifetimeAmount > 0 ? .notDue : .due
+        return facts.progressAmount > 0 ? .notDue : .due
 
     case .habit:
         return scheduledState(item.schedule, on: day, tickedToday: tickedToday, facts: facts)
 
     case .goal:
-        // A finished goal stays visible on the day it was finished, then leaves.
-        if let target = item.progress.target, facts.lifetimeAmount >= target, !tickedToday {
+        // A reached goal stays visible on the day it was reached, then leaves, unless
+        // a next round is started or the target raised.
+        if let target = item.progress.target, facts.progressAmount >= target, !tickedToday {
             return .notDue
         }
         return scheduledState(item.schedule, on: day, tickedToday: tickedToday, facts: facts)
@@ -77,13 +87,17 @@ private func scheduledState(_ schedule: Schedule, on day: LocalDay, tickedToday:
 public struct TodayRow: Hashable, Sendable, Identifiable {
     public let item: Item
     public let state: DueState
-    /// Sum of today's non-voided check-in amounts.
+    /// Sum of today's non-voided check-in amounts (in the current round, for a goal).
     public let todayAmount: Int
-    /// Lifetime total, for a counted goal's bar.
-    public let lifetimeAmount: Int
+    /// Progress toward a counted goal's target, in the current round.
+    public let progressAmount: Int
 
     public var id: UUID { item.id }
     public var isDone: Bool { state == .doneToday }
+    /// A counted goal whose current round has reached its target.
+    public var isGoalReached: Bool {
+        item.progress.target.map { progressAmount >= $0 } ?? false
+    }
 }
 
 public struct TodayList: Hashable, Sendable {
@@ -110,7 +124,7 @@ public func todayList(items: [Item], facts: [UUID: ItemFacts], on day: LocalDay)
             let f = facts[item.id] ?? .empty
             let state = dueState(item: item, on: day, facts: f)
             guard state == .due || state == .doneToday else { return nil }
-            return TodayRow(item: item, state: state, todayAmount: f.amount(on: day), lifetimeAmount: f.lifetimeAmount)
+            return TodayRow(item: item, state: state, todayAmount: f.amount(on: day), progressAmount: f.progressAmount)
         }
     return TodayList(day: day, rows: rows)
 }

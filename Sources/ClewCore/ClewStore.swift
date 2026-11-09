@@ -24,9 +24,14 @@ public protocol StoreReader {
     func checkIn(id: UUID) throws -> CheckIn?
     /// Non-voided check-ins of `itemIds` with `localDay >= from`.
     func checkIns(itemIds: [UUID], from: LocalDay) throws -> [CheckIn]
-    /// Sum of non-voided check-in amounts per item, all time. Missing means 0.
-    func lifetimeAmounts(itemIds: [UUID]) throws -> [UUID: Int]
+    /// Start of each goal's current round: the latest non-voided `GoalRound`. Items
+    /// still in round 1 are missing.
+    func roundStarts(itemIds: [UUID]) throws -> [UUID: Date]
+    /// Sum of non-voided check-in amounts per item since its current round started
+    /// (all time if it has no round). Missing means 0.
+    func progressAmounts(itemIds: [UUID]) throws -> [UUID: Int]
     func plans(itemId: UUID) throws -> [Plan]
+    func goalRounds(itemId: UUID) throws -> [GoalRound]
     func maxSortKey() throws -> Double?
 }
 
@@ -38,4 +43,5 @@ public protocol StoreWriter: StoreReader {
     /// Sets `voidedAt`/`voidReason`. Voids are monotonic: voiding twice is an error.
     func voidCheckIn(id: UUID, at: Date, reason: String) throws
     func insert(_ plan: Plan) throws
+    func insert(_ round: GoalRound) throws
 }

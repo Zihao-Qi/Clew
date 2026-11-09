@@ -117,20 +117,27 @@ struct AddView: View {
     @State private var kindChosenByUser = false
     @State private var schedule = ScheduleDraft()
     @State private var target = 30
+    /// The title fetched for the pasted link, if any; it is put into the field so it
+    /// can be edited, and recorded as `.fetched` only if left as fetched.
+    @State private var fetchedTitle: String?
+    @State private var fetchTask: Task<Void, Never>?
     @FocusState private var focused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            TextField(text: $text) { Text("Name or link") }
-                .textFieldStyle(.roundedBorder)
-                .focused($focused)
-                .onSubmit(save)
-                .accessibilityLabel(Text("Name or link"))
-                .onChange(of: text) {
-                    // SPEC §5: a pasted link goes to Later unless you chose otherwise.
-                    guard !kindChosenByUser else { return }
-                    kind = QuickEntry.parse(text).isBareLink ? .later : .today
+            HStack(spacing: 6) {
+                TextField(text: $text) { Text("Name or link") }
+                    .textFieldStyle(.roundedBorder)
+                    .focused($focused)
+                    .onSubmit(save)
+                    .accessibilityLabel(Text("Name or link"))
+                if fetchTask != nil {
+                    ProgressView()
+                        .controlSize(.small)
+                        .accessibilityLabel(Text("Fetching the title"))
                 }
+            }
+            .onChange(of: text) { textChanged() }
 
             Picker(selection: Binding(get: { kind }, set: { kind = $0; kindChosenByUser = true })) {
                 Text("Today").tag(AddKind.today)
@@ -166,7 +173,35 @@ struct AddView: View {
         .onAppear { focused = true }
     }
 
+    private func textChanged() {
+        let parsed = QuickEntry.parse(text)
+        // SPEC §5: a pasted link goes to Later unless you chose otherwise.
+        if !kindChosenByUser {
+            let isLinkOnly = parsed.isBareLink || (parsed.url != nil && parsed.title == fetchedTitle)
+            kind = isLinkOnly ? .later : .today
+        }
+        if parsed.isBareLink, let url = parsed.url {
+            fetchTitle(url, typed: text)
+        }
+    }
+
+    /// Fills in the page title, unless the user has typed something else meanwhile.
+    private func fetchTitle(_ url: URL, typed: String) {
+        fetchTask?.cancel()
+        fetchTask = Task {
+            let title = await model.fetchTitle(for: url)
+            guard !Task.isCancelled else { return }
+            fetchTask = nil
+            if let title, text == typed {
+                fetchedTitle = title
+                text = "\(title) \(url.absoluteString)"
+            }
+        }
+    }
+
     private func save() {
+        fetchTask?.cancel()
+        fetchTask = nil
         let parsed = QuickEntry.parse(text)
         let shape: NewItemShape = switch kind {
         case .today: .today
@@ -174,7 +209,8 @@ struct AddView: View {
         case .habit: .habit(schedule.schedule)
         case .goal: .goal(target: target, schedule: schedule.schedule)
         }
-        if model.add(NewItem(title: parsed.title, url: parsed.url, shape: shape)) {
+        let origin: TitleOrigin = parsed.title == fetchedTitle ? .fetched : .typed
+        if model.add(NewItem(title: parsed.title, titleOrigin: origin, url: parsed.url, shape: shape)) {
             done()
         }
     }
@@ -296,20 +332,37 @@ struct PickView: View {
     private var pickList: some View {
         VStack(alignment: .leading, spacing: 6) {
             ForEach(items) { item in
-                            Toggle(isOn: binding(for: item.id)) {
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(item.title).lineLimit(1)
-                                    if let host = item.url?.host {
-                                        Text(verbatim: host).font(.caption).foregroundStyle(.secondary)
-                                    }
-                                }
+                HStack(spacing: 8) {
+                    Toggle(isOn: binding(for: item.id)) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(item.title).lineLimit(1)
+                            if let host = item.url?.host {
+                                Text(verbatim: host).font(.caption).foregroundStyle(.secondary)
                             }
-                            .toggleStyle(.checkbox)
-                            .disabled(!picked.contains(item.id) && picked.count >= Clew.maxPicks)
-                            .accessibilityLabel(Text(item.title))
+                        }
+                    }
+                    .toggleStyle(.checkbox)
+                    .disabled(!picked.contains(item.id) && picked.count >= Clew.maxPicks)
+                    .accessibilityLabel(Text(item.title))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Button { delete(item) } label: { Image(systemName: "xmark") }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel(Text("Delete \(item.title)"))
+                }
+                .contextMenu {
+                    Button("Delete", role: .destructive) { delete(item) }
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func delete(_ item: Item) {
+        model.delete(item.id)
+        picked.removeAll { $0 == item.id }
+        items = model.laterItems()
     }
 
     private func binding(for id: UUID) -> Binding<Bool> {

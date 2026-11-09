@@ -59,7 +59,7 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
             active: try store.read { try $0.items(inStates: [.active]).map(\.id) },
             later: try store.read { try $0.items(inStates: [.later]).map(\.id) },
             recent: try store.read { try $0.checkIns(itemIds: [active.id], from: day("2026-11-09")).map(\.id) },
-            lifetime: try store.read { try $0.lifetimeAmounts(itemIds: [active.id, later.id]) },
+            lifetime: try store.read { try $0.progressAmounts(itemIds: [active.id, later.id]) },
             none: try store.read { try $0.checkIns(itemIds: [], from: day("2026-11-09")) },
             maxSort: try store.read { try $0.maxSortKey() }
         )
@@ -88,11 +88,17 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         let store = try SQLiteStore.inMemory()
         let counter = Counter()
         let token = store.observeChanges { counter.increment() }
-        try store.write { try $0.insert(sampleItem()) }
+        let goal = sampleItem()
+        try store.write { try $0.insert(goal) }
         #expect(counter.value == 1)
+        try store.write {
+            try $0.insert(GoalRound(id: UUID(), itemId: goal.id, startedAt: t0, localDay: day("2026-11-11"),
+                                    target: 30, source: .user))
+        }
+        #expect(counter.value == 2)
         token.cancel()
         try store.write { try $0.insert(sampleItem()) }
-        #expect(counter.value == 1)
+        #expect(counter.value == 2)
     }
 
     @Test func fileDatabaseSurvivesReopening() throws {
@@ -194,6 +200,76 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
     }
 }
 
+@Suite struct GoalRoundStoreTests {
+    @Test func progressCountsFromTheLatestLiveRound() throws {
+        let store = try SQLiteStore.inMemory()
+        let goal = sampleItem()
+        let early = sampleCheckIn(goal, amount: 5) // at t0
+        let late = CheckIn(id: UUID(), itemId: goal.id, localDay: day("2026-11-11"), at: t0.addingTimeInterval(7200),
+                           timeZoneId: "UTC", amount: 2, source: .user)
+        let r1 = GoalRound(id: UUID(), itemId: goal.id, startedAt: t0.addingTimeInterval(3600),
+                           localDay: day("2026-11-11"), target: 30, source: .user)
+        let r2 = GoalRound(id: UUID(), itemId: goal.id, startedAt: t0.addingTimeInterval(10_800),
+                           localDay: day("2026-11-11"), target: 30, source: .user)
+        try store.write { w in
+            try w.insert(goal)
+            try w.insert(early)
+            try w.insert(late)
+            try w.insert(r1)
+        }
+        #expect(try store.read { try $0.progressAmounts(itemIds: [goal.id]) } == [goal.id: 2])
+        #expect(try store.read { try $0.roundStarts(itemIds: [goal.id]) } == [goal.id: r1.startedAt])
+        try store.write { try $0.insert(r2) }
+        #expect(try store.read { try $0.progressAmounts(itemIds: [goal.id]) }[goal.id] == nil)
+        // A voided round no longer counts: back to r1.
+        try store.writer.write { try $0.execute(sql: "UPDATE goalRound SET voidedAt = ? WHERE id = ?", arguments: [t0, r2.id.uuidString]) }
+        #expect(try store.read { try $0.progressAmounts(itemIds: [goal.id]) } == [goal.id: 2])
+        #expect(try store.read { try $0.roundStarts(itemIds: [goal.id]) } == [goal.id: r1.startedAt])
+        #expect(try store.read { try $0.goalRounds(itemId: goal.id) }.map(\.id) == [r1.id, r2.id])
+    }
+
+    @Test(arguments: ["target = 99", "startedAt = '2030-01-01 00:00:00.000'", "source = 'dayflow'", "localDay = '2026-11-12'"])
+    func goalRoundsAreFacts(_ assignment: String) throws {
+        let store = try SQLiteStore.inMemory()
+        let goal = sampleItem()
+        let round = GoalRound(id: UUID(), itemId: goal.id, startedAt: t0, localDay: day("2026-11-11"), target: 30, source: .user)
+        try store.write { w in
+            try w.insert(goal)
+            try w.insert(round)
+        }
+        #expect(throws: DatabaseError.self) {
+            try store.writer.write { try $0.execute(sql: "UPDATE goalRound SET \(assignment)") }
+        }
+        #expect(throws: DatabaseError.self) {
+            try store.writer.write { try $0.execute(sql: "DELETE FROM goalRound") }
+        }
+        try store.writer.write { try $0.execute(sql: "UPDATE goalRound SET voidedAt = ?", arguments: [t0]) }
+        #expect(throws: DatabaseError.self) {
+            try store.writer.write { try $0.execute(sql: "UPDATE goalRound SET voidedAt = NULL") }
+        }
+    }
+
+    @Test func titleOriginRoundTripsAndDefaultsToTypedForOldRows() throws {
+        // A database created by v1a, before titleOrigin existed.
+        let queue = try DatabaseQueue()
+        try Schema.migrator.migrate(queue, upTo: "v1")
+        let oldId = UUID()
+        try queue.write { db in
+            try db.execute(sql: """
+                INSERT INTO item (id, kind, title, schedule, progress, state, sortKey, source, createdAt, updatedAt)
+                VALUES (?, 'once', 'Old', '{"type":"unscheduled","v":1}', '{"type":"none","v":1}', 'later', 1,
+                        'user', ?, ?)
+                """, arguments: [oldId.uuidString, t0, t0])
+        }
+        let store = try SQLiteStore(writer: queue)
+        #expect(try store.read { try $0.item(id: oldId) }?.titleOrigin == .typed)
+        var fetched = sampleItem()
+        fetched.titleOrigin = .fetched
+        try store.write { try $0.insert(fetched) }
+        #expect(try store.read { try $0.item(id: fetched.id) }?.titleOrigin == .fetched)
+    }
+}
+
 /// The command layer end to end on the real database.
 @Suite struct CommandsOnSQLiteTests {
     struct Clock: ClewDomain.Clock { let date: Date; func now() -> Date { date } }
@@ -214,7 +290,7 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         let today = try clew.today()
         #expect(today.rows.map(\.id) == [goal.id, habit.id, link.id])
         #expect(today.done == 1 && today.total == 3)
-        #expect(today.rows[0].lifetimeAmount == 2)
+        #expect(today.rows[0].progressAmount == 2)
         #expect(try clew.laterCount() == 0)
         #expect(try store.read { try $0.plans(itemId: link.id) }.count == 1)
     }
