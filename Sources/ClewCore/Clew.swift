@@ -116,6 +116,11 @@ public final class Clew: Sendable {
         }
     }
 
+    /// One item by id, if it exists and is not deleted.
+    public func item(id: UUID) throws -> Item? {
+        try store.read { try $0.item(id: id) }.flatMap { $0.deletedAt == nil ? $0 : nil }
+    }
+
     /// The Later pile, newest first. Its contents are shown only when picking.
     public func laterItems() throws -> [Item] {
         try store.read { r in
@@ -323,6 +328,12 @@ public final class Clew: Sendable {
             item.deletedAt = now
             item.updatedAt = now
             try w.update(item)
+            // Its reminder goes with it, in the same transaction.
+            if var reminder = try w.reminders().first(where: { $0.itemId == itemId }) {
+                reminder.deletedAt = now
+                reminder.updatedAt = now
+                try w.save(reminder)
+            }
         }
     }
 

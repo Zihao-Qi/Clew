@@ -20,7 +20,10 @@ extension Clew {
     /// Whether anything could ever notify: used to ask for permission only when needed.
     public func wantsNotifications() throws -> Bool {
         let s = try summaries()
-        let anyReminder = try storeForQueries.read { try $0.reminders().contains { $0.enabled } }
+        let anyReminder = try storeForQueries.read { r in
+            let live = Set(try r.items(inStates: [.active, .later, .paused]).map(\.id))
+            return try r.reminders().contains { $0.enabled && live.contains($0.itemId) }
+        }
         return s.morningEnabled || s.eveningEnabled || anyReminder
     }
 

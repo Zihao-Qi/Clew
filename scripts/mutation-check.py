@@ -174,6 +174,9 @@ M = [
  ("S34 setting not updated", S+"SQLiteStore.swift", "ON CONFLICT(key) DO UPDATE SET value = excluded.value, updatedAt = excluded.updatedAt", "ON CONFLICT(key) DO NOTHING", "ClewStoreTests"),
  ("S35 export no reminders", S+"SQLiteStore.swift", "reminders: try Row.fetchAll(db, sql: \"SELECT * FROM reminder ORDER BY updatedAt, id\").map(Self.reminder),", "reminders: [],", "ClewStoreTests"),
  ("S36 old export breaks", C+"ClewStore.swift", "reminders: try c.decodeIfPresent([Reminder].self, forKey: .reminders) ?? [],", "reminders: try c.decode([Reminder].self, forKey: .reminders),", "ClewStoreTests"),
+ ("N21 delete keeps reminder", C+"Clew.swift", "                reminder.deletedAt = now\n                reminder.updatedAt = now\n                try w.save(reminder)", "                _ = reminder", "ClewCoreTests"),
+ ("N22 wants counts dead items", C+"Reminders.swift", "return try r.reminders().contains { $0.enabled && live.contains($0.itemId) }", "return try r.reminders().contains { $0.enabled && !live.isEmpty || $0.enabled }", "ClewCoreTests"),
+ ("N23 item shows deleted", C+"Clew.swift", "try store.read { try $0.item(id: id) }.flatMap { $0.deletedAt == nil ? $0 : nil }", "try store.read { try $0.item(id: id) }", "ClewCoreTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

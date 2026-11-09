@@ -37,6 +37,29 @@ private func local(_ y: Int, _ m: Int, _ d: Int, _ h: Int) -> Date {
         #expect(throws: ClewError.itemNotFound) { try clew.setReminder(itemId: item.id, time: TimeOfDay(hour: 9, minute: 0)) }
     }
 
+    @Test func deletingAnItemRemovesItsReminder() throws {
+        let item = try clew.addItem(NewItem(title: "h", shape: .habit(.daily)))
+        let r = try #require(try clew.setReminder(itemId: item.id, time: TimeOfDay(hour: 18, minute: 0)))
+        clock.set(local(2026, 11, 11, 9))
+        try clew.deleteItem(itemId: item.id)
+        #expect(store.state.reminders[r.id]?.deletedAt == local(2026, 11, 11, 9))
+        #expect(try !clew.wantsNotifications())
+    }
+
+    @Test func aReminderOfAnArchivedItemDoesNotNeedNotifications() throws {
+        let item = try clew.addItem(NewItem(title: "h", shape: .habit(.daily)))
+        try clew.setReminder(itemId: item.id, time: TimeOfDay(hour: 18, minute: 0))
+        try clew.archive(itemId: item.id)
+        #expect(try !clew.wantsNotifications())
+    }
+
+    @Test func itemLookupSkipsDeletedItems() throws {
+        let item = try clew.addItem(NewItem(title: "l", url: URL(string: "https://a.example"), shape: .later))
+        #expect(try clew.item(id: item.id)?.url?.absoluteString == "https://a.example")
+        try clew.deleteItem(itemId: item.id)
+        #expect(try clew.item(id: item.id) == nil)
+    }
+
     @Test func summariesDefaultOffAndRoundTrip() throws {
         #expect(try clew.summaries() == .defaults)
         #expect(try !clew.wantsNotifications())

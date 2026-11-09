@@ -135,7 +135,9 @@ final class AppModel {
         case .done(let id): run { try $0.checkIn(itemId: id, source: .notification) }
         case .later(let id): run { try $0.moveToLater(itemId: id) }
         case .open(let id):
-            if let url = today?.rows.first(where: { $0.id == id })?.item.url { open(url) }
+            // From the database, not today's rows: the notification may be clicked after
+            // rollover, or for an item that is not on today's list any more.
+            if let url = (try? clew?.item(id: id))??.url { open(url) }
         }
     }
 
