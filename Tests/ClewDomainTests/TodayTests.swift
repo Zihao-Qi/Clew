@@ -158,6 +158,19 @@ private func facts(_ ticks: [CheckIn]) -> ItemFacts {
         #expect(after.rows.map(\.id) == before.rows.map(\.id))
     }
 
+    @Test func aRowKnowsTodaysLatestLiveTick() {
+        let g = item(.goal, schedule: .daily, progress: .counter(target: 30))
+        let morning = CheckIn(id: UUID(), itemId: g.id, localDay: wed, at: t0, timeZoneId: "UTC", source: .user)
+        let noon = CheckIn(id: UUID(), itemId: g.id, localDay: wed, at: t0.addingTimeInterval(3600), timeZoneId: "UTC", source: .user)
+        let undone = CheckIn(id: UUID(), itemId: g.id, localDay: wed, at: t0.addingTimeInterval(7200), timeZoneId: "UTC",
+                             source: .user, voidedAt: t0)
+        let yesterday = tick(g, "2026-11-10")
+        let row = todayList(items: [g], facts: [g.id: facts([morning, noon, undone, yesterday])], on: wed).rows[0]
+        #expect(row.lastTickToday?.id == noon.id)
+        let plain = item(.habit, schedule: .daily)
+        #expect(todayList(items: [plain], facts: [:], on: wed).rows[0].lastTickToday == nil)
+    }
+
     @Test func goalRowCarriesLifetimeAndTodayAmounts() {
         let g = item(.goal, schedule: .daily, progress: .counter(target: 30))
         let f = facts([tick(g, "2026-11-09", amount: 9), tick(g, "2026-11-11"), tick(g, "2026-11-11", voided: true)])

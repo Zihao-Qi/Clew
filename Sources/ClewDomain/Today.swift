@@ -33,6 +33,12 @@ public struct ItemFacts: Hashable, Sendable {
         recent.lazy.filter { c in !c.isVoided && (roundStart.map { c.at >= $0 } ?? true) }
     }
 
+    /// The latest live tick on `day` (in the current round, for a goal): what a rating
+    /// applies to.
+    func lastTick(on day: LocalDay) -> CheckIn? {
+        counted.filter { $0.localDay == day }.max { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) }
+    }
+
     func amount(on day: LocalDay) -> Int {
         counted.filter { $0.localDay == day }.reduce(0) { $0 + $1.amount }
     }
@@ -91,6 +97,8 @@ public struct TodayRow: Hashable, Sendable, Identifiable {
     public let todayAmount: Int
     /// Progress toward a counted goal's target, in the current round.
     public let progressAmount: Int
+    /// Today's latest live tick, if any: the one rating dots rate.
+    public let lastTickToday: CheckIn?
 
     public var id: UUID { item.id }
     public var isDone: Bool { state == .doneToday }
@@ -124,7 +132,8 @@ public func todayList(items: [Item], facts: [UUID: ItemFacts], on day: LocalDay)
             let f = facts[item.id] ?? .empty
             let state = dueState(item: item, on: day, facts: f)
             guard state == .due || state == .doneToday else { return nil }
-            return TodayRow(item: item, state: state, todayAmount: f.amount(on: day), progressAmount: f.progressAmount)
+            return TodayRow(item: item, state: state, todayAmount: f.amount(on: day), progressAmount: f.progressAmount,
+                            lastTickToday: f.lastTick(on: day))
         }
     return TodayList(day: day, rows: rows)
 }

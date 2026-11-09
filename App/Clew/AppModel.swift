@@ -233,8 +233,8 @@ final class AppModel {
     func tap(_ row: TodayRow) {
         if row.item.kind == .goal || !row.isDone {
             var tick: CheckIn?
-            guard run({ tick = try $0.checkIn(itemId: row.id) }), let tick else { return }
-            offerRating(itemId: row.id, checkInId: tick.id)
+            guard run({ tick = try $0.checkIn(itemId: row.id) }), tick != nil else { return }
+            offerRating(itemId: row.id)
         } else {
             run { try $0.undoToday(itemId: row.id) }
             if ratingPrompt?.itemId == row.id { ratingPrompt = nil }
@@ -243,9 +243,9 @@ final class AppModel {
 
     // MARK: - Rating dots (SPEC §4; off by default)
 
+    /// A row showing its rating dots as a hint after a tick (they also show on hover).
     struct RatingPrompt: Equatable {
         let itemId: UUID
-        let checkInId: UUID
         var rating: Int?
     }
 
@@ -254,17 +254,18 @@ final class AppModel {
     private(set) var ratingsOn = false
     @ObservationIgnored private var ratingPromptTask: Task<Void, Never>?
 
-    private func offerRating(itemId: UUID, checkInId: UUID) {
+    private func offerRating(itemId: UUID) {
         guard ratingsOn else { return }
-        let prompt = RatingPrompt(itemId: itemId, checkInId: checkInId)
+        let prompt = RatingPrompt(itemId: itemId)
         ratingPrompt = prompt
         hideRatingPrompt(after: .seconds(4), unlessChangedFrom: prompt)
     }
 
-    func rate(_ rating: Int) {
-        guard var prompt = ratingPrompt else { return }
-        guard run({ try $0.rate(checkInId: prompt.checkInId, rating: rating) }) else { return }
-        prompt.rating = rating
+    /// Rates today's latest live tick of the row (rating again changes it).
+    func rate(_ row: TodayRow, _ rating: Int) {
+        guard let tick = row.lastTickToday else { return }
+        guard run({ try $0.rate(checkInId: tick.id, rating: rating) }) else { return }
+        let prompt = RatingPrompt(itemId: row.id, rating: rating)
         ratingPrompt = prompt
         hideRatingPrompt(after: .milliseconds(1200), unlessChangedFrom: prompt)
     }
@@ -282,7 +283,10 @@ final class AppModel {
         run { try $0.setRatingsEnabled(on) }
     }
 
-    func undo(_ row: TodayRow) { run { try $0.undoToday(itemId: row.id) } }
+    func undo(_ row: TodayRow) {
+        run { try $0.undoToday(itemId: row.id) }
+        if ratingPrompt?.itemId == row.id { ratingPrompt = nil }
+    }
 
     /// Drop `dragged` onto `target`: it takes the target's place. Coming from above it
     /// lands after the target; from below, before it.

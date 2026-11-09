@@ -58,10 +58,9 @@ enum Snapshot {
 
     /// `CLEW_CLICK_TEST=1`: real mouse clicks on one goal row in an off-screen window;
     /// prints what each click did. In-memory data; opens nothing.
-    /// Limitation: SwiftUI tap gestures (row → details) only fire when the test window
-    /// can become active, which macOS refuses while the user works in another app.
-    /// Buttons (circle, −, link, rating dots) respond either way. A "details +0" while
-    /// the user is busy is not a regression; check by hand.
+    /// Limitations: one run showed "details +0" for every row tap while buttons still
+    /// worked; the cause is unproven (possibly the test window not becoming active).
+    /// Hover can't be simulated. Both are checked by hand.
     static func startClickTest() {
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(1)) // let NSApplication start its event loop
@@ -76,8 +75,9 @@ enum Snapshot {
                 model.urlOpener = { opened.append($0) }
                 var details = 0
                 @MainActor func row() -> TodayRow { model.today!.rows[0] }
-                let host = NSHostingView(rootView: RowView(row: row(), model: model, onEdit: {}, onOpen: { details += 1 })
-                    .frame(width: 340))
+                // A live row: re-rendered from the model like the app's list (a fixed row
+                // value would keep rating the tick that existed when the test began).
+                let host = NSHostingView(rootView: LiveRow(model: model, onOpen: { details += 1 }).frame(width: 340))
                 let size = host.fittingSize
                 let window = NSWindow(contentRect: NSRect(x: -10_000, y: -10_000, width: size.width, height: size.height),
                                       styleMask: [.titled], backing: .buffered, defer: false)
@@ -113,18 +113,23 @@ enum Snapshot {
                     print(String(format: "%-12@ x=%3.0f → details %+d, today's +1s %+d, links opened %+d", name as NSString, x,
                                  details - before.0, row().todayAmount - before.1, opened.count - before.2)); fflush(stdout)
                 }
-                // Rating dots (on): a +1 shows them; the third dot records "great"; they fade.
+                // Rating dots (on): a +1 shows five dots over the bar; the fifth records
+                // "great"; − still undoes and clears them; unrated, they fade after ~4 s.
                 model.setRatingsEnabled(true)
                 model.refresh()
                 try await click(22)
                 print("dots shown after a +1:", model.ratingPrompt != nil)
-                let tickId = model.ratingPrompt?.checkInId
-                try await click(334 - 12)            // the third dot, at the right end
-                let stored = tickId.flatMap { id in try? clew.details(itemId: goal.id) }.map { _ in tickId! }
-                print("rated:", model.ratingPrompt?.rating.map(String.init) ?? "none",
-                      "| details felt:", (try? clew.details(itemId: goal.id))?.stats.feltCounts ?? [:], stored != nil)
+                try await click(308)                 // the fifth dot, just left of "−"
+                let rated = row().lastTickToday?.rating
+                print("rated:", rated.map(String.init) ?? "none",
+                      "| details felt:", (try? clew.details(itemId: goal.id))?.stats.feltCounts ?? [:])
                 try await Task.sleep(for: .seconds(2))
                 print("dots gone after rating:", model.ratingPrompt == nil)
+                try await click(22)
+                let before = row().todayAmount
+                try await click(322)                 // "−" while the dots show
+                print("− still undoes while dots show:", row().todayAmount == before - 1,
+                      "| dots cleared by undo:", model.ratingPrompt == nil)
                 try await click(22)
                 try await Task.sleep(for: .milliseconds(4500))
                 print("dots gone 4.5 s after an unrated +1:", model.ratingPrompt == nil)
@@ -132,6 +137,16 @@ enum Snapshot {
             } catch {
                 print("click test failed:", error)
                 exit(1)
+            }
+        }
+    }
+
+    private struct LiveRow: View {
+        let model: AppModel
+        let onOpen: () -> Void
+        var body: some View {
+            if let row = model.today?.rows.first {
+                RowView(row: row, model: model, onEdit: {}, onOpen: onOpen)
             }
         }
     }
@@ -212,8 +227,11 @@ enum Snapshot {
                 }
             }
             render(MenuBarLabel(today: model.today).padding(4), appearance: .aqua, to: dir.appendingPathComponent("label.png"))
-            render(SettingsView(model: model), appearance: .aqua, to: dir.appendingPathComponent("settings-light.png"))
-            render(SettingsView(model: model), appearance: .darkAqua, to: dir.appendingPathComponent("settings-dark.png"))
+            for pane in SettingsView.Pane.allCases {
+                render(SettingsView(model: model, pane: pane), appearance: .aqua,
+                       to: dir.appendingPathComponent("settings-\(pane.rawValue)-light.png"))
+            }
+            render(SettingsView(model: model, pane: .data), appearance: .darkAqua, to: dir.appendingPathComponent("settings-data-dark.png"))
             print(dir.path)
             exit(0)
         } catch {

@@ -17,10 +17,12 @@ extension Clew {
         try storeForQueries.write { try $0.saveSetting(Self.ratingsKey, json: on ? "true" : "false", updatedAt: now) }
     }
 
-    /// How a tick felt: 1 meh, 2 fine, 3 great. Rating again replaces it (the latest
-    /// `ratedAt` wins, ARCHITECTURE §8). A voided tick cannot be rated.
+    /// How a tick felt, 1–5: rough, meh, okay, good, great. Rating again replaces it
+    /// (the latest `ratedAt` wins, ARCHITECTURE §8). A voided tick cannot be rated.
+    public static let ratingScale = 1...5
+
     public func rate(checkInId: UUID, rating: Int) throws {
-        guard (1...3).contains(rating) else { throw ClewError.notAllowed }
+        guard Self.ratingScale.contains(rating) else { throw ClewError.notAllowed }
         let now = clockForQueries.now()
         try storeForQueries.write { w in
             guard let checkIn = try w.checkIn(id: checkInId) else { throw ClewError.checkInNotFound }

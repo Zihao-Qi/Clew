@@ -9,7 +9,54 @@ enum Schema {
         migrator.registerMigration("v2-rounds-titleOrigin", migrate: v2)
         migrator.registerMigration("v3-reminders-settings", migrate: v3)
         migrator.registerMigration("v4-later-reviews", migrate: v4)
+        migrator.registerMigration("v5-five-point-ratings", migrate: v5)
         return migrator
+    }
+
+    /// Ratings go from 3 points to 5 (rough, meh, okay, good, great). SQLite cannot
+    /// change a CHECK constraint, so the table is rebuilt and its index and fact
+    /// triggers recreated. Existing ratings map meh→meh (1→2), fine→okay (2→3),
+    /// great→great (3→5); rating is a mutable field (ARCHITECTURE §4.2), so this is not
+    /// a change of fact substance. DROP TABLE's implicit delete fires no triggers.
+    private static func v5(_ db: Database) throws {
+        try db.execute(sql: """
+            CREATE TABLE checkIn_new (
+                id          TEXT PRIMARY KEY NOT NULL,
+                itemId      TEXT NOT NULL REFERENCES item(id),
+                localDay    TEXT NOT NULL,
+                at          DATETIME NOT NULL,
+                timeZoneId  TEXT NOT NULL,
+                amount      INTEGER NOT NULL DEFAULT 1 CHECK (amount >= 1),
+                rating      INTEGER CHECK (rating BETWEEN 1 AND 5),
+                ratedAt     DATETIME,
+                source      TEXT NOT NULL,
+                voidedAt    DATETIME,
+                voidReason  TEXT
+            );
+            INSERT INTO checkIn_new
+                SELECT id, itemId, localDay, at, timeZoneId, amount,
+                       CASE rating WHEN 1 THEN 2 WHEN 2 THEN 3 WHEN 3 THEN 5 ELSE rating END,
+                       ratedAt, source, voidedAt, voidReason
+                FROM checkIn;
+            DROP TABLE checkIn;
+            ALTER TABLE checkIn_new RENAME TO checkIn;
+            CREATE INDEX checkIn_item_day ON checkIn(itemId, localDay);
+
+            CREATE TRIGGER checkIn_no_delete BEFORE DELETE ON checkIn
+            BEGIN SELECT RAISE(ABORT, 'facts are never deleted'); END;
+
+            CREATE TRIGGER checkIn_substance_immutable BEFORE UPDATE ON checkIn
+            WHEN NEW.id IS NOT OLD.id OR NEW.itemId IS NOT OLD.itemId
+              OR NEW.localDay IS NOT OLD.localDay OR NEW.at IS NOT OLD.at
+              OR NEW.timeZoneId IS NOT OLD.timeZoneId OR NEW.amount IS NOT OLD.amount
+              OR NEW.source IS NOT OLD.source
+            BEGIN SELECT RAISE(ABORT, 'fact substance is immutable'); END;
+
+            CREATE TRIGGER checkIn_void_monotonic BEFORE UPDATE ON checkIn
+            WHEN OLD.voidedAt IS NOT NULL
+              AND (NEW.voidedAt IS NOT OLD.voidedAt OR NEW.voidReason IS NOT OLD.voidReason)
+            BEGIN SELECT RAISE(ABORT, 'voids are monotonic'); END;
+            """)
     }
 
     /// "Still want this?" answers: a fact (never updated in substance, never deleted).

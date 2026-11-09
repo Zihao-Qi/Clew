@@ -27,15 +27,18 @@ import Testing
         #expect(stored.amount == 1 && stored.localDay == tick.localDay)  // nothing else changed
     }
 
-    @Test func onlyOneToThreeOnALiveTick() throws {
+    @Test func onlyOneToFiveOnALiveTick() throws {
         let item = try clew.addItem(NewItem(title: "h", shape: .habit(.daily)))
         let tick = try clew.checkIn(itemId: item.id)
         #expect(throws: ClewError.notAllowed) { try clew.rate(checkInId: tick.id, rating: 0) }
-        #expect(throws: ClewError.notAllowed) { try clew.rate(checkInId: tick.id, rating: 4) }
+        #expect(throws: ClewError.notAllowed) { try clew.rate(checkInId: tick.id, rating: 6) }
+        try clew.rate(checkInId: tick.id, rating: 5)
+        try clew.rate(checkInId: tick.id, rating: 1)
+        #expect(store.state.checkIns[tick.id]?.rating == 1)
         #expect(throws: ClewError.checkInNotFound) { try clew.rate(checkInId: UUID(), rating: 2) }
         try clew.undoToday(itemId: item.id)
         #expect(throws: ClewError.notAllowed) { try clew.rate(checkInId: tick.id, rating: 2) }
-        #expect(store.state.checkIns[tick.id]?.rating == nil)
+        #expect(store.state.checkIns[tick.id]?.rating == 1)        // the voided tick keeps its last rating
     }
 
     @Test func detailsCountHowRatedTicksFelt() throws {
