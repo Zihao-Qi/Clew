@@ -177,6 +177,15 @@ M = [
  ("N21 delete keeps reminder", C+"Clew.swift", "                reminder.deletedAt = now\n                reminder.updatedAt = now\n                try w.save(reminder)", "                _ = reminder", "ClewCoreTests"),
  ("N22 wants counts dead items", C+"Reminders.swift", "return try r.reminders().contains { $0.enabled && live.contains($0.itemId) }", "return try r.reminders().contains { $0.enabled && !live.isEmpty || $0.enabled }", "ClewCoreTests"),
  ("N23 item shows deleted", C+"Clew.swift", "try store.read { try $0.item(id: id) }.flatMap { $0.deletedAt == nil ? $0 : nil }", "try store.read { try $0.item(id: id) }", "ClewCoreTests"),
+ ("R1 not midpoint", C+"Clew.swift", "let middle = (low + high) / 2", "let middle = high + 0.5", "ClewCoreTests"),
+ ("R2 end goes before", C+"Clew.swift", "case let (low?, nil): item.sortKey = low + 1", "case let (low?, nil): item.sortKey = low - 1", "ClewCoreTests"),
+ ("R3 start goes after", C+"Clew.swift", "case let (nil, high?): item.sortKey = high - 1", "case let (nil, high?): item.sortKey = high + 1", "ClewCoreTests"),
+ ("R4 any gap", C+"Clew.swift", "guard low < high else { throw ClewError.notAllowed }", "_ = low < high", "ClewCoreTests"),
+ ("R5 self neighbour", C+"Clew.swift", "guard neighbour != id, let other = try w.item(id: neighbour), other.deletedAt == nil else {", "guard let other = try w.item(id: neighbour) else {", "ClewCoreTests"),
+ ("R6 drop always after", C+"Clew.swift", "        return from < to\n            ? (target, to + 1 < order.count ? order[to + 1] : nil)", "        return true\n            ? (target, to + 1 < order.count ? order[to + 1] : nil)", "ClewCoreTests"),
+ ("R7 drop self", C+"Clew.swift", "guard dragged != target, let from = order.firstIndex(of: dragged),", "guard let from = order.firstIndex(of: dragged),", "ClewCoreTests"),
+ ("R8 neighbour touched", C+"Clew.swift", "            item.updatedAt = now\n            try w.update(item)\n        }\n    }\n\n    private static func renumber", "            item.updatedAt = now\n            try w.update(item)\n            if let above, var n = try w.item(id: above) { n.updatedAt = now; try w.update(n) }\n        }\n    }\n\n    private static func renumber", "ClewCoreTests"),
+ ("R9 no renumber", C+"Clew.swift", "                    try Self.renumber(w, now: now)\n", "", "ClewCoreTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

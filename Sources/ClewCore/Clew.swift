@@ -318,6 +318,64 @@ public final class Clew: Sendable {
         }
     }
 
+    /// Manual order: puts the item between two neighbours (either may be nil at the
+    /// ends of the list) by giving it a sort key between theirs. Only this item's row
+    /// changes; nothing else is renumbered.
+    public func moveItem(id: UUID, after above: UUID?, before below: UUID?) throws {
+        let now = clock.now()
+        try store.write { w in
+            guard var item = try w.item(id: id), item.deletedAt == nil else { throw ClewError.itemNotFound }
+            func key(_ neighbour: UUID?) throws -> Double? {
+                guard let neighbour else { return nil }
+                guard neighbour != id, let other = try w.item(id: neighbour), other.deletedAt == nil else {
+                    throw ClewError.notAllowed
+                }
+                return other.sortKey
+            }
+            let low = try key(above), high = try key(below)
+            switch (low, high) {
+            case let (low?, high?):
+                guard low < high else { throw ClewError.notAllowed }
+                let middle = (low + high) / 2
+                if low < middle, middle < high {
+                    item.sortKey = middle
+                } else {
+                    // Out of floating-point room (about 50 moves into one gap): renumber
+                    // every item 1, 2, 3… in its current order, then place this one.
+                    try Self.renumber(w, now: now)
+                    let fresh = try w.item(id: above!)!.sortKey
+                    item.sortKey = fresh + 0.5
+                }
+            case let (low?, nil): item.sortKey = low + 1
+            case let (nil, high?): item.sortKey = high - 1
+            case (nil, nil): return
+            }
+            item.updatedAt = now
+            try w.update(item)
+        }
+    }
+
+    private static func renumber(_ w: any StoreWriter, now: Date) throws {
+        let all = try w.items(inStates: Set(ItemState.allCases))
+            .sorted { ($0.sortKey, $0.createdAt, $0.id.uuidString) < ($1.sortKey, $1.createdAt, $1.id.uuidString) }
+        for (index, var other) in all.enumerated() where other.sortKey != Double(index + 1) {
+            other.sortKey = Double(index + 1)
+            other.updatedAt = now
+            try w.update(other)
+        }
+    }
+
+    /// Where a dragged row lands when dropped onto `target` in `order` (today's visible
+    /// ids): it takes the target's place, so coming from above it goes after the target
+    /// and from below it goes before. Nil when the drop changes nothing.
+    public static func dropNeighbours(dragged: UUID, onto target: UUID, in order: [UUID]) -> (after: UUID?, before: UUID?)? {
+        guard dragged != target, let from = order.firstIndex(of: dragged),
+              let to = order.firstIndex(of: target) else { return nil }
+        return from < to
+            ? (target, to + 1 < order.count ? order[to + 1] : nil)
+            : (to > 0 ? order[to - 1] : nil, target)
+    }
+
     /// Delete: a tombstone (`deletedAt`), never a hard delete. The item disappears
     /// everywhere; its check-ins and plans stay in the history (ARCHITECTURE §8).
     public func deleteItem(itemId: UUID) throws {
