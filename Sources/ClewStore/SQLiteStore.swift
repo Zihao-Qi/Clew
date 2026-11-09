@@ -151,6 +151,26 @@ private struct Access: StoreWriter {
         )
     }
 
+    func activeDays(from: LocalDay) throws -> Set<LocalDay> {
+        let days = try String.fetchAll(
+            db, sql: "SELECT DISTINCT localDay FROM checkIn WHERE voidedAt IS NULL AND localDay >= ?",
+            arguments: [from.description]
+        )
+        return Set(try days.map { text in
+            guard let day = LocalDay(string: text) else { throw StoreError.corruptRow(table: "checkIn", column: "localDay") }
+            return day
+        })
+    }
+
+    func allRecords() throws -> ExportRecords {
+        ExportRecords(
+            items: try Row.fetchAll(db, sql: "SELECT * FROM item ORDER BY createdAt, id").map(Self.item),
+            checkIns: try Row.fetchAll(db, sql: "SELECT * FROM checkIn ORDER BY at, id").map(Self.checkIn),
+            plans: try Row.fetchAll(db, sql: "SELECT * FROM plan ORDER BY at, id").map(Self.plan),
+            goalRounds: try Row.fetchAll(db, sql: "SELECT * FROM goalRound ORDER BY startedAt, id").map(Self.goalRound)
+        )
+    }
+
     func maxSortKey() throws -> Double? {
         try Double.fetchOne(db, sql: "SELECT MAX(sortKey) FROM item")
     }

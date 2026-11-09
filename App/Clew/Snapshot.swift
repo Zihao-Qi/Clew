@@ -37,6 +37,8 @@ enum Snapshot {
                 }
             }
             render(MenuBarLabel(today: model.today).padding(4), appearance: .aqua, to: dir.appendingPathComponent("label.png"))
+            render(SettingsView(model: model), appearance: .aqua, to: dir.appendingPathComponent("settings-light.png"))
+            render(SettingsView(model: model), appearance: .darkAqua, to: dir.appendingPathComponent("settings-dark.png"))
             print(dir.path)
             exit(0)
         } catch {

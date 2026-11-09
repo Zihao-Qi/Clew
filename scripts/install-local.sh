@@ -97,8 +97,15 @@ command -v xcodegen >/dev/null 2>&1 || {
 }
 
 if [[ "${SIGNING_MODE}" == "local" ]]; then
-  "${SCRIPT_DIR}/create-local-codesign-identity.sh" "${IDENTITY_NAME}"
-  SIGNING_ARGUMENTS=("CODE_SIGN_STYLE=Manual" "CODE_SIGN_IDENTITY=${IDENTITY_NAME}")
+  if "${SCRIPT_DIR}/create-local-codesign-identity.sh" "${IDENTITY_NAME}"; then
+    SIGNING_ARGUMENTS=("CODE_SIGN_STYLE=Manual" "CODE_SIGN_IDENTITY=${IDENTITY_NAME}")
+  else
+    # macOS does not trust a new self-signed certificate until the user says so.
+    # Install anyway, ad-hoc signed: data is kept; macOS may ask once after a rebuild.
+    echo "Falling back to ad-hoc signing (see above). Clew's data is kept." >&2
+    SIGNING_MODE="ad-hoc"
+    SIGNING_ARGUMENTS=("CODE_SIGN_STYLE=Manual" "CODE_SIGN_IDENTITY=-")
+  fi
 else
   SIGNING_ARGUMENTS=("CODE_SIGN_STYLE=Manual" "CODE_SIGN_IDENTITY=-")
 fi

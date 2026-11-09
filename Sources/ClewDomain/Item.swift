@@ -56,7 +56,7 @@ public enum Schedule: Hashable, Sendable {
 }
 
 /// A definition: what you intend. Mutable, soft-deleted (ADR-2).
-public struct Item: Hashable, Sendable, Identifiable {
+public struct Item: Hashable, Sendable, Identifiable, Codable {
     public var id: UUID
     public var kind: ItemKind
     public var title: String

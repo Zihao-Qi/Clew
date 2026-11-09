@@ -105,6 +105,17 @@ final class FakeStore: ClewStore, @unchecked Sendable {
             state.plans.values.filter { $0.itemId == itemId }.sorted { $0.at < $1.at }
         }
         func maxSortKey() throws -> Double? { state.items.values.map(\.sortKey).max() }
+        func activeDays(from: LocalDay) throws -> Set<LocalDay> {
+            Set(state.checkIns.values.filter { !$0.isVoided && $0.localDay >= from }.map(\.localDay))
+        }
+        func allRecords() throws -> ExportRecords {
+            ExportRecords(
+                items: state.items.values.sorted { ($0.createdAt, $0.id.uuidString) < ($1.createdAt, $1.id.uuidString) },
+                checkIns: state.checkIns.values.sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) },
+                plans: state.plans.values.sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) },
+                goalRounds: state.rounds.values.sorted { ($0.startedAt, $0.id.uuidString) < ($1.startedAt, $1.id.uuidString) }
+            )
+        }
 
         func insert(_ item: Item) throws {
             guard state.items[item.id] == nil else { throw FactViolation.duplicate }

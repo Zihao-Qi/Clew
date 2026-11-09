@@ -80,6 +80,10 @@ final class AppModel {
         scheduleRollover()
     }
 
+    func activeDays() -> ActiveDays? { try? clew?.activeDays() }
+
+    func exportData() -> Data? { try? clew?.exportDocument().encoded() }
+
     func laterItems() -> [Item] {
         (try? clew?.laterItems()) ?? []
     }
