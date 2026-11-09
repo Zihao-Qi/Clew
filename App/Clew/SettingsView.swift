@@ -58,6 +58,9 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .frame(width: 400)
         .fixedSize(horizontal: false, vertical: true)
+        // A menu bar app shows no window at launch, so macOS must not restore this one
+        // if it was open when Clew quit.
+        .background(NonRestorableWindow())
         .onAppear(perform: reload)
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in reload() }
     }
@@ -91,6 +94,20 @@ struct SettingsView: View {
             exportMessage = String(localized: "Saved.")
         } catch {
             exportMessage = String(localized: "Export failed. Try again.")
+        }
+    }
+}
+
+/// Marks its hosting window as not restorable (works on macOS 14, unlike the macOS 15
+/// `restorationBehavior` scene modifier).
+private struct NonRestorableWindow: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { Probe() }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    final class Probe: NSView {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            window?.isRestorable = false
         }
     }
 }
