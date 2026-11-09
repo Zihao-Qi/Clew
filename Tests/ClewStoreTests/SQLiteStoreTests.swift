@@ -165,6 +165,14 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         #expect(try store.read { try $0.item(id: item.id) } == item)
     }
 
+    @Test func ratingGoesThroughTheTriggersAndKeepsTheRestOfTheFact() throws {
+        let (store, c, _) = try seeded()
+        try store.write { try $0.rateCheckIn(id: c.id, rating: 3, at: t0.addingTimeInterval(5)) }
+        let rated = try #require(try store.read { try $0.checkIn(id: c.id) })
+        #expect(rated.rating == 3 && rated.ratedAt == t0.addingTimeInterval(5))
+        #expect(rated.amount == c.amount && rated.localDay == c.localDay && rated.at == c.at)
+    }
+
     @Test func factsCannotBeDeleted() throws {
         let (store, _, _) = try seeded()
         for table in ["checkIn", "plan"] {
@@ -411,6 +419,44 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
             try store.writer.write { try $0.execute(sql: "UPDATE laterReview SET voidedAt = NULL WHERE id = ?", arguments: [voided.id.uuidString]) }
         }
         #expect(try store.read { try $0.allRecords() }.laterReviews.count == 3)
+    }
+}
+
+@Suite struct FivePointMigrationTests {
+    /// A v4 database with 3-point ratings, migrated to v5.
+    @Test func ratingsMapAndTheFactRulesSurviveTheRebuild() throws {
+        let queue = try DatabaseQueue()
+        try Schema.migrator.migrate(queue, upTo: "v4-later-reviews")
+        let item = sampleItem()
+        let ids = (0..<5).map { _ in UUID() }
+        try queue.write { db in
+            try db.execute(sql: """
+                INSERT INTO item (id, kind, title, schedule, progress, state, sortKey, source, createdAt, updatedAt)
+                VALUES (?, 'habit', 't', '{"type":"daily","v":1}', '{"type":"none","v":1}', 'active', 1, 'user', ?, ?)
+                """, arguments: [item.id.uuidString, t0, t0])
+            for (i, rating) in [1, 2, 3, nil, 2].enumerated() {
+                try db.execute(sql: """
+                    INSERT INTO checkIn (id, itemId, localDay, at, timeZoneId, amount, rating, ratedAt, source, voidedAt)
+                    VALUES (?, ?, '2026-11-0\(i + 1)', ?, 'UTC', 1, ?, ?, 'user', ?)
+                    """, arguments: [ids[i].uuidString, item.id.uuidString, t0, rating, rating == nil ? nil : t0,
+                                     i == 4 ? t0 : nil])
+            }
+        }
+        let store = try SQLiteStore(writer: queue)                     // runs v5
+        let ratings = try ids.map { id in try store.read { try $0.checkIn(id: id) }?.rating }
+        #expect(ratings == [2, 3, 5, nil, 3])                            // meh, okay, great; voided kept
+        #expect(try store.read { try $0.checkIn(id: ids[4]) }?.voidedAt != nil)
+        // The rebuilt table still enforces the fact rules and the new range.
+        try store.write { try $0.rateCheckIn(id: ids[3], rating: 5, at: t0) }
+        #expect(throws: DatabaseError.self) { try store.write { try $0.rateCheckIn(id: ids[3], rating: 6, at: t0) } }
+        #expect(throws: DatabaseError.self) {
+            try store.writer.write { try $0.execute(sql: "UPDATE checkIn SET amount = 9 WHERE id = ?", arguments: [ids[0].uuidString]) }
+        }
+        #expect(throws: DatabaseError.self) { try store.writer.write { try $0.execute(sql: "DELETE FROM checkIn") } }
+        #expect(throws: DatabaseError.self) {
+            try store.writer.write { try $0.execute(sql: "UPDATE checkIn SET voidedAt = NULL WHERE id = ?", arguments: [ids[4].uuidString]) }
+        }
+        #expect(try store.read { try $0.checkIns(itemIds: [item.id], from: day("2026-11-01")) }.count == 4)
     }
 }
 

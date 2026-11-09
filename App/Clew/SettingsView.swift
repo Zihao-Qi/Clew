@@ -15,6 +15,61 @@ struct SettingsView: View {
     @State private var loginMessage: String?
     @State private var activeDays: ActiveDays?
     @State private var letGoCount = 0
+    @State private var ratingDots = false
+    @State private var pane: Pane?
+
+    /// A plain column of sections; selected one highlighted, keyboard and VoiceOver
+    /// reachable as buttons.
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(Pane.allCases) { item in
+                let selected = (pane ?? .general) == item
+                Button { pane = item } label: {
+                    Label { item.title } icon: { Image(systemName: item.icon).frame(width: 18) }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(RoundedRectangle(cornerRadius: 6)
+                            .fill(selected ? Color.accentColor.opacity(0.18) : .clear))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+            Spacer()
+        }
+        .padding(10)
+        .frame(width: 170)
+        .frame(maxHeight: .infinity)
+        .background(Color.primary.opacity(0.03))
+    }
+
+    init(model: AppModel, pane: Pane = .general) {
+        self.model = model
+        _pane = State(initialValue: pane)
+    }
+
+    /// The sidebar's sections.
+    enum Pane: String, CaseIterable, Identifiable {
+        case general, summaries, progress, data
+        var id: String { rawValue }
+        var title: Text {
+            switch self {
+            case .general: Text("General")
+            case .summaries: Text("Summaries")
+            case .progress: Text("Progress")
+            case .data: Text("Data")
+            }
+        }
+        var icon: String {
+            switch self {
+            case .general: "gearshape"
+            case .summaries: "bell"
+            case .progress: "chart.bar"
+            case .data: "externaldrive"
+            }
+        }
+    }
     @State private var exportMessage: String?
     @State private var summaries = SummarySettings.defaults
     @State private var backupList: [Backups.Entry] = []
@@ -22,96 +77,118 @@ struct SettingsView: View {
     @State private var restoreMessage: String?
 
     var body: some View {
-        Form {
-            Section {
-                // An explicit closure, not `set: setOpenAtLogin`: Swift 6.3 crashes generating the
-                // isolated thunk for the method reference.
-                Toggle("Open at login", isOn: Binding(get: { openAtLogin }, set: { setOpenAtLogin($0) }))
-                if let loginMessage {
+        HStack(spacing: 0) {
+            sidebar
+            Divider()
+            Form {
+                switch pane ?? .general {
+                case .general:
+                Section {
+                    // An explicit closure, not `set: setOpenAtLogin`: Swift 6.3 crashes generating the
+                    // isolated thunk for the method reference.
+                    Toggle("Open at login", isOn: Binding(get: { openAtLogin }, set: { setOpenAtLogin($0) }))
+                    if let loginMessage {
+                        HStack {
+                            Text(loginMessage).font(.callout).foregroundStyle(.secondary)
+                            Spacer()
+                            Button("Open Login Items") { LoginItem.openLoginItemsSettings() }
+                        }
+                    }
+                }
+
+                Section {
+                    Toggle("Rating dots after a tick", isOn: Binding(get: { ratingDots }, set: { on in
+                        ratingDots = on
+                        model.setRatingsEnabled(on)
+                    }))
+                } footer: {
+                    Text("Five dots for how it felt: rough, meh, okay, good, great. They show after a tick and when you hover there, so you can rate or change it later.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section {
+                    Button("Quit Clew") { NSApplication.shared.terminate(nil) }
+                        .keyboardShortcut("q")
+                        .accessibilityLabel(Text("Quit Clew"))
+                }
+                case .summaries:
+                Section {
+                    summaryRow(Text("Morning"), enabled: \.morningEnabled, time: \.morningTime)
+                    summaryRow(Text("Evening"), enabled: \.eveningEnabled, time: \.eveningTime)
+                    if model.notificationsDenied {
+                        NotificationsOffNotice()
+                    }
+                } header: {
+                    Text("Summaries")
+                } footer: {
+                    Text("Morning: how many are on today's list. Evening: how many are done.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                case .progress:
+                Section {
+                    LabeledContent {
+                        if let days = activeDays {
+                            Text("\(days.last7) of the last 7 · \(days.last14) of the last 14")
+                                .monospacedDigit()
+                        }
+                    } label: {
+                        Text("Active days")
+                    }
+                    LabeledContent {
+                        Text(verbatim: "\(letGoCount)").monospacedDigit()
+                    } label: {
+                        Text("Let go from Later")
+                    }
+                } footer: {
+                    Text("A day with at least one tick. Letting go of what you no longer want counts as a win.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                case .data:
+                Section {
+                    LabeledContent {
+                        Text(verbatim: backupList.first(where: { !$0.isSafetyCopy }).map { Self.dayText($0.day) }
+                             ?? String(localized: "Not yet"))
+                    } label: {
+                        Text("Last backup")
+                    }
                     HStack {
-                        Text(loginMessage).font(.callout).foregroundStyle(.secondary)
-                        Spacer()
-                        Button("Open Login Items") { LoginItem.openLoginItemsSettings() }
+                        Button("Restore…") { showingRestore = true }
+                            .disabled(backupList.isEmpty)
+                        if let restoreMessage {
+                            Text(restoreMessage).font(.callout).foregroundStyle(.secondary)
+                        }
                     }
+                } header: {
+                    Text("Backups")
+                } footer: {
+                    Text("Clew keeps a copy every day on this Mac: the last 14 days and 8 weeks before that.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-            }
 
-            Section {
-                summaryRow(Text("Morning"), enabled: \.morningEnabled, time: \.morningTime)
-                summaryRow(Text("Evening"), enabled: \.eveningEnabled, time: \.eveningTime)
-                if model.notificationsDenied {
-                    NotificationsOffNotice()
-                }
-            } header: {
-                Text("Summaries")
-            } footer: {
-                Text("Morning: how many are on today's list. Evening: how many are done.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section {
-                LabeledContent {
-                    if let days = activeDays {
-                        Text("\(days.last7) of the last 7 · \(days.last14) of the last 14")
-                            .monospacedDigit()
+                Section {
+                    HStack {
+                        Button("Export…", action: export)
+                        if let exportMessage {
+                            Text(exportMessage).font(.callout).foregroundStyle(.secondary)
+                        }
                     }
-                } label: {
-                    Text("Active days")
+                } footer: {
+                    Text("Everything Clew stores, as one JSON file.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                LabeledContent {
-                    Text(verbatim: "\(letGoCount)").monospacedDigit()
-                } label: {
-                    Text("Let go from Later")
-                }
-            } footer: {
-                Text("A day with at least one tick. Letting go of what you no longer want counts as a win.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
 
-            Section {
-                HStack {
-                    Button("Export…", action: export)
-                    if let exportMessage {
-                        Text(exportMessage).font(.callout).foregroundStyle(.secondary)
-                    }
                 }
-            } footer: {
-                Text("Everything Clew stores, as one JSON file.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
-
-            Section {
-                LabeledContent {
-                    Text(verbatim: backupList.first(where: { !$0.isSafetyCopy }).map { Self.dayText($0.day) }
-                         ?? String(localized: "Not yet"))
-                } label: {
-                    Text("Last backup")
-                }
-                HStack {
-                    Button("Restore…") { showingRestore = true }
-                        .disabled(backupList.isEmpty)
-                    if let restoreMessage {
-                        Text(restoreMessage).font(.callout).foregroundStyle(.secondary)
-                    }
-                }
-            } header: {
-                Text("Backups")
-            } footer: {
-                Text("Clew keeps a copy every day on this Mac: the last 14 days and 8 weeks before that.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section {
-                Button("Quit Clew") { NSApplication.shared.terminate(nil) }
-                    .keyboardShortcut("q")
-                    .accessibilityLabel(Text("Quit Clew"))
-            }
+            .formStyle(.grouped)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .formStyle(.grouped)
         .sheet(isPresented: $showingRestore) {
             RestoreSheet(entries: backupList) { entry in
                 showingRestore = false
@@ -123,8 +200,7 @@ struct SettingsView: View {
                 showingRestore = false
             }
         }
-        .frame(width: 400)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: 620, height: 440)
         // A menu bar app shows no window at launch, so macOS must not restore this one
         // if it was open when Clew quit.
         .background(NonRestorableWindow())
@@ -159,6 +235,7 @@ struct SettingsView: View {
         activeDays = model.activeDays()
         backupList = model.backupList()
         letGoCount = model.lettingGoCount()
+        ratingDots = model.ratingsOn
     }
 
     private func setOpenAtLogin(_ on: Bool) {

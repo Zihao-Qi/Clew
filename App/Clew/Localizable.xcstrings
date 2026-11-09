@@ -10,9 +10,6 @@
     "%lld weeks" : {},
     "%lld/%lld done" : {},
     "%lld× a week" : {},
-    "A day with at least one tick." : {
-      "extractionState" : "stale"
-    },
     "A day with at least one tick. Letting go of what you no longer want counts as a win." : {},
     "A fresh start is waiting tomorrow." : {},
     "Active days" : {},
@@ -22,9 +19,6 @@
     "Add to today" : {},
     "All time" : {},
     "Allow Clew in System Settings › General › Login Items." : {},
-    "Archive" : {
-      "extractionState" : "stale"
-    },
     "Back to today's list" : {},
     "Backups" : {},
     "Be gentle with yourself tonight." : {},
@@ -39,6 +33,7 @@
     "Close" : {},
     "Couldn't load today's list." : {},
     "Daily" : {},
+    "Data" : {},
     "Days" : {},
     "Days this week" : {},
     "Delete" : {},
@@ -51,7 +46,11 @@
     "Everything Clew stores, as one JSON file." : {},
     "Export failed. Try again." : {},
     "Export…" : {},
+    "Felt %@" : {},
+    "Felt:" : {},
     "Fetching the title" : {},
+    "Five dots for how it felt: rough, meh, okay, good, great. They show after a tick and when you hover there, so you can rate or change it later." : {},
+    "General" : {},
     "Give it a name." : {},
     "Goal" : {},
     "Goal reached! Start a next round or raise the target." : {},
@@ -95,9 +94,6 @@
     "Link (optional)" : {},
     "Links must start with http:// or https://." : {},
     "Mark %@ done" : {},
-    "More" : {
-      "extractionState" : "stale"
-    },
     "Morning" : {},
     "Morning: how many are on today's list. Evening: how many are done." : {},
     "Move Down" : {},
@@ -111,9 +107,6 @@
     "Notifications are off for Clew." : {},
     "Once" : {},
     "Open" : {},
-    "Open %@" : {
-      "extractionState" : "stale"
-    },
     "Open Login Items" : {},
     "Open at login" : {},
     "Open link for %@" : {},
@@ -123,10 +116,12 @@
     "Pick 1–3 for today" : {},
     "Pick a total between 1 and 100,000." : {},
     "Pick at least one day." : {},
+    "Progress" : {},
     "Quiet days count too." : {},
     "Quit Clew" : {},
     "Raise target…" : {},
     "Raise the target of %@" : {},
+    "Rating dots after a tick" : {},
     "Remind me" : {},
     "Reminder %@" : {},
     "Reminder time" : {},
@@ -148,9 +143,6 @@
     "Saved to Later (%lld)" : {},
     "Saved." : {},
     "Settings" : {},
-    "Settings…" : {
-      "extractionState" : "stale"
-    },
     "Some days are for resting." : {},
     "Start a next round of %@" : {},
     "Still want this?" : {},
@@ -171,6 +163,11 @@
     "Undo %@" : {},
     "Undo +1" : {},
     "Your current data is saved as a backup first, so a restore can be undone." : {},
+    "good" : {},
+    "great" : {},
+    "meh" : {},
+    "okay" : {},
+    "rough" : {},
     "🎉 Goal reached. Well done!" : {}
   },
   "version" : "1.0"

@@ -94,6 +94,8 @@ public protocol StoreWriter: StoreReader {
     func insert(_ checkIn: CheckIn) throws
     /// Sets `voidedAt`/`voidReason`. Voids are monotonic: voiding twice is an error.
     func voidCheckIn(id: UUID, at: Date, reason: String) throws
+    /// Sets `rating`/`ratedAt`, the check-in's only other mutable fields (§4.2).
+    func rateCheckIn(id: UUID, rating: Int, at: Date) throws
     func insert(_ plan: Plan) throws
     func insert(_ round: GoalRound) throws
     /// Inserts, or replaces the row with the same id.

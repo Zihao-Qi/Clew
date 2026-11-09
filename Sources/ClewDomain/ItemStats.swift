@@ -16,6 +16,14 @@ public struct ItemStats: Hashable, Sendable {
     public let roundsFinished: Int?
     /// Amount per day for the heatmap window.
     public let amountByDay: [LocalDay: Int]
+    /// How rated ticks felt: rating (1 rough … 5 great) → count. Empty when nothing
+    /// was rated (rating dots are off by default).
+    public let feltCounts: [Int: Int]
+
+    /// The details line's order: best first, only ratings that were given.
+    public var feltHighFirst: [(rating: Int, count: Int)] {
+        stride(from: 5, through: 1, by: -1).compactMap { r in feltCounts[r].map { (r, $0) } }
+    }
 
     /// - Parameters:
     ///   - checkIns: the item's check-ins (voided ones are ignored).
@@ -37,6 +45,7 @@ public struct ItemStats: Hashable, Sendable {
             roundsFinished = nil
         }
         amountByDay = byDay
+        feltCounts = live.compactMap(\.rating).filter { (1...5).contains($0) }.reduce(into: [:]) { $0[$1, default: 0] += 1 }
     }
 }
 

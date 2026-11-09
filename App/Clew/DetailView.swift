@@ -56,6 +56,13 @@ struct DetailView: View {
             Text(Self.summary(of: d))
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            if !d.stats.feltCounts.isEmpty {
+                // Counts only, never a score.
+                Text(verbatim: String(localized: "Felt:") + " " + d.stats.feltHighFirst.map { "\(RatingDots.word($0.rating)) \($0.count)" }
+                    .joined(separator: " · "))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 

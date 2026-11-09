@@ -295,6 +295,11 @@ private struct Access: StoreWriter {
         )
     }
 
+    func rateCheckIn(id: UUID, rating: Int, at: Date) throws {
+        try db.execute(sql: "UPDATE checkIn SET rating = ?, ratedAt = ? WHERE id = ?",
+                       arguments: [rating, at, id.uuidString])
+    }
+
     func insert(_ p: Plan) throws {
         try db.execute(
             sql: "INSERT INTO plan (id, itemId, localDay, at, source, voidedAt) VALUES (?, ?, ?, ?, ?, ?)",

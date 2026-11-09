@@ -58,6 +58,9 @@ enum Snapshot {
 
     /// `CLEW_CLICK_TEST=1`: real mouse clicks on one goal row in an off-screen window;
     /// prints what each click did. In-memory data; opens nothing.
+    /// Limitations: one run showed "details +0" for every row tap while buttons still
+    /// worked; the cause is unproven (possibly the test window not becoming active).
+    /// Hover can't be simulated. Both are checked by hand.
     static func startClickTest() {
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(1)) // let NSApplication start its event loop
@@ -72,8 +75,9 @@ enum Snapshot {
                 model.urlOpener = { opened.append($0) }
                 var details = 0
                 @MainActor func row() -> TodayRow { model.today!.rows[0] }
-                let host = NSHostingView(rootView: RowView(row: row(), model: model, onEdit: {}, onOpen: { details += 1 })
-                    .frame(width: 340))
+                // A live row: re-rendered from the model like the app's list (a fixed row
+                // value would keep rating the tick that existed when the test began).
+                let host = NSHostingView(rootView: LiveRow(model: model, onOpen: { details += 1 }).frame(width: 340))
                 let size = host.fittingSize
                 let window = NSWindow(contentRect: NSRect(x: -10_000, y: -10_000, width: size.width, height: size.height),
                                       styleMask: [.titled], backing: .buffered, defer: false)
@@ -85,10 +89,13 @@ enum Snapshot {
 
                 @MainActor func click(_ x: CGFloat, y: CGFloat = size.height / 2) async throws {
                     let p = host.convert(NSPoint(x: x, y: y), to: nil)
-                    for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
-                        let e = NSEvent.mouseEvent(with: type, location: p, modifierFlags: [], timestamp: 0,
-                                                   windowNumber: window.windowNumber, context: nil, eventNumber: 0,
-                                                   clickCount: 1, pressure: 1)!
+                    // Real timestamps and a short press, like a person's click: a tap
+                    // recognizer can ignore events stamped 0.
+                    for (i, type) in [NSEvent.EventType.leftMouseDown, .leftMouseUp].enumerated() {
+                        let e = NSEvent.mouseEvent(with: type, location: p, modifierFlags: [],
+                                                   timestamp: ProcessInfo.processInfo.systemUptime + Double(i) * 0.06,
+                                                   windowNumber: window.windowNumber, context: nil, eventNumber: i,
+                                                   clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0)!
                         NSApp.postEvent(e, atStart: false) // the queue, so a button's tracking loop sees mouseUp
                     }
                     try await Task.sleep(for: .milliseconds(250))
@@ -106,10 +113,59 @@ enum Snapshot {
                     print(String(format: "%-12@ x=%3.0f → details %+d, today's +1s %+d, links opened %+d", name as NSString, x,
                                  details - before.0, row().todayAmount - before.1, opened.count - before.2)); fflush(stdout)
                 }
+                // Rating dots on. A goal's +1 shows no dots, so the count stays visible
+                // while ticking (goals are rated on hover, which can't be simulated).
+                model.setRatingsEnabled(true)
+                model.refresh()
+                let countBefore = row().progressAmount
+                try await click(22)
+                try await click(22)
+                print("goal: no dots after +1s:", model.ratingPrompt == nil,
+                      "| count grew by 2:", row().progressAmount == countBefore + 2)
+                // A habit's tick shows the hint; its fifth dot records "great"; unrated, they fade.
+                let habit = try clew.addItem(NewItem(title: "Stretch", shape: .habit(.daily)))
+                model.refresh()
+                let habitHost = NSHostingView(rootView: LiveRow(model: model, onOpen: {}, itemId: habit.id).frame(width: 340))
+                let habitWindow = NSWindow(contentRect: NSRect(x: -10_000, y: -9_000, width: 340, height: size.height),
+                                           styleMask: [.titled], backing: .buffered, defer: false)
+                habitWindow.contentView = habitHost
+                habitWindow.makeKeyAndOrderFront(nil)
+                try await Task.sleep(for: .milliseconds(400))
+                @MainActor func clickHabit(_ x: CGFloat) async throws {
+                    let p = habitHost.convert(NSPoint(x: x, y: size.height / 2), to: nil)
+                    for (i, type) in [NSEvent.EventType.leftMouseDown, .leftMouseUp].enumerated() {
+                        let e = NSEvent.mouseEvent(with: type, location: p, modifierFlags: [],
+                                                   timestamp: ProcessInfo.processInfo.systemUptime + Double(i) * 0.06,
+                                                   windowNumber: habitWindow.windowNumber, context: nil, eventNumber: i,
+                                                   clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0)!
+                        NSApp.postEvent(e, atStart: false)
+                    }
+                    try await Task.sleep(for: .milliseconds(300))
+                }
+                @MainActor func habitRow() -> TodayRow? { model.today?.rows.first { $0.id == habit.id } }
+                try await clickHabit(22)
+                print("habit: dots shown after a tick:", model.ratingPrompt?.itemId == habit.id)
+                try await clickHabit(321)             // the fifth dot at the right end
+                print("habit: rated:", habitRow()?.lastTickToday?.rating.map(String.init) ?? "none")
+                try await clickHabit(22)              // undo the tick
+                try await clickHabit(22)              // tick again, leave it unrated
+                try await Task.sleep(for: .milliseconds(4500))
+                print("habit: dots gone 4.5 s after an unrated tick:", model.ratingPrompt == nil)
                 exit(0)
             } catch {
                 print("click test failed:", error)
                 exit(1)
+            }
+        }
+    }
+
+    private struct LiveRow: View {
+        let model: AppModel
+        let onOpen: () -> Void
+        var itemId: UUID? = nil
+        var body: some View {
+            if let row = itemId.flatMap({ id in model.today?.rows.first { $0.id == id } }) ?? model.today?.rows.first {
+                RowView(row: row, model: model, onEdit: {}, onOpen: onOpen)
             }
         }
     }
@@ -178,6 +234,10 @@ enum Snapshot {
             try seed(clew, clock: clock)
             let model = AppModel(clew: clew, notify: false)
             let editing = try clew.today().rows[2].item
+            // Rating dots on, and "Stretch" just ticked, so the list shows them.
+            model.setRatingsEnabled(true)
+            model.refresh()
+            if let stretch = model.today?.rows.first(where: { $0.item.title == "Stretch" }) { model.tap(stretch) }
             for (name, screen) in [("list", Screen.list), ("add", .add), ("pick", .pick),
                                    ("edit", .edit(editing, back: .list)), ("detail", .detail(editing.id))] {
                 for appearance in [NSAppearance.Name.aqua, .darkAqua] {
@@ -186,8 +246,11 @@ enum Snapshot {
                 }
             }
             render(MenuBarLabel(today: model.today).padding(4), appearance: .aqua, to: dir.appendingPathComponent("label.png"))
-            render(SettingsView(model: model), appearance: .aqua, to: dir.appendingPathComponent("settings-light.png"))
-            render(SettingsView(model: model), appearance: .darkAqua, to: dir.appendingPathComponent("settings-dark.png"))
+            for pane in SettingsView.Pane.allCases {
+                render(SettingsView(model: model, pane: pane), appearance: .aqua,
+                       to: dir.appendingPathComponent("settings-\(pane.rawValue)-light.png"))
+            }
+            render(SettingsView(model: model, pane: .data), appearance: .darkAqua, to: dir.appendingPathComponent("settings-data-dark.png"))
             print(dir.path)
             exit(0)
         } catch {

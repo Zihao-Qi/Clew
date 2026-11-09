@@ -49,8 +49,12 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
 3. **Links.** Any item can have a URL. The small link mark after its title opens
    it in the default browser. Pasting a link into `+ add` fills in the page's title,
    which you can edit before saving.
-4. **Done in one click.** Click `○` to mark it done (counted goals: +1). Three small
-   rating dots then appear **inside the same row** every time. The row never changes
+4. **Done in one click.** Click `○` to mark it done (counted goals: +1). If rating
+   dots are switched on (Settings, off by default), five small dots (how it felt:
+   rough, meh, okay, good, great) then appear at the right end **of the same row**
+   as a hint, fading if unused; hovering there later shows them again to rate or
+   change today's rating. Counted goals show no hint (it would hide the count while
+   ticking): hover their bar to rate; the dots take the bar's place and `−` stays. The row never changes
    height and the dots never cover the `+1` target, so rapid ticks can't mis-click.
    Optional; they fade after a few seconds. Ticked items stay visible until the day
    rolls over, so undo is always one click away.
@@ -116,6 +120,8 @@ stopped daily use, not adding features.
 - Weeks start on **Monday**; "N× per week" items reset then.
 - A counted goal's step is always **+1** per click.
 - The rating row is offered **every time**, and is always skippable.
+- Ratings are 5 points (rough … great), shown after a tick and on hover; Settings has
+  a sidebar: General, Summaries, Progress, Data (2026-11-09).
 - "Still want this?" lives only in the Later picker; untouched = not saved, edited,
   moved to Later or kept for 42 days. Rating dots are built off by default, as a
   Settings switch (2026-11-09).

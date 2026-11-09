@@ -137,6 +137,19 @@ struct RowView: View {
     var isDragged = false
 
     @State private var hovering = false
+    @State private var hoveringDots = false
+
+    /// Rating dots are on and there is a live tick today to rate.
+    private var canRate: Bool { model.ratingsOn && row.lastTickToday != nil }
+    /// Shown for a few seconds after a tick (a hint), and whenever the dots' place is
+    /// hovered, so a rating can be given or changed later.
+    private var showsDots: Bool { canRate && (model.ratingPrompt?.itemId == row.id || hoveringDots) }
+
+    private var dots: some View {
+        RatingDots(rating: model.ratingPrompt?.itemId == row.id ? model.ratingPrompt?.rating ?? row.lastTickToday?.rating
+                                                                  : row.lastTickToday?.rating) { model.rate(row, $0) }
+            .transition(.opacity)
+    }
 
     private var item: Item { row.item }
 
@@ -227,15 +240,25 @@ struct RowView: View {
             if let target = item.progress.target {
                 // Fixed widths, so every goal's bar starts in the same column.
                 HStack(spacing: 4) {
-                    ProgressView(value: Double(min(row.progressAmount, target)), total: Double(target))
-                        .progressViewStyle(.linear)
-                        .frame(width: 64)
-                        .accessibilityHidden(true)
-                    Text(verbatim: "\(row.progressAmount)/\(target)")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .frame(minWidth: Self.countWidth, alignment: .trailing)
-                        .accessibilityLabel(Text("\(row.progressAmount) of \(target)"))
+                    // Hovering the bar and count shows the rating dots in their place;
+                    // "−" stays put (SPEC §4: undo is always one click away).
+                    ZStack(alignment: .trailing) {
+                        HStack(spacing: 4) {
+                            ProgressView(value: Double(min(row.progressAmount, target)), total: Double(target))
+                                .progressViewStyle(.linear)
+                                .frame(width: 64)
+                                .accessibilityHidden(true)
+                            Text(verbatim: "\(row.progressAmount)/\(target)")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                                .frame(minWidth: Self.countWidth, alignment: .trailing)
+                                .accessibilityLabel(Text("\(row.progressAmount) of \(target)"))
+                        }
+                        .opacity(showsDots ? 0 : 1)
+                        if showsDots { dots }
+                    }
+                    .contentShape(Rectangle())
+                    .onHover { hoveringDots = $0 }
                     // Undo is one click away (SPEC §4), and kept apart from the circle so
                     // rapid +1s cannot hit it by mistake. Its slot is kept so columns align.
                     Button { model.undo(row) } label: { Image(systemName: "minus").imageScale(.small) }
@@ -246,6 +269,14 @@ struct RowView: View {
                         .accessibilityHidden(row.todayAmount == 0)
                         .accessibilityLabel(Text("Remove one from \(item.title)"))
                 }
+            } else if canRate {
+                // The right end of a ticked row: hover to rate or change the rating.
+                ZStack(alignment: .trailing) {
+                    Color.clear.frame(width: RatingDots.width, height: 14)
+                    if showsDots { dots }
+                }
+                .contentShape(Rectangle())
+                .onHover { hoveringDots = $0 }
             }
         }
     }
@@ -315,5 +346,45 @@ private struct RowFrames: PreferenceKey {
     static let defaultValue: [UUID: CGRect] = [:]
     static func reduce(value: inout [UUID: CGRect], nextValue: () -> [UUID: CGRect]) {
         value.merge(nextValue()) { $1 }
+    }
+}
+
+/// Five small dots: how a tick felt, 1 rough … 5 great. Optional; shown after a tick
+/// and on hover. Only when Settings › Rating dots is on.
+struct RatingDots: View {
+    let rating: Int?
+    let rate: (Int) -> Void
+
+    static let dot: CGFloat = 9
+    static let gap: CGFloat = 4
+    /// Five dots with their click padding.
+    static var width: CGFloat { 5 * (dot + 4) }
+
+    static func word(_ n: Int) -> String {
+        switch n {
+        case 1: String(localized: "rough")
+        case 2: String(localized: "meh")
+        case 3: String(localized: "okay")
+        case 4: String(localized: "good")
+        default: String(localized: "great")
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(1...5, id: \.self) { n in
+                Button { rate(n) } label: {
+                    Circle()
+                        .strokeBorder(Color.secondary.opacity(0.6), lineWidth: 1)
+                        .background(Circle().fill(n <= (rating ?? 0) ? Color.accentColor : .clear))
+                        .frame(width: Self.dot, height: Self.dot)
+                        .padding(2) // the click target is a little larger than the dot
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(Text(verbatim: Self.word(n)))
+                .accessibilityLabel(Text("Felt \(Self.word(n))"))
+            }
+        }
     }
 }
