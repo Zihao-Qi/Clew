@@ -58,6 +58,10 @@ enum Snapshot {
 
     /// `CLEW_CLICK_TEST=1`: real mouse clicks on one goal row in an off-screen window;
     /// prints what each click did. In-memory data; opens nothing.
+    /// Limitation: SwiftUI tap gestures (row → details) only fire when the test window
+    /// can become active, which macOS refuses while the user works in another app.
+    /// Buttons (circle, −, link, rating dots) respond either way. A "details +0" while
+    /// the user is busy is not a regression; check by hand.
     static func startClickTest() {
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(1)) // let NSApplication start its event loop
@@ -85,10 +89,13 @@ enum Snapshot {
 
                 @MainActor func click(_ x: CGFloat, y: CGFloat = size.height / 2) async throws {
                     let p = host.convert(NSPoint(x: x, y: y), to: nil)
-                    for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
-                        let e = NSEvent.mouseEvent(with: type, location: p, modifierFlags: [], timestamp: 0,
-                                                   windowNumber: window.windowNumber, context: nil, eventNumber: 0,
-                                                   clickCount: 1, pressure: 1)!
+                    // Real timestamps and a short press, like a person's click: a tap
+                    // recognizer can ignore events stamped 0.
+                    for (i, type) in [NSEvent.EventType.leftMouseDown, .leftMouseUp].enumerated() {
+                        let e = NSEvent.mouseEvent(with: type, location: p, modifierFlags: [],
+                                                   timestamp: ProcessInfo.processInfo.systemUptime + Double(i) * 0.06,
+                                                   windowNumber: window.windowNumber, context: nil, eventNumber: i,
+                                                   clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0)!
                         NSApp.postEvent(e, atStart: false) // the queue, so a button's tracking loop sees mouseUp
                     }
                     try await Task.sleep(for: .milliseconds(250))
@@ -106,6 +113,21 @@ enum Snapshot {
                     print(String(format: "%-12@ x=%3.0f → details %+d, today's +1s %+d, links opened %+d", name as NSString, x,
                                  details - before.0, row().todayAmount - before.1, opened.count - before.2)); fflush(stdout)
                 }
+                // Rating dots (on): a +1 shows them; the third dot records "great"; they fade.
+                model.setRatingsEnabled(true)
+                model.refresh()
+                try await click(22)
+                print("dots shown after a +1:", model.ratingPrompt != nil)
+                let tickId = model.ratingPrompt?.checkInId
+                try await click(334 - 12)            // the third dot, at the right end
+                let stored = tickId.flatMap { id in try? clew.details(itemId: goal.id) }.map { _ in tickId! }
+                print("rated:", model.ratingPrompt?.rating.map(String.init) ?? "none",
+                      "| details felt:", (try? clew.details(itemId: goal.id))?.stats.feltCounts ?? [:], stored != nil)
+                try await Task.sleep(for: .seconds(2))
+                print("dots gone after rating:", model.ratingPrompt == nil)
+                try await click(22)
+                try await Task.sleep(for: .milliseconds(4500))
+                print("dots gone 4.5 s after an unrated +1:", model.ratingPrompt == nil)
                 exit(0)
             } catch {
                 print("click test failed:", error)
@@ -178,6 +200,10 @@ enum Snapshot {
             try seed(clew, clock: clock)
             let model = AppModel(clew: clew, notify: false)
             let editing = try clew.today().rows[2].item
+            // Rating dots on, and "Stretch" just ticked, so the list shows them.
+            model.setRatingsEnabled(true)
+            model.refresh()
+            if let stretch = model.today?.rows.first(where: { $0.item.title == "Stretch" }) { model.tap(stretch) }
             for (name, screen) in [("list", Screen.list), ("add", .add), ("pick", .pick),
                                    ("edit", .edit(editing, back: .list)), ("detail", .detail(editing.id))] {
                 for appearance in [NSAppearance.Name.aqua, .darkAqua] {

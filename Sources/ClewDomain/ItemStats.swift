@@ -16,6 +16,9 @@ public struct ItemStats: Hashable, Sendable {
     public let roundsFinished: Int?
     /// Amount per day for the heatmap window.
     public let amountByDay: [LocalDay: Int]
+    /// How rated ticks felt: rating (1 meh, 2 fine, 3 great) → count. Empty when
+    /// nothing was rated (rating dots are off by default).
+    public let feltCounts: [Int: Int]
 
     /// - Parameters:
     ///   - checkIns: the item's check-ins (voided ones are ignored).
@@ -37,6 +40,7 @@ public struct ItemStats: Hashable, Sendable {
             roundsFinished = nil
         }
         amountByDay = byDay
+        feltCounts = live.compactMap(\.rating).filter { (1...3).contains($0) }.reduce(into: [:]) { $0[$1, default: 0] += 1 }
     }
 }
 

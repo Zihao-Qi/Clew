@@ -41,6 +41,16 @@ private func tick(_ i: Item, _ d: String, _ amount: Int = 1, voided: Bool = fals
         #expect(s.amountByDay[day("2026-11-10")] == nil)
     }
 
+    @Test func feltCountsOnlyLiveRatedTicks() {
+        let h = habit()
+        var great = tick(h, "2026-11-10"); great.rating = 3
+        var voided = tick(h, "2026-11-11", voided: true); voided.rating = 1
+        var odd = tick(h, "2026-11-09"); odd.rating = 7   // out of range: ignored
+        let s = ItemStats(item: h, checkIns: [great, voided, odd, tick(h, "2026-11-11")], rounds: [],
+                          currentRoundAmount: 0, today: today)
+        #expect(s.feltCounts == [3: 1])
+    }
+
     @Test func goalRoundsFinishedCountsPastRoundsAndAReachedCurrentOne() {
         let g = goal(3)
         let r = GoalRound(id: UUID(), itemId: g.id, startedAt: t0, localDay: today, target: 3, source: .user)

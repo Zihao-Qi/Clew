@@ -230,6 +230,11 @@ M = [
  ("B11 uncompressed", S+"Backups.swift", "try Self.compress(try Data(contentsOf: raw)).write(to: target, options: .atomic)", "try Data(contentsOf: raw).write(to: target, options: .atomic)", "ClewStoreTests"),
  ("B12 any name listed", S+"Backups.swift", "        return rest.hasPrefix(\"-before-restore\") ? (day, true) : nil", "        return (day, true)", "ClewStoreTests"),
  ("B13 count-based names", S+"Backups.swift", "let n = (used.max() ?? 0) + 1", "let n = list().filter { $0.isSafetyCopy && $0.day == today }.count + 1 + 0 * used.count", "ClewStoreTests"),
+ ("G1 on by default", C+"Ratings.swift", "guard let json = try r.setting(Self.ratingsKey) else { return false }", "guard let json = try r.setting(Self.ratingsKey) else { return true }", "ClewCoreTests"),
+ ("G2 any rating", C+"Ratings.swift", "guard (1...3).contains(rating) else { throw ClewError.notAllowed }", "_ = rating", "ClewCoreTests"),
+ ("G3 rate voided", C+"Ratings.swift", "guard !checkIn.isVoided else { throw ClewError.notAllowed }", "_ = checkIn", "ClewCoreTests"),
+ ("G4 felt counts voided", D+"ItemStats.swift", "feltCounts = live.compactMap(\\.rating)", "feltCounts = checkIns.compactMap(\\.rating)", "ClewDomainTests|ClewCoreTests"),
+ ("G5 rating not stored", S+"SQLiteStore.swift", "UPDATE checkIn SET rating = ?, ratedAt = ? WHERE id = ?", "UPDATE checkIn SET rating = rating, ratedAt = ? WHERE id = ? AND ? IS NOT NULL", "ClewStoreTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

@@ -165,6 +165,14 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         #expect(try store.read { try $0.item(id: item.id) } == item)
     }
 
+    @Test func ratingGoesThroughTheTriggersAndKeepsTheRestOfTheFact() throws {
+        let (store, c, _) = try seeded()
+        try store.write { try $0.rateCheckIn(id: c.id, rating: 3, at: t0.addingTimeInterval(5)) }
+        let rated = try #require(try store.read { try $0.checkIn(id: c.id) })
+        #expect(rated.rating == 3 && rated.ratedAt == t0.addingTimeInterval(5))
+        #expect(rated.amount == c.amount && rated.localDay == c.localDay && rated.at == c.at)
+    }
+
     @Test func factsCannotBeDeleted() throws {
         let (store, _, _) = try seeded()
         for table in ["checkIn", "plan"] {

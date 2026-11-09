@@ -15,6 +15,7 @@ struct SettingsView: View {
     @State private var loginMessage: String?
     @State private var activeDays: ActiveDays?
     @State private var letGoCount = 0
+    @State private var ratingDots = false
     @State private var exportMessage: String?
     @State private var summaries = SummarySettings.defaults
     @State private var backupList: [Backups.Entry] = []
@@ -46,6 +47,17 @@ struct SettingsView: View {
                 Text("Summaries")
             } footer: {
                 Text("Morning: how many are on today's list. Evening: how many are done.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Toggle("Rating dots after a tick", isOn: Binding(get: { ratingDots }, set: { on in
+                    ratingDots = on
+                    model.setRatingsEnabled(on)
+                }))
+            } footer: {
+                Text("Three dots for how it felt: meh, fine, great. Optional; they fade by themselves.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -159,6 +171,7 @@ struct SettingsView: View {
         activeDays = model.activeDays()
         backupList = model.backupList()
         letGoCount = model.lettingGoCount()
+        ratingDots = model.ratingsOn
     }
 
     private func setOpenAtLogin(_ on: Bool) {

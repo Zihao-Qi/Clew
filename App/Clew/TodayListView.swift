@@ -224,7 +224,11 @@ struct RowView: View {
             titleView
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            if let target = item.progress.target {
+            if model.ratingPrompt?.itemId == row.id, let prompt = model.ratingPrompt {
+                // Right end, far from the circle; for a goal it briefly covers the bar.
+                RatingDots(rating: prompt.rating, rate: model.rate)
+                    .transition(.opacity)
+            } else if let target = item.progress.target {
                 // Fixed widths, so every goal's bar starts in the same column.
                 HStack(spacing: 4) {
                     ProgressView(value: Double(min(row.progressAmount, target)), total: Double(target))
@@ -315,5 +319,38 @@ private struct RowFrames: PreferenceKey {
     static let defaultValue: [UUID: CGRect] = [:]
     static func reduce(value: inout [UUID: CGRect], nextValue: () -> [UUID: CGRect]) {
         value.merge(nextValue()) { $1 }
+    }
+}
+
+/// Three small dots: how a tick felt (1 meh, 2 fine, 3 great). Optional; they fade by
+/// themselves. Shown only when Settings › Rating dots is on.
+struct RatingDots: View {
+    let rating: Int?
+    let rate: (Int) -> Void
+
+    static func word(_ n: Int) -> String {
+        switch n {
+        case 1: String(localized: "meh")
+        case 2: String(localized: "fine")
+        default: String(localized: "great")
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 7) {
+            ForEach(1...3, id: \.self) { n in
+                Button { rate(n) } label: {
+                    Circle()
+                        .strokeBorder(Color.secondary.opacity(0.6), lineWidth: 1)
+                        .background(Circle().fill(n <= (rating ?? 0) ? Color.accentColor : .clear))
+                        .frame(width: 11, height: 11)
+                        .padding(3) // a slightly larger click target than the dot
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(Text(verbatim: Self.word(n)))
+                .accessibilityLabel(Text("Felt \(Self.word(n))"))
+            }
+        }
     }
 }

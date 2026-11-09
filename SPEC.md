@@ -49,8 +49,9 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
 3. **Links.** Any item can have a URL. The small link mark after its title opens
    it in the default browser. Pasting a link into `+ add` fills in the page's title,
    which you can edit before saving.
-4. **Done in one click.** Click `○` to mark it done (counted goals: +1). Three small
-   rating dots then appear **inside the same row** every time. The row never changes
+4. **Done in one click.** Click `○` to mark it done (counted goals: +1). If rating
+   dots are switched on (Settings, off by default), three small dots (how it felt:
+   meh, fine, great) then appear at the right end **of the same row** every time. The row never changes
    height and the dots never cover the `+1` target, so rapid ticks can't mis-click.
    Optional; they fade after a few seconds. Ticked items stay visible until the day
    rolls over, so undo is always one click away.

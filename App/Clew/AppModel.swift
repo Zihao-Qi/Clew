@@ -4,6 +4,7 @@ import ClewDomain
 import ClewStore
 import Foundation
 import Observation
+import SwiftUI
 
 struct SystemClock: Clock {
     func now() -> Date { Date() }
@@ -95,6 +96,7 @@ final class AppModel {
         do {
             let list = try clew.today()
             today = list
+            ratingsOn = (try? clew.ratingsEnabled()) ?? false
             laterCount = try clew.laterCount()
             // A closed congratulation stays closed only while that goal stays reached, so
             // reaching a raised target or a next round congratulates again.
@@ -229,13 +231,55 @@ final class AppModel {
 
     /// One click on a row's circle: `+1` for a goal, otherwise done ↔ undo.
     func tap(_ row: TodayRow) {
-        run {
-            if row.item.kind == .goal || !row.isDone {
-                try $0.checkIn(itemId: row.id)
-            } else {
-                try $0.undoToday(itemId: row.id)
-            }
+        if row.item.kind == .goal || !row.isDone {
+            var tick: CheckIn?
+            guard run({ tick = try $0.checkIn(itemId: row.id) }), let tick else { return }
+            offerRating(itemId: row.id, checkInId: tick.id)
+        } else {
+            run { try $0.undoToday(itemId: row.id) }
+            if ratingPrompt?.itemId == row.id { ratingPrompt = nil }
         }
+    }
+
+    // MARK: - Rating dots (SPEC §4; off by default)
+
+    struct RatingPrompt: Equatable {
+        let itemId: UUID
+        let checkInId: UUID
+        var rating: Int?
+    }
+
+    /// The row currently showing rating dots, if any.
+    private(set) var ratingPrompt: RatingPrompt?
+    private(set) var ratingsOn = false
+    @ObservationIgnored private var ratingPromptTask: Task<Void, Never>?
+
+    private func offerRating(itemId: UUID, checkInId: UUID) {
+        guard ratingsOn else { return }
+        let prompt = RatingPrompt(itemId: itemId, checkInId: checkInId)
+        ratingPrompt = prompt
+        hideRatingPrompt(after: .seconds(4), unlessChangedFrom: prompt)
+    }
+
+    func rate(_ rating: Int) {
+        guard var prompt = ratingPrompt else { return }
+        guard run({ try $0.rate(checkInId: prompt.checkInId, rating: rating) }) else { return }
+        prompt.rating = rating
+        ratingPrompt = prompt
+        hideRatingPrompt(after: .milliseconds(1200), unlessChangedFrom: prompt)
+    }
+
+    private func hideRatingPrompt(after delay: Duration, unlessChangedFrom prompt: RatingPrompt) {
+        ratingPromptTask?.cancel()
+        ratingPromptTask = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled, self?.ratingPrompt == prompt else { return }
+            withAnimation(.easeOut(duration: 0.3)) { self?.ratingPrompt = nil }
+        }
+    }
+
+    func setRatingsEnabled(_ on: Bool) {
+        run { try $0.setRatingsEnabled(on) }
     }
 
     func undo(_ row: TodayRow) { run { try $0.undoToday(itemId: row.id) } }

@@ -163,6 +163,12 @@ final class FakeStore: ClewStore, @unchecked Sendable {
             guard state.items[checkIn.itemId] != nil else { throw FactViolation.missingItem }
             state.checkIns[checkIn.id] = checkIn
         }
+        func rateCheckIn(id: UUID, rating: Int, at: Date) throws {
+            guard var c = state.checkIns[id] else { return }
+            c.rating = rating
+            c.ratedAt = at
+            state.checkIns[id] = c
+        }
         func voidCheckIn(id: UUID, at: Date, reason: String) throws {
             guard var c = state.checkIns[id] else { return }
             guard c.voidedAt == nil else { throw FactViolation.revoid }
