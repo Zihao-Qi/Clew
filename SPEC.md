@@ -288,6 +288,26 @@ stopped daily use, not adding features.
     counted goal; a goal: total reached). Notification permission
     is asked when the first block is placed (if this is on); if it is denied, Settings
     says so.
+  - **A repeating task's time slot** (*user*, 2026-11-10). A habit or a counted goal
+    can have a slot, set in Add and Edit: "On the timeline: at 8:00 for 60 min" (a
+    start on a quarter hour, a length of 15, 30, 45, 60, 90 or 120 minutes; off by
+    default). **Each day the task is on Today**, Clew places that block by itself,
+    once: on a day it is not due (a weekday not chosen, a weekly target met) there is
+    none. It then behaves like any block: the task lives on the timeline, the block's
+    end ticks it.
+    - **Direct changes are for today only:** moving, resizing, removing it or dragging
+      it back to the list changes today's block; tomorrow it is at the slot again. A
+      block removed today does not come back today.
+    - **The repeating slot changes only in Edit.** A change (or turning it off) also
+      applies to today's block if that block is untouched (not moved, resized or
+      removed by hand) and has not started; otherwise it starts tomorrow.
+    - **Never a tick for time that was not planned:** the block is placed only if its
+      end is still ahead when Clew places it (the day's start, or when Clew next runs:
+      a Mac that was off until 10:00 gets no 8–9 block that day; the task stays in the
+      list). It is not placed either when the task already has a block today (placed by
+      hand), or while the timeline is turned off.
+    - A slot near the day's end is cut at 4 a.m., like a dropped block. Once-tasks and
+      links have no slot.
   - **Calendar events (step 2)** show on the timeline as **read-only** blocks in their
     calendar's colour: title and time, nothing to click, never ticked, never counted,
     never alerted by Clew (Calendar has its own alerts). All-day events sit as a thin
