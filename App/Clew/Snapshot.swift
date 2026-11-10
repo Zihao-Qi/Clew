@@ -345,6 +345,18 @@ enum Snapshot {
                 render(RootView(model: model, screen: .list), appearance: .aqua, to: dir.appendingPathComponent("timeup-light.png"))
                 model.stopFocus()
             }
+            // The lifted card in both shapes (SPEC 2026-11-10: one tint, row or block).
+            if let row = model.today?.rows.first(where: { $0.item.title == "Write intro" }) {
+                for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+                    render(VStack(alignment: .leading, spacing: 12) {
+                        RowView(row: row, model: model, onEdit: {}, onOpen: {}, isDragged: true)
+                        LiftedBlockCard(title: row.item.title, start: Date(), minutes: 45)
+                            .frame(width: 290, height: 45)
+                            .padding(.leading, 40)
+                    }.frame(width: 340).padding(.vertical, 8), appearance: appearance,
+                           to: dir.appendingPathComponent("lifted-\(appearance == .aqua ? "light" : "dark").png"))
+                }
+            }
             // The other progress bar style.
             model.setBarStyle(.underTitle)
             model.refresh()

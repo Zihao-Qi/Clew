@@ -427,6 +427,32 @@ public final class Clew: Sendable {
             : (t > 0 ? others[t - 1] : nil, target)
     }
 
+    /// Where a block dragged off the timeline lands in the list: the gap before the first
+    /// row whose middle is below the pointer (0 = top, `spans.count` = the end).
+    public static func insertSlot(pointerY: Double, spans: [(minY: Double, maxY: Double)]) -> Int {
+        spans.filter { ($0.minY + $0.maxY) / 2 < pointerY }.count
+    }
+
+    /// How far row `index` slides to open the gap at `slot` for an incoming row.
+    public static func insertShift(index: Int, slot: Int, height: Double) -> Double {
+        index >= slot ? height : 0
+    }
+
+    /// The neighbours of the gap `slot` in the visible rows, taken from the whole list
+    /// (rows hidden on the timeline included), so the new place is strictly between two
+    /// existing ones. `item` itself is left out.
+    public static func insertNeighbours(at slot: Int, in visible: [UUID], within all: [UUID],
+                                        excluding item: UUID) -> (after: UUID?, before: UUID?) {
+        let shown = visible.filter { $0 != item }
+        let others = all.filter { $0 != item }
+        guard !shown.isEmpty else { return (nil, nil) }
+        if slot < shown.count, let t = others.firstIndex(of: shown[max(0, slot)]) {
+            return (t > 0 ? others[t - 1] : nil, shown[max(0, slot)])
+        }
+        guard let t = others.firstIndex(of: shown[shown.count - 1]) else { return (nil, nil) }
+        return (shown[shown.count - 1], t + 1 < others.count ? others[t + 1] : nil)
+    }
+
     /// Delete: a tombstone (`deletedAt`), never a hard delete. The item disappears
     /// everywhere; its check-ins and plans stay in the history (ARCHITECTURE §8).
     public func deleteItem(itemId: UUID) throws {
@@ -440,6 +466,27 @@ public final class Clew: Sendable {
             // Its reminder goes with it, in the same transaction.
             if var reminder = try w.reminders().first(where: { $0.itemId == itemId }) {
                 reminder.deletedAt = now
+                reminder.updatedAt = now
+                try w.save(reminder)
+            }
+        }
+    }
+
+    /// Undo of a delete (the Delete key's "Deleted · Undo", SPEC 2026-11-10): the item
+    /// comes back with the reminder it had, without its time blocks.
+    public func undeleteItem(itemId: UUID) throws {
+        let now = clock.now()
+        try store.write { w in
+            guard var item = try w.item(id: itemId) else { throw ClewError.itemNotFound }
+            guard let deletedAt = item.deletedAt else { throw ClewError.notAllowed }
+            item.deletedAt = nil
+            item.updatedAt = now
+            try w.update(item)
+            // Only the reminder the delete took (same instant), and only if none is live.
+            let all = try w.allRecords().reminders.filter { $0.itemId == itemId }
+            if !all.contains(where: { $0.deletedAt == nil }),
+               var reminder = all.first(where: { $0.deletedAt == deletedAt }) {
+                reminder.deletedAt = nil
                 reminder.updatedAt = now
                 try w.save(reminder)
             }
