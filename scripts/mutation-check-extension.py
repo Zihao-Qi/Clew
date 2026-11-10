@@ -30,6 +30,7 @@ M = [
  ("E19 progress range", E+"youtube.ts", "pct >= 0 && pct <= 100 ?", "true ?"),
  ("E20 progress as percent", E+"youtube.ts", "Math.round(pct) / 100", "pct"),
  ("E21 progress dropped", E+"youtube.ts", "entries.push(progress === undefined ? { externalRef: id, title } : { externalRef: id, title, progress });", "entries.push({ externalRef: id, title });"),
+ ("E22 turned off looks failed", E+"gateway.ts", "    if (r.status === 409) throw new GatewayError(\"turnedOff\", \"list turned off in Clew\", 409);\n", ""),
  ("E16 checks lax", E+"contract.ts", "[\"added\", \"renamed\", \"restored\", \"letGo\", \"skipped\", \"progressed\"].every((k) => isInt(r[k]))", "true"),
 ]
 results = []

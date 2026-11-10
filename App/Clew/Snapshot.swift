@@ -370,8 +370,15 @@ enum Snapshot {
             ExternalEntry(externalRef: "aaaaaaaaaaa", title: "Intro to diffusion models", progress: 0.4),
             ExternalEntry(externalRef: "bbbbbbbbbbb", title: "Swift concurrency deep dive", progress: 0.86),
             ExternalEntry(externalRef: "ccccccccccc", title: "Building a compiler in a weekend"),
-        ], listTotal: 3))
+            ExternalEntry(externalRef: "ddddddddddd", title: "A video since removed from Watch Later"),
+        ], listTotal: 4))
         clock.date = now.addingTimeInterval(-2 * 86_400)
+        // The fourth video left Watch Later: it counts as finished (SPEC 2026-11-10).
+        try clew.importExternal(ImportBatch(source: .extensionYouTube, entries: [
+            ExternalEntry(externalRef: "aaaaaaaaaaa", title: "Intro to diffusion models", progress: 0.4),
+            ExternalEntry(externalRef: "bbbbbbbbbbb", title: "Swift concurrency deep dive", progress: 0.86),
+            ExternalEntry(externalRef: "ccccccccccc", title: "Building a compiler in a weekend"),
+        ], listTotal: 3, scan: ScanReport(found: 3, parsed: 3, selectorVersion: "snapshot")))
         if let video = try clew.collection(.extensionYouTube)?.notStarted.first {
             try clew.checkIn(itemId: video.id)
         }

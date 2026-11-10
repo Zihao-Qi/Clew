@@ -198,6 +198,11 @@ struct SystemClockForTests: ClewDomain.Clock { let source: Now; func now() -> Da
         let response = try decode(API.ImportResponse.self, r)
         #expect(response.result.added == 2 && response.listCount == 2 && !response.needsUpdate)
         #expect(gateway.lastImport(from: .extensionYouTube)?.result.added == 2)
+        // listCount is what is on the list, ticked or not.
+        try clew.checkIn(itemId: try #require(try clew.collection(.extensionYouTube)?.notStarted.first).id)
+        let again = try decode(API.ImportResponse.self, request(
+            "POST", "/v1/import", body: importBody(["aaaaaaaaaaa", "bbbbbbbbbbb"], total: 2), token: paired.token))
+        #expect(again.listCount == 2)
 
         // The page said 12 videos but nothing could be read: flagged, nothing removed.
         let broken = try decode(API.ImportResponse.self, request(
@@ -217,6 +222,17 @@ struct SystemClockForTests: ClewDomain.Clock { let source: Now; func now() -> Da
         #expect(request("GET", "/v1/import", token: paired.token).status == 405)
         #expect(request("GET", "/v1/items").status == 404)
         #expect(try clew.collections().isEmpty)   // nothing was imported
+    }
+
+    @Test func aListTurnedOffInClewIsRefusedWithItsOwnStatus() throws {
+        let paired = try pairClient()
+        try clew.setCollection(.extensionYouTube, on: false)
+        let r = request("POST", "/v1/import", body: importBody(["aaaaaaaaaaa"], total: 1), token: paired.token)
+        #expect(r.status == 409)   // the extension says where to turn it back on
+        #expect(try decode(API.Failure.self, r).error == "list turned off in Clew")
+        #expect(try clew.collectionsOff() == [.extensionYouTube])
+        try clew.setCollection(.extensionYouTube, on: true)
+        #expect(try clew.collections().isEmpty)   // nothing was imported while it was off
     }
 
     @Test func aRevokedClientIsLockedOut() throws {

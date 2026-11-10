@@ -40,7 +40,7 @@ struct CollectionRowView: View {
                     .lineLimit(1)
                     .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(Self.rowSpace)).minX } action: { titleInset = $0 }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Text("\(summary.done) of \(summary.total)")
+                Text("\(summary.toWatch) to watch")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
                 Image(systemName: "chevron.right")
@@ -74,7 +74,7 @@ struct CollectionRowView: View {
         .onHover { hovering = $0 }
         .accessibilityElement(children: .ignore)
         .accessibilityAddTraits(.isButton)
-        .accessibilityLabel(Text("\(CollectionStyle.name(summary.source)), \(summary.done) of \(summary.total) done"))
+        .accessibilityLabel(Text("\(CollectionStyle.name(summary.source)), \(summary.toWatch) to watch, \(summary.done) done"))
         .accessibilityAction(.default, onOpen)
     }
 }
@@ -102,7 +102,7 @@ struct CollectionView: View {
                     Text(verbatim: CollectionStyle.name(source))
                         .font(.headline)
                         .accessibilityAddTraits(.isHeader)
-                    Text("\(page.done.count) of \(page.total) done")
+                    Text("\(page.toWatch) to watch, \(page.done.count) done")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -163,7 +163,8 @@ struct CollectionView: View {
 }
 
 /// One video on a collection's page: a circle to tick it (or undo today's tick) and a
-/// title that opens it; its watch progress in the chosen bar style.
+/// title that opens it; its watch progress in the chosen bar style. One that left the
+/// list counts as finished; "Not finished" takes it out (SPEC decision 2026-11-10).
 struct CollectionEntryRow: View {
     let entry: CollectionEntry
     let model: AppModel
@@ -181,8 +182,9 @@ struct CollectionEntryRow: View {
                         .foregroundStyle(isDone ? Color.accentColor : Color.secondary)
                 }
                 .buttonStyle(.borderless)
-                // A tick from an earlier day stays: undo is for today (SPEC §4).
-                .disabled(isDone && !entry.doneToday)
+                // A tick from an earlier day stays: undo is for today (SPEC §4). One that
+                // left the list is undone with "Not finished" instead.
+                .disabled(isDone && (!entry.doneToday || !entry.onList))
                 .accessibilityLabel(isDone ? Text("Undo \(item.title)") : Text("Mark \(item.title) done"))
 
                 Button {
@@ -213,7 +215,14 @@ struct CollectionEntryRow: View {
         .padding(.horizontal, 4)
         .contextMenu {
             if let url = item.url { Button("Open") { model.open(url) } }
-            Button("Delete", role: .destructive) { model.delete(item.id) }
+            if entry.onList {
+                Button("Delete", role: .destructive) { model.delete(item.id) }
+            } else {
+                Button("Not finished", role: .destructive) { model.markNotFinished(item.id) }
+            }
+        }
+        .accessibilityAction(named: entry.onList ? Text("Delete") : Text("Not finished")) {
+            entry.onList ? model.delete(item.id) : model.markNotFinished(item.id)
         }
     }
 }

@@ -124,6 +124,18 @@ describe("import", () => {
     await expect(new Gateway(net.fetchFn).importList(pairing, scan)).rejects.toMatchObject({ kind: "revoked" });
   });
 
+  test("a list turned off in Clew is told apart from a failed import", async () => {
+    const off: Server = async (url, init) =>
+      url.pathname === "/v1/hello" ? clew(url, init) : json(409, { error: "list turned off in Clew" });
+    const net = network({ [PORTS[0]]: off });
+    await expect(new Gateway(net.fetchFn).importList(pairing, scan)).rejects.toMatchObject({ kind: "turnedOff" });
+    const broken: Server = async (url, init) =>
+      url.pathname === "/v1/hello" ? clew(url, init) : json(500, { error: "import failed" });
+    await expect(new Gateway(network({ [PORTS[0]]: broken }).fetchFn).importList(pairing, scan)).rejects.toMatchObject({
+      kind: "refused",
+    });
+  });
+
   test("Clew's answer comes back checked", async () => {
     const net = network({ [PORTS[0]]: clew });
     const { response } = await new Gateway(net.fetchFn).importList(pairing, scan);

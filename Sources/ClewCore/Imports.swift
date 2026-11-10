@@ -42,7 +42,7 @@ public struct ImportResult: Hashable, Sendable, Codable {
     public var renamed: Int
     /// Items that had been let go because they left the list and are back on it.
     public var restored: Int
-    /// Untouched Later items that are no longer on the list, let go.
+    /// Items that left the list (they leave it for its Done group; SPEC 2026-11-10).
     public var letGo: Int
     /// Entries skipped as malformed (bad id or empty title).
     public var skipped: Int
@@ -70,14 +70,15 @@ extension Clew {
 
     /// Idempotent import of an external list into the Later pile (ADR-4: the import
     /// path, not the agent). Keyed by `(source, externalRef)`, so re-scans never
-    /// duplicate. New entries become saved links in Later with a fetched (untrusted)
-    /// title. When the scan is the whole list, Later items from this source that are
-    /// no longer on it and never done are let go (SPEC decision
-    /// 2026-11-09); one that comes back is restored. Items the user deleted or let go
-    /// themselves stay gone, and nothing on Today or done is ever touched.
+    /// duplicate. New entries join the source's collection with a fetched (untrusted)
+    /// title. When the scan is the whole list, items no longer on it leave the list and
+    /// count as finished: one not ticked yet gets a tick dated the day the import saw
+    /// it gone (SPEC decision 2026-11-10). One that comes back is restored. Items the
+    /// user deleted stay gone. A list turned off in Settings imports nothing.
     @discardableResult
     public func importExternal(_ batch: ImportBatch) throws -> ImportResult {
         guard Self.importSources.contains(batch.source) else { throw ClewError.notAllowed }
+        guard try !collectionsOff().contains(batch.source) else { throw ClewError.listTurnedOff }
         guard batch.entries.count <= Self.maxImportEntries else { throw ClewError.tooManyEntries(max: Self.maxImportEntries) }
 
         var result = ImportResult()
@@ -98,6 +99,7 @@ extension Clew {
         result.complete = scanAgrees && !entries.isEmpty && batch.listTotal == entries.count && result.skipped == 0
 
         let now = clockForQueries.now()
+        let zone = zonesForQueries.current()
         let day = currentDay()
         return try storeForQueries.write { w in
             var existing: [String: Item] = [:]
@@ -148,12 +150,19 @@ extension Clew {
 
             guard result.complete else { return result }
             let onList = Set(entries.map(\.ref))
-            // Everything that left the list leaves its collection, ticked or not; its
-            // ticks stay, so the collection's heatmap keeps them (SPEC 2026-11-09).
+            // Everything that left the list leaves it for the collection's Done group:
+            // removed means finished, whether or not progress was ever seen. The user
+            // can say otherwise with "Not finished" (SPEC 2026-11-10).
             let gone = existing.values.filter { item in
                 item.deletedAt == nil && !onList.contains(item.externalRef ?? "")
             }
+            let allTime = LocalDay(year: 1, month: 1, day: 1)!
+            let ticked = Set(try w.checkIns(itemIds: gone.map(\.id), from: allTime).map(\.itemId))
             for var item in gone {
+                if !ticked.contains(item.id) {
+                    try w.insert(CheckIn(id: newID(), itemId: item.id, localDay: day, at: now,
+                                         timeZoneId: zone.identifier, amount: 1, source: batch.source))
+                }
                 try w.insert(LaterReview(id: newID(), itemId: item.id, decision: .letGo, at: now, localDay: day,
                                          source: batch.source))
                 item.deletedAt = now

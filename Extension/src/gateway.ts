@@ -25,7 +25,7 @@ export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 
 export class GatewayError extends Error {
   constructor(
-    readonly kind: "unreachable" | "revoked" | "refused" | "badAnswer",
+    readonly kind: "unreachable" | "revoked" | "turnedOff" | "refused" | "badAnswer",
     message: string,
     readonly status?: number,
   ) {
@@ -118,6 +118,8 @@ export class Gateway {
     });
     const body: unknown = await r.json().catch(() => undefined);
     if (r.status === 401) throw new GatewayError("revoked", "Clew doesn't know this browser anymore", 401);
+    // The user turned this list off in Clew's Settings.
+    if (r.status === 409) throw new GatewayError("turnedOff", "list turned off in Clew", 409);
     if (!r.ok) throw new GatewayError("refused", isFailure(body) ? body.error : `HTTP ${r.status}`, r.status);
     if (!isImportResponse(body)) throw new GatewayError("badAnswer", "unexpected answer");
     return { response: body, port };

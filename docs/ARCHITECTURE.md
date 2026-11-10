@@ -300,9 +300,15 @@ also shows when signed out or broken, so an empty read is never trusted: emptyin
 Watch Later entirely leaves the collection as it is). Only then are items from that
 source that left the list let go, ticked or not (*changed* 2026-11-09 with
 collections; before, items on Today or ticked were never touched) (a `LaterReview` with the import's
-source, so Settings' "let go" count, which counts the user's own, skips it); their
-check-ins stay, so the collection's heatmap keeps them. An item let go that way comes
-back if it reappears (its let-go is voided); anything the user deleted stays gone.
+source, so Settings' "let go" count, which counts the user's own, skips it). **Removed
+means finished** (SPEC 2026-11-10): in the same transaction, each one without a live
+check-in gets one (`amount` 1, the import's `source`, today's `localDay`); one already
+ticked is not ticked again. An item let go that way comes back if it reappears (its
+let-go is voided; a tick it has stays); anything the user deleted stays gone. A source
+turned off (`collectionsOff`, setting `collectionsOff`: a JSON array of source raw
+values; unknown ones are dropped) refuses the import with `ClewError.listTurnedOff`
+before anything is read or written; the Gateway answers 409 and the extension shows
+"turned off in Clew".
 
 **Collections (v1.1, SPEC 2026-11-09).** Items whose source is in
 `Clew.collectionSources` (YouTube now, X next) form one collection per source. There
@@ -310,13 +316,18 @@ is no parent row: a collection is derived from `source`, so nothing needs migrat
 Today, Later, Pick, reordering and notifications all filter collection items out
 (including ones picked before collections existed); `PlanForToday` refuses them;
 `CheckIn` accepts them in any state, since they are ticked on the collection's page.
-Queries: `collections()` (the rows below the tasks: total and ticked; a source
-with no items left keeps its row while it has any tick) and
-`collection(source)` (the page: groups, and ticks per day including items since
-removed). Done-ness uses every live tick, like the row and `CheckIn`, even one dated
+Queries: `collections()` (the rows below the tasks, for sources turned on:
+`toWatch`, live and unticked; `done`, the Done group; `onList`; a source with no
+items left keeps its row while it has any tick) and `collection(source)` (the page:
+groups, and ticks per day including items since removed). The Done group is ticked
+items that are live or **left the list** (removed, and the import's let-go is their
+latest); items the user deleted are not in it, though their ticks stay in the
+heatmap. `markNotFinished(itemId:)` voids every live tick of an item that left the
+list (reason "not finished"), taking it out of Done and the heatmap; it refuses items
+still on the list, ones the user deleted, and tasks. Done-ness uses every live tick, like the row and `CheckIn`, even one dated
 after today (clock or time zone moved back); the heatmap and counts show days up to
-today only. The Gateway's import answer reports `listCount`, the collection's size
-(*changed from* `laterCount`).
+today only. The Gateway's import answer reports `listCount`, the items on the list
+(`onList`; *changed from* `laterCount`).
 
 **Browser extension (v1.1, `Extension/`, TypeScript, built with Bun).** Chrome MV3.
 - **Scrapers are quarantined:** one module per site (`src/youtube.ts`), with selectors

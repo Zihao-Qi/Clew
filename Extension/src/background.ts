@@ -7,8 +7,8 @@ import { Gateway, GatewayError, type Pairing } from "./gateway";
 export interface Status {
   at: number;
   ok: boolean;
-  /** "unreachable" → "Open Clew"; "revoked" → pair again. */
-  problem?: "unreachable" | "revoked" | "refused" | "badAnswer";
+  /** "unreachable" → "Open Clew"; "revoked" → pair again; "turnedOff" → Clew's Settings. */
+  problem?: "unreachable" | "revoked" | "turnedOff" | "refused" | "badAnswer";
   added?: number;
   letGo?: number;
   listCount?: number;

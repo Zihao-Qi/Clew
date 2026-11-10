@@ -16,6 +16,8 @@ public enum ClewError: Error, Equatable, Sendable {
     case notAllowed
     /// An import batch is larger than any list the site offers.
     case tooManyEntries(max: Int)
+    /// The user turned this imported list off in Settings.
+    case listTurnedOff
 }
 
 /// What the user chose in `+ add`. Each case is a valid shape, so invalid

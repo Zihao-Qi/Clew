@@ -269,6 +269,12 @@ final class AppModel {
         }
     }
 
+    /// A video that left the list counted as finished; the user says it wasn't.
+    func markNotFinished(_ id: UUID) { run { try $0.markNotFinished(itemId: id) } }
+
+    func collectionsOff() -> Set<Source> { (try? clew?.collectionsOff()) ?? [] }
+    func setCollection(_ source: Source, on: Bool) { run { try $0.setCollection(source, on: on) } }
+
     // MARK: - Rating dots (SPEC §4; off by default)
 
     /// A row showing its rating dots as a hint after a tick (they also show on hover).
@@ -407,6 +413,7 @@ final class AppModel {
         case .pickCount: String(localized: "Pick 1 to 3 items.")
         case .goalReached: String(localized: "Goal reached! Start a next round or raise the target.")
         case .itemNotFound, .checkInNotFound, .notAllowed, .tooManyEntries: String(localized: "That can't be done right now.")
+        case .listTurnedOff: String(localized: "That list is turned off in Settings › General.")
         }
     }
 

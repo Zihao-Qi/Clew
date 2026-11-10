@@ -25,7 +25,7 @@ private let a = "aaaaaaaaaaa", b = "bbbbbbbbbbb", c = "ccccccccccc", d = "dddddd
                     scan: ScanReport(found: entries.count, parsed: entries.count, selectorVersion: "t"))
     }
     /// Items on the YouTube collection now.
-    private func listed() throws -> Int { try clew.collections().first { $0.source == .extensionYouTube }?.total ?? 0 }
+    private func listed() throws -> Int { try clew.collections().first { $0.source == .extensionYouTube }?.onList ?? 0 }
     private func imported(_ ref: String) -> Item? {
         store.state.items.values.first { $0.externalRef == ref }
     }
@@ -107,7 +107,7 @@ private let a = "aaaaaaaaaaa", b = "bbbbbbbbbbb", c = "ccccccccccc", d = "dddddd
         try clew.importExternal(batch([video(a), video(b)], total: 2))
         let r = try clew.importExternal(batch([], total: 0))
         #expect(!r.complete && r.letGo == 0)
-        #expect(try listed() == 2)
+        #expect(try listed() == 2 && store.state.checkIns.isEmpty)   // nothing counted as finished
     }
 
     @Test func rowsTheScraperCouldNotReadMeanNotTheWholeList() throws {
@@ -121,7 +121,7 @@ private let a = "aaaaaaaaaaa", b = "bbbbbbbbbbb", c = "ccccccccccc", d = "dddddd
         #expect(try listed() == 2)
     }
 
-    @Test func whatLeftTheListLeavesTheCollectionTickedOrNot() throws {
+    @Test func whatLeftTheListLeavesItForDoneTickedOrNot() throws {
         try clew.importExternal(batch([video(a), video(b)], total: 2))
         let done = try #require(imported(b))
         try clew.checkIn(itemId: done.id)                       // ticked on the collection's page
@@ -131,7 +131,9 @@ private let a = "aaaaaaaaaaa", b = "bbbbbbbbbbb", c = "ccccccccccc", d = "dddddd
         #expect(r.letGo == 2)                                   // SPEC 2026-11-09: ticked ones leave too
         #expect(imported(a)?.deletedAt != nil && imported(b)?.deletedAt != nil)
         #expect(store.state.checkIns.values.allSatisfy { $0.voidedAt == nil })   // the tick stays
-        #expect(try clew.collection(.extensionYouTube)?.finishedAllTime == 1)
+        // Removed means finished (SPEC 2026-11-10): a gets its tick, b keeps its one.
+        #expect(try clew.collection(.extensionYouTube)?.finishedAllTime == 2)
+        #expect(try clew.collection(.extensionYouTube)?.done.count == 2)
         #expect(store.state.items[own.id]?.deletedAt == nil)    // the user's own item
     }
 

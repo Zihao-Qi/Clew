@@ -39,7 +39,8 @@ private func video(_ ref: String, watched: Double? = nil) -> ExternalEntry {
         try load([video("aaaaaaaaaaa"), video("bbbbbbbbbbb"), video("ccccccccccc"), video("ddddddddddd")])
         try clew.checkIn(itemId: try id("bbbbbbbbbbb"))
         let row = try #require(try clew.collections().first)
-        #expect(row.source == .extensionYouTube && row.total == 4 && row.done == 1 && row.fraction == 0.25)
+        #expect(row.source == .extensionYouTube && row.toWatch == 3 && row.done == 1 && row.onList == 4)
+        #expect(row.fraction == 0.25)
         #expect(try clew.today().total == 0)                        // never counted toward today
     }
 
@@ -66,13 +67,15 @@ private func video(_ ref: String, watched: Double? = nil) -> ExternalEntry {
         #expect(page.notStarted.map(\.item.externalRef) == ["bbbbbbbbbbb", "aaaaaaaaaaa"])
     }
 
-    @Test func theHeatmapKeepsTicksOfVideosThatLeftTheList() throws {
+    @Test func ticksOfVideosThatLeftTheListStayInDoneAndTheHeatmap() throws {
         try load([video("aaaaaaaaaaa"), video("bbbbbbbbbbb")])
         clock.set(local(3)); try clew.checkIn(itemId: try id("aaaaaaaaaaa"))
         clock.set(local(9)); try clew.checkIn(itemId: try id("bbbbbbbbbbb"))
         try load([video("ccccccccccc")])                            // a and b removed on YouTube
         let page = try #require(try clew.collection(.extensionYouTube))
-        #expect(page.done.isEmpty && page.total == 1)
+        #expect(page.done.map(\.item.externalRef) == ["bbbbbbbbbbb", "aaaaaaaaaaa"] && page.toWatch == 1)
+        #expect(page.done.allSatisfy { !$0.onList })
+        #expect(store.state.checkIns.count == 2)                    // already ticked: not ticked again
         let tue = LocalDay(string: "2026-11-03")!, mon = LocalDay(string: "2026-11-09")!
         #expect(page.finishedByDay == [tue: 1, mon: 1])
         #expect(page.finishedThisWeek == 1 && page.finishedLast30 == 2 && page.finishedAllTime == 2)
@@ -103,8 +106,9 @@ private func video(_ ref: String, watched: Double? = nil) -> ExternalEntry {
         try clew.deleteItem(itemId: try id("bbbbbbbbbbb"))
         try clew.deleteItem(itemId: try id("aaaaaaaaaaa"))
         let row = try #require(try clew.collections().first)
-        #expect(row.total == 0 && row.done == 0)
-        #expect(try clew.collection(.extensionYouTube)?.finishedAllTime == 1)
+        #expect(row.toWatch == 0 && row.done == 0 && row.onList == 0)
+        let page = try #require(try clew.collection(.extensionYouTube))
+        #expect(page.done.isEmpty && page.finishedAllTime == 1)    // deleted by the user: not in Done
     }
 
     @Test func aTickCanBeUndoneTheSameDay() throws {
@@ -115,5 +119,67 @@ private func video(_ ref: String, watched: Double? = nil) -> ExternalEntry {
         try clew.undoToday(itemId: a)
         let page = try #require(try clew.collection(.extensionYouTube))
         #expect(page.done.isEmpty && page.notStarted.count == 1 && page.finishedAllTime == 0)
+    }
+
+    // MARK: Removed means finished (SPEC decision 2026-11-10)
+
+    @Test func aVideoThatLeftTheListCountsAsFinishedTheDayItWasSeenGone() throws {
+        try load([video("aaaaaaaaaaa"), video("bbbbbbbbbbb"), video("ccccccccccc", watched: 0.1)])
+        clock.set(local(9)); try load([video("aaaaaaaaaaa")])       // b never started, c barely
+        let ticks = store.state.checkIns.values.filter { $0.voidedAt == nil }
+        #expect(ticks.count == 2 && ticks.allSatisfy { $0.localDay == LocalDay(string: "2026-11-09")! })
+        #expect(ticks.allSatisfy { $0.source == .extensionYouTube && $0.amount == 1 })
+        let row = try #require(try clew.collections().first)
+        #expect(row.toWatch == 1 && row.done == 2 && row.onList == 1)
+        #expect(row.fraction == 2.0 / 3.0)                          // done out of everything it holds
+        let page = try #require(try clew.collection(.extensionYouTube))
+        #expect(Set(page.done.map(\.item.externalRef)) == ["bbbbbbbbbbb", "ccccccccccc"])
+        #expect(page.finishedByDay == [LocalDay(string: "2026-11-09")!: 2])
+        // Scanning the same list again finishes nothing more.
+        clock.set(local(10)); try load([video("aaaaaaaaaaa")])
+        #expect(store.state.checkIns.count == 2)
+    }
+
+    @Test func notFinishedTakesItOutOfDoneAndTheHeatmap() throws {
+        try load([video("aaaaaaaaaaa"), video("bbbbbbbbbbb"), video("ccccccccccc")])
+        try clew.deleteItem(itemId: try id("ccccccccccc"))
+        try load([video("aaaaaaaaaaa")])
+        let b = try id("bbbbbbbbbbb")
+        try clew.markNotFinished(itemId: b)
+        let page = try #require(try clew.collection(.extensionYouTube))
+        #expect(page.done.isEmpty && page.total == 1 && page.finishedAllTime == 0)
+        #expect(try clew.collections().first?.done == 0)
+        // Only for what left the list: not one still on it, one the user deleted, or a task.
+        #expect(throws: ClewError.notAllowed) { try clew.markNotFinished(itemId: try id("aaaaaaaaaaa")) }
+        #expect(throws: ClewError.notAllowed) { try clew.markNotFinished(itemId: try id("ccccccccccc")) }
+        let task = try clew.addItem(NewItem(title: "t", shape: .later))
+        try clew.letGo(itemId: task.id)                              // removed by a let-go, but the user's
+        #expect(throws: ClewError.notAllowed) { try clew.markNotFinished(itemId: task.id) }
+        // Back on Watch Later, it is to watch again.
+        try load([video("aaaaaaaaaaa"), video("bbbbbbbbbbb")])
+        #expect(try clew.collection(.extensionYouTube)?.notStarted.map(\.item.externalRef).contains("bbbbbbbbbbb") == true)
+    }
+
+    // MARK: On and off
+
+    @Test func aListTurnedOffIsHiddenAndImportsNothing() throws {
+        try load([video("aaaaaaaaaaa")])
+        try clew.setCollection(.extensionYouTube, on: false)
+        #expect(try clew.collectionsOff() == [.extensionYouTube])
+        #expect(try clew.collections().isEmpty)
+        #expect(throws: ClewError.listTurnedOff) { try load([video("bbbbbbbbbbb")]) }
+        #expect(store.state.items.count == 1 && store.state.checkIns.isEmpty)   // nothing added or finished
+        try clew.setCollection(.extensionYouTube, on: true)
+        #expect(try clew.collections().first?.toWatch == 1)
+        try load([video("bbbbbbbbbbb")])
+        #expect(store.state.items.count == 2)
+        #expect(throws: ClewError.notAllowed) { try clew.setCollection(.user, on: false) }
+    }
+
+    @Test func anUnknownListInTheSettingIsIgnored() throws {
+        try store.write { try $0.saveSetting("collectionsOff", json: #"["extension.youtube","newer.site"]"#, updatedAt: local(2)) }
+        #expect(try clew.collectionsOff() == [.extensionYouTube])
+        try store.write { try $0.saveSetting("collectionsOff", json: #"{"bad":1}"#, updatedAt: local(2)) }
+        #expect(try clew.collectionsOff().isEmpty)
     }
 }

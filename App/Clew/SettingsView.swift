@@ -17,6 +17,7 @@ struct SettingsView: View {
     @State private var letGoCount = 0
     @State private var ratingDots = false
     @State private var barStyle = Clew.defaultBarStyle
+    @State private var listsOff: Set<Source> = []
     @State private var pane: Pane?
 
     /// A plain column of sections; selected one highlighted, keyboard and VoiceOver
@@ -122,6 +123,21 @@ struct SettingsView: View {
                     .pickerStyle(.radioGroup)
                 } footer: {
                     Text("How counted goals and started videos show their progress: the row fills up behind its name, a long bar runs under it, or no bar (goals keep their count).")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section {
+                    ForEach(Clew.collectionSources, id: \.self) { source in
+                        Toggle(CollectionStyle.name(source), isOn: Binding(get: { !listsOff.contains(source) }, set: { on in
+                            if on { listsOff.remove(source) } else { listsOff.insert(source) }
+                            model.setCollection(source, on: on)
+                        }))
+                    }
+                } header: {
+                    Text("Lists")
+                } footer: {
+                    Text("A list that's off is hidden from the menu and stops importing. What's in it stays, and comes back when you turn it on.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -263,6 +279,7 @@ struct SettingsView: View {
         letGoCount = model.lettingGoCount()
         ratingDots = model.ratingsOn
         barStyle = model.barStyle
+        listsOff = model.collectionsOff()
     }
 
     private func setOpenAtLogin(_ on: Bool) {
