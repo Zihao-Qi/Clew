@@ -7,15 +7,35 @@ const SETTLE_MS = 1500;
 let timer: ReturnType<typeof setTimeout> | undefined;
 let observer: MutationObserver | undefined;
 
+/** After the extension is reloaded or updated, this copy in an already-open tab is
+ * cut off from it (no `chrome.runtime.id`); it goes quiet instead of throwing
+ * "Extension context invalidated". The new copy runs when the tab reloads. */
+function orphaned(): boolean {
+  return !chrome.runtime?.id;
+}
+
+function stop(): void {
+  clearTimeout(timer);
+  observer?.disconnect();
+  observer = undefined;
+  document.removeEventListener("yt-navigate-finish", onPage);
+}
+
 function scanSoon(): void {
   clearTimeout(timer);
   timer = setTimeout(() => {
+    if (orphaned()) return stop();
     if (!isWatchLater(location.href)) return;
-    chrome.runtime.sendMessage({ type: "watchLater", scan: scanWatchLater(document) }).catch(() => {});
+    try {
+      chrome.runtime.sendMessage({ type: "watchLater", scan: scanWatchLater(document) }).catch(() => {});
+    } catch {
+      stop();
+    }
   }, SETTLE_MS);
 }
 
 function onPage(): void {
+  if (orphaned()) return stop();
   observer?.disconnect();
   observer = undefined;
   if (!isWatchLater(location.href)) return;
