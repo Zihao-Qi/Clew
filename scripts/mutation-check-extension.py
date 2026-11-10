@@ -46,6 +46,9 @@ M = [
  ("E35 history page missed", E+"x.ts", "(u.pathname === \"/i/history\" || u.pathname === \"/i/bookmarks\")", "u.pathname === \"/i/bookmarks\""),
  ("E36 quoted article", E+"x.ts", "if (!cover || inQuote(post, cover)) return undefined;", "if (!cover) return undefined;"),
  ("E37 author as title", E+"x.ts", "(d) => !d.closest(SELECTORS.userName) && (d.textContent ?? \"\").trim() !== \"\",", "(d) => (d.textContent ?? \"\").trim() !== \"\","),
+ ("E38 forget does nothing", E+"x.ts", "    this.entries.splice(i, 1);\n", "    if (i < -1) this.entries.splice(i, 1);\n"),
+ ("E39 run not shortened", E+"x.ts", "    if (i < this.run) this.run -= 1;\n", ""),
+ ("E40 unbookmarked rows kept", E+"x.ts", "if (post && !isUnbookmarked(post)) posts.push", "if (post) posts.push"),
  ("E16 checks lax", E+"contract.ts", "[\"added\", \"renamed\", \"restored\", \"letGo\", \"skipped\", \"progressed\"].every((k) => isInt(r[k]))", "true"),
 ]
 results = []

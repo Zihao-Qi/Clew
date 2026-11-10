@@ -161,6 +161,15 @@ extension Clew {
                 }
                 result.letGo += try leaveList(gone, source: batch.source, now: now, day: day, zone: zone, w)
             }
+            // A list with a count keeps the site's order for its page: what this scan
+            // saw, then what it did not, as before.
+            if !Self.orderedSources.contains(batch.source) {
+                let live = Set(try w.items(source: batch.source).filter { $0.deletedAt == nil }.compactMap(\.externalRef))
+                let seen = entries.map(\.ref).filter { live.contains($0) }
+                let inScan = Set(seen)
+                let rest = try Self.listOrder(batch.source, w).filter { live.contains($0) && !inScan.contains($0) }
+                try Self.saveListOrder(seen + rest, batch.source, now: now, w)
+            }
             // A list without a count (X bookmarks): the gap rule on the unbroken run.
             if Self.orderedSources.contains(batch.source) {
                 let run = scanAgrees && result.skipped == 0 ? max(0, batch.fromTop ?? 0) : 0   // never trust the client's number
@@ -260,6 +269,7 @@ extension Clew {
     }
 
     /// The order a list was last seen in, top first (derived state, kept in settings).
+    /// Collection pages list what is left in this order (SPEC 2026-11-10).
     static func listOrder(_ source: Source, _ r: any StoreReader) throws -> [String] {
         guard let json = try r.setting(listOrderKey(source)) else { return [] }
         return (try? JSONDecoder().decode([String].self, from: Data(json.utf8))) ?? []

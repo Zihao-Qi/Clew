@@ -41,7 +41,7 @@ public struct CollectionDetails: Hashable, Sendable {
     public let today: LocalDay
     /// Started, not ticked: most watched first.
     public let inProgress: [CollectionEntry]
-    /// Not started, not ticked: newest first.
+    /// Not started, not ticked: in the site's order.
     public let notStarted: [CollectionEntry]
     /// Ticked: most recent first.
     public let done: [CollectionEntry]
@@ -104,13 +104,18 @@ extension Clew {
                 else if (entry.watched ?? 0) > 0 { inProgress.append(entry) }
                 else { notStarted.append(entry) }
             }
-            let newestFirst = { (a: CollectionEntry, b: CollectionEntry) in
-                (a.item.createdAt, a.item.id.uuidString) > (b.item.createdAt, b.item.id.uuidString)
+            // What is left follows the site's own order (Watch Later's, X's newest bookmark
+            // first); anything not placed yet goes last, newest first.
+            let rank = Dictionary(try Self.listOrder(source, r).enumerated().map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
+            let siteOrder = { (a: CollectionEntry, b: CollectionEntry) in
+                let ra = rank[a.item.externalRef ?? ""] ?? Int.max, rb = rank[b.item.externalRef ?? ""] ?? Int.max
+                if ra != rb { return ra < rb }
+                return (a.item.createdAt, a.item.id.uuidString) > (b.item.createdAt, b.item.id.uuidString)
             }
             inProgress.sort {
                 ($0.watched ?? 0, $0.item.createdAt, $0.item.id.uuidString) > ($1.watched ?? 0, $1.item.createdAt, $1.item.id.uuidString)
             }
-            notStarted.sort(by: newestFirst)
+            notStarted.sort(by: siteOrder)
             done.sort { ($0.doneAt ?? .distantPast, $0.item.id.uuidString) > ($1.doneAt ?? .distantPast, $1.item.id.uuidString) }
 
             var byDay: [LocalDay: Int] = [:]

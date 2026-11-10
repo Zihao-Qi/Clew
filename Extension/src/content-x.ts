@@ -59,7 +59,9 @@ function onClick(event: MouseEvent): void {
   if (orphaned()) return stop();
   if (!(event.target instanceof Element)) return;
   const click = bookmarkClick(event.target, postBy);
-  if (click) send({ type: "bookmark", click });
+  if (!click) return;
+  if (!click.bookmarked) scan?.forget(click.entry.externalRef);
+  send({ type: "bookmark", click });
 }
 
 const observer = new MutationObserver(look);

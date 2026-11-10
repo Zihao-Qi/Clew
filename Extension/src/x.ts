@@ -109,6 +109,11 @@ export function readPost(post: Element, postBy: (handle: string) => string): Ext
   return title ? { externalRef: id, title } : undefined;
 }
 
+/** The post shows the "Bookmark" button, so it is not bookmarked (any more). */
+export function isUnbookmarked(post: Element): boolean {
+  return post.querySelector(SELECTORS.bookmark) !== null && post.querySelector(SELECTORS.unbookmark) === null;
+}
+
 /** "transform: translateY(123px)" → 123. */
 export function cellTop(cell: Element): number | undefined {
   const m = /translateY\((-?\d+(?:\.\d+)?)px\)/.exec(cell.getAttribute("style") ?? "");
@@ -130,7 +135,8 @@ export function readWindow(root: ParentNode, postBy: (handle: string) => string)
   const posts: (ExternalEntry | undefined)[] = [];
   for (const { cell } of cells) {
     const post = cell.querySelector(SELECTORS.post);
-    if (post) posts.push(readPost(post, postBy));
+    // Unbookmarked while on the page: X may keep showing it, but it is off the list.
+    if (post && !isUnbookmarked(post)) posts.push(readPost(post, postBy));
   }
   return { atTop: cells.length > 0 && cells[0]?.top === 0, posts };
 }
@@ -160,6 +166,16 @@ export class BookmarkScan {
       this.entries.push(p);
       if (this.state === "running") this.run = this.entries.length;
     }
+  }
+
+  /** A post unbookmarked during this visit leaves the scan, so the next send does not
+   * bring it back (it was seen 19 → 18 → 19 on 2026-11-10). */
+  forget(ref: string): void {
+    const i = this.entries.findIndex((e) => e.externalRef === ref);
+    if (i < 0) return;
+    this.entries.splice(i, 1);
+    this.refs.delete(ref);
+    if (i < this.run) this.run -= 1;
   }
 
   request(): ImportRequest {

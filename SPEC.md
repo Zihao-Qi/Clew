@@ -155,7 +155,9 @@ stopped daily use, not adding features.
   while the collection has anything finished, even if the list is emptied, so its
   heatmap stays reachable. Clicking it opens its page: a heatmap of days a video was ticked, ticked this
   week / last 30 days / all time, and the whole list (In progress, most watched first;
-  Not started, newest first; Done, folded, including videos that left the list).
+  Not started (posts: To read) in the site's own order, Watch Later's or X's newest
+  bookmark first (*changed* 2026-11-10 from "newest first", which gave no order to
+  videos imported together); Done, folded, including videos that left the list).
   Each video has a circle (undo is for today's tick, and only while it is on the list)
   and a title that opens it. Each list can be turned **off** in Settings › General ›
   Lists (2026-11-10): its row is hidden and imports are refused (the extension says

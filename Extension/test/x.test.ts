@@ -92,6 +92,35 @@ describe("a scan built while scrolling", () => {
     expect(s.request().fromTop).toBe(0);
   });
 
+  test("a post unbookmarked during the visit leaves the scan and the run", () => {
+    const s = new BookmarkScan();
+    s.add({ atTop: true, posts: [e(1), e(2), e(3)] });
+    s.forget(e(2).externalRef);
+    s.forget("unknown");
+    expect(s.request().entries.map((x) => x.title)).toEqual(["p1", "p3"]);
+    expect(s.request().fromTop).toBe(2);
+    s.add({ atTop: false, posts: [e(3), e(5)] });              // still unbroken
+    expect(s.request().fromTop).toBe(3);
+  });
+
+  test("forgetting a post seen after a break leaves the run as it was", () => {
+    const s = new BookmarkScan();
+    s.add({ atTop: true, posts: [e(1), e(2)] });
+    s.add({ atTop: false, posts: [e(7), e(8)] });              // a break
+    s.forget(e(8).externalRef);
+    expect(s.request().fromTop).toBe(2);
+    expect(s.request().entries.length).toBe(3);
+  });
+
+  test("a post showing the Bookmark button is not on the list", () => {
+    const doc = page();
+    const first = doc.querySelector('[data-testid="removeBookmark"]')!;
+    first.setAttribute("data-testid", "bookmark");                // X flipped it after the click
+    const w = readWindow(doc, postBy);
+    expect(w.posts.map((p) => p?.externalRef)).not.toContain("1850000000000000001");
+    expect(w.posts.filter((p) => p === undefined).length).toBe(1);   // not counted as unreadable
+  });
+
   test("an unreadable row is reported, so Clew compares nothing", () => {
     const s = new BookmarkScan();
     s.add({ atTop: true, posts: [e(1), undefined, e(3)] });

@@ -337,6 +337,15 @@ Removals come from:
   posts are ignored when unbookmarked; a bookmark needs a title.
 Both refuse a list turned off (`listTurnedOff`, 409).
 
+**Site order (2026-11-10).** Every collection keeps the order its site shows in the
+setting `listOrder.<source>`, and its page lists what is left in that order (items
+not placed yet last, newest first). X's comes from the gap rule and the button.
+Watch Later's is rewritten by each scan: the live items it saw, in page order, then
+the live items it did not see, as before (so a partial scan moves nothing it did not
+see). The extension drops a post from the visit's scan when it is unbookmarked there,
+and never counts a row that shows the "Bookmark" button: before, a scan sent after
+the click brought the post straight back (seen 19 → 18 → 19).
+
 **Collections (v1.1, SPEC 2026-11-09).** Items whose source is in
 `Clew.collectionSources` (YouTube, then X) form one collection per source. There
 is no parent row: a collection is derived from `source`, so nothing needs migrating.

@@ -48,6 +48,13 @@ private let a = "1850000000000000001", b = "1850000000000000002", c = "185000000
         #expect(try clew.today().total == 0 && clew.laterPile().isEmpty)
     }
 
+    @Test func toReadFollowsXsOrderNewestBookmarkFirst() throws {
+        try scan([c, a, b])
+        #expect(try page().notStarted.compactMap(\.item.externalRef) == [c, a, b])
+        try clew.bookmarkChanged(source: .extensionX, entry: post(n), bookmarked: true)
+        #expect(try page().notStarted.compactMap(\.item.externalRef) == [n, c, a, b])
+    }
+
     @Test func aPostMissingBetweenTwoStillThereWasRead() throws {
         try scan([a, b, c, d, e])
         clock.set(local(10))

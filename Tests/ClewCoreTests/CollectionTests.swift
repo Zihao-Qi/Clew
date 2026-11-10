@@ -60,11 +60,19 @@ private func video(_ ref: String, watched: Double? = nil) -> ExternalEntry {
         #expect(page.total == 6)
     }
 
-    @Test func notStartedIsNewestFirst() throws {
-        try load([video("aaaaaaaaaaa")])
-        clock.set(local(3)); try load([video("aaaaaaaaaaa"), video("bbbbbbbbbbb")])
-        let page = try #require(try clew.collection(.extensionYouTube))
-        #expect(page.notStarted.map(\.item.externalRef) == ["bbbbbbbbbbb", "aaaaaaaaaaa"])
+    @Test func notStartedFollowsWatchLatersOwnOrder() throws {
+        // All videos of one scan arrive at the same moment, so "newest first" was no order
+        // at all; the page follows Watch Later instead (2026-11-10).
+        try load([video("ccccccccccc"), video("aaaaaaaaaaa"), video("bbbbbbbbbbb")])
+        #expect(try clew.collection(.extensionYouTube)?.notStarted.map(\.item.externalRef)
+                == ["ccccccccccc", "aaaaaaaaaaa", "bbbbbbbbbbb"])
+        clock.set(local(3)); try load([video("bbbbbbbbbbb"), video("ccccccccccc"), video("aaaaaaaaaaa")])   // reordered
+        #expect(try clew.collection(.extensionYouTube)?.notStarted.map(\.item.externalRef)
+                == ["bbbbbbbbbbb", "ccccccccccc", "aaaaaaaaaaa"])
+        // A partial scan keeps the rest where it was.
+        try clew.importExternal(ImportBatch(source: .extensionYouTube, entries: [video("aaaaaaaaaaa")], listTotal: 3))
+        #expect(try clew.collection(.extensionYouTube)?.notStarted.map(\.item.externalRef)
+                == ["aaaaaaaaaaa", "bbbbbbbbbbb", "ccccccccccc"])
     }
 
     @Test func ticksOfVideosThatLeftTheListStayInDoneAndTheHeatmap() throws {
