@@ -51,6 +51,15 @@ final class AppModel {
     @ObservationIgnored private var notifications: NotificationsAdapter?
     @ObservationIgnored private var observation: (any StoreObservation)?
     @ObservationIgnored private var rolloverTimer: Timer?
+    @ObservationIgnored private var focusEndTimer: Timer?
+    @ObservationIgnored private var focusTick: Timer?
+    /// The current second while a timer runs, so the timed row and the menu bar count
+    /// down. A TimelineView inside the menu bar label made SwiftUI redraw the status
+    /// item without end (100% CPU, seen 2026-11-10); one tick a second does not.
+    private(set) var clockTick = Date()
+    /// The running focus timer or break (SPEC 2026-11-10), if any.
+    private(set) var focus: FocusTimer?
+    private(set) var focusOffersBreak = true
     @ObservationIgnored private var systemObservers: [NSObjectProtocol] = []
 
     /// The live app: the database in the sandbox container.
@@ -111,6 +120,17 @@ final class AppModel {
             watched = try clew.watchProgress(itemIds: list.rows.map(\.id))
             barStyle = (try? clew.barStyle()) ?? Clew.defaultBarStyle
             collections = try clew.collections()
+            focusOffersBreak = (try? clew.focusOffersBreak()) ?? true
+            focus = try clew.focusTimer()
+            if let running = focus {
+                // A break that is over simply ends; a timer whose task left Today (done
+                // elsewhere, deleted, moved to Later) ends with it.
+                let over = running.phase == .rest && running.isOver(at: Date())
+                if over || !list.rows.contains(where: { $0.id == running.itemId }) {
+                    _ = try? clew.stopFocus()
+                    focus = nil
+                }
+            }
             // A closed congratulation stays closed only while that goal stays reached, so
             // reaching a raised target or a next round congratulates again.
             let reached = Set(list.rows.filter(\.isGoalReached).map(\.id))
@@ -119,6 +139,8 @@ final class AppModel {
             notice = String(localized: "Couldn't load today's list.")
         }
         scheduleRollover()
+        scheduleFocusEnd()
+        tickWhileFocusing()
         reconcileNotifications()
         backUpIfNeeded()
     }
@@ -275,6 +297,26 @@ final class AppModel {
     func collectionsOff() -> Set<Source> { (try? clew?.collectionsOff()) ?? [] }
     func setCollection(_ source: Source, on: Bool) { run { try $0.setCollection(source, on: on) } }
 
+    // MARK: - Focus timer (SPEC 2026-11-10)
+
+    func startFocus(_ row: TodayRow, minutes: Int) {
+        askForNotifications()
+        run { try $0.startFocus(itemId: row.id, minutes: minutes) }
+    }
+    func pauseFocus() { run { try $0.pauseFocus() } }
+    func resumeFocus() { run { try $0.resumeFocus() } }
+    func extendFocus() { run { try $0.extendFocus() } }
+    func startBreak() { run { try $0.startBreak() } }
+    func stopFocus() { run { try $0.stopFocus() } }
+    /// "Done" when time is up: the tick (or +1) the user asked for, never an undo, then
+    /// the timer ends.
+    func finishFocus(_ row: TodayRow) {
+        var tick: CheckIn?
+        guard run({ tick = try $0.finishFocus() }) else { return }
+        if tick != nil { offerRating(itemId: row.id) }
+    }
+    func setFocusOffersBreak(_ on: Bool) { run { try $0.setFocusOffersBreak(on) } }
+
     // MARK: - Rating dots (SPEC §4; off by default)
 
     /// A row showing its rating dots as a hint after a tick (they also show on hover).
@@ -414,6 +456,7 @@ final class AppModel {
         case .goalReached: String(localized: "Goal reached! Start a next round or raise the target.")
         case .itemNotFound, .checkInNotFound, .notAllowed, .tooManyEntries: String(localized: "That can't be done right now.")
         case .listTurnedOff: String(localized: "That list is turned off in Settings › General.")
+        case .focusRunning: String(localized: "A focus timer is already running. Stop it first.")
         }
     }
 
@@ -431,6 +474,36 @@ final class AppModel {
         timer.tolerance = 5
         RunLoop.main.add(timer, forMode: .common)
         rolloverTimer = timer
+    }
+
+    /// Refreshes the moment focus or break time is up, so the row asks "Done?" and an
+    /// over break ends even with the list closed.
+    private func scheduleFocusEnd() {
+        focusEndTimer?.invalidate()
+        focusEndTimer = nil
+        guard let endsAt = focus?.endsAt, endsAt > Date() else { return }
+        let timer = Timer(fire: endsAt.addingTimeInterval(0.5), interval: 0, repeats: false) { [weak self] _ in
+            Task { @MainActor in self?.refresh() }
+        }
+        timer.tolerance = 1
+        RunLoop.main.add(timer, forMode: .common)
+        focusEndTimer = timer
+    }
+
+    private func tickWhileFocusing() {
+        guard focus != nil else {
+            focusTick?.invalidate()
+            focusTick = nil
+            return
+        }
+        clockTick = Date()
+        guard focusTick == nil else { return }
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.clockTick = Date() }
+        }
+        timer.tolerance = 0.1
+        RunLoop.main.add(timer, forMode: .common)
+        focusTick = timer
     }
 
     private func observeSystemTime() {

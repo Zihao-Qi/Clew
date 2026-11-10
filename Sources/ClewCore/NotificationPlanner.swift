@@ -13,6 +13,10 @@ public enum PlannedContent: Hashable, Sendable {
     /// "0/6 done" can never fire (ARCHITECTURE §6).
     case eveningKindLine(index: Int)
     case reminder(itemId: UUID, title: String, canOpen: Bool, canMoveToLater: Bool)
+    /// Focus time on a task is up (SPEC 2026-11-10).
+    case focusEnded(itemId: UUID, title: String)
+    /// The 5-minute break is over.
+    case breakEnded(title: String)
 }
 
 public struct PlannedNotification: Hashable, Sendable {

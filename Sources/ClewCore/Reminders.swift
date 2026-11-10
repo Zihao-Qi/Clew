@@ -43,10 +43,13 @@ extension Clew {
             for id in ids {
                 facts[id] = ItemFacts(recent: recent[id] ?? [], progressAmount: progress[id] ?? 0, roundStart: rounds[id])
             }
-            return NotificationPlanner.plan(
+            let planned = NotificationPlanner.plan(
                 now: now, zone: zone, rolloverHour: rolloverHour, items: items, facts: facts,
                 reminders: try r.reminders(), summaries: summaries
             )
+            // The running timer's end comes first: it is minutes away and asked for.
+            guard let focus = try focusNotification(r, now: now) else { return planned }
+            return [focus] + planned.prefix(NotificationPlanner.maxPending - 1)
         }
     }
 

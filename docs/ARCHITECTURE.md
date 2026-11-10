@@ -365,6 +365,26 @@ counts).
 still showing the post or rows read just before a click, from undoing a removal; a
 click is never stale.
 
+**Focus timer (v1.2, SPEC 2026-11-10).** Not a fact: the one running timer,
+`FocusTimer {phase: focus | rest, itemId, startedAt, length, pausedAt?, pausedFor}`, is
+kept in the setting `focusTimer` (JSON; `null` when none; an unreadable one is no
+timer), so it survives sleep and quitting. All times are absolute; elapsed time never
+goes below zero if the clock moves back. Commands: `startFocus(itemId:minutes:)`
+(only `focusMinutes` = 10/25/45, only items on today's list, which never holds a
+collection's items; a running focus throws `focusRunning`, a break is replaced),
+`pauseFocus`, `resumeFocus` (adds the paused span), `extendFocus` (focus only: +5 min
+from now, or from the planned end if not up yet), `startBreak` (only from a focus whose
+time is up, only when breaks are offered), `finishFocus` ("Done/+1": the tick the
+circle would make but never an undo, since `checkIn` keeps a day's existing tick; no
++1 past a goal's target; then the timer ends), `stopFocus` (returns what ran). The end is a planned notification (`clew.focus`, first in the plan
+so the 64-pending cap never drops it), absent while paused, once over, or when its
+task is no longer active (moved to Later). The app ends
+a timer whose task left Today and a break that is over; it refreshes at `endsAt`, and
+only the timed row and the menu bar label redraw every second, from the model's
+one-second tick (`clockTick`, running only while a timer exists). Never a
+`TimelineView` in the menu bar label: SwiftUI then redraws the status item without
+end (measured 2026-11-10: 99% CPU in a minimal MenuBarExtra, 0.1–2% with the tick).
+
 **Site order (2026-11-10).** Every collection keeps the order its site shows in the
 setting `listOrder.<source>`, and its page lists what is left in that order (items
 not placed yet last, newest first). X's comes from the gap rule and the button.
