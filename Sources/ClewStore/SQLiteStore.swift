@@ -51,7 +51,7 @@ public final class SQLiteStore: ClewStore {
     public func observeChanges(_ onChange: @escaping @Sendable () -> Void) -> any StoreObservation {
         let observation = DatabaseRegionObservation(tracking: Table("item"), Table("checkIn"), Table("plan"), Table("goalRound"),
                                                      Table("reminder"), Table("settings"), Table("laterReview"),
-                                                     Table("watchProgress"))
+                                                     Table("watchProgress"), Table("focusSession"))
         let cancellable = observation.start(in: writer, onError: { _ in }, onChange: { _ in onChange() })
         return Observation(cancellable)
     }
@@ -190,7 +190,8 @@ private struct Access: StoreWriter {
                               updatedAt: try Self.required(row, "updatedAt", table: "settings"))
             },
             laterReviews: try Row.fetchAll(db, sql: "SELECT * FROM laterReview ORDER BY at, id").map(Self.laterReview),
-            watchProgress: try Row.fetchAll(db, sql: "SELECT * FROM watchProgress ORDER BY itemId").map(Self.watchProgress)
+            watchProgress: try Row.fetchAll(db, sql: "SELECT * FROM watchProgress ORDER BY itemId").map(Self.watchProgress),
+            focusSessions: try Row.fetchAll(db, sql: "SELECT * FROM focusSession ORDER BY at, id").map(Self.focusSession)
         )
     }
 
@@ -219,6 +220,30 @@ private struct Access: StoreWriter {
             arguments: StatementArguments(itemIds.map(\.uuidString))
         ).map(Self.watchProgress)
         return Dictionary(rows.map { ($0.itemId, $0) }, uniquingKeysWith: { a, _ in a })
+    }
+
+    func focusSessions(itemIds: [UUID]) throws -> [FocusSession] {
+        guard !itemIds.isEmpty else { return [] }
+        return try Row.fetchAll(
+            db, sql: "SELECT * FROM focusSession WHERE voidedAt IS NULL AND itemId IN (\(Self.marks(itemIds.count))) ORDER BY at, id",
+            arguments: StatementArguments(itemIds.map(\.uuidString))
+        ).map(Self.focusSession)
+    }
+
+    func focusSession(id: UUID) throws -> FocusSession? {
+        try Row.fetchOne(db, sql: "SELECT * FROM focusSession WHERE id = ?", arguments: [id.uuidString]).map(Self.focusSession)
+    }
+
+    func insert(_ s: FocusSession) throws {
+        try db.execute(
+            sql: "INSERT INTO focusSession (id, itemId, localDay, at, minutes, kind, voidedAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            arguments: [s.id.uuidString, s.itemId.uuidString, s.localDay.description, s.at, s.minutes, s.kind.rawValue, s.voidedAt]
+        )
+    }
+
+    func voidFocusSession(id: UUID, at: Date) throws {
+        // The trigger rejects re-voiding.
+        try db.execute(sql: "UPDATE focusSession SET voidedAt = ? WHERE id = ?", arguments: [at, id.uuidString])
     }
 
     func save(_ p: WatchProgress) throws {
@@ -440,6 +465,19 @@ private struct Access: StoreWriter {
             fraction: try required(row, "fraction", table: t),
             observedAt: try required(row, "observedAt", table: t),
             source: try raw(row, "source", table: t)
+        )
+    }
+
+    private static func focusSession(_ row: Row) throws -> FocusSession {
+        let t = "focusSession"
+        return FocusSession(
+            id: try uuid(row, "id", table: t),
+            itemId: try uuid(row, "itemId", table: t),
+            localDay: try day(row, "localDay", table: t),
+            at: try required(row, "at", table: t),
+            minutes: try required(row, "minutes", table: t),
+            kind: try raw(row, "kind", table: t),
+            voidedAt: row["voidedAt"]
         )
     }
 

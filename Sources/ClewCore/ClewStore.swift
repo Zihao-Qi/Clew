@@ -51,6 +51,9 @@ public protocol StoreReader {
     func items(source: Source) throws -> [Item]
     /// The latest watch progress of these items; missing means none seen.
     func watchProgress(itemIds: [UUID]) throws -> [UUID: WatchProgress]
+    /// Non-voided focus sessions of these items, oldest first.
+    func focusSessions(itemIds: [UUID]) throws -> [FocusSession]
+    func focusSession(id: UUID) throws -> FocusSession?
 }
 
 /// Everything Clew stores, as it is stored.
@@ -63,10 +66,11 @@ public struct ExportRecords: Hashable, Sendable, Codable {
     public var settings: [SettingRecord]
     public var laterReviews: [LaterReview]
     public var watchProgress: [WatchProgress]
+    public var focusSessions: [FocusSession]
 
     public init(items: [Item], checkIns: [CheckIn], plans: [Plan], goalRounds: [GoalRound],
                 reminders: [Reminder] = [], settings: [SettingRecord] = [], laterReviews: [LaterReview] = [],
-                watchProgress: [WatchProgress] = []) {
+                watchProgress: [WatchProgress] = [], focusSessions: [FocusSession] = []) {
         self.items = items
         self.checkIns = checkIns
         self.plans = plans
@@ -75,10 +79,11 @@ public struct ExportRecords: Hashable, Sendable, Codable {
         self.settings = settings
         self.laterReviews = laterReviews
         self.watchProgress = watchProgress
+        self.focusSessions = focusSessions
     }
 
     private enum CodingKeys: String, CodingKey {
-        case items, checkIns, plans, goalRounds, reminders, settings, laterReviews, watchProgress
+        case items, checkIns, plans, goalRounds, reminders, settings, laterReviews, watchProgress, focusSessions
     }
 
     /// `reminders` and `settings` arrived after the first exports; older files read as empty.
@@ -92,7 +97,8 @@ public struct ExportRecords: Hashable, Sendable, Codable {
             reminders: try c.decodeIfPresent([Reminder].self, forKey: .reminders) ?? [],
             settings: try c.decodeIfPresent([SettingRecord].self, forKey: .settings) ?? [],
             laterReviews: try c.decodeIfPresent([LaterReview].self, forKey: .laterReviews) ?? [],
-            watchProgress: try c.decodeIfPresent([WatchProgress].self, forKey: .watchProgress) ?? []
+            watchProgress: try c.decodeIfPresent([WatchProgress].self, forKey: .watchProgress) ?? [],
+            focusSessions: try c.decodeIfPresent([FocusSession].self, forKey: .focusSessions) ?? []
         )
     }
 }
@@ -116,6 +122,9 @@ public protocol StoreWriter: StoreReader {
     func voidLaterReview(id: UUID, at: Date) throws
     /// Inserts or replaces the item's row, unless the stored one was observed later.
     func save(_ progress: WatchProgress) throws
+    func insert(_ session: FocusSession) throws
+    /// Sets `voidedAt`. Voids are monotonic: voiding twice is an error.
+    func voidFocusSession(id: UUID, at: Date) throws
 }
 
 /// A row of the `settings` table: a definition with last-writer-wins by `updatedAt`.

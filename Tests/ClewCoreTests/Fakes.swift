@@ -29,6 +29,7 @@ final class FakeStore: ClewStore, @unchecked Sendable {
         var settings: [String: SettingRecord] = [:]
         var laterReviews: [UUID: LaterReview] = [:]
         var watchProgress: [UUID: WatchProgress] = [:]
+        var focusSessions: [UUID: FocusSession] = [:]
     }
 
     enum FactViolation: Error { case revoid, duplicate, missingItem }
@@ -121,7 +122,8 @@ final class FakeStore: ClewStore, @unchecked Sendable {
                 reminders: state.reminders.values.sorted { ($0.updatedAt, $0.id.uuidString) < ($1.updatedAt, $1.id.uuidString) },
                 settings: state.settings.values.sorted { $0.key < $1.key },
                 laterReviews: state.laterReviews.values.sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) },
-                watchProgress: state.watchProgress.values.sorted { $0.itemId.uuidString < $1.itemId.uuidString }
+                watchProgress: state.watchProgress.values.sorted { $0.itemId.uuidString < $1.itemId.uuidString },
+                focusSessions: state.focusSessions.values.sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) }
             )
         }
         func reminders() throws -> [Reminder] {
@@ -140,6 +142,23 @@ final class FakeStore: ClewStore, @unchecked Sendable {
         }
         func watchProgress(itemIds: [UUID]) throws -> [UUID: WatchProgress] {
             state.watchProgress.filter { itemIds.contains($0.key) }
+        }
+        func focusSessions(itemIds: [UUID]) throws -> [FocusSession] {
+            let ids = Set(itemIds)
+            return state.focusSessions.values.filter { ids.contains($0.itemId) && $0.voidedAt == nil }
+                .sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) }
+        }
+        func focusSession(id: UUID) throws -> FocusSession? { state.focusSessions[id] }
+        func insert(_ session: FocusSession) throws {
+            guard state.focusSessions[session.id] == nil else { throw FactViolation.duplicate }
+            guard state.items[session.itemId] != nil else { throw FactViolation.missingItem }
+            state.focusSessions[session.id] = session
+        }
+        func voidFocusSession(id: UUID, at: Date) throws {
+            guard var s = state.focusSessions[id] else { return }
+            guard s.voidedAt == nil else { throw FactViolation.revoid }
+            s.voidedAt = at
+            state.focusSessions[id] = s
         }
         func save(_ progress: WatchProgress) throws {
             guard state.items[progress.itemId] != nil else { throw FactViolation.missingItem }

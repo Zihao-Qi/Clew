@@ -194,9 +194,14 @@ stopped daily use, not adding features.
   is up a notification fires and the row asks **Done / +1, 5 more min, Break, Stop**;
   it never ticks by itself. **Break:** 5 minutes, offered when Settings › General ›
   Focus timer › "Offer a break after focusing" is on (default on), with its own
-  notification. A timer whose task leaves Today ends. Step 2 (next): recording focus
-  time (optional in Settings), adding time by hand, and "Focus: N min" on details.
-
+  notification. A timer whose task leaves Today ends. **Recording (step 2):** a focus
+  that is stopped, finished with Done, or followed by a break is saved as a session of
+  its real minutes (pauses left out, at least half a minute; a break never counts), on
+  the day it started. Settings › Focus timer › "Record focus time" (default on) turns
+  that off; sessions already saved stay. **By hand:** the task's details › Focus › "Add
+  time…" (a day up to today, 1–720 minutes), always allowed, since the timer may be
+  forgotten or the Mac not there. Details show "N this week · N in all" and the latest
+  sessions, each removable (a void).
 - Weeks start on **Monday**; "N× per week" items reset then.
 - A counted goal's step is always **+1** per click.
 - The rating row is offered **every time**, and is always skippable.

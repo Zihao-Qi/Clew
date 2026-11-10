@@ -11,7 +11,36 @@ enum Schema {
         migrator.registerMigration("v4-later-reviews", migrate: v4)
         migrator.registerMigration("v5-five-point-ratings", migrate: v5)
         migrator.registerMigration("v6-watch-progress", migrate: v6)
+        migrator.registerMigration("v7-focus-sessions", migrate: v7)
         return migrator
+    }
+
+    /// Focus sessions (v1.2): facts, voided never deleted (SPEC decision 2026-11-10).
+    private static func v7(_ db: Database) throws {
+        try db.execute(sql: """
+            CREATE TABLE focusSession (
+                id        TEXT PRIMARY KEY NOT NULL,
+                itemId    TEXT NOT NULL REFERENCES item(id),
+                localDay  TEXT NOT NULL,
+                at        DATETIME NOT NULL,
+                minutes   INTEGER NOT NULL CHECK (minutes BETWEEN 1 AND 720),
+                kind      TEXT NOT NULL CHECK (kind IN ('timer', 'manual')),
+                voidedAt  DATETIME
+            );
+            CREATE INDEX focusSession_item ON focusSession(itemId, localDay);
+
+            CREATE TRIGGER focusSession_no_delete BEFORE DELETE ON focusSession
+            BEGIN SELECT RAISE(ABORT, 'facts are never deleted'); END;
+
+            CREATE TRIGGER focusSession_substance_immutable BEFORE UPDATE ON focusSession
+            WHEN NEW.id IS NOT OLD.id OR NEW.itemId IS NOT OLD.itemId OR NEW.localDay IS NOT OLD.localDay
+              OR NEW.at IS NOT OLD.at OR NEW.minutes IS NOT OLD.minutes OR NEW.kind IS NOT OLD.kind
+            BEGIN SELECT RAISE(ABORT, 'fact substance is immutable'); END;
+
+            CREATE TRIGGER focusSession_void_monotonic BEFORE UPDATE ON focusSession
+            WHEN OLD.voidedAt IS NOT NULL AND NEW.voidedAt IS NOT OLD.voidedAt
+            BEGIN SELECT RAISE(ABORT, 'voids are monotonic'); END;
+            """)
     }
 
     /// Watch progress (v1.1): latest state, one row per item (ARCHITECTURE §4.2).

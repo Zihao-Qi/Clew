@@ -30,6 +30,7 @@ struct DetailView: View {
                     Heatmap(details: details)
                     statTiles(details)
                 }
+                FocusSection(model: model, itemId: itemId)
                 HStack {
                     if details.isOneOff, let url = details.item.url {
                         Button(Self.isVideo(details.item) ? "Open video" : "Open link") { model.open(url) }
@@ -280,5 +281,103 @@ struct Heatmap: View {
         case 2...3: Color.accentColor.opacity(0.7)
         default: Color.accentColor.opacity(0.95)
         }
+    }
+}
+
+/// A task's focus time (SPEC decision 2026-11-10): this week and all time, the latest
+/// sessions (each removable), and "Add time…" for work done without the timer.
+struct FocusSection: View {
+    let model: AppModel
+    let itemId: UUID
+
+    @State private var adding = false
+    @State private var day = Date()
+    @State private var minutes = 25
+
+    var body: some View {
+        // Reading the summary through the model re-renders after every change.
+        let summary = model.focusSummary(for: itemId)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Focus").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer()
+                if !adding {
+                    Button("Add time…") {
+                        day = Date()
+                        minutes = 25
+                        adding = true
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(Text("Add focus time by hand"))
+                }
+            }
+            if let summary, summary.total > 0 {
+                Text(verbatim: String(localized: "\(Self.duration(summary.thisWeek)) this week") + " · "
+                    + String(localized: "\(Self.duration(summary.total)) in all"))
+                    .font(.callout)
+                ForEach(summary.recent) { session in
+                    HStack(spacing: 6) {
+                        Text(verbatim: Self.dayLabel(session.localDay) + " · " + Self.duration(session.minutes)
+                             + (session.kind == .manual ? " · " + String(localized: "by hand") : ""))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button { model.removeFocusSession(session.id) } label: {
+                            Image(systemName: "xmark").imageScale(.small)
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel(Text("Remove \(Self.duration(session.minutes)) on \(Self.dayLabel(session.localDay))"))
+                    }
+                }
+            } else if !adding {
+                Text("No focus time yet. Use the timer (right-click the task → Focus), or add time you worked without it.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if adding { form }
+        }
+    }
+
+    private var form: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            DatePicker("Day", selection: $day, in: ...Date(), displayedComponents: .date)
+                .datePickerStyle(.field)
+            Stepper(value: $minutes, in: 1...Clew.maxFocusMinutes, step: 5) {
+                HStack(spacing: 4) {
+                    Text("Minutes")
+                    TextField("Minutes", value: $minutes, format: .number)
+                        .frame(width: 52)
+                        .multilineTextAlignment(.trailing)
+                        .accessibilityLabel(Text("Minutes worked"))
+                }
+            }
+            HStack {
+                Button("Add") {
+                    if model.addFocusTime(itemId, on: day, minutes: minutes) { adding = false }
+                }
+                .keyboardShortcut(.defaultAction)
+                Button("Cancel") { adding = false }
+            }
+            .controlSize(.small)
+        }
+    }
+
+    /// "25 min", "1 h", "2 h 5 min".
+    static func duration(_ minutes: Int) -> String {
+        let h = minutes / 60, m = minutes % 60
+        if h == 0 { return String(localized: "\(m) min") }
+        return m == 0 ? String(localized: "\(h) h") : String(localized: "\(h) h \(m) min")
+    }
+
+    /// "Nov 9", in the user's language.
+    static func dayLabel(_ day: LocalDay) -> String {
+        var c = DateComponents()
+        c.year = day.year
+        c.month = day.month
+        c.day = day.day
+        guard let date = Calendar.current.date(from: c) else { return day.description }
+        return date.formatted(.dateTime.month(.abbreviated).day())
     }
 }

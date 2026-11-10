@@ -317,6 +317,26 @@ final class AppModel {
     }
     func setFocusOffersBreak(_ on: Bool) { run { try $0.setFocusOffersBreak(on) } }
 
+    // MARK: Focus time (SPEC 2026-11-10, step 2)
+
+    func focusSummary(for itemId: UUID) -> FocusSummary? {
+        _ = today   // read so the details page re-renders after every change
+        return try? clew?.focusSummary(itemId: itemId)
+    }
+
+    /// Time worked by hand on `date`'s calendar day.
+    @discardableResult
+    func addFocusTime(_ itemId: UUID, on date: Date, minutes: Int) -> Bool {
+        let c = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        guard let y = c.year, let m = c.month, let d = c.day, let day = LocalDay(year: y, month: m, day: d) else { return false }
+        return run { try $0.addFocusTime(itemId: itemId, day: day, minutes: minutes) }
+    }
+
+    func removeFocusSession(_ id: UUID) { run { try $0.removeFocusSession(id: id) } }
+
+    var focusRecordsTime: Bool { (try? clew?.focusRecordsTime()) ?? true }
+    func setFocusRecordsTime(_ on: Bool) { run { try $0.setFocusRecordsTime(on) } }
+
     // MARK: - Rating dots (SPEC §4; off by default)
 
     /// A row showing its rating dots as a hint after a tick (they also show on hover).
@@ -457,6 +477,7 @@ final class AppModel {
         case .itemNotFound, .checkInNotFound, .notAllowed, .tooManyEntries: String(localized: "That can't be done right now.")
         case .listTurnedOff: String(localized: "That list is turned off in Settings › General.")
         case .focusRunning: String(localized: "A focus timer is already running. Stop it first.")
+        case .invalidMinutes(let max): String(localized: "Pick between 1 and \(max) minutes.")
         }
     }
 

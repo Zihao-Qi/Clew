@@ -101,6 +101,7 @@ Reminder        id, itemId, time (hour, minute; local), enabled, updatedAt, dele
 Settings        key (PK), value (JSON), updatedAt
 — later phases —
 WatchProgress   itemId (PK), fraction (0–1), observedAt, source   (v1.1) ← latest only, YouTube watch %
+FocusSession    id, itemId, localDay, at, minutes (1–720), kind: timer | manual, voidedAt?   (v1.2) ← a fact
 ChangeLog       seq (monotonic), entity, entityId, op, at, source  (v1.1) ← for Gateway "changes since" and sync
 DayReflection   localDay (PK), valence (-1…1), bestItemId?, at, updatedAt  (v1.2)
 Award           id = hash(kind, itemId, milestone), kind (e.g. goal.finished),
@@ -379,8 +380,19 @@ circle would make but never an undo, since `checkIn` keeps a day's existing tick
 +1 past a goal's target; then the timer ends), `stopFocus` (returns what ran). The end is a planned notification (`clew.focus`, first in the plan
 so the 64-pending cap never drops it), absent while paused, once over, or when its
 task is no longer active (moved to Later). The app ends
-a timer whose task left Today and a break that is over; it refreshes at `endsAt`, and
-only the timed row and the menu bar label redraw every second, from the model's
+a timer whose task left Today and a break that is over, and refreshes at `endsAt`.
+
+`stopFocus`, `finishFocus` and `startBreak` save the focus that ended as a
+`FocusSession` (kind `timer`: real minutes rounded, pauses left out, at least 1; `at`
+and `localDay` from its start; never a break) when the setting `focusRecordsTime` is on
+(default). `addFocusTime(itemId:day:minutes:)` adds a `manual` one (1–720 minutes, a day
+up to today, a live task, not a collection item; allowed with recording off).
+`removeFocusSession(id:)` voids one (twice changes nothing). `focusSummary(itemId:)`:
+minutes this week and in all (days up to today, voided left out) and the latest
+sessions, newest day first. The table has the fact triggers (no delete, substance
+immutable, monotonic void) and `minutes BETWEEN 1 AND 720`; exports carry it (older
+exports read as none). The app
+only redraws the timed row and the menu bar label every second, from the model's
 one-second tick (`clockTick`, running only while a timer exists). Never a
 `TimelineView` in the menu bar label: SwiftUI then redraws the status item without
 end (measured 2026-11-10: 99% CPU in a minimal MenuBarExtra, 0.1–2% with the tick).
