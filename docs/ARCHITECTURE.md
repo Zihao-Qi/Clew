@@ -138,10 +138,10 @@ Award           id = hash(kind, itemId, milestone), kind (e.g. goal.finished),
   Watch Later scan (`ExternalEntry.progress`, 0–1, rounded to 0.01; out of range is
   ignored, the video still imported). `WatchProgress` keeps one row per item, the
   newest `observedAt` wins, and an unchanged reading writes nothing, so re-scans
-  never bloat the database. It never creates a `CheckIn` (*changed from the plan*,
-  user decision 2026-11-09: progress is shown, ticking stays the user's), does not
-  restart an item's Later clock, and does not keep a video in Later once it leaves
-  Watch Later. A video the user deleted gets no progress. It is named
+  never bloat the database. Progress itself never creates a `CheckIn` (*changed from
+  the plan*, user decision 2026-11-09: progress is shown, not acted on); the only
+  automatic tick is the one a video gets when it leaves Watch Later (*changed*
+  2026-11-10, "removed means finished", see Import rules), whatever its progress. A video the user deleted gets no progress. It is named
   `WatchProgress`, not `ItemProgress`, to keep it apart from `Item.progress`.
 
 ### 4.3 Time (ADR-3)
@@ -303,8 +303,9 @@ collections; before, items on Today or ticked were never touched) (a `LaterRevie
 source, so Settings' "let go" count, which counts the user's own, skips it). **Removed
 means finished** (SPEC 2026-11-10): in the same transaction, each one without a live
 check-in gets one (`amount` 1, the import's `source`, today's `localDay`); one already
-ticked is not ticked again. An item let go that way comes back if it reappears (its
-let-go is voided; a tick it has stays); anything the user deleted stays gone. A source
+ticked is not ticked again. An item let go that way comes back if it reappears: its
+let-go is voided, and so are the ticks the import gave it (source = the import's), so
+it is to watch again; a tick the user made stays. Anything the user deleted stays gone. A source
 turned off (`collectionsOff`, setting `collectionsOff`: a JSON array of source raw
 values; unknown ones are dropped) refuses the import with `ClewError.listTurnedOff`
 before anything is read or written; the Gateway answers 409 and the extension shows

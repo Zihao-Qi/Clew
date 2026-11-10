@@ -40,7 +40,7 @@ struct BrowserSettings: View {
         } header: {
             Text("Chrome extension")
         } footer: {
-            Text("The extension adds the videos in your YouTube Watch Later to the Later pile. It talks only to Clew on this Mac.")
+            Text("The extension copies your YouTube Watch Later into Clew, as one list below your tasks. It talks only to Clew on this Mac.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -67,7 +67,7 @@ struct BrowserSettings: View {
             } header: {
                 Text("YouTube Watch Later")
             } footer: {
-                Text("Videos you remove from Watch Later leave the Later pile too, unless you picked or finished them.")
+                Text("A video you remove from Watch Later counts as finished. If you didn't finish it, right-click it in the list and choose Not finished.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

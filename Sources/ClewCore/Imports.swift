@@ -36,7 +36,7 @@ public struct ImportBatch: Hashable, Sendable {
 }
 
 public struct ImportResult: Hashable, Sendable, Codable {
-    /// New items in the Later pile.
+    /// New items in the source's collection.
     public var added: Int
     /// Titles brought up to date (only titles the user never edited).
     public var renamed: Int
@@ -68,7 +68,7 @@ extension Clew {
     public static let maxImportEntries = 5_000
     static let letGoBecauseGone = "left the external list"
 
-    /// Idempotent import of an external list into the Later pile (ADR-4: the import
+    /// Idempotent import of an external list into its collection (ADR-4: the import
     /// path, not the agent). Keyed by `(source, externalRef)`, so re-scans never
     /// duplicate. New entries join the source's collection with a fetched (untrusted)
     /// title. When the scan is the whole list, items no longer on it leave the list and
@@ -121,7 +121,13 @@ extension Clew {
                     if item.deletedAt != nil {
                         guard let review = try Self.automaticLetGo(of: item, source: batch.source, w) else { continue }
                         try w.voidLaterReview(id: review.id, at: now)
-                        item.deletedAt = nil   // only Later items are let go, so it is back in Later
+                        // Back on the list, it is to watch again: the tick the import gave
+                        // it when it left is voided; a tick the user made stays.
+                        let allTime = LocalDay(year: 1, month: 1, day: 1)!
+                        for tick in try w.checkIns(itemIds: [item.id], from: allTime) where tick.source == batch.source {
+                            try w.voidCheckIn(id: tick.id, at: now, reason: "back on the list")
+                        }
+                        item.deletedAt = nil
                         changed = true
                         result.restored += 1
                     }

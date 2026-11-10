@@ -1,6 +1,6 @@
 {
   "extName": { "message": "Clew" },
-  "extDescription": { "message": "Adds the videos in your YouTube Watch Later to Clew's Later pile, on this Mac." },
+  "extDescription": { "message": "Copies your YouTube Watch Later into Clew, on this Mac." },
   "pairHint": { "message": "In Clew, open Settings › Browser and click Pair Chrome. Type the code here." },
   "codeLabel": { "message": "Pairing code" },
   "pairButton": { "message": "Pair" },

@@ -360,6 +360,8 @@ M = [
  ("RF20 to watch counts ticked", C+"Collections.swift", "toWatch: live.filter { !ticked.contains($0.id) }.count", "toWatch: live.count", "CollectionTests|ImportTests|ImportStoreTests|ClewTests|LaterReviewTests|NotificationPlannerTests|ReminderCommandTests"),
  ("RF17 off not 409", W+"Gateway.swift", "            failure(409, \"list turned off in Clew\")", "            failure(500, \"list turned off in Clew\")", "ClewGatewayTests"),
  ("RF18 listCount to watch", W+"Gateway.swift", "?.onList) ?? 0))", "?.toWatch) ?? 0))", "ClewGatewayTests"),
+ ("RF21 restore keeps auto tick", C+"Imports.swift", "for tick in try w.checkIns(itemIds: [item.id], from: allTime) where tick.source == batch.source {", "for tick in try w.checkIns(itemIds: [item.id], from: allTime) where false {", "CollectionTests|ImportTests|ImportStoreTests|ClewTests|LaterReviewTests|NotificationPlannerTests|ReminderCommandTests"),
+ ("RF22 restore voids user tick", C+"Imports.swift", "for tick in try w.checkIns(itemIds: [item.id], from: allTime) where tick.source == batch.source {", "for tick in try w.checkIns(itemIds: [item.id], from: allTime) {", "CollectionTests|ImportTests|ImportStoreTests|ClewTests|LaterReviewTests|NotificationPlannerTests|ReminderCommandTests"),
  ("W24 stop is a no-op", W+"Listener.swift", "            listener?.cancel()\n", "", "ClewGatewayTests"),
 ]
 

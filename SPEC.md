@@ -127,7 +127,8 @@ stopped daily use, not adding features.
   tick dated the day Clew saw it gone, whether or not any progress was seen, and it
   stays in the collection's Done group. "Not finished" (right-click) takes it out of
   Done and the heatmap. This happens only when the page showed the whole list (never
-  from an empty list); a video re-added comes back. What the user deleted stays gone.
+  from an empty list); a video re-added comes back, to watch again (its automatic tick
+  is undone; one the user made stays). What the user deleted stays gone.
   These automatic removals are not counted as the user's "let go". The same rule will
   apply to X: unbookmarking a post means it was read. Pairing: Settings › Browser
   shows a 6-digit code.

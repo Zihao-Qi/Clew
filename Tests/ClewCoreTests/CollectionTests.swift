@@ -160,6 +160,21 @@ private func video(_ ref: String, watched: Double? = nil) -> ExternalEntry {
         #expect(try clew.collection(.extensionYouTube)?.notStarted.map(\.item.externalRef).contains("bbbbbbbbbbb") == true)
     }
 
+    @Test func aVideoBackOnWatchLaterIsToWatchAgainButKeepsTheUsersTick() throws {
+        // Review of 2026-11-10 (Gemini): a restored video kept the import's tick and was
+        // stuck in Done.
+        try load([video("aaaaaaaaaaa"), video("bbbbbbbbbbb"), video("ccccccccccc")])
+        try clew.checkIn(itemId: try id("ccccccccccc"))             // the user finished c
+        clock.set(local(3)); try load([video("aaaaaaaaaaa")])        // b and c leave
+        clock.set(local(4)); try load([video("aaaaaaaaaaa"), video("bbbbbbbbbbb"), video("ccccccccccc")])
+        let page = try #require(try clew.collection(.extensionYouTube))
+        #expect(Set(page.notStarted.map(\.item.externalRef)) == ["aaaaaaaaaaa", "bbbbbbbbbbb"])
+        #expect(page.done.map(\.item.externalRef) == ["ccccccccccc"] && page.done.allSatisfy(\.onList))
+        #expect(page.finishedAllTime == 1)
+        let voided = store.state.checkIns.values.filter { $0.voidedAt != nil }
+        #expect(voided.count == 1 && voided.allSatisfy { $0.source == .extensionYouTube })
+    }
+
     // MARK: On and off
 
     @Test func aListTurnedOffIsHiddenAndImportsNothing() throws {
