@@ -363,6 +363,10 @@ private let tuesday = LocalDay(string: "2026-11-10")!
         try clew.deleteItem(itemId: b)
         try settle(at: at(10, 14))
         #expect(block(bb.id).removedAt != nil && ticks(b).count == 1)
+        // Undoing the delete brings the task back to the list, without its block.
+        try clew.undeleteItem(itemId: b)
+        try settle(at: at(10, 14, 1))
+        #expect(try clew.timeline().placedItems.isEmpty && row(b) != nil)
     }
 
     // MARK: Focus, alerts, display

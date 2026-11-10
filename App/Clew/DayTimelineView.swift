@@ -2,13 +2,6 @@ import ClewCore
 import ClewDomain
 import SwiftUI
 
-/// Where a row dragged over the timeline would land (SPEC 2026-11-10).
-struct TimelineDrop: Equatable {
-    var itemId: UUID
-    var start: Date
-    var minutes: Int
-}
-
 /// Where the timeline is, in the list's coordinate space, so a dragged row can tell
 /// which hour it is over.
 struct TimelineGeometry: Equatable {
@@ -51,13 +44,16 @@ enum TimelineMetrics {
 struct DayTimelineView: View {
     let model: AppModel
     let day: TimelineDay
-    /// A row being dragged over the hours: where it would land.
-    let ghost: TimelineDrop?
     let space: String
     @Binding var geometry: TimelineGeometry
     @Binding var topQuarter: Int?
-    @Binding var floating: FloatingBlock?
+    /// The block being dragged: the lifted card draws it (TodayListView).
+    let liftedBlock: UUID?
+    /// The task under the pointer (the Delete key's target).
     @Binding var hovered: UUID?
+    /// A block's drag, reported to the list (nil: cancelled), and its drop.
+    let onDrag: (TimelineBlock, DragGesture.Value?) -> Void
+    let onDrop: (TimelineBlock) -> Void
     let onMove: (TimelineBlock) -> Void
     let onOpen: (UUID) -> Void
     let onEdit: (Item) -> Void
@@ -70,27 +66,13 @@ struct DayTimelineView: View {
                     let width = g.size.width - TimelineMetrics.labelWidth - 6
                     ForEach(day.blocks) { block in
                         TimelineBlockView(model: model, block: block, day: day, space: space,
-                                          viewport: geometry.viewport, floating: $floating, hovered: $hovered,
+                                          isLifted: liftedBlock == block.id, hovered: $hovered,
+                                          onDrag: { onDrag(block, $0) }, onDrop: { onDrop(block) },
                                           onMove: { onMove(block) }, onOpen: { onOpen(block.block.itemId) },
                                           onEdit: onEdit)
                             .frame(width: max(20, width / CGFloat(block.lanes) - 2))
                             .offset(x: TimelineMetrics.labelWidth + CGFloat(block.lane) * width / CGFloat(block.lanes),
                                     y: TimelineMetrics.y(block.block.start, in: day))
-                    }
-                    if let ghost {
-                        RoundedRectangle(cornerRadius: 4)
-                            .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
-                            .background(RoundedRectangle(cornerRadius: 4).fill(Color.accentColor.opacity(0.1)))
-                            .frame(width: width, height: CGFloat(ghost.minutes) * TimelineMetrics.pointsPerMinute)
-                            .overlay(alignment: .topLeading) {
-                                Text(verbatim: TimelineMetrics.time(ghost.start))
-                                    .font(.caption2.monospacedDigit())
-                                    .padding(.horizontal, 4)
-                                    .padding(.top, 1)
-                            }
-                            .offset(x: TimelineMetrics.labelWidth, y: TimelineMetrics.y(ghost.start, in: day))
-                            .allowsHitTesting(false)
-                            .accessibilityHidden(true)
                     }
                     // The current time, redrawn each minute (popover content: a TimelineView
                     // is fine here, unlike in the menu bar label).
@@ -164,9 +146,11 @@ struct TimelineBlockView: View {
     let block: TimelineBlock
     let day: TimelineDay
     let space: String
-    let viewport: CGRect
-    @Binding var floating: FloatingBlock?
+    /// Being dragged: the lifted card stands in for it.
+    let isLifted: Bool
     @Binding var hovered: UUID?
+    let onDrag: (DragGesture.Value?) -> Void
+    let onDrop: () -> Void
     let onMove: () -> Void
     let onOpen: () -> Void
     let onEdit: (Item) -> Void
@@ -174,9 +158,7 @@ struct TimelineBlockView: View {
     /// True while a drag of the block is live; it resets by itself when the drag ends
     /// or is cancelled, which clears what the drag showed (Gemini review).
     @GestureState private var dragging = false
-    @State private var moveBy = 0          // minutes, while dragging
     @State private var resizeBy = 0
-    @State private var overList = false
 
     private var b: TimeBlock { block.block }
     private var row: TodayRow? { model.today?.rows.first { $0.id == b.itemId } }
@@ -194,23 +176,23 @@ struct TimelineBlockView: View {
             .overlay(alignment: .topLeading) { label }
             .overlay(alignment: .bottom) { if block.canChange { resizeHandle } }
             .frame(height: max(height - 1, 6))
-            // Off the timeline it floats at the pointer instead (TodayListView).
-            .opacity(overList ? 0 : 1)
-            .offset(y: CGFloat(moveBy) * TimelineMetrics.pointsPerMinute)
+            // While dragged, the lifted card draws it, over the hours or over the list.
+            .opacity(isLifted ? 0 : 1)
             .contentShape(Rectangle())
             // The same as a row: click opens the details, right-click the menu.
             .onTapGesture(perform: onOpen)
             .gesture(moveGesture)
             .onHover { inside in
-                if inside { hovered = b.id } else if hovered == b.id { hovered = nil }
+                if inside { hovered = b.itemId } else if hovered == b.itemId { hovered = nil }
             }
             .contextMenu { menu }
             .onChange(of: dragging) { _, live in
-                if !live { moveBy = 0; overList = false; floating = nil }
+                // Ended or cancelled: nothing of the drag stays on screen.
+                if !live, isLifted { onDrag(nil) }
             }
             .onDisappear {
-                if overList { floating = nil }
-                if hovered == b.id { hovered = nil }
+                if isLifted { onDrag(nil) }
+                if hovered == b.itemId { hovered = nil }
             }
             .help(Text(verbatim: "\(block.title) · \(range)"))
             .accessibilityElement(children: .ignore)
@@ -233,7 +215,7 @@ struct TimelineBlockView: View {
     }
 
     private var range: String {
-        "\(TimelineMetrics.time(b.start.addingTimeInterval(TimeInterval(moveBy * 60))))–\(TimelineMetrics.time(b.start.addingTimeInterval(TimeInterval((moveBy + minutes) * 60))))"
+        "\(TimelineMetrics.time(b.start))–\(TimelineMetrics.time(b.start.addingTimeInterval(TimeInterval(minutes * 60))))"
     }
 
     private var stateText: Text {
@@ -296,35 +278,13 @@ struct TimelineBlockView: View {
     private var moveGesture: some Gesture {
         DragGesture(minimumDistance: 3, coordinateSpace: .named(space))
             .updating($dragging) { _, live, _ in live = true }
-            .onChanged { value in
-                // Dragged onto the list below: let go there to put it back (SPEC 2026-11-10).
-                overList = isOverList(value)
-                floating = overList ? FloatingBlock(title: block.title, location: value.location) : nil
-                guard block.canChange, !overList else { return }
-                moveBy = moveMinutes(value)
-            }
+            // The list draws and drops it: over the hours it moves, over the list it goes
+            // back there (SPEC 2026-11-10).
+            .onChanged { onDrag($0) }
             .onEnded { value in
-                // From the final position, not from state a cancel may already have reset.
-                let remove = isOverList(value)
-                let change = remove || !block.canChange ? 0 : moveMinutes(value)
-                moveBy = 0
-                overList = false
-                floating = nil
-                if remove {
-                    model.removeBlock(b.id)
-                } else if change != 0 {
-                    model.moveBlock(b.id, to: b.start.addingTimeInterval(TimeInterval(change * 60)))
-                }
+                onDrag(value)          // from the final position, whatever state a cancel reset
+                onDrop()
             }
-    }
-
-    private func isOverList(_ value: DragGesture.Value) -> Bool { value.location.y > viewport.maxY + 4 }
-
-    /// The drag as whole quarter hours, kept inside the day.
-    private func moveMinutes(_ value: DragGesture.Value) -> Int {
-        let earliest = -Int(b.start.timeIntervalSince(day.start) / 60)
-        let latest = TimelineMetrics.room(after: b.start, in: day) - b.minutes
-        return min(max(Self.snap(value.translation.height), earliest), latest)
     }
 
     /// A drag in points as whole quarter hours of minutes.

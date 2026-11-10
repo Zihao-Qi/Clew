@@ -357,6 +357,16 @@ final class AppModel {
     func addBlock(after id: UUID) { run { try $0.addBlock(after: id) } }
     func canAddBlock(after block: TimeBlock) -> Bool { clew?.canAddBlock(after: block) ?? false }
     func removeBlock(_ id: UUID) { run { try $0.removeBlock(id: id) } }
+
+    /// A block dragged onto the list: off the timeline, and the task (if it has no other
+    /// blocks) lands in the gap it was dropped in, `slot` among the list's rows.
+    func putBack(_ blockId: UUID, itemId: UUID, at slot: Int) {
+        let visible = listRows.map(\.id)
+        guard run({ try $0.removeBlock(id: blockId) }) else { return }
+        guard listRows.contains(where: { $0.id == itemId }), let all = today?.rows.map(\.id) else { return }
+        let (after, before) = Clew.insertNeighbours(at: slot, in: visible, within: all, excluding: itemId)
+        run { try $0.moveItem(id: itemId, after: after, before: before) }
+    }
     func blockNotFinished(_ id: UUID) { run { try $0.blockNotFinished(id: id) } }
     func undoLateTicks(_ itemId: UUID) { run { try $0.undoLateTicks(itemId: itemId) } }
     func dismissLateTicks(_ itemId: UUID) { run { try $0.dismissLateTicks(itemId: itemId) } }
@@ -470,7 +480,28 @@ final class AppModel {
         drop(row.id, onto: rows[target])
     }
     func moveToLater(_ row: TodayRow) { run { try $0.moveToLater(itemId: row.id) } }
-    func delete(_ id: UUID) { run { try $0.deleteItem(itemId: id) } }
+    /// The task deleted last, for a few seconds: "Deleted “…” · Undo" (SPEC 2026-11-10).
+    private(set) var lastDeleted: (id: UUID, title: String)?
+    @ObservationIgnored private var lastDeletedTask: Task<Void, Never>?
+
+    func delete(_ id: UUID) {
+        let title = (try? clew?.item(id: id))??.title
+        guard run({ try $0.deleteItem(itemId: id) }) else { return }
+        guard let title else { return }
+        lastDeleted = (id, title)
+        lastDeletedTask?.cancel()
+        lastDeletedTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(6))
+            guard !Task.isCancelled, self?.lastDeleted?.id == id else { return }
+            self?.lastDeleted = nil
+        }
+    }
+
+    func undoDelete() {
+        guard let deleted = lastDeleted else { return }
+        lastDeleted = nil
+        run { try $0.undeleteItem(itemId: deleted.id) }
+    }
     func nextRound(_ row: TodayRow) { run { try $0.startNextRound(itemId: row.id) } }
     func dismissCelebration(_ row: TodayRow) { dismissedCelebrations.insert(row.id) }
 

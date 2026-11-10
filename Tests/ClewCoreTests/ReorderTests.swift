@@ -49,6 +49,25 @@ import Testing
         #expect(Array(titles.prefix(42)) == ["a"] + (0..<40).map { "x\($0)" } + ["b"])
     }
 
+    @Test func aBlockDraggedToTheListOpensAGapWhereItLands() throws {
+        let spans = [(minY: 0.0, maxY: 30.0), (minY: 30.0, maxY: 60.0), (minY: 60.0, maxY: 90.0)]
+        #expect(Clew.insertSlot(pointerY: -5, spans: spans) == 0)
+        #expect(Clew.insertSlot(pointerY: 14, spans: spans) == 0)
+        #expect(Clew.insertSlot(pointerY: 16, spans: spans) == 1)
+        #expect(Clew.insertSlot(pointerY: 200, spans: spans) == 3)
+        #expect(Clew.insertShift(index: 0, slot: 1, height: 30) == 0)
+        #expect(Clew.insertShift(index: 1, slot: 1, height: 30) == 30)
+        let ids = (0..<5).map { _ in UUID() }
+        let (a, b, c, d, x) = (ids[0], ids[1], ids[2], ids[3], ids[4])
+        // b and x are on the timeline; x comes back into the gap before c.
+        let shown = [a, c, d]
+        #expect(Clew.insertNeighbours(at: 1, in: shown, within: ids, excluding: x) == (b, c))
+        #expect(Clew.insertNeighbours(at: 0, in: shown, within: ids, excluding: x) == (nil, a))
+        #expect(Clew.insertNeighbours(at: 3, in: shown, within: [a, b, c, d, x], excluding: x) == (d, nil))
+        #expect(Clew.insertNeighbours(at: 3, in: shown, within: [a, c, d, b, x], excluding: x) == (d, b))
+        #expect(Clew.insertNeighbours(at: 0, in: [], within: ids, excluding: x) == (nil, nil))
+    }
+
     @Test func aDroppedRowTakesTheTargetsPlace() throws {
         let ids = (0..<4).map { _ in UUID() }
         let (a, b, c, d) = (ids[0], ids[1], ids[2], ids[3])

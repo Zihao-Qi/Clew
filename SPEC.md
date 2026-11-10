@@ -216,8 +216,13 @@ stopped daily use, not adding features.
     task **leaves the list and lives on the timeline** for the day, as a **30-minute
     block** snapped to 15 minutes. Drag a block to move it and its bottom edge to resize
     it (15 minutes at least, ending at 4 a.m. at the latest). **Dragging a block back
-    onto the list** removes it; a task with no blocks left is back in the list. The
-    dragged row or block floats above both, so it moves freely between them. Only tasks
+    onto the list** removes it; a task with no blocks left is back in the list, in the
+    gap it was dropped in. **One lifted card** carries what is dragged (*changed*
+    2026-11-10 after use: a dashed outline and a different chip looked like other
+    things): over the list it looks exactly like a row being reordered, and the rows
+    slide apart where it would land; over the hours it is the block it would become, at
+    the quarter hour under the pointer; one tint for both, and its shape changes
+    smoothly as it crosses the line. Only tasks
     on Today can be placed; the collection rows cannot. Blocks may overlap each other and
     events; overlapping ones sit side by side. Tasks on the timeline still count in the
     menu bar's `done/total`. With the timeline turned off, every task is in the list.
@@ -227,8 +232,13 @@ stopped daily use, not adding features.
     (a start-time and length picker), **Length** (15, 30, 45, 60, 90 minutes; lengths
     that would pass 4 a.m. are not offered), **Add another block** (right after it, the
     same length; not offered when that would pass 4 a.m.), **Not finished**, **Remove
-    block**. Clicking a block opens the task's details. The row's right-click › **Put on
-    timeline…** places it without dragging.
+    block**, **Delete**. Clicking a block opens the task's details. The row's right-click ›
+    **Put on timeline…** places it without dragging.
+  - **The Delete key** deletes the task under the pointer, a row or a block, like the
+    menu's Delete (*user*, 2026-11-10: delete is a real delete; taking a block off the
+    timeline is Remove block or dragging it back). Every delete shows "Deleted “Write
+    intro” · Undo" for a few seconds; Undo brings the task back with its reminder,
+    without its blocks.
   - **Several blocks** are allowed (Add another block); the first comes from dragging the
     row or Put on timeline….
   - **A block's end ticks the task** (*new rule*: until now only the user and a

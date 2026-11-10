@@ -7,9 +7,9 @@ struct TodayListView: View {
     @Binding var screen: Screen
     @Environment(\.openWindow) private var openWindow
     /// Reordering with a plain drag gesture inside the list (SwiftUI's draggable /
-    /// dropDestination never delivered the drop in the menu bar panel). The dragged row
-    /// follows the pointer; the rows in between slide aside live; release lands it in
-    /// the gap. The slot and shift math is in Core (Clew.dragSlot / dragShift), tested.
+    /// dropDestination never delivered the drop in the menu bar panel). The rows in
+    /// between slide aside live; release lands it in the gap. The slot and shift math is
+    /// in Core (Clew.dragSlot / dragShift / insertSlot / insertShift), tested.
     @State private var dragging: UUID?
     @State private var dragTranslation: CGFloat = 0
     @State private var dragSlot: Int?
@@ -17,18 +17,21 @@ struct TodayListView: View {
     /// Row frames frozen when a drag begins, so slots are measured against the list as
     /// it was, not against rows that are sliding.
     @State private var dragFrames: [CGRect] = []
-    /// The day timeline above the list (SPEC 2026-11-10): where it is, where a row
-    /// dragged over it would land, and its scroll position (a quarter hour at the top).
+    /// The day timeline above the list (SPEC 2026-11-10): where it is and its scroll
+    /// position (a quarter hour at the top).
     @State private var timelineGeo = TimelineGeometry()
-    @State private var ghost: TimelineDrop?
     @State private var topQuarter: Int?
     @State private var edgeScroll: Timer?
     /// The rows' full height, so a long list scrolls instead of passing the screen.
     @State private var rowsHeight: CGFloat = 0
-    /// A block dragged off the timeline, drawn above everything so it moves freely.
-    @State private var floating: FloatingBlock?
-    /// The block under the pointer: the Delete key removes it.
-    @State private var hoveredBlock: UUID?
+    /// What is being dragged, drawn as one lifted card above the list and the timeline:
+    /// a row over the list, a block over the hours (user, 2026-11-10: the same thing,
+    /// moving smoothly between the two).
+    @State private var lifted: Lifted?
+    /// The task under the pointer (a row or a block): the Delete key deletes it.
+    @State private var hoveredItem: UUID?
+    /// Cleared by itself when a row drag ends or is cancelled.
+    @GestureState private var rowDragLive = false
 
     private static let listSpace = "todayList"
 
@@ -40,14 +43,23 @@ struct TodayListView: View {
         return max(160, screen - (showsTimeline ? TimelineMetrics.height : 0) - 170)
     }
 
-    /// Over the hours: the quarter hour under the pointer, as long as the task's open
-    /// block (or 30 minutes, cut at the day's end).
-    private func drop(for row: TodayRow, at y: CGFloat) -> TimelineDrop? {
-        guard showsTimeline, let day = model.timeline, y < timelineGeo.viewport.maxY else { return nil }
-        let start = TimelineMetrics.start(atContentY: y - timelineGeo.contentTop, in: day)
-        let open = day.blocks.first { $0.block.itemId == row.id && $0.block.end > Date() }?.block.minutes
-        let room = TimelineMetrics.room(after: start, in: day)
-        return TimelineDrop(itemId: row.id, start: start, minutes: min(open ?? Clew.blockDefaultMinutes, room))
+    /// Above the list's top, the pointer is over the hours.
+    private func isOverTimeline(_ y: CGFloat) -> Bool { showsTimeline && y < timelineGeo.viewport.maxY + 4 }
+
+    /// Where a block at `start` lasting `minutes` sits, in the list's coordinate space.
+    private func blockFrame(start: Date, minutes: Int) -> CGRect {
+        guard let day = model.timeline else { return .zero }
+        let view = timelineGeo.viewport
+        return CGRect(x: view.minX + TimelineMetrics.labelWidth,
+                      y: timelineGeo.contentTop + TimelineMetrics.y(start, in: day),
+                      width: max(20, view.width - TimelineMetrics.labelWidth - 6),
+                      height: CGFloat(minutes) * TimelineMetrics.pointsPerMinute)
+    }
+
+    /// A row's place and size for a card over the list: like the first row, at `y`.
+    private func rowFrame(centeredAt y: CGFloat) -> CGRect {
+        let sample = dragFrames.first ?? rowFrames.values.first ?? CGRect(x: 0, y: 0, width: 340, height: 34)
+        return CGRect(x: sample.minX, y: y - sample.height / 2, width: sample.width, height: sample.height)
     }
 
     /// Near the timeline's top or bottom edge while dragging, it scrolls by itself.
@@ -77,34 +89,53 @@ struct TodayListView: View {
     }
 
     private func offset(for row: TodayRow, at index: Int, in rows: [TodayRow]) -> CGFloat {
+        // A block coming down from the timeline opens a gap where it would land.
+        if let lifted, lifted.blockId != nil, let slot = lifted.slot {
+            let height = Double(dragFrames.first?.height ?? 34)
+            return CGFloat(Clew.insertShift(index: index, slot: slot, height: height))
+        }
         guard let dragging, let from = rows.firstIndex(where: { $0.id == dragging }) else { return 0 }
         if row.id == dragging { return dragTranslation }
         let height = Double(dragFrames.indices.contains(from) ? dragFrames[from].height : 0)
         return CGFloat(Clew.dragShift(index: index, from: from, to: dragSlot ?? from, draggedHeight: height))
     }
 
+    private func endDrag() {
+        scrollAtEdge(nil)
+        lifted = nil
+        dragging = nil
+        dragTranslation = 0
+        dragSlot = nil
+    }
+
+    // MARK: Dragging a row
+
     private func drag(_ row: TodayRow, in rows: [TodayRow]) -> some Gesture {
         DragGesture(minimumDistance: 3, coordinateSpace: .named(Self.listSpace))
+            .updating($rowDragLive) { _, live, _ in live = true }
             .onChanged { value in
                 if dragging == nil {
                     dragFrames = rows.map { rowFrames[$0.id] ?? .zero }
                     dragging = row.id
                 }
-                // Up over the timeline: the row follows the pointer and the hour under it
-                // shows where it would land; the other rows stay where they are.
-                if let drop = drop(for: row, at: value.location.y) {
-                    ghost = drop
+                let from = rows.firstIndex(where: { $0.id == row.id }) ?? 0
+                let own = dragFrames.indices.contains(from) ? dragFrames[from] : rowFrame(centeredAt: value.location.y)
+                // Up over the hours: the card becomes the block it would be, at the
+                // quarter hour under the pointer; the other rows stay where they are.
+                if isOverTimeline(value.location.y), let day = model.timeline {
+                    let start = TimelineMetrics.start(atContentY: value.location.y - timelineGeo.contentTop, in: day)
+                    let open = day.blocks.first { $0.block.itemId == row.id && $0.block.end > Date() }?.block.minutes
+                    let minutes = min(open ?? Clew.blockDefaultMinutes, TimelineMetrics.room(after: start, in: day))
+                    lifted = Lifted(itemId: row.id, blockId: nil, title: row.item.title, overTimeline: true,
+                                    frame: blockFrame(start: start, minutes: minutes), start: start, minutes: minutes)
                     dragTranslation = value.translation.height
                     if dragSlot != nil { withAnimation(.easeOut(duration: 0.15)) { dragSlot = nil } }
                     scrollAtEdge(value.location.y)
                     return
                 }
-                ghost = nil
                 scrollAtEdge(nil)
                 // Kept inside the rows: never over the footer (Add, Later, Settings).
-                let from = rows.firstIndex(where: { $0.id == row.id }) ?? 0
-                if let first = dragFrames.first, let last = dragFrames.last, dragFrames.indices.contains(from) {
-                    let own = dragFrames[from]
+                if let first = dragFrames.first, let last = dragFrames.last {
                     dragTranslation = CGFloat(Clew.clampDrag(
                         translation: Double(value.translation.height),
                         row: (minY: Double(own.minY), maxY: Double(own.maxY)),
@@ -112,6 +143,8 @@ struct TodayListView: View {
                 } else {
                     dragTranslation = value.translation.height
                 }
+                lifted = Lifted(itemId: row.id, blockId: nil, title: row.item.title, overTimeline: false,
+                                frame: own.offsetBy(dx: 0, dy: dragTranslation))
                 let spans = dragFrames.map { (minY: Double($0.minY), maxY: Double($0.maxY)) }
                 let slot = Clew.dragSlot(pointerY: Double(value.location.y), spans: spans)
                 if slot != dragSlot {
@@ -119,21 +152,88 @@ struct TodayListView: View {
                 }
             }
             .onEnded { _ in
-                scrollAtEdge(nil)
+                let landing = lifted
                 var t = Transaction()
                 t.disablesAnimations = true
                 withTransaction(t) {
-                    if let ghost {
-                        model.place(ghost.itemId, at: ghost.start, minutes: ghost.minutes)
+                    if let landing, landing.overTimeline, let start = landing.start {
+                        model.place(landing.itemId, at: start, minutes: landing.minutes)
                     } else if let from = rows.firstIndex(where: { $0.id == row.id }), let to = dragSlot, to != from {
                         model.drop(row.id, onto: rows[to])
                     }
-                    ghost = nil
-                    dragging = nil
-                    dragTranslation = 0
-                    dragSlot = nil
+                    endDrag()
                 }
             }
+    }
+
+    // MARK: Dragging a block
+
+    /// A block's move gesture reports here, so the card can leave the timeline.
+    private func blockDrag(_ block: TimelineBlock, _ value: DragGesture.Value?) {
+        guard let value else { return endDrag() }      // cancelled
+        let b = block.block
+        if lifted == nil {
+            dragFrames = model.listRows.map { rowFrames[$0.id] ?? .zero }
+        }
+        if isOverTimeline(value.location.y), let day = model.timeline {
+            let earliest = -Int(b.start.timeIntervalSince(day.start) / 60)
+            let latest = TimelineMetrics.room(after: b.start, in: day) - b.minutes
+            let move = block.canChange ? min(max(TimelineBlockView.snap(value.translation.height), earliest), latest) : 0
+            let start = b.start.addingTimeInterval(TimeInterval(move * 60))
+            lifted = Lifted(itemId: b.itemId, blockId: b.id, title: block.title, overTimeline: true,
+                            frame: blockFrame(start: start, minutes: b.minutes), start: start, minutes: b.minutes)
+            scrollAtEdge(value.location.y)
+        } else {
+            // Down over the list: a row, with the rows opening the gap it would take.
+            let spans = dragFrames.map { (minY: Double($0.minY), maxY: Double($0.maxY)) }
+            let slot = Clew.insertSlot(pointerY: Double(value.location.y), spans: spans)
+            if lifted?.slot != slot {
+                withAnimation(.easeOut(duration: 0.15)) {
+                    lifted = Lifted(itemId: b.itemId, blockId: b.id, title: block.title, overTimeline: false,
+                                    frame: rowFrame(centeredAt: value.location.y), slot: slot)
+                }
+            } else {
+                lifted?.overTimeline = false
+                lifted?.frame = rowFrame(centeredAt: value.location.y)
+            }
+            scrollAtEdge(nil)
+        }
+    }
+
+    private func blockDropped(_ block: TimelineBlock) {
+        let landing = lifted
+        var t = Transaction()
+        t.disablesAnimations = true
+        withTransaction(t) {
+            if let landing, !landing.overTimeline {
+                model.putBack(block.block.id, itemId: block.block.itemId, at: landing.slot ?? 0)
+            } else if let landing, let start = landing.start, start != block.block.start {
+                model.moveBlock(block.block.id, to: start)
+            }
+            endDrag()
+        }
+    }
+
+    /// The lifted card: the dragged row's own look over the list, a block over the hours,
+    /// one tint for both. Its frame moves smoothly from one shape to the other.
+    @ViewBuilder
+    private var liftedCard: some View {
+        if let lifted, let row = model.row(lifted.itemId) {
+            ZStack(alignment: .topLeading) {
+                RowView(row: row, model: model, onEdit: {}, onOpen: {}, isDragged: true)
+                    .frame(width: lifted.frame.width, alignment: .leading)
+                    .opacity(lifted.overTimeline ? 0 : 1)
+                LiftedBlockCard(title: lifted.title, start: lifted.start, minutes: lifted.minutes)
+                    .opacity(lifted.overTimeline ? 1 : 0)
+            }
+            .frame(width: lifted.frame.width, height: lifted.frame.height, alignment: .topLeading)
+            .clipped()
+            .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
+            .position(x: lifted.frame.midX, y: lifted.frame.midY)
+            .animation(.spring(response: 0.22, dampingFraction: 0.9), value: lifted.overTimeline)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
     }
 
     @ViewBuilder
@@ -144,16 +244,17 @@ struct TodayListView: View {
                         onOpen: { screen = .detail(row.id) },
                         onPlace: showsTimeline ? { screen = .place(row.id, block: nil) } : nil,
                         canMoveUp: index > 0, canMoveDown: index < rows.count - 1,
-                        isDragged: dragging == row.id)
+                        isDragged: dragging == row.id,
+                        onHoverChange: { inside in
+                            if inside { hoveredItem = row.id } else if hoveredItem == row.id { hoveredItem = nil }
+                        })
                     .background(GeometryReader { g in
                         Color.clear.preference(key: RowFrames.self,
                                                value: [row.id: g.frame(in: .named(Self.listSpace))])
                     })
                     .offset(y: offset(for: row, at: index, in: rows))
-                    .zIndex(dragging == row.id ? 1 : 0)
-                    .shadow(color: .black.opacity(dragging == row.id ? 0.18 : 0), radius: 6, y: 2)
-                    // Over the hours the row gives way to the block it would become.
-                    .opacity(dragging == row.id && ghost != nil ? 0 : 1)
+                    // The lifted card draws the dragged row, here or over the hours.
+                    .opacity(dragging == row.id ? 0 : 1)
                     .gesture(drag(row, in: rows))
             }
         }
@@ -164,9 +265,10 @@ struct TodayListView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if showsTimeline, let day = model.timeline {
-                DayTimelineView(model: model, day: day, ghost: ghost, space: Self.listSpace,
-                                geometry: $timelineGeo, topQuarter: $topQuarter, floating: $floating,
-                                hovered: $hoveredBlock,
+                DayTimelineView(model: model, day: day, space: Self.listSpace,
+                                geometry: $timelineGeo, topQuarter: $topQuarter,
+                                liftedBlock: lifted?.blockId, hovered: $hoveredItem,
+                                onDrag: blockDrag, onDrop: blockDropped,
                                 onMove: { block in screen = .place(block.block.itemId, block: block.id) },
                                 onOpen: { screen = .detail($0) },
                                 onEdit: { item in screen = .edit(item, back: .list) })
@@ -185,8 +287,6 @@ struct TodayListView: View {
                         rowsStack(rows)
                     }
                 }
-                // A row dragged up onto the timeline is drawn over it.
-                .zIndex(dragging != nil ? 1 : 0)
                 .onPreferenceChange(RowFrames.self) { rowFrames = $0 }
             } else {
                 Group {
@@ -215,6 +315,20 @@ struct TodayListView: View {
 
             NoticeView(text: model.notice ?? model.confirmation)
                 .animation(.easeOut(duration: 0.4), value: model.notice ?? model.confirmation)
+            if let deleted = model.lastDeleted {
+                // A delete is for good, so it can be taken back for a few seconds.
+                HStack(spacing: 8) {
+                    Text("Deleted “\(deleted.title)”").lineLimit(1).truncationMode(.middle)
+                    Spacer(minLength: 4)
+                    Button("Undo") { model.undoDelete() }
+                        .accessibilityLabel(Text("Undo deleting \(deleted.title)"))
+                }
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .buttonStyle(.borderless)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 6)
+            }
 
             if model.browser?.youTube?.needsUpdate == true || model.browser?.x?.needsUpdate == true {
                 // Health report, not silence (ARCHITECTURE §6). Quiet, never red.
@@ -253,34 +367,23 @@ struct TodayListView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
         }
-        .overlay(alignment: .topLeading) {
-            // A block dragged down to the list floats at the pointer, unclipped.
-            if let floating {
-                Text(floating.title)
-                    .font(.callout)
-                    .lineLimit(1)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .windowBackgroundColor)))
-                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.25)).padding(-1))
-                    .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
-                    .frame(maxWidth: 280)
-                    .fixedSize()
-                    .position(x: floating.location.x, y: floating.location.y)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-            }
+        // Above both the list and the timeline, so nothing clips it.
+        .overlay(alignment: .topLeading) { liftedCard }
+        .onChange(of: rowDragLive) { _, live in
+            // A row drag that was cancelled leaves nothing behind.
+            if !live, dragging != nil, lifted?.blockId == nil { endDrag() }
         }
         .background {
-            // Delete removes the block under the pointer (user, 2026-11-10).
-            Button("Remove block") {
-                // The removed block's view goes without an "exit" hover, so forget it here.
-                if let id = hoveredBlock { hoveredBlock = nil; model.removeBlock(id) }
+            // Delete deletes the task under the pointer, in the list or on the timeline,
+            // like the menu's Delete (user, 2026-11-10); Undo shows for a few seconds.
+            Button("Delete") {
+                // The deleted task's view goes without an "exit" hover, so forget it here.
+                if let id = hoveredItem { hoveredItem = nil; model.delete(id) }
             }
                 .keyboardShortcut(.delete, modifiers: [])
                 .opacity(0)
                 .frame(width: 0, height: 0)
-                .disabled(hoveredBlock == nil)
+                .disabled(hoveredItem == nil || dragging != nil || lifted != nil)
                 .accessibilityHidden(true)
         }
         // One space for the timeline and the rows, so a row can be dragged onto an hour.
@@ -288,10 +391,46 @@ struct TodayListView: View {
     }
 }
 
-/// A block being dragged off the timeline toward the list.
-struct FloatingBlock: Equatable {
+/// What is being dragged (a row from the list, or a block from the timeline) and the
+/// card drawing it: its frame in the list's space, and where it lands.
+struct Lifted: Equatable {
+    var itemId: UUID
+    /// The block being dragged; nil for a row from the list.
+    var blockId: UUID?
     var title: String
-    var location: CGPoint
+    var overTimeline: Bool
+    var frame: CGRect
+    /// Over the hours: the block it would be.
+    var start: Date? = nil
+    var minutes: Int = Clew.blockDefaultMinutes
+    /// A block over the list: the gap it would take.
+    var slot: Int? = nil
+}
+
+/// The lifted card's block shape: the same tint as a dragged row, the block's title and
+/// time.
+struct LiftedBlockCard: View {
+    let title: String
+    let start: Date?
+    let minutes: Int
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 6)
+            .fill(Color(nsColor: .windowBackgroundColor))
+            .overlay(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.12)))
+            .overlay(alignment: .topLeading) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(title).font(.caption).lineLimit(1)
+                    if let start, minutes >= 30 {
+                        Text(verbatim: "\(TimelineMetrics.time(start))–\(TimelineMetrics.time(start.addingTimeInterval(TimeInterval(minutes * 60))))")
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal, 4)
+                .padding(.top, minutes <= 15 ? 0 : 2)
+            }
+    }
 }
 
 /// "Ticked for yesterday: Write intro · Not finished": a block that ended while the
@@ -348,6 +487,8 @@ struct RowView: View {
     /// This row is being dragged: it gets a solid background so rows sliding under it
     /// don't show through.
     var isDragged = false
+    /// Tells the list which task is under the pointer (the Delete key's target).
+    var onHoverChange: ((Bool) -> Void)? = nil
 
     @State private var hovering = false
     @State private var hoveringDots = false
@@ -443,7 +584,7 @@ struct RowView: View {
         // − and celebration buttons are buttons and keep their own clicks.
         .contentShape(Rectangle())
         .onTapGesture(perform: onOpen)
-        .onHover { hovering = $0 }
+        .onHover { hovering = $0; onHoverChange?($0) }
         .accessibilityAction(named: Text("Move Up")) { if canMoveUp { model.move(row, by: -1) } }
         .accessibilityAction(named: Text("Move Down")) { if canMoveDown { model.move(row, by: 1) } }
         .accessibilityActions {

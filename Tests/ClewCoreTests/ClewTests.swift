@@ -366,6 +366,34 @@ private struct Harness {
     }
 }
 
+@Suite struct UndeleteTests {
+    @Test func undoBringsTheTaskBackWithItsReminder() throws {
+        let h = Harness()
+        let habit = try h.clew.addItem(NewItem(title: "h", shape: .habit(.daily)))
+        try h.clew.setReminder(itemId: habit.id, time: TimeOfDay(hour: 18, minute: 0))
+        h.clock.set(local(2026, 11, 10, 11))
+        try h.clew.deleteItem(itemId: habit.id)
+        h.clock.set(local(2026, 11, 10, 11, 1))
+        try h.clew.undeleteItem(itemId: habit.id)
+        #expect(try h.clew.today().rows.map(\.id) == [habit.id])
+        #expect(h.store.state.items[habit.id]?.deletedAt == nil)
+        #expect(try h.clew.reminder(forItem: habit.id)?.time == TimeOfDay(hour: 18, minute: 0))
+        #expect(throws: ClewError.notAllowed) { try h.clew.undeleteItem(itemId: habit.id) }
+        #expect(throws: ClewError.itemNotFound) { try h.clew.undeleteItem(itemId: UUID()) }
+    }
+
+    @Test func aReminderRemovedEarlierStaysRemoved() throws {
+        let h = Harness()
+        let item = try h.clew.addItem(NewItem(title: "x", shape: .today))
+        try h.clew.setReminder(itemId: item.id, time: TimeOfDay(hour: 9, minute: 0))
+        try h.clew.setReminder(itemId: item.id, time: nil)          // removed before the delete
+        h.clock.set(local(2026, 11, 10, 11))
+        try h.clew.deleteItem(itemId: item.id)
+        try h.clew.undeleteItem(itemId: item.id)
+        #expect(try h.clew.reminder(forItem: item.id) == nil)
+    }
+}
+
 @Suite struct TitleOriginTests {
     @Test func fetchedTitleIsMarkedUntilTheUserChangesIt() throws {
         let h = Harness()
