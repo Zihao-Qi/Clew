@@ -228,10 +228,12 @@ extension Clew {
             let open = try w.timeBlocks(from: today)
                 .filter { $0.itemId == itemId && $0.localDay == today && $0.removedAt == nil && $0.end > now }
                 .min { ($0.start, $0.id.uuidString) < ($1.start, $1.id.uuidString) }
-            if let open {
-                return try change(open, start: start, minutes: minutes ?? open.minutes, today: today, now: now, w)
-            }
             let room = Int(bounds.end.timeIntervalSince(start) / 60)
+            if let open {
+                // Its length goes with it, cut at the day's end like a new block's.
+                return try change(open, start: start, minutes: minutes ?? min(open.minutes, room), today: today,
+                                  now: now, w)
+            }
             let length = minutes ?? min(Self.blockDefaultMinutes, room)
             try Self.checkLength(length, start: start, bounds)
             let block = TimeBlock(id: newID(), itemId: itemId, localDay: today, start: start, minutes: length,

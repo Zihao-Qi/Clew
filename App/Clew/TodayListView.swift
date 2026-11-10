@@ -120,7 +120,7 @@ struct TodayListView: View {
                 t.disablesAnimations = true
                 withTransaction(t) {
                     if let ghost {
-                        model.place(ghost.itemId, at: ghost.start)
+                        model.place(ghost.itemId, at: ghost.start, minutes: ghost.minutes)
                     } else if let from = rows.firstIndex(where: { $0.id == row.id }), let to = dragSlot, to != from {
                         model.drop(row.id, onto: rows[to])
                     }
@@ -397,7 +397,9 @@ struct RowView: View {
         .onHover { hovering = $0 }
         .accessibilityAction(named: Text("Move Up")) { if canMoveUp { model.move(row, by: -1) } }
         .accessibilityAction(named: Text("Move Down")) { if canMoveDown { model.move(row, by: 1) } }
-        .accessibilityAction(named: Text("Put on timeline…")) { onPlace?() }
+        .accessibilityActions {
+            if let onPlace { Button("Put on timeline…", action: onPlace) }
+        }
         .contextMenu {
             if row.todayAmount > 0 {
                 if item.kind == .goal {

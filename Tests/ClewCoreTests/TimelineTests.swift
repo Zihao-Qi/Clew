@@ -67,6 +67,18 @@ private let tuesday = LocalDay(string: "2026-11-10")!
         try settle(at: at(10, 15))
         let second = try clew.placeOnTimeline(itemId: id, start: at(10, 16))
         #expect(second.id != first.id && store.state.timeBlocks.count == 2)
+        // Dragged near the day's end, a longer block is cut to fit, as the drop shows it.
+        try clew.resizeBlock(id: second.id, minutes: 45)
+        let cut = try clew.placeOnTimeline(itemId: id, start: at(11, 3, 45))
+        #expect(cut.id == second.id && cut.minutes == 15)
+    }
+
+    @Test func blockLengthsAreWholeQuarterHours() throws {
+        let b = try clew.placeOnTimeline(itemId: try task(), start: at(10, 10))
+        for bad in [20, 10, 0] {
+            #expect(throws: ClewError.self) { try clew.resizeBlock(id: b.id, minutes: bad) }
+        }
+        #expect(try clew.resizeBlock(id: b.id, minutes: 15).minutes == 15)
     }
 
     @Test func anotherBlockGoesRightAfterWithTheSameLength() throws {
@@ -144,6 +156,7 @@ private let tuesday = LocalDay(string: "2026-11-10")!
         let h = try clew.placeOnTimeline(itemId: habit, start: at(10, 11))
         try settle(at: at(10, 11, 30))
         #expect(ticks(habit).count == 1 && block(h.id).tickId == nil)
+        #expect(try clew.timeline().blocks.map(\.state) == [.skipped, .skipped])
     }
 
     @Test func aBlockDecidesOnceSoAnUntickHolds() throws {
@@ -339,6 +352,11 @@ private let tuesday = LocalDay(string: "2026-11-10")!
         #expect(ticks(a).isEmpty)
         try clew.planForToday(itemIds: [a])                // back the same day, without blocks
         #expect(try clew.timeline().blocks.isEmpty)
+        // Before Clew settles, a block of a task gone from Today gets no second block.
+        let c = try task("c")
+        let bc = try clew.placeOnTimeline(itemId: c, start: at(10, 15))
+        try clew.moveToLater(itemId: c)
+        #expect(throws: ClewError.notAllowed) { try clew.addBlock(after: bc.id) }
         let b = try task("b")
         let bb = try clew.placeOnTimeline(itemId: b, start: at(10, 13))
         try settle(at: at(10, 13, 30))

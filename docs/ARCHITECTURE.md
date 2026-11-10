@@ -425,7 +425,7 @@ are every source but `timeline`.
   `covered` / `skipped` (decided, no `tickId`).
 - **Commands:** `placeOnTimeline(itemId:start:minutes?)` (the row's drag and "Put on
   timeline…": moves the task's earliest block not ended, else adds one; 30 minutes by
-  default, cut at the day's end; only rows on today's list), `moveBlock(id:start:)`,
+  default, and a moved block's length, cut at the day's end; only rows on today's list), `moveBlock(id:start:)`,
   `resizeBlock(id:minutes:)`, `addBlock(after:)` (same length, right after; refused if it
   would pass the day's end), `removeBlock(id:)`, `blockNotFinished(id:)`. Moving or
   resizing changes the end, so it voids a live `tickId`, clears `decidedAt`/`tickId`

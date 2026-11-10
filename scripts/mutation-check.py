@@ -485,6 +485,10 @@ M = [
  ("TL45 drop rounds to nearest", C+"Timeline.swift", "(minutes / Double(blockStepMinutes)).rounded(.down)", "(minutes / Double(blockStepMinutes)).rounded()", TL),
  ("TL46 drop past the day", C+"Timeline.swift", "let q = min(max(Int((minutes / Double(blockStepMinutes)).rounded(.down)), 0), quarters - 1)", "let q = Int((minutes / Double(blockStepMinutes)).rounded(.down))", TL),
  ("TL47 snap down", C+"Timeline.swift", "Int((minutes / Double(blockStepMinutes)).rounded()) * blockStepMinutes", "Int((minutes / Double(blockStepMinutes)).rounded(.towardZero)) * blockStepMinutes", TL),
+ ("TL48 skipped shows pending", C+"Timeline.swift", "?? (cover.map { !$0.isVoided } == true ? .covered : .skipped)", "?? (cover.map { !$0.isVoided } == true ? .covered : .pending)", TL),
+ ("TL49 another for any task", C+"Timeline.swift", "            let b = try liveBlock(id, today: today, w)\n            guard try todayList(w, on: today).rows.contains(where: { $0.id == b.itemId }) else {\n                throw ClewError.notAllowed\n            }\n", "            let b = try liveBlock(id, today: today, w)\n", TL),
+ ("TL50 any length", C+"Timeline.swift", "guard minutes >= blockStepMinutes, minutes % blockStepMinutes == 0, minutes <= room else {", "guard minutes <= room else {", TL),
+ ("TL51 drag not cut", C+"Timeline.swift", "minutes: minutes ?? min(open.minutes, room), today: today,", "minutes: minutes ?? open.minutes, today: today,", TL),
  ("TL43 table allows 10", S+"Schema.swift", "CHECK (minutes BETWEEN 15 AND 1500 AND minutes % 15 = 0)", "CHECK (minutes BETWEEN 1 AND 1500)", "SQLiteStoreTests"),
  ("TL44 block can be deleted", S+"Schema.swift", "            CREATE TRIGGER timeBlock_no_delete BEFORE DELETE ON timeBlock\n            BEGIN SELECT RAISE(ABORT, 'time blocks are removed with a tombstone, never deleted'); END;\n", "", "SQLiteStoreTests"),
 ]
