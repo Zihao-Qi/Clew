@@ -12,7 +12,37 @@ enum Schema {
         migrator.registerMigration("v5-five-point-ratings", migrate: v5)
         migrator.registerMigration("v6-watch-progress", migrate: v6)
         migrator.registerMigration("v7-focus-sessions", migrate: v7)
+        migrator.registerMigration("v8-time-blocks", migrate: v8)
         return migrator
+    }
+
+    /// The day timeline's blocks (v1.2): definitions, removed with a tombstone, never
+    /// deleted (SPEC decision 2026-11-10). A block's day, item and placing never change.
+    private static func v8(_ db: Database) throws {
+        try db.execute(sql: """
+            CREATE TABLE timeBlock (
+                id         TEXT PRIMARY KEY NOT NULL,
+                itemId     TEXT NOT NULL REFERENCES item(id),
+                localDay   TEXT NOT NULL,
+                start      DATETIME NOT NULL,
+                minutes    INTEGER NOT NULL CHECK (minutes BETWEEN 15 AND 1500 AND minutes % 15 = 0),
+                placedAt   DATETIME NOT NULL,
+                updatedAt  DATETIME NOT NULL,
+                decidedAt  DATETIME,
+                tickId     TEXT REFERENCES checkIn(id),
+                coverId    TEXT REFERENCES checkIn(id),
+                removedAt  DATETIME
+            );
+            CREATE INDEX timeBlock_day ON timeBlock(localDay, start);
+
+            CREATE TRIGGER timeBlock_no_delete BEFORE DELETE ON timeBlock
+            BEGIN SELECT RAISE(ABORT, 'time blocks are removed with a tombstone, never deleted'); END;
+
+            CREATE TRIGGER timeBlock_fixed BEFORE UPDATE ON timeBlock
+            WHEN NEW.id IS NOT OLD.id OR NEW.itemId IS NOT OLD.itemId OR NEW.localDay IS NOT OLD.localDay
+              OR NEW.placedAt IS NOT OLD.placedAt
+            BEGIN SELECT RAISE(ABORT, 'a time block keeps its task, day and placing'); END;
+            """)
     }
 
     /// Focus sessions (v1.2): facts, voided never deleted (SPEC decision 2026-11-10).

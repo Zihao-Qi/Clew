@@ -19,6 +19,8 @@ struct SettingsView: View {
     @State private var barStyle = Clew.defaultBarStyle
     @State private var listsOff: Set<Source> = []
     @State private var offersBreak = true
+    @State private var timelineShown = true
+    @State private var blockAlerts = true
     @State private var recordsTime = true
     @State private var pane: Pane?
 
@@ -142,6 +144,26 @@ struct SettingsView: View {
                     Text("Focus timer")
                 } footer: {
                     Text("Right-click a task and choose Focus to work on it for 10, 25 or 45 minutes. When time is up, it asks whether you're done; it never ticks by itself. Recorded time shows on the task's details, where you can also add time you worked without the timer.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section {
+                    Toggle("Show the day timeline", isOn: Binding(get: { timelineShown }, set: { on in
+                        timelineShown = on
+                        model.setTimelineShown(on)
+                    }))
+                    Toggle("Alert when a block starts", isOn: Binding(get: { blockAlerts }, set: { on in
+                        blockAlerts = on
+                        model.setBlockAlerts(on)
+                    }))
+                    if model.notificationsDenied, blockAlerts {
+                        NotificationsOffNotice()
+                    }
+                } header: {
+                    Text("Day timeline")
+                } footer: {
+                    Text("Today's hours above the list. Drag a task onto an hour; when its block ends, the task is ticked. Right-click a block to undo, move or remove it.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -300,6 +322,8 @@ struct SettingsView: View {
         barStyle = model.barStyle
         listsOff = model.collectionsOff()
         offersBreak = model.focusOffersBreak
+        timelineShown = model.timelineShown
+        blockAlerts = model.blockAlerts
         recordsTime = model.focusRecordsTime
     }
 

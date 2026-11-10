@@ -60,6 +60,13 @@ final class AppModel {
     /// The running focus timer or break (SPEC 2026-11-10), if any.
     private(set) var focus: FocusTimer?
     private(set) var focusOffersBreak = true
+    /// Today's timeline (SPEC 2026-11-10), shown above the list when it is on.
+    private(set) var timeline: TimelineDay?
+    private(set) var timelineShown = true
+    private(set) var blockAlerts = true
+    /// Tasks ticked by a block for an earlier day while the Mac slept.
+    private(set) var lateTicks: [LateTick] = []
+    @ObservationIgnored private var blockEdgeTimer: Timer?
     @ObservationIgnored private var systemObservers: [NSObjectProtocol] = []
 
     /// The live app: the database in the sandbox container.
@@ -113,6 +120,9 @@ final class AppModel {
     func refresh() {
         guard let clew else { return }
         do {
+            // A block whose end passed ticks first (it writes only when something
+            // changes, so the refresh its write causes does nothing more).
+            _ = try? clew.settleBlocks()
             let list = try clew.today()
             today = list
             ratingsOn = (try? clew.ratingsEnabled()) ?? false
@@ -121,6 +131,10 @@ final class AppModel {
             barStyle = (try? clew.barStyle()) ?? Clew.defaultBarStyle
             collections = try clew.collections()
             focusOffersBreak = (try? clew.focusOffersBreak()) ?? true
+            timelineShown = (try? clew.timelineShown()) ?? true
+            blockAlerts = (try? clew.blockAlerts()) ?? true
+            timeline = try clew.timeline()
+            lateTicks = try clew.lateTicks()
             focus = try clew.focusTimer()
             if let running = focus {
                 // A break that is over simply ends; a timer whose task left Today (done
@@ -140,6 +154,7 @@ final class AppModel {
         }
         scheduleRollover()
         scheduleFocusEnd()
+        scheduleBlockEdge()
         tickWhileFocusing()
         reconcileNotifications()
         backUpIfNeeded()
@@ -316,6 +331,31 @@ final class AppModel {
         if tick != nil { offerRating(itemId: row.id) }
     }
     func setFocusOffersBreak(_ on: Bool) { run { try $0.setFocusOffersBreak(on) } }
+
+    // MARK: - Day timeline (SPEC 2026-11-10)
+
+    /// A row dropped on an hour, or "Put on timeline…".
+    @discardableResult
+    func place(_ itemId: UUID, at start: Date, minutes: Int? = nil) -> Bool {
+        if blockAlerts { askForNotifications() }
+        return run { try $0.placeOnTimeline(itemId: itemId, start: start, minutes: minutes) }
+    }
+    @discardableResult
+    func moveBlock(_ id: UUID, to start: Date, minutes: Int? = nil) -> Bool {
+        run { try $0.moveBlock(id: id, start: start, minutes: minutes) }
+    }
+    func resizeBlock(_ id: UUID, minutes: Int) { run { try $0.resizeBlock(id: id, minutes: minutes) } }
+    func addBlock(after id: UUID) { run { try $0.addBlock(after: id) } }
+    func canAddBlock(after block: TimeBlock) -> Bool { clew?.canAddBlock(after: block) ?? false }
+    func removeBlock(_ id: UUID) { run { try $0.removeBlock(id: id) } }
+    func blockNotFinished(_ id: UUID) { run { try $0.blockNotFinished(id: id) } }
+    func undoLateTicks(_ itemId: UUID) { run { try $0.undoLateTicks(itemId: itemId) } }
+    func dismissLateTicks(_ itemId: UUID) { run { try $0.dismissLateTicks(itemId: itemId) } }
+    func setTimelineShown(_ on: Bool) { run { try $0.setTimelineShown(on) } }
+    func setBlockAlerts(_ on: Bool) {
+        if on { askForNotifications() }
+        run { try $0.setBlockAlerts(on) }
+    }
 
     // MARK: Focus time (SPEC 2026-11-10, step 2)
 
@@ -522,6 +562,22 @@ final class AppModel {
         timer.tolerance = 1
         RunLoop.main.add(timer, forMode: .common)
         focusEndTimer = timer
+    }
+
+    /// Refreshes at the next block start or end, so a block ticks the moment it ends
+    /// (and the timeline shows it running) even with the list closed.
+    private func scheduleBlockEdge() {
+        blockEdgeTimer?.invalidate()
+        blockEdgeTimer = nil
+        let now = Date()
+        let edges = (timeline?.blocks ?? []).flatMap { [$0.block.start, $0.block.end] }.filter { $0 > now }
+        guard let next = edges.min() else { return }
+        let timer = Timer(fire: next.addingTimeInterval(0.5), interval: 0, repeats: false) { [weak self] _ in
+            Task { @MainActor in self?.refresh() }
+        }
+        timer.tolerance = 1
+        RunLoop.main.add(timer, forMode: .common)
+        blockEdgeTimer = timer
     }
 
     private func tickWhileFocusing() {

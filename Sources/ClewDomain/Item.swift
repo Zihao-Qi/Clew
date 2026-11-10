@@ -24,6 +24,8 @@ public enum Source: String, Codable, Sendable, CaseIterable {
     case extensionX = "extension.x"
     case dayflow
     case `import`
+    /// A time block's own tick, when its end passed (SPEC 2026-11-10, day timeline).
+    case timeline
 }
 
 /// Where an item's title came from. A fetched title was written by a stranger, so the

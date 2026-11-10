@@ -73,7 +73,8 @@ An iPhone app later reuses Domain, Core and Store unchanged; only the UI target 
 
 The core split: **what you intend** is mutable; **what happened** is append-only.
 
-- **Definitions** (edited freely, soft-deleted): `Item`, `Reminder`, `Settings`.
+- **Definitions** (edited freely, soft-deleted): `Item`, `Reminder`, `Settings`,
+  `TimeBlock` (v1.2).
 - **Facts** (inserted, never updated in substance; corrected by voiding):
   `CheckIn`, `Plan`, `GoalRound`, `LaterReview`, `DayReflection` (v1.2), `Award` (v1.3). (`WatchProgress` is
   latest-state; see §4.2.)
@@ -102,6 +103,8 @@ Settings        key (PK), value (JSON), updatedAt
 — later phases —
 WatchProgress   itemId (PK), fraction (0–1), observedAt, source   (v1.1) ← latest only, YouTube watch %
 FocusSession    id, itemId, localDay, at, minutes (1–720), kind: timer | manual, voidedAt?   (v1.2) ← a fact
+TimeBlock       id, itemId, localDay, start, minutes, placedAt, updatedAt, decidedAt?, tickId?,
+                coverId?, removedAt?   (v1.2) ← a definition: the day timeline (§6)
 ChangeLog       seq (monotonic), entity, entityId, op, at, source  (v1.1) ← for Gateway "changes since" and sync
 DayReflection   localDay (PK), valence (-1…1), bestItemId?, at, updatedAt  (v1.2)
 Award           id = hash(kind, itemId, milestone), kind (e.g. goal.finished),
@@ -127,7 +130,7 @@ Award           id = hash(kind, itemId, milestone), kind (e.g. goal.finished),
   children / all children). A YouTube playlist imported as a course becomes a
   parent with 30 children, with no new concepts.
 - `source` is `user | notification | extension.youtube | extension.x | dayflow |
-  import`. Every write is attributed. **`agent` is never a source of user data**
+  import | timeline` (a time block's own tick, v1.2). Every write is attributed. **`agent` is never a source of user data**
   (ADR-4); agent writes exist only in `AgentOutput`.
 - `(source, externalRef)` is unique, so imports are **idempotent upserts**:
   re-scanning Watch Later never duplicates.
@@ -397,6 +400,58 @@ only redraws the timed row and the menu bar label every second, from the model's
 one-second tick (`clockTick`, running only while a timer exists). Never a
 `TimelineView` in the menu bar label: SwiftUI then redraws the status item without
 end (measured 2026-11-10: 99% CPU in a minimal MenuBarExtra, 0.1–2% with the tick).
+
+**Day timeline (v1.2, SPEC 2026-11-10).** A placed task is a `TimeBlock`, a
+**definition** (it moves and resizes), tombstoned with `removedAt`, never deleted:
+`TimeBlock {id, itemId, localDay, start, minutes, placedAt, updatedAt, decidedAt?,
+tickId?, coverId?, removedAt?}`. `start` is an instant on a 15-minute step counted from
+the day's start (the rollover instant, so DST days stay right); `minutes` is a multiple
+of 15, at least 15, and the block ends by the next rollover. A block's own tick is a
+normal `CheckIn` with `source = timeline` and `localDay` = the block's day (the one
+exception to "the day comes from the clock at creation", §4.3); its `at` is when it was
+made, so a goal's rounds and "ticked while a focus ran" compare real instants.
+`tickId` points at it; `coverId` at the hand tick the block used instead. "Hand" ticks
+are every source but `timeline`.
+
+- **Deciding** (`settleBlocks`, Core): a live block whose end has passed and has no
+  `decidedAt` decides once, then keeps `decidedAt`. Its task must be live and active
+  (else the block is removed and never ticks). It **skips** when the task needs
+  nothing: a once-task or link done (on any day), a habit ticked on the block's day, a
+  goal reached in its current round. A goal is **covered** by the earliest live hand
+  tick on the block's day made at or after `placedAt` that no other block (removed ones
+  included) uses; it is kept in `coverId`, so after a move the same tick covers it again
+  and another block cannot take it. Otherwise it **ticks**. States are derived:
+  `pending` (no `decidedAt`), `ticked` (`tickId` live), `undone` (`tickId` voided),
+  `covered` / `skipped` (decided, no `tickId`).
+- **Commands:** `placeOnTimeline(itemId:start:minutes?)` (the row's drag and "Put on
+  timeline…": moves the task's earliest block not ended, else adds one; 30 minutes by
+  default, and a moved block's length, cut at the day's end; only rows on today's list), `moveBlock(id:start:)`,
+  `resizeBlock(id:minutes:)`, `addBlock(after:)` (same length, right after; refused if it
+  would pass the day's end), `removeBlock(id:)`, `blockNotFinished(id:)`. Moving or
+  resizing changes the end, so it voids a live `tickId`, clears `decidedAt`/`tickId`
+  (keeps `coverId`) and decides at once if the new end has passed. Removing voids a live
+  `tickId`. **Rounds:** a `tickId` made before the goal's current round started is
+  kept: move and Not finished are refused (`notAllowed`), remove keeps it. Every command
+  works on today's blocks only.
+- **Leaving Today:** `settleBlocks` first removes today's live blocks whose task is not on
+  today's list (any reason; the rollover never runs this on an earlier day's blocks),
+  then decides. It writes only when something changes, so the app can run it on every
+  refresh (launch, wake, every change, the next block's end) without a loop.
+- **Earlier days:** `lateTicks()` = live block ticks with `localDay` before today and
+  made today (`LocalDay(of: at)` = today), grouped by task, minus the ids in the setting
+  `lateTicksSeen` (dismissed). Their Not finished voids all of a task's listed ticks,
+  unless the rounds rule keeps one. A goal whose current round was reached that way
+  stays on Today's list (`todayList(keepReached:)`), so its congratulation shows.
+- **Focus:** `finishFocus` makes no tick when a live block tick of the same task was
+  made between the timer's `startedAt` and now.
+- **Alerts:** the plan adds `clew.block.<id>` at each of today's pending blocks' start
+  (after now), for a task that still needs something, when the setting `blockAlerts`
+  is on (default). `wantsNotifications` counts it; the app asks permission when the
+  first block is placed.
+- **Display** (`timeline()`): the day's start and end, and today's live blocks of
+  tasks on the list with title, state, `canChange` (the rounds rule) and a lane, so
+  overlapping blocks sit side by side. The setting `timelineShown` (default on) hides
+  it. The table `timeBlock` (v8) has no-delete; exports carry it (older read as none).
 
 **Site order (2026-11-10).** Every collection keeps the order its site shows in the
 setting `listOrder.<source>`, and its page lists what is left in that order (items

@@ -17,8 +17,60 @@ struct TodayListView: View {
     /// Row frames frozen when a drag begins, so slots are measured against the list as
     /// it was, not against rows that are sliding.
     @State private var dragFrames: [CGRect] = []
+    /// The day timeline above the list (SPEC 2026-11-10): where it is, where a row
+    /// dragged over it would land, and its scroll position (a quarter hour at the top).
+    @State private var timelineGeo = TimelineGeometry()
+    @State private var ghost: TimelineDrop?
+    @State private var topQuarter: Int?
+    @State private var edgeScroll: Timer?
+    /// The rows' full height, so a long list scrolls instead of passing the screen.
+    @State private var rowsHeight: CGFloat = 0
 
     private static let listSpace = "todayList"
+
+    private var showsTimeline: Bool { model.timelineShown && model.timeline != nil }
+
+    /// The rows may take what the screen has left after the timeline and the footer.
+    private var rowsLimit: CGFloat {
+        let screen = NSScreen.main?.visibleFrame.height ?? 800
+        return max(160, screen - (showsTimeline ? TimelineMetrics.height : 0) - 170)
+    }
+
+    /// Over the hours: the quarter hour under the pointer, as long as the task's open
+    /// block (or 30 minutes, cut at the day's end).
+    private func drop(for row: TodayRow, at y: CGFloat) -> TimelineDrop? {
+        guard showsTimeline, let day = model.timeline, y < timelineGeo.viewport.maxY else { return nil }
+        let start = TimelineMetrics.start(atContentY: y - timelineGeo.contentTop, in: day)
+        let open = day.blocks.first { $0.block.itemId == row.id && $0.block.end > Date() }?.block.minutes
+        let room = TimelineMetrics.room(after: start, in: day)
+        return TimelineDrop(itemId: row.id, start: start, minutes: min(open ?? Clew.blockDefaultMinutes, room))
+    }
+
+    /// Near the timeline's top or bottom edge while dragging, it scrolls by itself.
+    private func scrollAtEdge(_ y: CGFloat?) {
+        let view = timelineGeo.viewport
+        var step = 0
+        if let y, y < view.maxY {
+            if y < view.minY + 18 { step = -1 } else if y > view.maxY - 18 { step = 1 }
+        }
+        guard step != 0 else {
+            edgeScroll?.invalidate()
+            edgeScroll = nil
+            return
+        }
+        guard edgeScroll == nil else { return }
+        let direction = step
+        let timer = Timer(timeInterval: 0.12, repeats: true) { _ in
+            Task { @MainActor in
+                guard let day = model.timeline else { return }
+                let visible = Int(TimelineMetrics.height) / TimelineMetrics.quarter
+                let top = (topQuarter ?? 0) + direction
+                topQuarter = min(max(top, 0), TimelineMetrics.quarters(day) - visible)
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        edgeScroll = timer
+    }
 
     private func offset(for row: TodayRow, at index: Int, in rows: [TodayRow]) -> CGFloat {
         guard let dragging, let from = rows.firstIndex(where: { $0.id == dragging }) else { return 0 }
@@ -34,6 +86,17 @@ struct TodayListView: View {
                     dragFrames = rows.map { rowFrames[$0.id] ?? .zero }
                     dragging = row.id
                 }
+                // Up over the timeline: the row follows the pointer and the hour under it
+                // shows where it would land; the other rows stay where they are.
+                if let drop = drop(for: row, at: value.location.y) {
+                    ghost = drop
+                    dragTranslation = value.translation.height
+                    if dragSlot != nil { withAnimation(.easeOut(duration: 0.15)) { dragSlot = nil } }
+                    scrollAtEdge(value.location.y)
+                    return
+                }
+                ghost = nil
+                scrollAtEdge(nil)
                 // Kept inside the rows: never over the footer (Add, Later, Settings).
                 let from = rows.firstIndex(where: { $0.id == row.id }) ?? 0
                 if let first = dragFrames.first, let last = dragFrames.last, dragFrames.indices.contains(from) {
@@ -52,12 +115,16 @@ struct TodayListView: View {
                 }
             }
             .onEnded { _ in
+                scrollAtEdge(nil)
                 var t = Transaction()
                 t.disablesAnimations = true
                 withTransaction(t) {
-                    if let from = rows.firstIndex(where: { $0.id == row.id }), let to = dragSlot, to != from {
+                    if let ghost {
+                        model.place(ghost.itemId, at: ghost.start, minutes: ghost.minutes)
+                    } else if let from = rows.firstIndex(where: { $0.id == row.id }), let to = dragSlot, to != from {
                         model.drop(row.id, onto: rows[to])
                     }
+                    ghost = nil
                     dragging = nil
                     dragTranslation = 0
                     dragSlot = nil
@@ -65,28 +132,54 @@ struct TodayListView: View {
             }
     }
 
+    @ViewBuilder
+    private func rowsStack(_ rows: [TodayRow]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                RowView(row: row, model: model, onEdit: { screen = .edit(row.item, back: .list) },
+                        onOpen: { screen = .detail(row.id) },
+                        onPlace: showsTimeline ? { screen = .place(row.id, block: nil) } : nil,
+                        startTime: showsTimeline ? model.timeline?.nextStart(of: row.id, now: Date()) : nil,
+                        canMoveUp: index > 0, canMoveDown: index < rows.count - 1,
+                        isDragged: dragging == row.id)
+                    .background(GeometryReader { g in
+                        Color.clear.preference(key: RowFrames.self,
+                                               value: [row.id: g.frame(in: .named(Self.listSpace))])
+                    })
+                    .offset(y: offset(for: row, at: index, in: rows))
+                    .zIndex(dragging == row.id ? 1 : 0)
+                    .shadow(color: .black.opacity(dragging == row.id ? 0.18 : 0), radius: 6, y: 2)
+                    .gesture(drag(row, in: rows))
+            }
+        }
+        .padding(.vertical, 6)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { rowsHeight = $0 }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            if showsTimeline, let day = model.timeline {
+                DayTimelineView(model: model, day: day, ghost: ghost, space: Self.listSpace,
+                                geometry: $timelineGeo, topQuarter: $topQuarter,
+                                onMove: { block in screen = .place(block.block.itemId, block: block.id) })
+                Divider()
+            }
+            ForEach(model.lateTicks) { late in
+                LateTickLine(late: late, today: model.today?.day, model: model)
+            }
             if let rows = model.today?.rows, !rows.isEmpty {
-                VStack(spacing: 0) {
-                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                        RowView(row: row, model: model, onEdit: { screen = .edit(row.item, back: .list) },
-                                onOpen: { screen = .detail(row.id) },
-                                canMoveUp: index > 0, canMoveDown: index < rows.count - 1,
-                                isDragged: dragging == row.id)
-                            .background(GeometryReader { g in
-                                Color.clear.preference(key: RowFrames.self,
-                                                       value: [row.id: g.frame(in: .named(Self.listSpace))])
-                            })
-                            .offset(y: offset(for: row, at: index, in: rows))
-                            .zIndex(dragging == row.id ? 1 : 0)
-                            .shadow(color: .black.opacity(dragging == row.id ? 0.18 : 0), radius: 6, y: 2)
-                            .gesture(drag(row, in: rows))
+                Group {
+                    if rowsHeight > rowsLimit {
+                        // A long list scrolls rather than pushing the menu past the screen.
+                        ScrollView(.vertical) { rowsStack(rows) }
+                            .frame(height: rowsLimit)
+                    } else {
+                        rowsStack(rows)
                     }
                 }
-                .coordinateSpace(name: Self.listSpace)
+                // A row dragged up onto the timeline is drawn over it.
+                .zIndex(dragging != nil ? 1 : 0)
                 .onPreferenceChange(RowFrames.self) { rowFrames = $0 }
-                .padding(.vertical, 6)
             } else {
                 Text("Nothing for today.")
                     .foregroundStyle(.secondary)
@@ -145,6 +238,44 @@ struct TodayListView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
         }
+        // One space for the timeline and the rows, so a row can be dragged onto an hour.
+        .coordinateSpace(name: Self.listSpace)
+    }
+}
+
+/// "Ticked for yesterday: Write intro · Not finished": a block that ended while the
+/// Mac slept ticked its task for that day (SPEC 2026-11-10). One line per task.
+struct LateTickLine: View {
+    let late: LateTick
+    let today: LocalDay?
+    let model: AppModel
+
+    private var text: Text {
+        if let today, late.day == today.adding(days: -1) {
+            return Text("Ticked for yesterday: \(late.title)")
+        }
+        let weekday = Calendar.current.weekdaySymbols[(late.day.weekday.rawValue % 7)]
+        return Text("Ticked for \(weekday): \(late.title)")
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            text
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer(minLength: 4)
+            if late.canUndo {
+                Button("Not finished") { model.undoLateTicks(late.itemId) }
+                    .accessibilityLabel(Text("\(late.title) was not finished"))
+            }
+            Button { model.dismissLateTicks(late.itemId) } label: { Image(systemName: "xmark").imageScale(.small) }
+                .accessibilityLabel(Text("Close"))
+        }
+        .font(.callout)
+        .foregroundStyle(.secondary)
+        .buttonStyle(.borderless)
+        .padding(.horizontal, 12)
+        .padding(.top, 6)
     }
 }
 
@@ -159,6 +290,10 @@ struct RowView: View {
     let model: AppModel
     let onEdit: () -> Void
     let onOpen: () -> Void
+    /// "Put on timeline…", when the timeline is shown.
+    var onPlace: (() -> Void)? = nil
+    /// The start of the task's next block not ended ("10:00").
+    var startTime: Date? = nil
     var canMoveUp = false
     var canMoveDown = false
     /// This row is being dragged: it gets a solid background so rows sliding under it
@@ -262,6 +397,9 @@ struct RowView: View {
         .onHover { hovering = $0 }
         .accessibilityAction(named: Text("Move Up")) { if canMoveUp { model.move(row, by: -1) } }
         .accessibilityAction(named: Text("Move Down")) { if canMoveDown { model.move(row, by: 1) } }
+        .accessibilityActions {
+            if let onPlace { Button("Put on timeline…", action: onPlace) }
+        }
         .contextMenu {
             if row.todayAmount > 0 {
                 if item.kind == .goal {
@@ -272,6 +410,9 @@ struct RowView: View {
             }
             Button("Details", action: onOpen)
             Button("Edit…", action: onEdit)
+            if let onPlace {
+                Button("Put on timeline…", action: onPlace)
+            }
             if timer == nil, model.focus?.phase != .focus, !row.isGoalReached {
                 Menu("Focus") {
                     ForEach(Clew.focusMinutes, id: \.self) { m in
@@ -386,6 +527,16 @@ struct RowView: View {
                 timerControls(now: now)
                     .fixedSize()
                     .layoutPriority(1)
+                if timer == nil, let startTime {
+                    // When its block starts (SPEC 2026-11-10); right after the title, like
+                    // the timer, so nothing else moves.
+                    Text(verbatim: TimelineMetrics.time(startTime))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .fixedSize()
+                        .layoutPriority(1)
+                        .accessibilityLabel(Text("On the timeline at \(TimelineMetrics.time(startTime))"))
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 

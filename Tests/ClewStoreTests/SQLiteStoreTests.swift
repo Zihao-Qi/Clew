@@ -103,9 +103,13 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         try store.write { try $0.insert(FocusSession(id: UUID(), itemId: goal.id, localDay: day("2026-11-10"), at: t0,
                                                      minutes: 5, kind: .manual)) }
         #expect(counter.value == 4)
+        // A block moved on the timeline redraws it (SPEC 2026-11-10).
+        try store.write { try $0.save(TimeBlock(id: UUID(), itemId: goal.id, localDay: day("2026-11-10"), start: t0,
+                                                minutes: 30, placedAt: t0, updatedAt: t0)) }
+        #expect(counter.value == 5)
         token.cancel()
         try store.write { try $0.insert(sampleItem()) }
-        #expect(counter.value == 4)
+        #expect(counter.value == 5)
     }
 
     @Test func fileDatabaseSurvivesReopening() throws {
@@ -217,6 +221,45 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
     @Test func exportsFromBeforeFocusSessionsStillOpen() throws {
         let json = #"{"items":[],"checkIns":[],"plans":[],"goalRounds":[]}"#
         #expect(try JSONDecoder().decode(ExportRecords.self, from: Data(json.utf8)).focusSessions.isEmpty)
+    }
+
+    @Test func timeBlocksAreDefinitionsRemovedWithATombstone() throws {
+        // SPEC 2026-11-10, day timeline: a block moves and resizes, keeps its task, day
+        // and placing, is never deleted, and is only a whole number of quarter hours.
+        let store = try SQLiteStore.inMemory()
+        let item = sampleItem(.once)
+        var b = TimeBlock(id: UUID(), itemId: item.id, localDay: day("2026-11-10"), start: t0, minutes: 30,
+                          placedAt: t0, updatedAt: t0)
+        try store.write { w in try w.insert(item); try w.save(b) }
+        #expect(try store.read { try $0.timeBlock(id: b.id) } == b)
+        #expect(try store.read { try $0.pendingTimeBlocks() } == [b])
+        let tick = CheckIn(id: UUID(), itemId: item.id, localDay: day("2026-11-10"), at: t0 + 1800,
+                           timeZoneId: "UTC", source: .timeline)
+        b.start = t0 + 900
+        b.minutes = 45
+        b.decidedAt = t0 + 1800
+        b.tickId = tick.id
+        b.updatedAt = t0 + 1800
+        try store.write { w in try w.insert(tick); try w.save(b) }
+        #expect(try store.read { try $0.timeBlock(id: b.id) } == b)
+        #expect(try store.read { try $0.pendingTimeBlocks() }.isEmpty)
+        b.removedAt = t0 + 2000
+        try store.write { try $0.save(b) }
+        #expect(try store.read { try $0.timeBlocks(from: day("2026-11-10")) } == [b])   // removed ones too
+        #expect(try store.read { try $0.timeBlocks(from: day("2026-11-11")) }.isEmpty)
+        #expect(throws: DatabaseError.self) { try store.writer.write { try $0.execute(sql: "DELETE FROM timeBlock") } }
+        #expect(throws: DatabaseError.self) {
+            try store.writer.write { try $0.execute(sql: "UPDATE timeBlock SET localDay = '2026-11-11'") }
+        }
+        for minutes in [10, 0, 1515] {
+            #expect(throws: DatabaseError.self) {
+                try store.write { try $0.save(TimeBlock(id: UUID(), itemId: item.id, localDay: day("2026-11-10"),
+                                                        start: t0, minutes: minutes, placedAt: t0, updatedAt: t0)) }
+            }
+        }
+        #expect(try store.read { try $0.allRecords() }.timeBlocks == [b])
+        let old = #"{"items":[],"checkIns":[],"plans":[],"goalRounds":[]}"#
+        #expect(try JSONDecoder().decode(ExportRecords.self, from: Data(old.utf8)).timeBlocks.isEmpty)
     }
 
     @Test func voidsAreMonotonic() throws {

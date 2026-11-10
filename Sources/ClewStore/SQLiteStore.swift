@@ -51,7 +51,8 @@ public final class SQLiteStore: ClewStore {
     public func observeChanges(_ onChange: @escaping @Sendable () -> Void) -> any StoreObservation {
         let observation = DatabaseRegionObservation(tracking: Table("item"), Table("checkIn"), Table("plan"), Table("goalRound"),
                                                      Table("reminder"), Table("settings"), Table("laterReview"),
-                                                     Table("watchProgress"), Table("focusSession"))
+                                                     Table("watchProgress"), Table("focusSession"),
+                                                     Table("timeBlock"))
         let cancellable = observation.start(in: writer, onError: { _ in }, onChange: { _ in onChange() })
         return Observation(cancellable)
     }
@@ -191,7 +192,8 @@ private struct Access: StoreWriter {
             },
             laterReviews: try Row.fetchAll(db, sql: "SELECT * FROM laterReview ORDER BY at, id").map(Self.laterReview),
             watchProgress: try Row.fetchAll(db, sql: "SELECT * FROM watchProgress ORDER BY itemId").map(Self.watchProgress),
-            focusSessions: try Row.fetchAll(db, sql: "SELECT * FROM focusSession ORDER BY at, id").map(Self.focusSession)
+            focusSessions: try Row.fetchAll(db, sql: "SELECT * FROM focusSession ORDER BY at, id").map(Self.focusSession),
+            timeBlocks: try Row.fetchAll(db, sql: "SELECT * FROM timeBlock ORDER BY placedAt, id").map(Self.timeBlock)
         )
     }
 
@@ -238,6 +240,35 @@ private struct Access: StoreWriter {
         try db.execute(
             sql: "INSERT INTO focusSession (id, itemId, localDay, at, minutes, kind, voidedAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
             arguments: [s.id.uuidString, s.itemId.uuidString, s.localDay.description, s.at, s.minutes, s.kind.rawValue, s.voidedAt]
+        )
+    }
+
+    func timeBlocks(from: LocalDay) throws -> [TimeBlock] {
+        try Row.fetchAll(db, sql: "SELECT * FROM timeBlock WHERE localDay >= ? ORDER BY start, id",
+                         arguments: [from.description]).map(Self.timeBlock)
+    }
+
+    func pendingTimeBlocks() throws -> [TimeBlock] {
+        try Row.fetchAll(db, sql: "SELECT * FROM timeBlock WHERE decidedAt IS NULL AND removedAt IS NULL ORDER BY start, id")
+            .map(Self.timeBlock)
+    }
+
+    func timeBlock(id: UUID) throws -> TimeBlock? {
+        try Row.fetchOne(db, sql: "SELECT * FROM timeBlock WHERE id = ?", arguments: [id.uuidString]).map(Self.timeBlock)
+    }
+
+    func save(_ b: TimeBlock) throws {
+        try db.execute(
+            sql: """
+                INSERT INTO timeBlock (id, itemId, localDay, start, minutes, placedAt, updatedAt, decidedAt, tickId,
+                                       coverId, removedAt)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET start = excluded.start, minutes = excluded.minutes,
+                    updatedAt = excluded.updatedAt, decidedAt = excluded.decidedAt, tickId = excluded.tickId,
+                    coverId = excluded.coverId, removedAt = excluded.removedAt
+                """,
+            arguments: [b.id.uuidString, b.itemId.uuidString, b.localDay.description, b.start, b.minutes, b.placedAt,
+                        b.updatedAt, b.decidedAt, b.tickId?.uuidString, b.coverId?.uuidString, b.removedAt]
         )
     }
 
@@ -465,6 +496,23 @@ private struct Access: StoreWriter {
             fraction: try required(row, "fraction", table: t),
             observedAt: try required(row, "observedAt", table: t),
             source: try raw(row, "source", table: t)
+        )
+    }
+
+    private static func timeBlock(_ row: Row) throws -> TimeBlock {
+        let t = "timeBlock"
+        return TimeBlock(
+            id: try uuid(row, "id", table: t),
+            itemId: try uuid(row, "itemId", table: t),
+            localDay: try day(row, "localDay", table: t),
+            start: try required(row, "start", table: t),
+            minutes: try required(row, "minutes", table: t),
+            placedAt: try required(row, "placedAt", table: t),
+            updatedAt: try required(row, "updatedAt", table: t),
+            decidedAt: row["decidedAt"],
+            tickId: try optionalUUID(row, "tickId", table: t),
+            coverId: try optionalUUID(row, "coverId", table: t),
+            removedAt: row["removedAt"]
         )
     }
 

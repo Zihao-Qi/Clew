@@ -54,6 +54,12 @@ public protocol StoreReader {
     /// Non-voided focus sessions of these items, oldest first.
     func focusSessions(itemIds: [UUID]) throws -> [FocusSession]
     func focusSession(id: UUID) throws -> FocusSession?
+    /// Every time block of `from` and later days, removed ones included (a hand tick a
+    /// removed block used stays used), by start.
+    func timeBlocks(from: LocalDay) throws -> [TimeBlock]
+    /// Live blocks still waiting to decide, any day.
+    func pendingTimeBlocks() throws -> [TimeBlock]
+    func timeBlock(id: UUID) throws -> TimeBlock?
 }
 
 /// Everything Clew stores, as it is stored.
@@ -67,10 +73,12 @@ public struct ExportRecords: Hashable, Sendable, Codable {
     public var laterReviews: [LaterReview]
     public var watchProgress: [WatchProgress]
     public var focusSessions: [FocusSession]
+    public var timeBlocks: [TimeBlock]
 
     public init(items: [Item], checkIns: [CheckIn], plans: [Plan], goalRounds: [GoalRound],
                 reminders: [Reminder] = [], settings: [SettingRecord] = [], laterReviews: [LaterReview] = [],
-                watchProgress: [WatchProgress] = [], focusSessions: [FocusSession] = []) {
+                watchProgress: [WatchProgress] = [], focusSessions: [FocusSession] = [],
+                timeBlocks: [TimeBlock] = []) {
         self.items = items
         self.checkIns = checkIns
         self.plans = plans
@@ -80,10 +88,11 @@ public struct ExportRecords: Hashable, Sendable, Codable {
         self.laterReviews = laterReviews
         self.watchProgress = watchProgress
         self.focusSessions = focusSessions
+        self.timeBlocks = timeBlocks
     }
 
     private enum CodingKeys: String, CodingKey {
-        case items, checkIns, plans, goalRounds, reminders, settings, laterReviews, watchProgress, focusSessions
+        case items, checkIns, plans, goalRounds, reminders, settings, laterReviews, watchProgress, focusSessions, timeBlocks
     }
 
     /// `reminders` and `settings` arrived after the first exports; older files read as empty.
@@ -98,7 +107,8 @@ public struct ExportRecords: Hashable, Sendable, Codable {
             settings: try c.decodeIfPresent([SettingRecord].self, forKey: .settings) ?? [],
             laterReviews: try c.decodeIfPresent([LaterReview].self, forKey: .laterReviews) ?? [],
             watchProgress: try c.decodeIfPresent([WatchProgress].self, forKey: .watchProgress) ?? [],
-            focusSessions: try c.decodeIfPresent([FocusSession].self, forKey: .focusSessions) ?? []
+            focusSessions: try c.decodeIfPresent([FocusSession].self, forKey: .focusSessions) ?? [],
+            timeBlocks: try c.decodeIfPresent([TimeBlock].self, forKey: .timeBlocks) ?? []
         )
     }
 }
@@ -125,6 +135,8 @@ public protocol StoreWriter: StoreReader {
     func insert(_ session: FocusSession) throws
     /// Sets `voidedAt`. Voids are monotonic: voiding twice is an error.
     func voidFocusSession(id: UUID, at: Date) throws
+    /// Inserts, or replaces the row with the same id.
+    func save(_ block: TimeBlock) throws
 }
 
 /// A row of the `settings` table: a definition with last-writer-wins by `updatedAt`.

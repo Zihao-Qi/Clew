@@ -118,10 +118,17 @@ final class NotificationsAdapter: NSObject, UNUserNotificationCenterDelegate {
             content.title = String(localized: "Break's over")
             content.body = String(localized: "Back to \(title) when you're ready.")
             content.sound = .default
+        case .blockStarts(let itemId, let title, let until):
+            // "Write intro · now until 10:30" (SPEC 2026-11-10); clicking it opens Clew.
+            content.title = title
+            content.body = String(localized: "Now until \(until.formatted(date: .omitted, time: .shortened))")
+            content.sound = .default
+            content.userInfo["itemId"] = itemId.uuidString
         }
         content.categoryIdentifier = category
-        // The fingerprint: same time and text means nothing to change.
-        content.userInfo["fp"] = "\(Int(planned.fireAt.timeIntervalSince1970))|\(content.title)|\(category)"
+        // The fingerprint: same time and text means nothing to change (the body too: a
+        // resized block's "until" changes only there).
+        content.userInfo["fp"] = "\(Int(planned.fireAt.timeIntervalSince1970))|\(content.title)|\(content.body)|\(category)"
 
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone.current

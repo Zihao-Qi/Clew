@@ -290,10 +290,33 @@ enum Snapshot {
             try clew.addFocusTime(itemId: editing.id, day: today, minutes: 25)
             try clew.addFocusTime(itemId: editing.id, day: today.adding(days: -1), minutes: 50)
             try clew.addFocusTime(itemId: editing.id, day: today.adding(days: -9), minutes: 90)
+            // The day timeline (SPEC 2026-11-10): a block that ticked an hour ago, one
+            // running now, one later, overlapping another.
+            let day = try clew.timeline()
+            let quarterNow = day.start.addingTimeInterval(
+                (Date().timeIntervalSince(day.start) / 900).rounded(.down) * 900)
+            let rows = try clew.today().rows
+            func task(_ title: String) -> UUID? { rows.first { $0.item.title == title }?.id }
+            let intro = try clew.addItem(NewItem(title: "Write intro", shape: .today)).id
+            if let papers = task("Read papers"),
+               let long = task("A very long item title that should truncate nicely in the row") {
+                clock.date = Date().addingTimeInterval(-2 * 3600)
+                if quarterNow.addingTimeInterval(-2700) >= day.start {
+                    _ = try? clew.placeOnTimeline(itemId: papers, start: quarterNow.addingTimeInterval(-2700))
+                }
+                _ = try? clew.placeOnTimeline(itemId: intro, start: quarterNow, minutes: 45)
+                _ = try? clew.placeOnTimeline(itemId: long, start: quarterNow.addingTimeInterval(1800), minutes: 60)
+                clock.date = Date()
+                _ = try? clew.settleBlocks()
+            }
             // Rating dots on, and "Stretch" just ticked, so the list shows them.
             model.setRatingsEnabled(true)
             model.refresh()
             if let stretch = model.today?.rows.first(where: { $0.item.title == "Stretch" }) { model.tap(stretch) }
+            if let papers = model.today?.rows.first(where: { $0.item.title == "Write intro" }) {
+                render(RootView(model: model, screen: .place(papers.id, block: nil)), appearance: .aqua,
+                       to: dir.appendingPathComponent("place-light.png"))
+            }
             for (name, screen) in [("list", Screen.list), ("add", .add), ("pick", .pick),
                                    ("edit", .edit(editing, back: .list)), ("detail", .detail(editing.id)),
                                    ("collection", .collection(.extensionYouTube)),

@@ -110,18 +110,23 @@ public final class Clew: Sendable {
 
     public func today() throws -> TodayList {
         let day = currentDay()
-        return try store.read { r in
-            let items = try r.items(inStates: [.active]).filter { !Self.isCollectionItem($0) }
-            let ids = items.map(\.id)
-            let recent = Dictionary(grouping: try r.checkIns(itemIds: ids, from: day.weekStart), by: \.itemId)
-            let progress = try r.progressAmounts(itemIds: ids)
-            let rounds = try r.roundStarts(itemIds: ids)
-            var facts: [UUID: ItemFacts] = [:]
-            for id in ids {
-                facts[id] = ItemFacts(recent: recent[id] ?? [], progressAmount: progress[id] ?? 0, roundStart: rounds[id])
-            }
-            return todayList(items: items, facts: facts, on: day)
+        return try store.read { try todayList($0, on: day) }
+    }
+
+    /// Today's list as `r` sees it, inside a read or a write. Goals reached by a time
+    /// block's late tick stay on it (SPEC 2026-11-10).
+    func todayList(_ r: any StoreReader, on day: LocalDay) throws -> TodayList {
+        let items = try r.items(inStates: [.active]).filter { !Self.isCollectionItem($0) }
+        let ids = items.map(\.id)
+        let recent = Dictionary(grouping: try r.checkIns(itemIds: ids, from: day.weekStart), by: \.itemId)
+        let progress = try r.progressAmounts(itemIds: ids)
+        let rounds = try r.roundStarts(itemIds: ids)
+        var facts: [UUID: ItemFacts] = [:]
+        for id in ids {
+            facts[id] = ItemFacts(recent: recent[id] ?? [], progressAmount: progress[id] ?? 0, roundStart: rounds[id])
         }
+        let late = Set(try lateBlockTicks(r, today: day).map(\.block.itemId))
+        return ClewDomain.todayList(items: items, facts: facts, on: day, keepReached: late)
     }
 
     /// One item by id, if it exists and is not deleted.
