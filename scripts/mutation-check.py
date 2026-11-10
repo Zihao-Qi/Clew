@@ -497,6 +497,8 @@ M = [
  ("TL57 end ignores hidden", C+"Clew.swift", "        return (shown[shown.count - 1], t + 1 < others.count ? others[t + 1] : nil)", "        return (shown[shown.count - 1], nil)", "ReorderTests"),
  ("TL58 undelete no reminder", C+"Clew.swift", "                reminder.deletedAt = nil\n                reminder.updatedAt = now\n                try w.save(reminder)", "", "UndeleteTests"),
  ("TL59 undelete any reminder", C+"Clew.swift", "var reminder = all.first(where: { $0.deletedAt == deletedAt })", "var reminder = all.first", "UndeleteTests"),
+ ("TL60 undelete doubles reminder", C+"Clew.swift", "if !all.contains(where: { $0.deletedAt == nil }),", "if true,", "UndeleteTests"),
+ ("TL61 gap counts itself", C+"Clew.swift", "let shown = visible.filter { $0 != item }", "let shown = visible", "ReorderTests"),
  ("TL43 table allows 10", S+"Schema.swift", "CHECK (minutes BETWEEN 15 AND 1500 AND minutes % 15 = 0)", "CHECK (minutes BETWEEN 1 AND 1500)", "SQLiteStoreTests"),
  ("TL44 block can be deleted", S+"Schema.swift", "            CREATE TRIGGER timeBlock_no_delete BEFORE DELETE ON timeBlock\n            BEGIN SELECT RAISE(ABORT, 'time blocks are removed with a tombstone, never deleted'); END;\n", "", "SQLiteStoreTests"),
 ]

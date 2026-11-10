@@ -392,6 +392,19 @@ private struct Harness {
         try h.clew.undeleteItem(itemId: item.id)
         #expect(try h.clew.reminder(forItem: item.id) == nil)
     }
+
+    @Test func aLiveReminderIsNeverDoubled() throws {
+        // A reminder already live (e.g. from another device) wins over the old one.
+        let h = Harness()
+        let item = try h.clew.addItem(NewItem(title: "x", shape: .today))
+        try h.clew.setReminder(itemId: item.id, time: TimeOfDay(hour: 9, minute: 0))
+        h.clock.set(local(2026, 11, 10, 11))
+        try h.clew.deleteItem(itemId: item.id)
+        let fresh = Reminder(id: UUID(), itemId: item.id, time: TimeOfDay(hour: 20, minute: 0)!, updatedAt: local(2026, 11, 10, 11))
+        try h.store.write { try $0.save(fresh) }
+        try h.clew.undeleteItem(itemId: item.id)
+        #expect(h.store.state.reminders.values.filter { $0.itemId == item.id && $0.deletedAt == nil }.map(\.id) == [fresh.id])
+    }
 }
 
 @Suite struct TitleOriginTests {
