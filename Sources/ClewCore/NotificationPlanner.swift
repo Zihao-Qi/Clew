@@ -88,6 +88,13 @@ public enum NotificationPlanner {
         return Array(planned.sorted { ($0.fireAt, $0.id) < ($1.fireAt, $1.id) }.prefix(maxPending))
     }
 
+    /// Delivered "Done?" questions to withdraw: those of slot blocks no longer asking
+    /// (answered, or their day is over). Other notifications are never touched.
+    public static func staleQuestions(delivered: [String], asking: Set<UUID>) -> [String] {
+        let keep = Set(asking.map { idPrefix + "ask." + $0.uuidString })
+        return delivered.filter { $0.hasPrefix(idPrefix + "ask.") && !keep.contains($0) }.sorted()
+    }
+
     /// Rotates through the kind lines so two evenings in a row never repeat.
     public static func kindLine(for day: LocalDay) -> Int {
         ((day.ordinal % kindLineCount) + kindLineCount) % kindLineCount

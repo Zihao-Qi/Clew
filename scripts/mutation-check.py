@@ -505,6 +505,9 @@ M = [
  ("TL43 table allows 10", S+"Schema.swift", "CHECK (minutes BETWEEN 15 AND 1500 AND minutes % 15 = 0)", "CHECK (minutes BETWEEN 1 AND 1500)", "SQLiteStoreTests"),
  ("TL44 block can be deleted", S+"Schema.swift", "            CREATE TRIGGER timeBlock_no_delete BEFORE DELETE ON timeBlock\n            BEGIN SELECT RAISE(ABORT, 'time blocks are removed with a tombstone, never deleted'); END;\n", "", "SQLiteStoreTests"),
  # A repeating task's time slot (SPEC 2026-11-10)
+ ("SL28 goal +1 counts as done", C+"Timeline.swift", "            let needs = row.item.progress.target != nil ? !row.isGoalReached : !row.isDone", "            let needs = !row.isDone", SL),
+ ("SL29 withdraw everything", C+"NotificationPlanner.swift", "return delivered.filter { $0.hasPrefix(idPrefix + \"ask.\") && !keep.contains($0) }.sorted()", "return delivered.filter { $0.hasPrefix(idPrefix) }.sorted()", SL),
+ ("SL30 withdraw nothing", C+"NotificationPlanner.swift", "return delivered.filter { $0.hasPrefix(idPrefix + \"ask.\") && !keep.contains($0) }.sorted()", "return []", SL),
  ("SL1 slot ticks", C+"Timeline.swift", "        if b.origin == .slot {\n            switch result {", "        if false {\n            switch result {", SL),
  ("SL2 asks twice", C+"Timeline.swift", "guard asks, b.askedAt == nil else { return false }", "guard asks else { return false }", SL),
  ("SL3 asks with timeline off", C+"Timeline.swift", "guard asks, b.askedAt == nil else { return false }", "guard b.askedAt == nil else { return false }", SL),

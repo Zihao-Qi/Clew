@@ -265,6 +265,16 @@ struct TodayListView: View {
         }
         .padding(.vertical, 6)
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { rowsHeight = $0 }
+        // A block coming down from the timeline: the list grows by one row, so the rows
+        // sliding down to open its gap push what is below (the YouTube row, the footer)
+        // instead of covering it (user, 2026-11-10).
+        .padding(.bottom, incomingGap)
+    }
+
+    /// The extra room a block held over the list takes: one row while it is there.
+    private var incomingGap: CGFloat {
+        guard let lifted, lifted.blockId != nil, !lifted.overTimeline, lifted.slot != nil else { return 0 }
+        return dragFrames.first?.height ?? 34
     }
 
     var body: some View {

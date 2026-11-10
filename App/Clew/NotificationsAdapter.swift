@@ -171,10 +171,7 @@ final class NotificationsAdapter: NSObject, UNUserNotificationCenterDelegate {
     /// "Done?" notifications for blocks no longer asking are removed.
     func withdrawQuestions(keeping asking: Set<UUID>) async {
         let delivered = await center.deliveredNotifications()
-        let stale = delivered.map(\.request.identifier).filter { id in
-            id.hasPrefix(NotificationPlanner.idPrefix + "ask.")
-                && !asking.contains { id == NotificationPlanner.idPrefix + "ask." + $0.uuidString }
-        }
+        let stale = NotificationPlanner.staleQuestions(delivered: delivered.map(\.request.identifier), asking: asking)
         if !stale.isEmpty { center.removeDeliveredNotifications(withIdentifiers: stale) }
     }
 

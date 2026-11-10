@@ -71,6 +71,21 @@ private let eightToNine = TimeSlot(hour: 8, minute: 0, minutes: 60)!
         #expect(blocks(id).isEmpty)
     }
 
+    @Test func aGoalWithAPlusOneTodayStillGetsItsSlot() throws {
+        let id = try goal()
+        clock.set(at(10, 4, 30)); try clew.checkIn(itemId: id)       // 1/30 before the slot is placed
+        try settle(at: at(10, 5))
+        #expect(blocks(id).count == 1)
+    }
+
+    @Test func answeredQuestionsAreWithdrawn() {
+        let asking = UUID(), answered = UUID()
+        let delivered = ["clew.ask.\(asking.uuidString)", "clew.ask.\(answered.uuidString)",
+                         "clew.reminder.x.2026-11-10", "other.app"]
+        #expect(NotificationPlanner.staleQuestions(delivered: delivered, asking: [asking])
+                == ["clew.ask.\(answered.uuidString)"])
+    }
+
     @Test func aSlotThatHasStartedIsNotPlacedThatDay() throws {
         let id = try habit()
         try settle(at: at(10, 8, 30))                             // the Mac was off until 8:30
