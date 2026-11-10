@@ -454,8 +454,9 @@ final class AppModel {
     /// lands after the target; from below, before it.
     @discardableResult
     func drop(_ dragged: UUID, onto target: TodayRow) -> Bool {
-        guard let order = Optional(listRows.map(\.id)),
-              let (above, below) = Clew.dropNeighbours(dragged: dragged, onto: target.id, in: order)
+        guard let all = today?.rows.map(\.id),
+              let (above, below) = Clew.dropNeighbours(dragged: dragged, onto: target.id, in: listRows.map(\.id),
+                                                        within: all)
         else { return false }
         return run { try $0.moveItem(id: dragged, after: above, before: below) }
     }

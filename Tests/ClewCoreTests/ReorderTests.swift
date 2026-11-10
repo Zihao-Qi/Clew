@@ -62,6 +62,11 @@ import Testing
         #expect(Clew.dropNeighbours(dragged: c, onto: a, in: ids)! == (nil, a))
         #expect(Clew.dropNeighbours(dragged: b, onto: b, in: ids) == nil)
         #expect(Clew.dropNeighbours(dragged: UUID(), onto: b, in: ids) == nil)
+        // b is on the timeline, hidden: d onto c lands between b and c, never on b's key.
+        let shown = [a, c, d]
+        #expect(Clew.dropNeighbours(dragged: d, onto: c, in: shown, within: ids)! == (b, c))
+        #expect(Clew.dropNeighbours(dragged: a, onto: c, in: shown, within: ids)! == (c, d))
+        #expect(Clew.dropNeighbours(dragged: c, onto: a, in: [a, c], within: ids)! == (nil, a))
     }
 
     @Test func dropThenMoveGivesTheExpectedOrder() throws {

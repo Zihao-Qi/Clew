@@ -171,6 +171,9 @@ struct TimelineBlockView: View {
     let onOpen: () -> Void
     let onEdit: (Item) -> Void
 
+    /// True while a drag of the block is live; it resets by itself when the drag ends
+    /// or is cancelled, which clears what the drag showed (Gemini review).
+    @GestureState private var dragging = false
     @State private var moveBy = 0          // minutes, while dragging
     @State private var resizeBy = 0
     @State private var overList = false
@@ -202,6 +205,13 @@ struct TimelineBlockView: View {
                 if inside { hovered = b.id } else if hovered == b.id { hovered = nil }
             }
             .contextMenu { menu }
+            .onChange(of: dragging) { _, live in
+                if !live { moveBy = 0; overList = false; floating = nil }
+            }
+            .onDisappear {
+                if overList { floating = nil }
+                if hovered == b.id { hovered = nil }
+            }
             .help(Text(verbatim: "\(block.title) · \(range)"))
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Text("\(block.title), \(range)"))
@@ -215,6 +225,9 @@ struct TimelineBlockView: View {
                 }
                 if let row, row.todayAmount > 0 {
                     Button(row.item.kind == .goal ? "Undo +1" : "Undo") { model.undo(row) }
+                }
+                if timer != nil {
+                    Button("Stop the timer") { model.stopFocus() }
                 }
             }
     }
@@ -271,8 +284,9 @@ struct TimelineBlockView: View {
                         let wanted = b.minutes + Self.snap(value.translation.height)
                         resizeBy = min(max(wanted, Clew.blockStepMinutes), room) - b.minutes
                     }
-                    .onEnded { _ in
-                        let change = resizeBy
+                    .onEnded { value in
+                        let room = TimelineMetrics.room(after: b.start, in: day)
+                        let change = min(max(b.minutes + Self.snap(value.translation.height), Clew.blockStepMinutes), room) - b.minutes
                         resizeBy = 0
                         if change != 0 { model.resizeBlock(b.id, minutes: b.minutes + change) }
                     }
@@ -281,17 +295,18 @@ struct TimelineBlockView: View {
 
     private var moveGesture: some Gesture {
         DragGesture(minimumDistance: 3, coordinateSpace: .named(space))
+            .updating($dragging) { _, live, _ in live = true }
             .onChanged { value in
                 // Dragged onto the list below: let go there to put it back (SPEC 2026-11-10).
-                overList = value.location.y > viewport.maxY + 4
+                overList = isOverList(value)
                 floating = overList ? FloatingBlock(title: block.title, location: value.location) : nil
                 guard block.canChange, !overList else { return }
-                let earliest = -Int(b.start.timeIntervalSince(day.start) / 60)
-                let latest = TimelineMetrics.room(after: b.start, in: day) - b.minutes
-                moveBy = min(max(Self.snap(value.translation.height), earliest), latest)
+                moveBy = moveMinutes(value)
             }
-            .onEnded { _ in
-                let change = moveBy, remove = overList
+            .onEnded { value in
+                // From the final position, not from state a cancel may already have reset.
+                let remove = isOverList(value)
+                let change = remove || !block.canChange ? 0 : moveMinutes(value)
                 moveBy = 0
                 overList = false
                 floating = nil
@@ -301,6 +316,15 @@ struct TimelineBlockView: View {
                     model.moveBlock(b.id, to: b.start.addingTimeInterval(TimeInterval(change * 60)))
                 }
             }
+    }
+
+    private func isOverList(_ value: DragGesture.Value) -> Bool { value.location.y > viewport.maxY + 4 }
+
+    /// The drag as whole quarter hours, kept inside the day.
+    private func moveMinutes(_ value: DragGesture.Value) -> Int {
+        let earliest = -Int(b.start.timeIntervalSince(day.start) / 60)
+        let latest = TimelineMetrics.room(after: b.start, in: day) - b.minutes
+        return min(max(Self.snap(value.translation.height), earliest), latest)
     }
 
     /// A drag in points as whole quarter hours of minutes.
@@ -328,8 +352,13 @@ struct TimelineBlockView: View {
             Button("Edit…") { onEdit(row.item) }
             if let timer {
                 if timer.phase == .focus, timer.isOver(at: Date()) {
-                    Button(row.item.kind == .goal ? "+1 and stop" : "Done and stop") { model.finishFocus(row) }
+                    if !row.isGoalReached {
+                        Button(row.item.kind == .goal ? "+1 and stop" : "Done and stop") { model.finishFocus(row) }
+                    }
                     Button("5 more min") { model.extendFocus() }
+                    if model.focusOffersBreak {
+                        Button("Break") { model.startBreak() }
+                    }
                 } else if timer.phase == .focus {
                     Button(timer.isPaused ? "Resume the timer" : "Pause the timer") {
                         timer.isPaused ? model.resumeFocus() : model.pauseFocus()
@@ -342,6 +371,9 @@ struct TimelineBlockView: View {
                         Button("\(m) min") { model.startFocus(row, minutes: m) }
                     }
                 }
+            }
+            if (row.item.kind == .once || row.item.kind == .link), row.progressAmount == 0 {
+                Button("Move to Later") { model.moveToLater(row) }
             }
             Divider()
         }
@@ -362,6 +394,9 @@ struct TimelineBlockView: View {
         }
         Divider()
         Button("Remove block") { model.removeBlock(b.id) }
+        if row != nil {
+            Button("Delete", role: .destructive) { model.delete(b.itemId) }
+        }
     }
 }
 

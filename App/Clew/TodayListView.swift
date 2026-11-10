@@ -273,7 +273,10 @@ struct TodayListView: View {
         }
         .background {
             // Delete removes the block under the pointer (user, 2026-11-10).
-            Button("Remove block") { if let hoveredBlock { model.removeBlock(hoveredBlock) } }
+            Button("Remove block") {
+                // The removed block's view goes without an "exit" hover, so forget it here.
+                if let id = hoveredBlock { hoveredBlock = nil; model.removeBlock(id) }
+            }
                 .keyboardShortcut(.delete, modifiers: [])
                 .opacity(0)
                 .frame(width: 0, height: 0)
