@@ -5,7 +5,7 @@ import SwiftUI
 /// Where the timeline is, in the list's coordinate space, so a dragged row can tell
 /// which hour it is over.
 struct TimelineGeometry: Equatable {
-    /// The visible part (about 4 hours).
+    /// The visible part (about 6 hours).
     var viewport: CGRect = .zero
     /// The top of the whole day's content (moves as it scrolls).
     var contentTop: CGFloat = 0
