@@ -207,50 +207,69 @@ stopped daily use, not adding features.
   so a plan and the list are one glance. Settings › General › "Show the day timeline"
   (default on) turns it off and the menu is as before. About **4 hours show** (about
   60 points an hour), it scrolls up and down through Clew's day (4 a.m. to 4 a.m.), and
-  it opens scrolled to now, with a line at the current time; the menu grows taller by
-  that much. **Today only:** no tomorrow, nothing planned ahead.
-  - **Placing:** drag a task's row from Today's list onto an hour. It drops as a
-    **30-minute block**, snapped to 15 minutes; drag the block to move it and its
-    bottom edge to resize it (15 minutes at least, never past 4 a.m.). Only tasks on
-    Today can be placed; the collection rows cannot. Blocks may overlap each other and
-    events; overlapping ones sit side by side. A placed task's row shows its start time
-    ("10:00"). **Unplacing:** drag the block back onto the list, or right-click it ›
-    Remove block (the accessible way; Move to… on the block's right-click does the
-    same for moving).
-  - **One block is the easy case:** dragging a task that already has a block **moves**
-    that block (on a task with several, the earliest one not ended). A second block
-    comes only from the block's right-click › **Add another block** (placed right after
-    it).
+  it opens scrolled to now, with a quiet line at the current time; the menu grows taller
+  by that much, but never past the screen (the list scrolls when it must). **Today
+  only:** no tomorrow, nothing planned ahead. Nothing on it is red or says "missed".
+  - **Placing:** drag a task's row from Today's list onto an hour (the timeline scrolls
+    when the drag nears its top or bottom edge). It drops as a **30-minute block**,
+    snapped to 15 minutes; drag the block to move it and its bottom edge to resize it
+    (15 minutes at least, ending at 4 a.m. at the latest). Only tasks on Today can be
+    placed; the collection rows cannot. Blocks may overlap each other and events;
+    overlapping ones sit side by side. A task's row shows the start of its next block
+    not yet ended ("10:00"). **Unplacing:** drag the block back onto the list.
+  - **Without dragging** (and for VoiceOver): the row's right-click › **Put on
+    timeline…** and the block's right-click › **Move to…** open a small start-time and
+    length picker; the block's right-click also has **Length** (15, 30, 45, 60, 90
+    minutes) and **Remove block**. Each is also an accessibility action.
+  - **One block is the easy case:** dragging a task's row again **moves** its block
+    that has not ended (the earliest, if several); if all its blocks have ended, it
+    adds a new one. A second block before then comes only from the block's right-click
+    › **Add another block** (right after it; not offered when that would pass 4 a.m.).
   - **A block's end ticks the task** (*new rule*: until now only the user and a
     finished external list ticked; the focus timer still never ticks by itself). It is a
-    real tick: the row is done, it counts on the heatmap and in the week, and a counted
-    goal gets **+1**. It is skipped when the task needs nothing: a task already done
-    today, a counted goal whose total is reached, or a tick made by hand earlier today
-    that already covers it (a task gets at most one automatic tick per ended block,
-    minus the ticks made by hand today, so ticking by hand before the end never counts
-    twice). A block dropped or resized so that it has already ended ticks at once, so
-    past hours can be used to log what was done. If the Mac sleeps or Clew is not
-    running at the end, it ticks when Clew runs again, on the block's own day, even
-    after 4 a.m.
-  - **Undo:** right-click › Not finished (on the block or the row), or untick the row
-    as usual. The block stays and does not tick again. **Moving a block that has
-    ended** undoes its tick; it ticks again when its new end passes (at once if that
-    is also past). **Removing** a block that ticked also undoes its tick (the tick
-    belongs to the block); ticks made by hand are never touched.
+    real tick, dated the block's day: the row is done, it counts on the heatmap and in
+    the week, and a counted goal gets **+1**. **A block decides once**, when its end
+    passes (or at once, if it is placed or changed so that it has already ended): it
+    ticks, or it skips. The outcome is kept; only changing its end makes it decide
+    again. It **skips** when the task needs nothing: a task already done today (not a
+    counted goal), a counted goal whose total is reached, or a tick **made by hand since
+    the block was placed** that no earlier block used (each hand tick covers one block,
+    so ticking by hand before the end never counts twice; the circle, `+1`, a
+    reminder's Done and a focus timer's Done are all "by hand"). A focus timer's Done
+    adds nothing when a block of the same task ticked while that timer ran (one sitting,
+    one tick). If the Mac sleeps or Clew is not running at the end, the block decides
+    when Clew runs again, still for its own day, even after 4 a.m.; a block ending at
+    exactly 4:00 belongs to the day it ends.
+  - **Undo:** right-click a block that ticked › **Not finished**, or untick the row as
+    usual; the block stays, quieter, and does not tick again. **Changing a block's end**
+    (move, resize) undoes its tick and lets it decide again, also after Not finished.
+    **Removing** a block that ticked also undoes its tick (the tick belongs to the
+    block); ticks made by hand are never touched. **Rounds:** once a counted goal's next
+    round has started (or its target was raised), a block whose tick came before that
+    keeps the tick: it can still be removed (tick kept) but not moved or un-finished.
+    **Yesterday:** a tick made after 4 a.m. for the day before (the Mac was asleep)
+    shows one line above the list, "Ticked for yesterday: Write intro · Not finished",
+    until dismissed or the next rollover.
   - Blocks are **not focus time**: only the focus timer and time added by hand are
-    recorded. A focus timer can run on a task with a block; its Done covers the block.
-  - A block whose task leaves Today (Later, deleted) disappears and never ticks. Blocks
-    belong to their day: at 4 a.m. the timeline starts empty, and an unfinished task
-    rolls forward as usual, without its block.
+    recorded. A focus timer can run on a task with a block.
+  - **Leaving Today:** moving a task to Later or deleting it removes its blocks for
+    good (blocks not ended never tick; ticks already made stay). If it comes back the
+    same day, it comes back without blocks. Blocks belong to their day: at 4 a.m. the
+    timeline starts empty and an unfinished task rolls forward as usual, without its
+    block. The rollover is not leaving Today: a block that ended the evening before still
+    decides.
   - **Start alert:** "Write intro · now until 10:30" when a block starts, with **Open
     Clew**. Settings › Notifications › "Alert when a block starts" (default on). None
-    for a block placed after its start.
+    for a block placed after its start or a task already done. Notification permission
+    is asked when the first block is placed (if this is on); if it is denied, Settings
+    says so.
   - **Calendar events (step 2)** show on the timeline as **read-only** blocks in their
     calendar's colour: title and time, nothing to click, never ticked, never counted,
     never alerted by Clew (Calendar has its own alerts). All-day events sit as a thin
     line at the top. Declined events are hidden. Clew reads **every calendar in macOS
     Calendar** (Google, iCloud, Exchange too, once added in System Settings › Internet
-    Accounts); Settings › Calendar lists them with checkboxes. Clew **never writes to a
+    Accounts); Settings › Calendar lists them with checkboxes, and Clew remembers only
+    the ones unticked, so a new calendar shows by default. Clew **never writes to a
     calendar**, and events are read live: never saved, exported or sent anywhere.
     Access is asked only when "Show your calendar" on the timeline (or in Settings) is
     clicked; without it the timeline works with tasks alone.
@@ -291,5 +310,7 @@ Swift 6, SwiftUI, macOS 14+, XcodeGen (`project.yml`), GRDB. Unit tests in a
 framework target so they run without launching the app. Copy
 `install-local.sh` and `LoginItem.swift` from Tact, minus its Accessibility
 signing step. App Sandbox stays **on**: Clew needs no Accessibility permission. The
-day timeline's events (v1.2) need only the sandbox's Calendars entitlement and
-full read access (EventKit asks for read and write together on macOS 14; Clew never writes).
+day timeline's events (v1.2) need the sandbox's Calendars entitlement
+(`com.apple.security.personal-information.calendars`), an
+`NSCalendarsFullAccessUsageDescription`, and full access: macOS 14 offers only full or
+write-only access, no read-only, so the prompt text says Clew only reads.
