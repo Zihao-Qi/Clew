@@ -332,8 +332,10 @@ struct RowView: View {
         .padding(.leading, 28)
     }
 
-    /// The running timer's controls at the row's end: time left (☕ in a break), pause
-    /// or resume, stop. Hovering a row with no timer shows ▶ to start one.
+    /// The running timer's controls, right after the title: time left (☕ in a break),
+    /// pause or resume, stop. A timer is started from right-click → Focus only, so
+    /// nothing appears or moves on hover (user, 2026-11-10: a ▶ before the count sat
+    /// in a different place on goal rows).
     @ViewBuilder
     private func timerControls(now: Date) -> some View {
         if let timer {
@@ -355,19 +357,6 @@ struct RowView: View {
                     .buttonStyle(.borderless)
                     .accessibilityLabel(timer.phase == .rest ? Text("End the break") : Text("Stop the timer"))
             }
-        } else if hovering, model.focus?.phase != .focus, !row.isGoalReached {
-            Menu {
-                ForEach(Clew.focusMinutes, id: \.self) { m in
-                    Button("\(m) min") { model.startFocus(row, minutes: m) }
-                }
-            } label: {
-                Image(systemName: "play.circle").foregroundStyle(.secondary)
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .help(Text("Focus on this"))
-            .accessibilityLabel(Text("Focus on \(item.title)"))
         }
     }
 
@@ -391,10 +380,14 @@ struct RowView: View {
             .disabled(row.isGoalReached)
             .accessibilityLabel(tapLabel)
 
-            titleView
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            timerControls(now: now)
+            HStack(spacing: 8) {
+                titleView
+                // Kept whole; a long title truncates instead.
+                timerControls(now: now)
+                    .fixedSize()
+                    .layoutPriority(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             if let target = item.progress.target {
                 // Fixed widths, so every goal's bar starts in the same column.

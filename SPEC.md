@@ -184,11 +184,13 @@ stopped daily use, not adding features.
   heatmap (videos had this page too until they moved to their collection's page). Their details show where the item is (In Later, On Today, Done Nov 9),
   watch progress for videos, a short history (saved, picked, kept, done · felt), and
   Open video / Open link.
-- **Focus timer (v1.2, 2026-11-10):** a tomato clock on a task on Today. Hover the row
-  and click ▶ (or right-click → Focus) for **10, 25 or 45 minutes**; one timer at a
+- **Focus timer (v1.2, 2026-11-10):** a tomato clock on a task on Today. Right-click
+  the row → Focus → **10, 25 or 45 minutes** (*changed* the same day: a ▶ on hover sat
+  before the count, so it moved between goal and plain rows); one timer at a
   time (a running focus must be stopped first; a break is simply replaced). The task's
   bar fills with the time in the chosen bar style, and the menu bar shows the
-  countdown. Pause and Stop are on the row; sleep and quitting lose nothing. When time
+  countdown. While it runs, the time, Pause and Stop sit right after the title (a long
+  title truncates; nothing else moves); sleep and quitting lose nothing. When time
   is up a notification fires and the row asks **Done / +1, 5 more min, Break, Stop**;
   it never ticks by itself. **Break:** 5 minutes, offered when Settings › General ›
   Focus timer › "Offer a break after focusing" is on (default on), with its own

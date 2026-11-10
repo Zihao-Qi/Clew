@@ -136,7 +136,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Focus timer")
                 } footer: {
-                    Text("Hover a task and click ▶ to focus on it for 10, 25 or 45 minutes. When time is up, it asks whether you're done; it never ticks by itself.")
+                    Text("Right-click a task and choose Focus to work on it for 10, 25 or 45 minutes. When time is up, it asks whether you're done; it never ticks by itself.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
