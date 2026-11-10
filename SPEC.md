@@ -252,21 +252,23 @@ stopped daily use, not adding features.
     keeps the tick: it can still be removed (tick kept) but not moved or un-finished.
     **Earlier days:** a tick made for an earlier day (the Mac was asleep past 4 a.m.)
     shows one line per task above the list, "Ticked for yesterday: Write intro · Not
-    finished" (or "for Friday"), until dismissed or the next rollover; Not finished is
-    left out when the rule above keeps the tick.
+    finished" (or "for Friday"), until dismissed or the next rollover. Its Not finished
+    undoes all of that task's ticks made that way, and is left out when the rule above
+    keeps them. A goal whose total was reached that way shows its congratulation and
+    choices on Today.
   - Blocks are **not focus time**: only the focus timer and time added by hand are
     recorded. A focus timer can run on a task with a block.
-  - **Leaving Today:** moving a task to Later, deleting it, or editing it so it is not
-    due today removes its blocks for
-    good (blocks not ended never tick; ticks already made stay). If it comes back the
+  - **Leaving Today:** whenever a task is no longer on Today's list, for any reason but
+    the rollover (moved to Later, deleted, edited or un-ticked off it), its blocks are
+    removed for good (blocks not ended never tick; ticks already made stay). If it comes back the
     same day, it comes back without blocks. Blocks belong to their day: at 4 a.m. the
     timeline starts empty and an unfinished task rolls forward as usual, without its
     block. The rollover is not leaving Today: a block that ended the evening before still
     decides.
   - **Start alert:** "Write intro · now until 10:30" when a block starts, with **Open
     Clew**. Settings › Notifications › "Alert when a block starts" (default on). None
-    for a block placed after its start or a task that needs nothing (done today; a
-    goal: total reached). Notification permission
+    for a block placed after its start or a task that needs nothing (done today, not a
+    counted goal; a goal: total reached). Notification permission
     is asked when the first block is placed (if this is on); if it is denied, Settings
     says so.
   - **Calendar events (step 2)** show on the timeline as **read-only** blocks in their
