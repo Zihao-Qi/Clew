@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { parseHTML } from "linkedom";
-import { BookmarkScan, bookmarkClick, cellTop, isBookmarks, postId, readWindow, SELECTOR_VERSION } from "../src/x";
+import { BookmarkScan, bookmarkClick, cellTop, isBookmarks, postId, readPost, readWindow, SELECTOR_VERSION } from "../src/x";
 
 const page = () =>
   parseHTML(readFileSync(new URL("fixtures/x-bookmarks.synthetic.html", import.meta.url), "utf8")).document;
@@ -9,9 +9,11 @@ const postBy = (h: string) => `Post by ${h}`;
 const e = (n: number) => ({ externalRef: `18500000000000000${String(n).padStart(2, "0")}`, title: `p${n}` });
 
 describe("X bookmarks page", () => {
-  test("is only x.com/i/bookmarks", () => {
+  test("is the Bookmarks tab (/i/history, or the older /i/bookmarks), never Likes", () => {
     expect(isBookmarks("https://x.com/i/bookmarks")).toBe(true);
     expect(isBookmarks("https://x.com/i/bookmarks?x=1")).toBe(true);
+    expect(isBookmarks("https://x.com/i/history")).toBe(true);           // where Bookmarks lives now
+    expect(isBookmarks("https://x.com/i/history/likes")).toBe(false);    // the Likes tab
     expect(isBookmarks("https://x.com/home")).toBe(false);
     expect(isBookmarks("https://evil.example/i/bookmarks")).toBe(false);
     expect(isBookmarks("not a url")).toBe(false);
@@ -24,8 +26,20 @@ describe("X bookmarks page", () => {
       { externalRef: "1850000000000000001", title: "Plain text post" },
       { externalRef: "1850000000000000004", title: "Own words" },
       { externalRef: "1850000000000000002", title: "Post by @bob_2" },
+      { externalRef: "1850000000000000006", title: "How to learn anything" }, // an X Article: its title
       undefined,                                           // a post it could not read
     ]);
+  });
+
+  test("an article's title is never its author's name or a quoted article's", () => {
+    const { document } = parseHTML(`
+      <article id="bare"><div><div data-testid="User-Name"><div dir="auto"><span>Gus</span></div></div>
+        <a href="/gus/status/41"><time></time></a><div><div data-testid="article-cover-image"></div></div></div></article>
+      <article id="quoting"><a href="/hal/status/42"><time></time></a>
+        <div data-testid="tweetText">My take</div>
+        <div role="link"><div><div data-testid="article-cover-image"></div><div dir="auto">Their article</div></div></div></article>`);
+    expect(readPost(document.getElementById("bare")!, postBy)?.title).toBe("Post by @gus");
+    expect(readPost(document.getElementById("quoting")!, postBy)?.title).toBe("My take");
   });
 
   test("a page not scrolled to the top is not the top", () => {

@@ -128,8 +128,9 @@ stopped daily use, not adding features.
   from an empty list); a video re-added comes back, to watch again (its automatic tick
   is undone; one the user made stays). What the user deleted stays gone.
 - **X bookmarks (v1.1, 2026-11-10):** the second collection ("X bookmarks  5 to
-  read ›"). A post's title is its own text (not a quoted post's), or "Post by @name"
-  when it has none. **Adding:** opening x.com/i/bookmarks in Chrome reads the posts
+  read ›"). A post's title is the title of the X Article it shares, else its own text
+  (not a quoted post's), else "Post by @name". **Adding:** opening Bookmarks in Chrome
+  (x.com/i/history, where X moved it; the Likes tab is ignored) reads the posts
   as you scroll (newest first, so new ones are seen at once), and bookmarking a post
   anywhere on x.com in Chrome adds it right away. **Removing = read** (same rule as
   Watch Later): unbookmarking in Chrome marks it read at once. The page shows no count

@@ -387,8 +387,14 @@ today only. The Gateway's import answer reports `listCount`, the items on the li
   throttled to every 250 ms and the scan is sent 1.5 s after the page settles. A
   capture-phase click listener on `document` sees the bookmark button before X flips
   it (`bookmark` = being bookmarked, `removeBookmark` = being removed) and posts to
-  `/v1/bookmark` at once. **Selectors unverified** as of 2026-11-10 (Chrome was signed
-  out of X); they must be checked on the signed-in page before this is relied on.
+  `/v1/bookmark` at once. Checked on the signed-in page 2026-11-10: Bookmarks lives
+  at `/i/history` (its Bookmarks tab; `/i/history/likes` is Likes and is ignored;
+  `/i/bookmarks` still accepted); rows are `cellInnerDiv` with `translateY` (fractions
+  too); the button is `<button data-testid="bookmark|removeBookmark">`; quotes are in
+  `div[role="link"]` with their own time link. An X Article has no `tweetText`: its
+  title is the first `[dir="auto"]` text in the card around `article-cover-image`
+  (never the author's name, never a quoted article's), and it is preferred to the
+  post's own text.
 
 **MCP server (v1.2).** `clew-mcp` is a tiny stdio executable. Its tools map 1:1 onto
 Gateway endpoints and are **read-only** (`get_today`, `get_history`, `get_later`,

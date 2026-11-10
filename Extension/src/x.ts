@@ -9,9 +9,13 @@
 
 import type { BookmarkRequest, ExternalEntry, ImportRequest } from "./contract";
 
-// UNVERIFIED (2026-11-10): written before the real page could be checked (Chrome was
-// signed out of X). Check every selector on the signed-in Bookmarks page first.
-export const SELECTOR_VERSION = "x-2026-11-10";
+// Checked on the signed-in page 2026-11-10: Bookmarks now lives at /i/history (a
+// "Bookmarks" tab; /i/history/likes is Likes), rows are cellInnerDiv with
+// translateY (fractions too), posts are article[data-testid="tweet"] with their own
+// time link, quotes sit in div[role="link"], and the button is a <button> with
+// data-testid "bookmark" or "removeBookmark". X Articles have no tweetText: their
+// title is the first text in the card around "article-cover-image".
+export const SELECTOR_VERSION = "x-2026-11-10b";
 
 export const SELECTORS = {
   /** One per row of the timeline, `style="transform: translateY(<n>px); …"`. */
@@ -27,15 +31,24 @@ export const SELECTORS = {
   unbookmark: '[data-testid="removeBookmark"]',
   /** The quoted post's box inside a post. */
   quote: 'div[role="link"]',
+  /** An X Article's cover image; its card's first text is the article's title. */
+  articleCover: '[data-testid="article-cover-image"]',
+  /** Text blocks (the article title is the first one in the card). */
+  textBlock: '[dir="auto"]',
 } as const;
 
 const STATUS = /^\/[A-Za-z0-9_]{1,15}\/status\/(\d{1,19})(?:[/?#]|$)/;
 const HANDLE = /^\/([A-Za-z0-9_]{1,15})\/status\//;
 
+/** The Bookmarks page: /i/history (its Bookmarks tab, seen 2026-11-10) or the older
+ * /i/bookmarks. Never the Likes tab. */
 export function isBookmarks(url: string): boolean {
   try {
     const u = new URL(url);
-    return (u.hostname === "x.com" || u.hostname === "twitter.com") && u.pathname === "/i/bookmarks";
+    return (
+      (u.hostname === "x.com" || u.hostname === "twitter.com") &&
+      (u.pathname === "/i/history" || u.pathname === "/i/bookmarks")
+    );
   } catch {
     return false;
   }
@@ -69,17 +82,30 @@ export function postText(post: Element): string {
   return (own?.textContent ?? "").replace(/\s+/g, " ").trim();
 }
 
+/** An X Article's title (the article this post shares), not a quoted post's. */
+export function articleTitle(post: Element): string | undefined {
+  const cover = post.querySelector(SELECTORS.articleCover);
+  if (!cover || inQuote(post, cover)) return undefined;
+  for (let el = cover.parentElement; el && el !== post; el = el.parentElement) {
+    const block = Array.from(el.querySelectorAll(SELECTORS.textBlock)).find(
+      (d) => !d.closest(SELECTORS.userName) && (d.textContent ?? "").trim() !== "",
+    );
+    if (block) return (block.textContent ?? "").replace(/\s+/g, " ").trim();
+  }
+  return undefined;
+}
+
 export function postHandle(post: Element): string | undefined {
   return HANDLE.exec(statusLink(post) ?? "")?.[1];
 }
 
-/** A post as an entry: its text, or "Post by @name" (`postBy`) when it has none. */
+/** A post as an entry: the title of the X Article it shares, else its own text, else
+ * "Post by @name" (`postBy`). */
 export function readPost(post: Element, postBy: (handle: string) => string): ExternalEntry | undefined {
   const id = postId(post);
   if (!id) return undefined;
-  const text = postText(post);
   const handle = postHandle(post);
-  const title = text || (handle ? postBy(`@${handle}`) : "");
+  const title = articleTitle(post) || postText(post) || (handle ? postBy(`@${handle}`) : "");
   return title ? { externalRef: id, title } : undefined;
 }
 

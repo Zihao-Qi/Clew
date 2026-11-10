@@ -42,6 +42,10 @@ M = [
  ("E31 wrong endpoint", E+"gateway.ts", "this.post(pairing, \"/v1/bookmark\", request)", "this.post(pairing, \"/v1/import\", request)"),
  ("E32 bookmark answer lax", E+"contract.ts", "return isObject(v) && isInt(v.listCount) && isImportResult(v.result);", "return isObject(v);"),
  ("E33 zero id", E+"x.ts", "return id && !id.startsWith(\"0\") ? id : undefined;", "return id;"),
+ ("E34 article title ignored", E+"x.ts", "const title = articleTitle(post) || postText(post) ||", "const title = postText(post) ||"),
+ ("E35 history page missed", E+"x.ts", "(u.pathname === \"/i/history\" || u.pathname === \"/i/bookmarks\")", "u.pathname === \"/i/bookmarks\""),
+ ("E36 quoted article", E+"x.ts", "if (!cover || inQuote(post, cover)) return undefined;", "if (!cover) return undefined;"),
+ ("E37 author as title", E+"x.ts", "(d) => !d.closest(SELECTORS.userName) && (d.textContent ?? \"\").trim() !== \"\",", "(d) => (d.textContent ?? \"\").trim() !== \"\","),
  ("E16 checks lax", E+"contract.ts", "[\"added\", \"renamed\", \"restored\", \"letGo\", \"skipped\", \"progressed\"].every((k) => isInt(r[k]))", "true"),
 ]
 results = []
