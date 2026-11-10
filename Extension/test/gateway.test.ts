@@ -39,7 +39,7 @@ const clew: Server = async (url, init) => {
     const auth = (init?.headers as Record<string, string>).Authorization;
     if (auth !== "Bearer tok") return json(401, { error: "unknown token" });
     return json(200, {
-      result: { added: 1, renamed: 0, restored: 0, letGo: 0, skipped: 0, complete: true },
+      result: { added: 1, renamed: 0, restored: 0, letGo: 0, skipped: 0, progressed: 0, complete: true },
       needsUpdate: false,
       laterCount: 1,
     });

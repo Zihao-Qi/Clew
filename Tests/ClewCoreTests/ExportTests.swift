@@ -52,6 +52,17 @@ private func local(_ y: Int, _ m: Int, _ d: Int, _ h: Int) -> Date {
         #expect(doc.records.checkIns.first?.voidedAt != nil)
     }
 
+    @Test func exportsFromBeforeWatchProgressStillOpen() throws {
+        let doc = ExportDocument(exportedAt: Date(timeIntervalSince1970: 0),
+                                 records: ExportRecords(items: [], checkIns: [], plans: [], goalRounds: []))
+        var json = try #require(try JSONSerialization.jsonObject(with: try doc.encoded()) as? [String: Any])
+        var records = try #require(json["records"] as? [String: Any])
+        #expect(records.removeValue(forKey: "watchProgress") != nil)
+        json["records"] = records
+        let old = try ExportDocument.decode(try JSONSerialization.data(withJSONObject: json))
+        #expect(old.records.watchProgress.isEmpty)
+    }
+
     @Test func otherVersionsAreRejected() throws {
         let doc = ExportDocument(exportedAt: Date(timeIntervalSince1970: 0),
                                  records: ExportRecords(items: [], checkIns: [], plans: [], goalRounds: []))

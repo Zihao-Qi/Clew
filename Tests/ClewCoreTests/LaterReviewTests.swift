@@ -14,6 +14,17 @@ private func local(_ m: Int, _ d: Int, _ h: Int = 10) -> Date {
     let clock = TestClock(local(9, 28))
     var clew: Clew { Clew(store: store, clock: clock, zones: FixedZone("America/New_York")) }
 
+    @Test func pickShowsTheSiteButNotForYouTube() throws {
+        for (url, title) in [("https://www.youtube.com/watch?v=aaaaaaaaaaa", "a"), ("https://youtube.com/watch?v=x", "b"),
+                             ("https://m.youtube.com/watch?v=x", "c"), ("https://youtu.be/x", "d"),
+                             ("https://www.medium.com/x", "e"), ("https://Example.org/y", "f")] {
+            try clew.addItem(NewItem(title: title, url: URL(string: url), shape: .later))
+        }
+        try clew.addItem(NewItem(title: "g", shape: .later))   // no link
+        let labels = Dictionary(uniqueKeysWithValues: try clew.laterPile().map { ($0.item.title, $0.siteLabel ?? "-") })
+        #expect(labels == ["a": "-", "b": "-", "c": "-", "d": "-", "e": "medium.com", "f": "example.org", "g": "-"])
+    }
+
     @Test func asksAfterSixWeeksUntouched() throws {
         let item = try clew.addItem(NewItem(title: "old", shape: .later))   // Sep 28
         clock.set(local(11, 8))                                              // 41 days

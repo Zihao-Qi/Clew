@@ -7,10 +7,14 @@ import Foundation
 public struct ExternalEntry: Hashable, Sendable, Codable {
     public var externalRef: String
     public var title: String
+    /// How much was watched, 0–1, when the site shows it. Out-of-range values are
+    /// ignored (the entry itself is still imported).
+    public var progress: Double?
 
-    public init(externalRef: String, title: String) {
+    public init(externalRef: String, title: String, progress: Double? = nil) {
         self.externalRef = externalRef
         self.title = title
+        self.progress = progress
     }
 }
 
@@ -42,16 +46,19 @@ public struct ImportResult: Hashable, Sendable, Codable {
     public var letGo: Int
     /// Entries skipped as malformed (bad id or empty title).
     public var skipped: Int
+    /// Items whose watch progress changed.
+    public var progressed: Int
     /// Whether the scan was the whole list (so removals could be applied).
     public var complete: Bool
 
     public init(added: Int = 0, renamed: Int = 0, restored: Int = 0, letGo: Int = 0, skipped: Int = 0,
-                complete: Bool = false) {
+                progressed: Int = 0, complete: Bool = false) {
         self.added = added
         self.renamed = renamed
         self.restored = restored
         self.letGo = letGo
         self.skipped = skipped
+        self.progressed = progressed
         self.complete = complete
     }
 }
@@ -75,13 +82,13 @@ extension Clew {
 
         var result = ImportResult()
         var seen = Set<String>()
-        var entries: [(ref: String, title: String, url: URL)] = []
+        var entries: [(ref: String, title: String, url: URL, progress: Double?)] = []
         for entry in batch.entries {
             guard let ref = Self.validExternalRef(entry.externalRef, source: batch.source),
                   let title = Self.importedTitle(entry.title),
                   let url = Self.externalURL(ref, source: batch.source)
             else { result.skipped += 1; continue }
-            if seen.insert(ref).inserted { entries.append((ref, title, url)) }
+            if seen.insert(ref).inserted { entries.append((ref, title, url, Self.watchFraction(entry.progress))) }
         }
         // The whole list only if the site's count, the rows on the page and the parsed
         // entries all agree, nothing was malformed, and the list is not empty: a broken
@@ -98,6 +105,14 @@ extension Clew {
                 if let ref = item.externalRef { existing[ref] = item }
             }
             var sortKey = try w.maxSortKey() ?? 0
+            let watched = try w.watchProgress(itemIds: existing.values.map(\.id))
+            /// Saves a new reading only when it differs from the stored one, so
+            /// re-scans write nothing.
+            func record(_ fraction: Double?, for itemId: UUID) throws {
+                guard let fraction, watched[itemId]?.fraction != fraction else { return }
+                try w.save(WatchProgress(itemId: itemId, fraction: fraction, observedAt: now, source: batch.source))
+                result.progressed += 1
+            }
             for entry in entries {
                 if var item = existing[entry.ref] {
                     var changed = false
@@ -117,14 +132,17 @@ extension Clew {
                         item.updatedAt = now
                         try w.update(item)
                     }
+                    try record(entry.progress, for: item.id)
                 } else {
                     sortKey += 1
-                    try w.insert(Item(
+                    let item = Item(
                         id: newID(), kind: .link, title: entry.title, titleOrigin: .fetched, url: entry.url,
                         schedule: .unscheduled, progress: .none, state: .later, sortKey: sortKey,
                         source: batch.source, externalRef: entry.ref, createdAt: now, updatedAt: now
-                    ))
+                    )
+                    try w.insert(item)
                     result.added += 1
+                    try record(entry.progress, for: item.id)
                 }
             }
 
@@ -199,6 +217,14 @@ extension Clew {
 /// What a scraper saw on the page, sent with every scan (ARCHITECTURE §6 "health
 /// report, not silence"): rows it found, rows it could read, and its selector table's
 /// version.
+extension Clew {
+    /// 0–1 rounded to 0.01, or nil when absent or out of range.
+    static func watchFraction(_ value: Double?) -> Double? {
+        guard let value, value.isFinite, (0...1).contains(value) else { return nil }
+        return (value * 100).rounded() / 100
+    }
+}
+
 public struct ScanReport: Hashable, Sendable, Codable {
     public var found: Int
     public var parsed: Int

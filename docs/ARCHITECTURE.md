@@ -75,7 +75,7 @@ The core split: **what you intend** is mutable; **what happened** is append-only
 
 - **Definitions** (edited freely, soft-deleted): `Item`, `Reminder`, `Settings`.
 - **Facts** (inserted, never updated in substance; corrected by voiding):
-  `CheckIn`, `Plan`, `GoalRound`, `LaterReview`, `DayReflection` (v1.2), `Award` (v1.3). (`ItemProgress` is
+  `CheckIn`, `Plan`, `GoalRound`, `LaterReview`, `DayReflection` (v1.2), `Award` (v1.3). (`WatchProgress` is
   latest-state; see §4.2.)
 
 Everything the UI shows (today's list, the `4/6`, progress bars, levels, recaps)
@@ -100,7 +100,7 @@ Reminder        id, itemId, time (hour, minute; local), enabled, updatedAt, dele
                 ← at most one live reminder per item; it fires on the item's due days
 Settings        key (PK), value (JSON), updatedAt
 — later phases —
-ItemProgress    itemId (PK), fraction (0–1), observedAt, source   (v1.1) ← latest only, e.g. YouTube watch %
+WatchProgress   itemId (PK), fraction (0–1), observedAt, source   (v1.1) ← latest only, YouTube watch %
 ChangeLog       seq (monotonic), entity, entityId, op, at, source  (v1.1) ← for Gateway "changes since" and sync
 DayReflection   localDay (PK), valence (-1…1), bestItemId?, at, updatedAt  (v1.2)
 Award           id = hash(kind, itemId, milestone), kind (e.g. goal.finished),
@@ -134,12 +134,15 @@ Award           id = hash(kind, itemId, milestone), kind (e.g. goal.finished),
 - **Fields mutated after insert are named, with their merge policy** (see §8):
   `rating` (last writer wins by `ratedAt`), and `voidedAt`/`voidReason`
   (monotonic: once voided, stays voided).
-- **Progress is latest-state, not a fact stream.** The extension may report watch %
-  often; `ItemProgress` keeps only the newest value per item, so scans never bloat
-  the database. Reaching 100% is the one transition that becomes a fact: a
-  `CheckIn`, created only if the item has **no non-voided CheckIn from that source**,
-  so re-scans cannot create it twice. (A deterministic ID was rejected: with
-  monotonic voids, one accidental void would block that item forever.)
+- **Watch progress is latest-state, not a fact stream.** It arrives with each
+  Watch Later scan (`ExternalEntry.progress`, 0–1, rounded to 0.01; out of range is
+  ignored, the video still imported). `WatchProgress` keeps one row per item, the
+  newest `observedAt` wins, and an unchanged reading writes nothing, so re-scans
+  never bloat the database. It never creates a `CheckIn` (*changed from the plan*,
+  user decision 2026-11-09: progress is shown, ticking stays the user's), does not
+  restart an item's Later clock, and does not keep a video in Later once it leaves
+  Watch Later. A video the user deleted gets no progress. It is named
+  `WatchProgress`, not `ItemProgress`, to keep it apart from `Item.progress`.
 
 ### 4.3 Time (ADR-3)
 
@@ -198,7 +201,7 @@ ChangeLog entry, and an attributed `source`:
 `AddItem`, `EditItem`, `CheckIn`, `VoidCheckIn`, `Rate`, `PlanForToday`,
 `MoveToLater`, `StartNextRound`, `DeleteItem` (tombstone), `ArchiveItem`,
 `SetReminder`, `Export`; later
-`ImportExternal(batch)`, `RecordProgress` (v1.1), `Reflect` (v1.2).
+`ImportExternal(batch)` (also carries watch progress, v1.1), `Reflect` (v1.2).
 
 Queries are read models: `Today`, `Later(filter)`, `History(range)`,
 `Goal(id)`, `Recap(range)`.
@@ -316,8 +319,12 @@ go stays gone; items on Today or done are never touched.
 - The content script scans when the Watch Later page opens (YouTube is a single-page
   app: `yt-navigate-finish`) and again as more rows load; the service worker is the
   only part that talks to Clew, and skips an identical scan within a minute.
-- Sends `ImportExternal` batches now; `RecordProgress` comes with watch progress. It
-  does not compute progress itself.
+- Sends `ImportExternal` batches, each video with its watch progress when its
+  thumbnail shows the red bar (verified 2026-11-09 on the Watch Later page:
+  `ytw-thumbnail-overlay-resume-playback-renderer` > a div with `style="width: N%"`;
+  the 2026-11-08 class is kept as a fallback). Progress is read only from the
+  Watch Later page, not while a video plays (user decision 2026-11-09: no second
+  scraper on the player). It does not compute anything else.
 
 **MCP server (v1.2).** `clew-mcp` is a tiny stdio executable. Its tools map 1:1 onto
 Gateway endpoints and are **read-only** (`get_today`, `get_history`, `get_later`,
@@ -383,7 +390,7 @@ was false, because some fact fields change after insert.)
 | DayReflection | one row per `localDay`; last writer wins by `updatedAt` |
 | Item, Reminder, Settings | **row-level** last writer wins by `updatedAt` (every definition table has `updatedAt` + `deletedAt`). Field-level merge, if two devices editing different fields of one item ever matters, uses CKSyncEngine's server-record conflict callback with stored system fields; decided in v2 |
 | `Award.voidedAt` | monotonic |
-| ItemProgress | newest `observedAt` wins |
+| WatchProgress | newest `observedAt` wins |
 | Deletes | tombstones (`deletedAt`), never hard deletes |
 
 Two devices ticking the same daily habit offline produce two CheckIns. That is

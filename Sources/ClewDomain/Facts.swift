@@ -124,3 +124,21 @@ public enum LaterAge {
         daysWaiting >= askAfterDays
     }
 }
+
+/// How much of a video was watched, as last seen on its site (ARCHITECTURE §4.2).
+/// Latest state, not a fact: one row per item, and an older observation never
+/// replaces a newer one. It never ticks anything (SPEC decision 2026-11-09).
+public struct WatchProgress: Hashable, Sendable, Codable {
+    public let itemId: UUID
+    /// 0–1, in steps of 0.01.
+    public var fraction: Double
+    public var observedAt: Date
+    public var source: Source
+
+    public init(itemId: UUID, fraction: Double, observedAt: Date, source: Source) {
+        self.itemId = itemId
+        self.fraction = fraction
+        self.observedAt = observedAt
+        self.source = source
+    }
+}

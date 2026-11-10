@@ -5,9 +5,20 @@ import Foundation
 public struct LaterEntry: Hashable, Sendable, Identifiable {
     public let item: Item
     public let daysWaiting: Int
+    /// How much of the video was watched (0–1), if seen.
+    public var watched: Double?
     /// SPEC §5: waited 6+ weeks untouched, so the picker asks "still want this?".
     public var asksStillWant: Bool { LaterAge.asksStillWant(daysWaiting: daysWaiting) }
     public var id: UUID { item.id }
+
+    /// The site shown under a saved link's title in Pick, e.g. "medium.com". None for
+    /// YouTube: those are videos, which the title already says (user, 2026-11-09).
+    public var siteLabel: String? {
+        guard let host = item.url?.host?.lowercased(), !host.isEmpty else { return nil }
+        let site = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        let youTube = site == "youtube.com" || site.hasSuffix(".youtube.com") || site == "youtu.be"
+        return youTube ? nil : site
+    }
 }
 
 extension Clew {
@@ -18,6 +29,7 @@ extension Clew {
         let today = currentDay()
         return try storeForQueries.read { r in
             let items = try r.items(inStates: [.later])
+            let watched = try r.watchProgress(itemIds: items.map(\.id))
             let kept = Dictionary(grouping: try r.laterReviews(itemIds: items.map(\.id)).filter { $0.decision == .keep },
                                   by: \.itemId)
             return items
@@ -26,7 +38,8 @@ extension Clew {
                     let lastKeep = kept[item.id]?.map(\.at).max()
                     let touched = max(item.updatedAt, lastKeep ?? item.updatedAt)
                     let day = LocalDay(of: touched, in: zone, rolloverHour: rolloverHour)
-                    return LaterEntry(item: item, daysWaiting: LaterAge.daysWaiting(lastTouched: day, today: today))
+                    return LaterEntry(item: item, daysWaiting: LaterAge.daysWaiting(lastTouched: day, today: today),
+                                      watched: watched[item.id]?.fraction)
                 }
         }
     }

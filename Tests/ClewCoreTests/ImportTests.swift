@@ -9,8 +9,8 @@ private func local(_ m: Int, _ d: Int, _ h: Int = 10) -> Date {
     return cal.date(from: DateComponents(year: 2026, month: m, day: d, hour: h))!
 }
 
-private func video(_ ref: String, _ title: String = "A video") -> ExternalEntry {
-    ExternalEntry(externalRef: ref, title: title)
+private func video(_ ref: String, _ title: String = "A video", watched: Double? = nil) -> ExternalEntry {
+    ExternalEntry(externalRef: ref, title: title, progress: watched)
 }
 
 private let a = "aaaaaaaaaaa", b = "bbbbbbbbbbb", c = "ccccccccccc", d = "ddddddddddd"
@@ -185,6 +185,51 @@ private let a = "aaaaaaaaaaa", b = "bbbbbbbbbbb", c = "ccccccccccc", d = "dddddd
         try clew.letGo(itemId: try #require(imported(a)).id)
         #expect(try clew.importExternal(batch([video(a)], total: 1)).restored == 0)
         #expect(imported(a)?.deletedAt != nil)
+    }
+
+    // MARK: Watch progress (read from the Watch Later page)
+
+    @Test func watchProgressIsKeptAndRewrittenOnlyWhenItChanges() throws {
+        let first = try clew.importExternal(batch([video(a, watched: 0.4), video(b)], total: 2))
+        #expect(first.progressed == 1)
+        let ida = try #require(imported(a)).id, idb = try #require(imported(b)).id
+        #expect(try clew.watchProgress(itemIds: [ida, idb]) == [ida: 0.4])
+        clock.set(local(11, 10))
+        #expect(try clew.importExternal(batch([video(a, watched: 0.4), video(b)], total: 2)).progressed == 0)
+        #expect(store.state.watchProgress[ida]?.observedAt == local(11, 9))   // re-scans write nothing
+        let moved = try clew.importExternal(batch([video(a, watched: 0.86), video(b)], total: 2))
+        #expect(moved.progressed == 1)
+        #expect(store.state.watchProgress[ida]?.fraction == 0.86)
+        #expect(store.state.watchProgress[ida]?.observedAt == local(11, 10))
+        #expect(store.state.watchProgress[ida]?.source == .extensionYouTube)
+    }
+
+    @Test func progressNeverTicksAndDoesNotRestartTheLaterClock() throws {
+        try clew.importExternal(batch([video(a), video(b)], total: 2))
+        let before = try #require(imported(a))
+        try clew.planForToday(itemIds: [try #require(imported(b)).id])
+        clock.set(local(11, 12))
+        try clew.importExternal(batch([video(a, watched: 1), video(b, watched: 1)], total: 2))
+        let after = try #require(imported(a))
+        #expect(after.state == .later && after.updatedAt == before.updatedAt)
+        // SPEC 2026-11-09: never ticks, in Later or on Today.
+        #expect(store.state.checkIns.isEmpty)
+        #expect(imported(b)?.state == .active)
+        #expect(try clew.laterPile().first?.watched == 1)
+    }
+
+    @Test func unreadableProgressIsIgnoredButTheVideoIsImported() throws {
+        let r = try clew.importExternal(batch(
+            [video(a, watched: 1.5), video(b, watched: -0.1), video(c, watched: .nan), video(d, watched: 0.333)], total: 4))
+        #expect(r.added == 4 && r.skipped == 0 && r.progressed == 1)
+        #expect(store.state.watchProgress.values.map(\.fraction) == [0.33])
+    }
+
+    @Test func aVideoTheUserDeletedGetsNoProgress() throws {
+        try clew.importExternal(batch([video(a)], total: 1))
+        try clew.deleteItem(itemId: try #require(imported(a)).id)
+        #expect(try clew.importExternal(batch([video(a, watched: 0.5)], total: 1)).progressed == 0)
+        #expect(store.state.watchProgress.isEmpty)
     }
 
     @Test func onlyImportSourcesAndBoundedBatches() throws {

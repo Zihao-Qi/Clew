@@ -26,7 +26,11 @@ M = [
  ("E14 total guessed", E+"youtube.ts", "...(total === undefined ? {} : { listTotal: total }),", "listTotal: total ?? entries.length,"),
  ("E15 title attr only", E+"youtube.ts", "(link?.getAttribute(\"title\") || link?.textContent || \"\")", "(link?.getAttribute(\"title\") || \"\")"),
  ("E17 redirects followed", E+"gateway.ts", "{ redirect: \"error\" }", "{ redirect: \"follow\" }"),
- ("E16 checks lax", E+"contract.ts", "[\"added\", \"renamed\", \"restored\", \"letGo\", \"skipped\"].every((k) => isInt(r[k]))", "true"),
+ ("E18 progress selector", E+"youtube.ts", "\"ytw-thumbnail-overlay-resume-playback-renderer .ytwThumbnailOverlayResumePlaybackRendererThumbnailOverlayResumePlaybackProgress\"", "\"ytw-thumbnail-overlay-resume-playback-renderer .renamed\""),
+ ("E19 progress range", E+"youtube.ts", "pct >= 0 && pct <= 100 ?", "true ?"),
+ ("E20 progress as percent", E+"youtube.ts", "Math.round(pct) / 100", "pct"),
+ ("E21 progress dropped", E+"youtube.ts", "entries.push(progress === undefined ? { externalRef: id, title } : { externalRef: id, title, progress });", "entries.push({ externalRef: id, title });"),
+ ("E16 checks lax", E+"contract.ts", "[\"added\", \"renamed\", \"restored\", \"letGo\", \"skipped\", \"progressed\"].every((k) => isInt(r[k]))", "true"),
 ]
 results = []
 for name, path, old, new in M:

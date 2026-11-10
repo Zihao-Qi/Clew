@@ -28,6 +28,23 @@ struct ParisZone: TimeZoneSource { func current() -> TimeZone { TimeZone(identif
                     listTotal: refs.count, scan: ScanReport(found: refs.count, parsed: refs.count, selectorVersion: "t"))
     }
 
+    @Test func watchProgressRoundTripsAndNewestWins() throws {
+        try clew.importExternal(ImportBatch(source: .extensionYouTube,
+            entries: [ExternalEntry(externalRef: "aaaaaaaaaaa", title: "v", progress: 0.4)], listTotal: 1))
+        let id = try #require(try store.read { try $0.items(source: .extensionYouTube) }.first).id
+        #expect(try clew.watchProgress(itemIds: [id]) == [id: 0.4])
+        let newer = WatchProgress(itemId: id, fraction: 0.9, observedAt: clock.now() + 60, source: .extensionYouTube)
+        let older = WatchProgress(itemId: id, fraction: 0.1, observedAt: clock.now() - 60, source: .extensionYouTube)
+        try store.write { try $0.save(newer); try $0.save(older) }
+        #expect(try clew.watchProgress(itemIds: [id]) == [id: 0.9])
+        #expect(try store.read { try $0.allRecords() }.watchProgress.map(\.fraction) == [0.9])
+        // Out of range is refused by the table itself.
+        #expect(throws: (any Error).self) {
+            try store.write { try $0.save(WatchProgress(itemId: id, fraction: 1.5, observedAt: clock.now() + 120,
+                                                        source: .extensionYouTube)) }
+        }
+    }
+
     @Test func leaveAndComeBackRoundTripsThroughSQLite() throws {
         try clew.importExternal(batch(["aaaaaaaaaaa", "bbbbbbbbbbb"]))
         clock.advance()

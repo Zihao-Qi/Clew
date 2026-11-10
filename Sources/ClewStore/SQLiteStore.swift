@@ -50,7 +50,8 @@ public final class SQLiteStore: ClewStore {
 
     public func observeChanges(_ onChange: @escaping @Sendable () -> Void) -> any StoreObservation {
         let observation = DatabaseRegionObservation(tracking: Table("item"), Table("checkIn"), Table("plan"), Table("goalRound"),
-                                                     Table("reminder"), Table("settings"), Table("laterReview"))
+                                                     Table("reminder"), Table("settings"), Table("laterReview"),
+                                                     Table("watchProgress"))
         let cancellable = observation.start(in: writer, onError: { _ in }, onChange: { _ in onChange() })
         return Observation(cancellable)
     }
@@ -188,7 +189,8 @@ private struct Access: StoreWriter {
                               value: try Self.required(row, "value", table: "settings"),
                               updatedAt: try Self.required(row, "updatedAt", table: "settings"))
             },
-            laterReviews: try Row.fetchAll(db, sql: "SELECT * FROM laterReview ORDER BY at, id").map(Self.laterReview)
+            laterReviews: try Row.fetchAll(db, sql: "SELECT * FROM laterReview ORDER BY at, id").map(Self.laterReview),
+            watchProgress: try Row.fetchAll(db, sql: "SELECT * FROM watchProgress ORDER BY itemId").map(Self.watchProgress)
         )
     }
 
@@ -208,6 +210,25 @@ private struct Access: StoreWriter {
 
     func items(source: Source) throws -> [Item] {
         try Row.fetchAll(db, sql: "SELECT * FROM item WHERE source = ?", arguments: [source.rawValue]).map(Self.item)
+    }
+
+    func watchProgress(itemIds: [UUID]) throws -> [UUID: WatchProgress] {
+        guard !itemIds.isEmpty else { return [:] }
+        let rows = try Row.fetchAll(
+            db, sql: "SELECT * FROM watchProgress WHERE itemId IN (\(Self.marks(itemIds.count)))",
+            arguments: StatementArguments(itemIds.map(\.uuidString))
+        ).map(Self.watchProgress)
+        return Dictionary(rows.map { ($0.itemId, $0) }, uniquingKeysWith: { a, _ in a })
+    }
+
+    func save(_ p: WatchProgress) throws {
+        // Newest observation wins (ARCHITECTURE §8).
+        try db.execute(sql: """
+            INSERT INTO watchProgress (itemId, fraction, observedAt, source) VALUES (?, ?, ?, ?)
+            ON CONFLICT(itemId) DO UPDATE SET fraction = excluded.fraction, observedAt = excluded.observedAt,
+                source = excluded.source
+            WHERE excluded.observedAt >= watchProgress.observedAt
+            """, arguments: [p.itemId.uuidString, p.fraction, p.observedAt, p.source.rawValue])
     }
 
     func voidLaterReview(id: UUID, at: Date) throws {
@@ -409,6 +430,16 @@ private struct Access: StoreWriter {
             enabled: try required(row, "enabled", table: t),
             updatedAt: try required(row, "updatedAt", table: t),
             deletedAt: row["deletedAt"]
+        )
+    }
+
+    private static func watchProgress(_ row: Row) throws -> WatchProgress {
+        let t = "watchProgress"
+        return WatchProgress(
+            itemId: try uuid(row, "itemId", table: t),
+            fraction: try required(row, "fraction", table: t),
+            observedAt: try required(row, "observedAt", table: t),
+            source: try raw(row, "source", table: t)
         )
     }
 

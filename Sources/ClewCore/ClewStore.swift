@@ -49,6 +49,8 @@ public protocol StoreReader {
     /// Every item from `source`, soft-deleted ones included (imports are keyed by
     /// `(source, externalRef)`).
     func items(source: Source) throws -> [Item]
+    /// The latest watch progress of these items; missing means none seen.
+    func watchProgress(itemIds: [UUID]) throws -> [UUID: WatchProgress]
 }
 
 /// Everything Clew stores, as it is stored.
@@ -60,9 +62,11 @@ public struct ExportRecords: Hashable, Sendable, Codable {
     public var reminders: [Reminder]
     public var settings: [SettingRecord]
     public var laterReviews: [LaterReview]
+    public var watchProgress: [WatchProgress]
 
     public init(items: [Item], checkIns: [CheckIn], plans: [Plan], goalRounds: [GoalRound],
-                reminders: [Reminder] = [], settings: [SettingRecord] = [], laterReviews: [LaterReview] = []) {
+                reminders: [Reminder] = [], settings: [SettingRecord] = [], laterReviews: [LaterReview] = [],
+                watchProgress: [WatchProgress] = []) {
         self.items = items
         self.checkIns = checkIns
         self.plans = plans
@@ -70,10 +74,11 @@ public struct ExportRecords: Hashable, Sendable, Codable {
         self.reminders = reminders
         self.settings = settings
         self.laterReviews = laterReviews
+        self.watchProgress = watchProgress
     }
 
     private enum CodingKeys: String, CodingKey {
-        case items, checkIns, plans, goalRounds, reminders, settings, laterReviews
+        case items, checkIns, plans, goalRounds, reminders, settings, laterReviews, watchProgress
     }
 
     /// `reminders` and `settings` arrived after the first exports; older files read as empty.
@@ -86,7 +91,8 @@ public struct ExportRecords: Hashable, Sendable, Codable {
             goalRounds: try c.decode([GoalRound].self, forKey: .goalRounds),
             reminders: try c.decodeIfPresent([Reminder].self, forKey: .reminders) ?? [],
             settings: try c.decodeIfPresent([SettingRecord].self, forKey: .settings) ?? [],
-            laterReviews: try c.decodeIfPresent([LaterReview].self, forKey: .laterReviews) ?? []
+            laterReviews: try c.decodeIfPresent([LaterReview].self, forKey: .laterReviews) ?? [],
+            watchProgress: try c.decodeIfPresent([WatchProgress].self, forKey: .watchProgress) ?? []
         )
     }
 }
@@ -108,6 +114,8 @@ public protocol StoreWriter: StoreReader {
     func insert(_ review: LaterReview) throws
     /// Sets the review's `voidedAt`. Voids are monotonic: voiding twice is an error.
     func voidLaterReview(id: UUID, at: Date) throws
+    /// Inserts or replaces the item's row, unless the stored one was observed later.
+    func save(_ progress: WatchProgress) throws
 }
 
 /// A row of the `settings` table: a definition with last-writer-wins by `updatedAt`.

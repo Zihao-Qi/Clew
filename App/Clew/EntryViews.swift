@@ -353,17 +353,21 @@ struct PickView: View {
                         Toggle(isOn: binding(for: item.id)) {
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(item.title).lineLimit(1)
-                                let host = item.url?.host
-                                if host != nil || entry.asksStillWant {
-                                    Text(verbatim: [host, entry.asksStillWant ? Self.weeks(entry.daysWaiting) : nil]
+                                let site = entry.siteLabel
+                                if site != nil || entry.asksStillWant {
+                                    Text(verbatim: [site, entry.asksStillWant ? Self.weeks(entry.daysWaiting) : nil]
                                         .compactMap { $0 }.joined(separator: " · "))
                                         .font(.caption).foregroundStyle(.secondary)
+                                }
+                                if model.barStyle == .underTitle, let watched = entry.watched, watched > 0 {
+                                    ProgressLine(fraction: watched).padding(.top, 1)
                                 }
                             }
                         }
                         .toggleStyle(.checkbox)
                         .disabled(!picked.contains(item.id) && picked.count >= Clew.maxPicks)
                         .accessibilityLabel(Text(item.title))
+                        .accessibilityValue(Self.watchedValue(entry))
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                         Button { delete(item) } label: { Image(systemName: "xmark") }
@@ -384,12 +388,25 @@ struct PickView: View {
                         .padding(.leading, 22)
                     }
                 }
+                .padding(.vertical, 2)
+                .padding(.horizontal, 4)
+                .background {
+                    if model.barStyle == .behindTitle, let watched = entry.watched, watched > 0 {
+                        ProgressFill(fraction: watched)
+                    }
+                }
                 .contextMenu {
                     Button("Delete", role: .destructive) { delete(item) }
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// "40 percent watched" for a started video, read with its title.
+    static func watchedValue(_ entry: LaterEntry) -> Text {
+        guard let watched = entry.watched, watched > 0 else { return Text(verbatim: "") }
+        return Text("\(Int((watched * 100).rounded())) percent watched")
     }
 
     /// "7 weeks", in the user's language.

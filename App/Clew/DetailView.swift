@@ -2,9 +2,11 @@ import ClewCore
 import ClewDomain
 import SwiftUI
 
-/// A task's details (opened by clicking its row): how it is going, a GitHub-style
-/// heatmap, and Edit / Delete. Only what got done is shown: no streaks, no "missed",
-/// no red (SPEC design rules).
+/// A task's details (opened by clicking its row). Habits and goals: how it is going,
+/// a GitHub-style heatmap, and Edit / Delete. One-off items (once-tasks, saved links,
+/// videos): where it is, how much was watched, and a short history (SPEC decision
+/// 2026-11-09). Only what got done is shown: no streaks, no "missed", no red (SPEC
+/// design rules).
 struct DetailView: View {
     let model: AppModel
     let itemId: UUID
@@ -22,9 +24,17 @@ struct DetailView: View {
 
             if let details = model.details(for: itemId) {
                 header(details)
-                Heatmap(details: details)
-                statTiles(details)
+                if details.isOneOff {
+                    OneOffDetails(details: details)
+                } else {
+                    Heatmap(details: details)
+                    statTiles(details)
+                }
                 HStack {
+                    if details.isOneOff, let url = details.item.url {
+                        Button(Self.isVideo(details.item) ? "Open video" : "Open link") { model.open(url) }
+                            .keyboardShortcut(.defaultAction)
+                    }
                     Button("Edit…") { onEdit(details.item) }
                     Spacer()
                     Button("Delete", role: .destructive) {
@@ -91,12 +101,17 @@ struct DetailView: View {
         .accessibilityElement(children: .combine)
     }
 
+    static func isVideo(_ item: Item) -> Bool {
+        item.source == .extensionYouTube || item.url?.host?.hasSuffix("youtube.com") == true
+    }
+
     /// "Goal · Daily · Reminder 6:00 PM", in the user's language.
     static func summary(of d: ItemDetails) -> String {
         var parts: [String] = []
         switch d.item.kind {
         case .once: parts.append(String(localized: "Once"))
         case .link: parts.append(String(localized: "Saved link"))
+            if d.item.source == .extensionYouTube { parts.append(String(localized: "YouTube Watch Later")) }
         case .habit: parts.append(String(localized: "Habit"))
         case .goal: parts.append(String(localized: "Goal"))
         }
@@ -112,6 +127,75 @@ struct DetailView: View {
             parts.append(String(localized: "Reminder \(time)"))
         }
         return parts.joined(separator: " · ")
+    }
+}
+
+/// A one-off item's page body: watch progress (videos), where it is now, and what
+/// happened to it, newest last.
+struct OneOffDetails: View {
+    let details: ItemDetails
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let watch = details.watch, watch.fraction > 0 {
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 8) {
+                        ProgressLine(fraction: watch.fraction).frame(width: 180)
+                        Text("\(Int((watch.fraction * 100).rounded()))% watched")
+                            .font(.callout.monospacedDigit())
+                    }
+                    Text("As of \(Self.day(watch.observedAt)), from Watch Later")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                .accessibilityElement(children: .combine)
+            }
+            if let status = status {
+                Text(status).font(.callout)
+            }
+            if !details.history.isEmpty {
+                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 3) {
+                    ForEach(Array(details.history.enumerated()), id: \.offset) { _, entry in
+                        GridRow {
+                            Text(verbatim: Self.day(entry.at))
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                            Text(verbatim: line(entry.event))
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+                .font(.caption)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// "Done Nov 9", "On Today" or "In Later".
+    private var status: String? {
+        if let done = details.history.last(where: { if case .done = $0.event { true } else { false } }) {
+            return String(localized: "Done \(Self.day(done.at))")
+        }
+        switch details.item.state {
+        case .active: return String(localized: "On Today")
+        case .later: return String(localized: "In Later")
+        case .paused, .archived: return nil
+        }
+    }
+
+    private func line(_ event: HistoryEntry.Event) -> String {
+        switch event {
+        case .added(.extensionYouTube): String(localized: "Saved from Watch Later")
+        case .added: details.item.kind == .link ? String(localized: "Saved") : String(localized: "Added")
+        case .picked: String(localized: "Picked for today")
+        case .done(let rating?): String(localized: "Done · felt \(RatingDots.word(rating))")
+        case .done(nil): String(localized: "Done")
+        case .kept: String(localized: "Kept in Later")
+        }
+    }
+
+    /// "Nov 9", in the user's language.
+    static func day(_ date: Date) -> String {
+        date.formatted(.dateTime.month(.abbreviated).day())
     }
 }
 

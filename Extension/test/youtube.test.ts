@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { parseHTML } from "linkedom";
-import { isWatchLater, parseCount, scanWatchLater, SELECTOR_VERSION, videoId } from "../src/youtube";
+import { isWatchLater, parseCount, parseProgress, scanWatchLater, SELECTOR_VERSION, videoId } from "../src/youtube";
 
 const page = (name: string) => parseHTML(readFileSync(new URL(`fixtures/${name}`, import.meta.url), "utf8")).document;
 
@@ -12,12 +12,18 @@ describe("Watch Later scan", () => {
       source: "extension.youtube",
       listTotal: 3,
       entries: [
-        { externalRef: "aaaaaaaaaaa", title: "First video" },
-        { externalRef: "bbbbbbbbbbb", title: "Second video" },
+        { externalRef: "aaaaaaaaaaa", title: "First video", progress: 0.11 },
+        { externalRef: "bbbbbbbbbbb", title: "Second video", progress: 0.86 },
         { externalRef: "ccccccccccc", title: "Third video" },
       ],
       scan: { found: 3, parsed: 3, selectorVersion: SELECTOR_VERSION },
     });
+  });
+
+  test("a progress bar that can't be read is left out, not guessed", () => {
+    const doc = page("watch-later.synthetic.html");
+    doc.querySelector(".ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment")!.setAttribute("style", "width: 40px");
+    expect(scanWatchLater(doc).entries[1]).toEqual({ externalRef: "bbbbbbbbbbb", title: "Second video" });
   });
 
   test("a changed page is reported, not silently empty", () => {
@@ -44,6 +50,17 @@ describe("Watch Later scan", () => {
 });
 
 describe("helpers", () => {
+  test("progress is a percentage width, as a fraction", () => {
+    expect(parseProgress("width: 11%;")).toBe(0.11);
+    expect(parseProgress("width:100%")).toBe(1);
+    expect(parseProgress("width: 0%")).toBe(0);
+    expect(parseProgress("width: 33.4%")).toBe(0.33);
+    expect(parseProgress("max-width: 50%")).toBeUndefined();
+    expect(parseProgress("width: 140%")).toBeUndefined();
+    expect(parseProgress("width: 40px")).toBeUndefined();
+    expect(parseProgress(null)).toBeUndefined();
+  });
+
   test("only the Watch Later page", () => {
     expect(isWatchLater("https://www.youtube.com/playlist?list=WL")).toBe(true);
     expect(isWatchLater("https://www.youtube.com/playlist?list=PL123")).toBe(false);
