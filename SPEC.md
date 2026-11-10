@@ -120,26 +120,46 @@ stopped daily use, not adding features.
 
 ## Decisions (2026-11-08)
 
-- **Watch Later import (v1.1, 2026-11-09):** a paired Chrome extension adds each
-  video in YouTube's Watch Later to the **Later pile** as a saved link, when the Watch
-  Later page is opened. A video removed from Watch Later leaves the Later pile too,
-  but only if it is still untouched there (not on Today, never done), and only when
-  the page showed the whole list (never from an empty list); it comes back if re-added. What the user deleted or
-  let go stays gone. These automatic removals are not counted as the user's "let go".
-  Pairing: Settings › Browser shows a 6-digit code.
+- **Watch Later import (v1.1, 2026-11-09):** a paired Chrome extension copies
+  YouTube's Watch Later into Clew when the Watch Later page is opened. A video removed
+  from Watch Later **counts as finished** (*changed* 2026-11-10, user decision: before,
+  it just left Clew and an unticked one was never recorded): one not ticked yet gets a
+  tick dated the day Clew saw it gone, whether or not any progress was seen, and it
+  stays in the collection's Done group. "Not finished" (right-click) takes it out of
+  Done and the heatmap. This happens only when the page showed the whole list (never
+  from an empty list); a video re-added comes back, to watch again (its automatic tick
+  is undone; one the user made stays). What the user deleted stays gone.
+  These automatic removals are not counted as the user's "let go". The same rule will
+  apply to X: unbookmarking a post means it was read. Pairing: Settings › Browser
+  shows a 6-digit code.
+- **Collections (v1.1, 2026-11-09):** an imported list is **one collection**, not one
+  task per video: a row below the tasks, after a thin divider and with no heading
+  ("YouTube Watch Later  9 to watch ›", X bookmarks next; *changed* 2026-11-10 from
+  "1 of 3", since Done keeps growing). It has no circle and does not
+  count toward today's `done/total`. Its videos never appear on Today, in Later or in
+  Pick (*changed*: they were Later items with their own details page). The row stays
+  while the collection has anything finished, even if the list is emptied, so its
+  heatmap stays reachable. Clicking it opens its page: a heatmap of days a video was ticked, ticked this
+  week / last 30 days / all time, and the whole list (In progress, most watched first;
+  Not started, newest first; Done, folded, including videos that left the list).
+  Each video has a circle (undo is for today's tick, and only while it is on the list)
+  and a title that opens it. Each list can be turned **off** in Settings › General ›
+  Lists (2026-11-10): its row is hidden and imports are refused (the extension says
+  so); what it holds stays and comes back when it is turned on.
 - **Watch progress (v1.1, 2026-11-09):** read only from the red bars on the Watch
   Later page, when it is opened (not while a video plays: simpler, and it covers
-  videos watched on other devices). Shown as a thin bar under the video's title in
-  Today and in Pick, and as "40% watched" on its details. It never ticks anything.
+  videos watched on other devices). Shown on the video's row in its collection, in
+  the chosen bar style. It never ticks anything (a video ticks when it leaves Watch
+  Later, whatever its progress; see Watch Later import).
 - **Progress bars (2026-11-09):** Settings › General › Progress bars picks one of two
-  styles for counted goals and started videos: *behind the title* (the row's rounded
+  styles for counted goals, collections and started videos: *behind the title* (the row's rounded
   background fills from the left, default) or *under the title* (a long bar under the
   name, almost to the row's end) or *no bar*. The short bar beside the count is gone;
   `10/30` stays. Pick shows a link's site ("medium.com", no "www.") but not for
   YouTube videos.
   The same bar will show a focus timer's time later.
-- **One-off details (2026-11-09):** once-tasks, saved links and videos have no
-  heatmap. Their details show where the item is (In Later, On Today, Done Nov 9),
+- **One-off details (2026-11-09):** once-tasks and saved links have no
+  heatmap (videos had this page too until they moved to their collection's page). Their details show where the item is (In Later, On Today, Done Nov 9),
   watch progress for videos, a short history (saved, picked, kept, done · felt), and
   Open video / Open link.
 

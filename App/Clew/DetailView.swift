@@ -91,6 +91,16 @@ struct DetailView: View {
     }
 
     private func tile(value: String, label: Text) -> some View {
+        StatTile(value: value, label: label)
+    }
+}
+
+/// A number with a caption, as on the details pages.
+struct StatTile: View {
+    let value: String
+    let label: Text
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(verbatim: value).font(.title3.monospacedDigit().weight(.semibold))
             label.font(.caption).foregroundStyle(.secondary)
@@ -100,7 +110,9 @@ struct DetailView: View {
         .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
         .accessibilityElement(children: .combine)
     }
+}
 
+extension DetailView {
     static func isVideo(_ item: Item) -> Bool {
         item.source == .extensionYouTube || item.url?.host?.hasSuffix("youtube.com") == true
     }
@@ -202,15 +214,28 @@ struct OneOffDetails: View {
 /// 16 Monday-to-Sunday columns ending with this week. Ticked days are filled; other
 /// days are a quiet gray, never red; days after today are left blank.
 struct Heatmap: View {
-    let details: ItemDetails
+    let today: LocalDay
+    let amountByDay: [LocalDay: Int]
+    /// Goals get lighter single ticks, so days with many +1s stand out.
+    var graded = false
+
+    init(details: ItemDetails) {
+        self.init(today: details.today, amountByDay: details.stats.amountByDay, graded: details.item.kind == .goal)
+    }
+
+    init(today: LocalDay, amountByDay: [LocalDay: Int], graded: Bool = false) {
+        self.today = today
+        self.amountByDay = amountByDay
+        self.graded = graded
+    }
     /// Fills the 316 pt content width exactly (the tiles' width):
     /// 10 pt labels + 16 cells + 16 gaps of 2.5 pt → cell = (316 − 10 − 40) / 16.
     private let gap: CGFloat = 2.5
     private var cell: CGFloat { (316 - 10 - gap * CGFloat(Clew.heatmapWeeks)) / CGFloat(Clew.heatmapWeeks) }
 
     var body: some View {
-        let columns = heatmapColumns(endingAt: details.today, weeks: Clew.heatmapWeeks)
-        let doneDays = columns.joined().compactMap { $0 }.filter { (details.stats.amountByDay[$0] ?? 0) > 0 }.count
+        let columns = heatmapColumns(endingAt: today, weeks: Clew.heatmapWeeks)
+        let doneDays = columns.joined().compactMap { $0 }.filter { (amountByDay[$0] ?? 0) > 0 }.count
         let shown = columns.joined().compactMap { $0 }.count
         HStack(alignment: .top, spacing: gap) {
             VStack(alignment: .trailing, spacing: gap) {
@@ -238,8 +263,8 @@ struct Heatmap: View {
         let shape = RoundedRectangle(cornerRadius: 2)
         if let day {
             shape
-                .fill(fill(details.stats.amountByDay[day] ?? 0))
-                .overlay { if day == details.today { shape.stroke(Color.primary.opacity(0.5), lineWidth: 1) } }
+                .fill(fill(amountByDay[day] ?? 0))
+                .overlay { if day == today { shape.stroke(Color.primary.opacity(0.5), lineWidth: 1) } }
                 .frame(width: cell, height: cell)
                 .help(Text(verbatim: day.description))
         } else {
@@ -251,7 +276,7 @@ struct Heatmap: View {
     private func fill(_ amount: Int) -> Color {
         switch amount {
         case 0: Color.primary.opacity(0.07)
-        case 1: Color.accentColor.opacity(details.item.kind == .goal ? 0.45 : 0.8)
+        case 1: Color.accentColor.opacity(graded ? 0.45 : 0.8)
         case 2...3: Color.accentColor.opacity(0.7)
         default: Color.accentColor.opacity(0.95)
         }

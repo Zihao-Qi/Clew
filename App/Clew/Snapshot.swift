@@ -285,14 +285,13 @@ enum Snapshot {
             try seed(clew, clock: clock)
             let model = AppModel(clew: clew, notify: false)
             let editing = try clew.today().rows[2].item
-            let video = try unwrap(clew.today().rows.first { $0.item.source == .extensionYouTube }?.item)
             // Rating dots on, and "Stretch" just ticked, so the list shows them.
             model.setRatingsEnabled(true)
             model.refresh()
             if let stretch = model.today?.rows.first(where: { $0.item.title == "Stretch" }) { model.tap(stretch) }
             for (name, screen) in [("list", Screen.list), ("add", .add), ("pick", .pick),
                                    ("edit", .edit(editing, back: .list)), ("detail", .detail(editing.id)),
-                                   ("detail-video", .detail(video.id))] {
+                                   ("collection", .collection(.extensionYouTube))] {
                 for appearance in [NSAppearance.Name.aqua, .darkAqua] {
                     let file = dir.appendingPathComponent("\(name)-\(appearance == .aqua ? "light" : "dark").png")
                     render(RootView(model: model, screen: screen), appearance: appearance, to: file)
@@ -301,7 +300,7 @@ enum Snapshot {
             // The other progress bar style.
             model.setBarStyle(.underTitle)
             model.refresh()
-            for (name, screen) in [("list-under", Screen.list), ("pick-under", .pick)] {
+            for (name, screen) in [("list-under", Screen.list), ("collection-under", .collection(.extensionYouTube))] {
                 for appearance in [NSAppearance.Name.aqua, .darkAqua] {
                     let file = dir.appendingPathComponent("\(name)-\(appearance == .aqua ? "light" : "dark").png")
                     render(RootView(model: model, screen: screen), appearance: appearance, to: file)
@@ -321,12 +320,6 @@ enum Snapshot {
             FileHandle.standardError.write(Data("snapshot failed: \(error)\n".utf8))
             exit(1)
         }
-    }
-
-    private struct Missing: Error {}
-    private static func unwrap<T>(_ value: T?) throws -> T {
-        guard let value else { throw Missing() }
-        return value
     }
 
     /// A clock the snapshot can move into the past to seed history.
@@ -377,11 +370,19 @@ enum Snapshot {
             ExternalEntry(externalRef: "aaaaaaaaaaa", title: "Intro to diffusion models", progress: 0.4),
             ExternalEntry(externalRef: "bbbbbbbbbbb", title: "Swift concurrency deep dive", progress: 0.86),
             ExternalEntry(externalRef: "ccccccccccc", title: "Building a compiler in a weekend"),
-        ], listTotal: 3))
-        clock.date = now
-        if let video = try clew.laterPile().first(where: { $0.item.externalRef == "aaaaaaaaaaa" }) {
-            try clew.planForToday(itemIds: [video.id])
+            ExternalEntry(externalRef: "ddddddddddd", title: "A video since removed from Watch Later"),
+        ], listTotal: 4))
+        clock.date = now.addingTimeInterval(-2 * 86_400)
+        // The fourth video left Watch Later: it counts as finished (SPEC 2026-11-10).
+        try clew.importExternal(ImportBatch(source: .extensionYouTube, entries: [
+            ExternalEntry(externalRef: "aaaaaaaaaaa", title: "Intro to diffusion models", progress: 0.4),
+            ExternalEntry(externalRef: "bbbbbbbbbbb", title: "Swift concurrency deep dive", progress: 0.86),
+            ExternalEntry(externalRef: "ccccccccccc", title: "Building a compiler in a weekend"),
+        ], listTotal: 3, scan: ScanReport(found: 3, parsed: 3, selectorVersion: "snapshot")))
+        if let video = try clew.collection(.extensionYouTube)?.notStarted.first {
+            try clew.checkIn(itemId: video.id)
         }
+        clock.date = now
     }
 
     private static func render(_ view: some View, appearance: NSAppearance.Name, to file: URL) {

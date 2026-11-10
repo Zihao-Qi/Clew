@@ -138,10 +138,10 @@ Award           id = hash(kind, itemId, milestone), kind (e.g. goal.finished),
   Watch Later scan (`ExternalEntry.progress`, 0–1, rounded to 0.01; out of range is
   ignored, the video still imported). `WatchProgress` keeps one row per item, the
   newest `observedAt` wins, and an unchanged reading writes nothing, so re-scans
-  never bloat the database. It never creates a `CheckIn` (*changed from the plan*,
-  user decision 2026-11-09: progress is shown, ticking stays the user's), does not
-  restart an item's Later clock, and does not keep a video in Later once it leaves
-  Watch Later. A video the user deleted gets no progress. It is named
+  never bloat the database. Progress itself never creates a `CheckIn` (*changed from
+  the plan*, user decision 2026-11-09: progress is shown, not acted on); the only
+  automatic tick is the one a video gets when it leaves Watch Later (*changed*
+  2026-11-10, "removed means finished", see Import rules), whatever its progress. A video the user deleted gets no progress. It is named
   `WatchProgress`, not `ItemProgress`, to keep it apart from `Item.progress`.
 
 ### 4.3 Time (ADR-3)
@@ -297,11 +297,38 @@ from the client; titles are cleaned, cut to 200 characters and stored as `fetche
 **whole list** only when the page's own count, the rows on the page and the entries
 read all agree, no entry was malformed, and the list is not empty (a "No videos" page
 also shows when signed out or broken, so an empty read is never trusted: emptying
-Watch Later entirely leaves the Later pile as it is). Only then are Later items from that source that left the list, and
-were never done, let go (a `LaterReview` with the import's source, so Settings'
-"let go" count, which counts the user's own, skips it). An item let go that way
-comes back if it reappears (its let-go is voided); anything the user deleted or let
-go stays gone; items on Today or done are never touched.
+Watch Later entirely leaves the collection as it is). Only then are items from that
+source that left the list let go, ticked or not (*changed* 2026-11-09 with
+collections; before, items on Today or ticked were never touched) (a `LaterReview` with the import's
+source, so Settings' "let go" count, which counts the user's own, skips it). **Removed
+means finished** (SPEC 2026-11-10): in the same transaction, each one without a live
+check-in gets one (`amount` 1, the import's `source`, today's `localDay`); one already
+ticked is not ticked again. An item let go that way comes back if it reappears: its
+let-go is voided, and so are the ticks the import gave it (source = the import's), so
+it is to watch again; a tick the user made stays. Anything the user deleted stays gone. A source
+turned off (`collectionsOff`, setting `collectionsOff`: a JSON array of source raw
+values; unknown ones are dropped) refuses the import with `ClewError.listTurnedOff`
+before anything is read or written; the Gateway answers 409 and the extension shows
+"turned off in Clew".
+
+**Collections (v1.1, SPEC 2026-11-09).** Items whose source is in
+`Clew.collectionSources` (YouTube now, X next) form one collection per source. There
+is no parent row: a collection is derived from `source`, so nothing needs migrating.
+Today, Later, Pick, reordering and notifications all filter collection items out
+(including ones picked before collections existed); `PlanForToday` refuses them;
+`CheckIn` accepts them in any state, since they are ticked on the collection's page.
+Queries: `collections()` (the rows below the tasks, for sources turned on:
+`toWatch`, live and unticked; `done`, the Done group; `onList`; a source with no
+items left keeps its row while it has any tick) and `collection(source)` (the page:
+groups, and ticks per day including items since removed). The Done group is ticked
+items that are live or **left the list** (removed, and the import's let-go is their
+latest); items the user deleted are not in it, though their ticks stay in the
+heatmap. `markNotFinished(itemId:)` voids every live tick of an item that left the
+list (reason "not finished"), taking it out of Done and the heatmap; it refuses items
+still on the list, ones the user deleted, and tasks. Done-ness uses every live tick, like the row and `CheckIn`, even one dated
+after today (clock or time zone moved back); the heatmap and counts show days up to
+today only. The Gateway's import answer reports `listCount`, the items on the list
+(`onList`; *changed from* `laterCount`).
 
 **Browser extension (v1.1, `Extension/`, TypeScript, built with Bun).** Chrome MV3.
 - **Scrapers are quarantined:** one module per site (`src/youtube.ts`), with selectors

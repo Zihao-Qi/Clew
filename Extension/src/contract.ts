@@ -57,7 +57,7 @@ export interface ImportResult {
 export interface ImportResponse {
   result: ImportResult;
   needsUpdate: boolean;
-  laterCount: number;
+  listCount: number;
 }
 
 export interface Failure {
@@ -85,7 +85,7 @@ export function isPairResponse(v: unknown): v is PairResponse {
 }
 
 export function isImportResponse(v: unknown): v is ImportResponse {
-  if (!isObject(v) || typeof v.needsUpdate !== "boolean" || !isInt(v.laterCount) || !isObject(v.result)) return false;
+  if (!isObject(v) || typeof v.needsUpdate !== "boolean" || !isInt(v.listCount) || !isObject(v.result)) return false;
   const r = v.result;
   return (
     ["added", "renamed", "restored", "letGo", "skipped", "progressed"].every((k) => isInt(r[k])) && typeof r.complete === "boolean"

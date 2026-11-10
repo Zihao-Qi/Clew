@@ -16,6 +16,8 @@ public enum ClewError: Error, Equatable, Sendable {
     case notAllowed
     /// An import batch is larger than any list the site offers.
     case tooManyEntries(max: Int)
+    /// The user turned this imported list off in Settings.
+    case listTurnedOff
 }
 
 /// What the user chose in `+ add`. Each case is a valid shape, so invalid
@@ -105,7 +107,7 @@ public final class Clew: Sendable {
     public func today() throws -> TodayList {
         let day = currentDay()
         return try store.read { r in
-            let items = try r.items(inStates: [.active])
+            let items = try r.items(inStates: [.active]).filter { !Self.isCollectionItem($0) }
             let ids = items.map(\.id)
             let recent = Dictionary(grouping: try r.checkIns(itemIds: ids, from: day.weekStart), by: \.itemId)
             let progress = try r.progressAmounts(itemIds: ids)
@@ -126,12 +128,12 @@ public final class Clew: Sendable {
     /// The Later pile, newest first. Its contents are shown only when picking.
     public func laterItems() throws -> [Item] {
         try store.read { r in
-            try r.items(inStates: [.later]).sorted { ($0.createdAt, $0.id.uuidString) > ($1.createdAt, $1.id.uuidString) }
+            try r.items(inStates: [.later]).filter { !Self.isCollectionItem($0) }.sorted { ($0.createdAt, $0.id.uuidString) > ($1.createdAt, $1.id.uuidString) }
         }
     }
 
     public func laterCount() throws -> Int {
-        try store.read { try $0.items(inStates: [.later]).count }
+        try store.read { try $0.items(inStates: [.later]).filter { !Self.isCollectionItem($0) }.count }
     }
 
     public func observeChanges(_ onChange: @escaping @Sendable () -> Void) -> any StoreObservation {
@@ -210,7 +212,8 @@ public final class Clew: Sendable {
         let day = LocalDay(of: now, in: zone, rolloverHour: rolloverHour)
         return try store.write { w in
             guard let item = try w.item(id: itemId), item.deletedAt == nil else { throw ClewError.itemNotFound }
-            guard item.state == .active else { throw ClewError.notAllowed }
+            // Today's items, and a collection's videos and posts, ticked from its page.
+            guard item.state == .active || Self.isCollectionItem(item) else { throw ClewError.notAllowed }
             if let target = item.progress.target {
                 if (try w.progressAmounts(itemIds: [itemId])[itemId] ?? 0) >= target {
                     throw ClewError.goalReached
@@ -274,7 +277,8 @@ public final class Clew: Sendable {
             var sortKey = (try w.maxSortKey() ?? 0)
             for id in ids {
                 guard var item = try w.item(id: id), item.deletedAt == nil else { throw ClewError.itemNotFound }
-                guard item.state == .later else { throw ClewError.notAllowed }
+                // A collection's items stay in their collection (SPEC 2026-11-09).
+                guard item.state == .later, !Self.isCollectionItem(item) else { throw ClewError.notAllowed }
                 sortKey += 1
                 item.state = .active
                 item.plannedDay = day
@@ -360,7 +364,7 @@ public final class Clew: Sendable {
     private static func renumber(_ w: any StoreWriter, now: Date) throws {
         // Only the active list: Later items get a fresh place when picked, and touching
         // their updatedAt would restart their "still want this?" 6 weeks.
-        let all = try w.items(inStates: [.active])
+        let all = try w.items(inStates: [.active]).filter { !Self.isCollectionItem($0) }
             .sorted { ($0.sortKey, $0.createdAt, $0.id.uuidString) < ($1.sortKey, $1.createdAt, $1.id.uuidString) }
         for (index, var other) in all.enumerated() where other.sortKey != Double(index + 1) {
             other.sortKey = Double(index + 1)

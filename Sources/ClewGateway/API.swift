@@ -42,7 +42,9 @@ public enum API {
     public struct ImportResponse: Codable, Hashable, Sendable {
         public var result: ImportResult
         public var needsUpdate: Bool
-        public var laterCount: Int
+        /// Items now in this source's collection.
+        /// Items now in this source's collection.
+        public var listCount: Int
     }
 
     public struct Failure: Codable, Hashable, Sendable {

@@ -22,6 +22,8 @@ final class AppModel {
     private(set) var laterCount = 0
     /// How much of each video on today's list was watched (0–1), from Watch Later.
     private(set) var watched: [UUID: Double] = [:]
+    /// Imported lists (YouTube Watch Later), shown below the tasks.
+    private(set) var collections: [CollectionSummary] = []
     /// How rows draw progress (Settings › General).
     private(set) var barStyle = Clew.defaultBarStyle
     /// Set when the database cannot be opened; the list is replaced by this message.
@@ -108,6 +110,7 @@ final class AppModel {
             laterCount = try clew.laterCount()
             watched = try clew.watchProgress(itemIds: list.rows.map(\.id))
             barStyle = (try? clew.barStyle()) ?? Clew.defaultBarStyle
+            collections = try clew.collections()
             // A closed congratulation stays closed only while that goal stays reached, so
             // reaching a raised target or a next round congratulates again.
             let reached = Set(list.rows.filter(\.isGoalReached).map(\.id))
@@ -253,6 +256,25 @@ final class AppModel {
         }
     }
 
+    // MARK: - Collections (SPEC 2026-11-09)
+
+    func collection(_ source: Source) -> CollectionDetails? { (try? clew?.collection(source)) ?? nil }
+
+    /// The circle on a collection's video: tick it, or undo a tick made today.
+    func toggleFinished(_ entry: CollectionEntry) {
+        if entry.doneToday {
+            run { try $0.undoToday(itemId: entry.id) }
+        } else if entry.doneAt == nil {
+            run { try $0.checkIn(itemId: entry.id) }
+        }
+    }
+
+    /// A video that left the list counted as finished; the user says it wasn't.
+    func markNotFinished(_ id: UUID) { run { try $0.markNotFinished(itemId: id) } }
+
+    func collectionsOff() -> Set<Source> { (try? clew?.collectionsOff()) ?? [] }
+    func setCollection(_ source: Source, on: Bool) { run { try $0.setCollection(source, on: on) } }
+
     // MARK: - Rating dots (SPEC §4; off by default)
 
     /// A row showing its rating dots as a hint after a tick (they also show on hover).
@@ -391,6 +413,7 @@ final class AppModel {
         case .pickCount: String(localized: "Pick 1 to 3 items.")
         case .goalReached: String(localized: "Goal reached! Start a next round or raise the target.")
         case .itemNotFound, .checkInNotFound, .notAllowed, .tooManyEntries: String(localized: "That can't be done right now.")
+        case .listTurnedOff: String(localized: "That list is turned off in Settings › General.")
         }
     }
 

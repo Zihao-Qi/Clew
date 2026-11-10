@@ -28,7 +28,7 @@ extension Clew {
         let zone = zonesForQueries.current()
         let today = currentDay()
         return try storeForQueries.read { r in
-            let items = try r.items(inStates: [.later])
+            let items = try r.items(inStates: [.later]).filter { !Self.isCollectionItem($0) }
             let watched = try r.watchProgress(itemIds: items.map(\.id))
             let kept = Dictionary(grouping: try r.laterReviews(itemIds: items.map(\.id)).filter { $0.decision == .keep },
                                   by: \.itemId)

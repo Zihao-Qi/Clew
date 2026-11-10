@@ -24,6 +24,8 @@ private let a = "aaaaaaaaaaa", b = "bbbbbbbbbbb", c = "ccccccccccc", d = "dddddd
         ImportBatch(source: .extensionYouTube, entries: entries, listTotal: total,
                     scan: ScanReport(found: entries.count, parsed: entries.count, selectorVersion: "t"))
     }
+    /// Items on the YouTube collection now.
+    private func listed() throws -> Int { try clew.collections().first { $0.source == .extensionYouTube }?.onList ?? 0 }
     private func imported(_ ref: String) -> Item? {
         store.state.items.values.first { $0.externalRef == ref }
     }
@@ -36,7 +38,7 @@ private let a = "aaaaaaaaaaa", b = "bbbbbbbbbbb", c = "ccccccccccc", d = "dddddd
         #expect(item.title == "First video")
         #expect(item.titleOrigin == .fetched)                    // stranger-written (AGENT §4)
         #expect(item.url == URL(string: "https://www.youtube.com/watch?v=aaaaaaaaaaa"))
-        #expect(try clew.laterCount() == 2)
+        #expect(try listed() == 2)
         #expect(try clew.today().rows.isEmpty)
     }
 
@@ -75,7 +77,7 @@ private let a = "aaaaaaaaaaa", b = "bbbbbbbbbbb", c = "ccccccccccc", d = "dddddd
         let r = try clew.importExternal(batch([video(a)], total: 1))
         #expect(r.letGo == 2 && r.complete)
         #expect(imported(b)?.deletedAt != nil && imported(c)?.deletedAt != nil)
-        #expect(try clew.laterCount() == 1)
+        #expect(try listed() == 1)
         // Recorded as the import's decision, not counted as the user's win.
         #expect(store.state.laterReviews.values.allSatisfy { $0.decision == .letGo && $0.source == .extensionYouTube })
         #expect(try clew.lettingGoCount() == 0)
@@ -96,7 +98,7 @@ private let a = "aaaaaaaaaaa", b = "bbbbbbbbbbb", c = "ccccccccccc", d = "dddddd
         #expect(try clew.importExternal(batch([video(a)], total: 3)).letGo == 0)
         #expect(try clew.importExternal(batch([video(a)], total: nil)).letGo == 0)
         #expect(try clew.importExternal(batch([], total: nil)).letGo == 0)
-        #expect(try clew.laterCount() == 3)
+        #expect(try listed() == 3)
     }
 
     @Test func anEmptyListNeverLetsGo() throws {
@@ -105,7 +107,7 @@ private let a = "aaaaaaaaaaa", b = "bbbbbbbbbbb", c = "ccccccccccc", d = "dddddd
         try clew.importExternal(batch([video(a), video(b)], total: 2))
         let r = try clew.importExternal(batch([], total: 0))
         #expect(!r.complete && r.letGo == 0)
-        #expect(try clew.laterCount() == 2)
+        #expect(try listed() == 2 && store.state.checkIns.isEmpty)   // nothing counted as finished
     }
 
     @Test func rowsTheScraperCouldNotReadMeanNotTheWholeList() throws {
@@ -116,42 +118,51 @@ private let a = "aaaaaaaaaaa", b = "bbbbbbbbbbb", c = "ccccccccccc", d = "dddddd
         #expect(!r.complete && r.letGo == 0)
         // No scan report at all: not trusted either.
         #expect(try !clew.importExternal(ImportBatch(source: .extensionYouTube, entries: [video(a)], listTotal: 1)).complete)
-        #expect(try clew.laterCount() == 2)
+        #expect(try listed() == 2)
     }
 
-    @Test func itemsOnTodayDoneOrFromTheUserAreNeverLetGo() throws {
-        try clew.importExternal(batch([video(a), video(b), video(c)], total: 3))
-        let onToday = try #require(imported(b)), done = try #require(imported(c))
-        try clew.planForToday(itemIds: [onToday.id, done.id])
-        try clew.checkIn(itemId: done.id)
+    @Test func whatLeftTheListLeavesItForDoneTickedOrNot() throws {
+        try clew.importExternal(batch([video(a), video(b)], total: 2))
+        let done = try #require(imported(b))
+        try clew.checkIn(itemId: done.id)                       // ticked on the collection's page
         let own = try clew.addItem(NewItem(title: "mine", url: URL(string: "https://www.youtube.com/watch?v=ccccccccccc"),
                                            shape: .later))
         let r = try clew.importExternal(batch([video(d)], total: 1))
-        #expect(r.letGo == 1)                                   // only a, untouched in Later
-        #expect(imported(a)?.deletedAt != nil)
-        #expect(imported(b)?.deletedAt == nil)                  // on Today, not done yet
-        #expect(imported(c)?.deletedAt == nil)                  // on Today, done
+        #expect(r.letGo == 2)                                   // SPEC 2026-11-09: ticked ones leave too
+        #expect(imported(a)?.deletedAt != nil && imported(b)?.deletedAt != nil)
+        #expect(store.state.checkIns.values.allSatisfy { $0.voidedAt == nil })   // the tick stays
+        // Removed means finished (SPEC 2026-11-10): a gets its tick, b keeps its one.
+        #expect(try clew.collection(.extensionYouTube)?.finishedAllTime == 2)
+        #expect(try clew.collection(.extensionYouTube)?.done.count == 2)
         #expect(store.state.items[own.id]?.deletedAt == nil)    // the user's own item
     }
 
-    @Test func aPickedItemMovedBackToLaterIsLaterAgain() throws {
+    @Test func collectionItemsStayInTheirCollection() throws {
         try clew.importExternal(batch([video(a)], total: 1))
         let item = try #require(imported(a))
-        try clew.planForToday(itemIds: [item.id])
-        try clew.moveToLater(itemId: item.id)
-        #expect(try clew.importExternal(batch([video(d)], total: 1)).letGo == 1)
-    }
-
-    @Test func aDoneItemBackInLaterStaysWhenItLeavesTheList() throws {
-        try clew.importExternal(batch([video(a)], total: 1))
-        let item = try #require(imported(a))
-        try clew.planForToday(itemIds: [item.id])
-        try clew.checkIn(itemId: item.id)
-        // Force it back to Later the way a future command might (e.g. sync).
+        #expect(throws: ClewError.notAllowed) { try clew.planForToday(itemIds: [item.id]) }
+        #expect(try clew.laterCount() == 0 && clew.laterPile().isEmpty && clew.laterItems().isEmpty)
+        #expect(try clew.today().rows.isEmpty)
+        // Picked before collections existed: still not on Today.
         try store.write { w in
-            var i = try #require(try w.item(id: item.id)); i.state = .later; try w.update(i)
+            var i = try #require(try w.item(id: item.id))
+            i.state = .active; i.plannedDay = clew.currentDay(); i.sortKey = 0.5   // off the 1, 2, 3… grid
+            try w.update(i)
         }
-        #expect(try clew.importExternal(batch([video(d)], total: 1)).letGo == 0)
+        #expect(try clew.today().rows.isEmpty)
+        // ...is left out when Today's order is renumbered (80 moves into one gap force it)...
+        let sortKey = try #require(imported(a)).sortKey
+        let first = try clew.addItem(NewItem(title: "first", shape: .habit(.daily)))
+        var below = try clew.addItem(NewItem(title: "last", shape: .habit(.daily))).id
+        for i in 0..<80 {
+            let x = try clew.addItem(NewItem(title: "x\(i)", shape: .habit(.daily)))
+            try clew.moveItem(id: x.id, after: first.id, before: below)
+            below = x.id
+        }
+        #expect(imported(a)?.sortKey == sortKey)
+        // ...and never reminds about it.
+        try clew.setReminder(itemId: item.id, time: TimeOfDay(hour: 23, minute: 0))
+        #expect(try clew.plannedNotifications().isEmpty)
     }
 
     @Test func aVideoBackOnTheListIsRestored() throws {
@@ -174,7 +185,7 @@ private let a = "aaaaaaaaaaa", b = "bbbbbbbbbbb", c = "ccccccccccc", d = "dddddd
         let r = try clew.importExternal(batch([video(a), video(b)], total: 2))
         #expect(r.restored == 0 && r.added == 0)
         #expect(imported(a)?.deletedAt != nil && imported(b)?.deletedAt != nil)
-        #expect(try clew.laterCount() == 0)
+        #expect(try listed() == 0)
     }
 
     @Test func aLetGoAfterTheImportsOwnIsTheUsers() throws {
@@ -207,15 +218,13 @@ private let a = "aaaaaaaaaaa", b = "bbbbbbbbbbb", c = "ccccccccccc", d = "dddddd
     @Test func progressNeverTicksAndDoesNotRestartTheLaterClock() throws {
         try clew.importExternal(batch([video(a), video(b)], total: 2))
         let before = try #require(imported(a))
-        try clew.planForToday(itemIds: [try #require(imported(b)).id])
         clock.set(local(11, 12))
         try clew.importExternal(batch([video(a, watched: 1), video(b, watched: 1)], total: 2))
         let after = try #require(imported(a))
         #expect(after.state == .later && after.updatedAt == before.updatedAt)
-        // SPEC 2026-11-09: never ticks, in Later or on Today.
-        #expect(store.state.checkIns.isEmpty)
-        #expect(imported(b)?.state == .active)
-        #expect(try clew.laterPile().first?.watched == 1)
+        #expect(store.state.checkIns.isEmpty)                  // SPEC 2026-11-09: never ticks
+        let page = try #require(try clew.collection(.extensionYouTube))
+        #expect(page.inProgress.map(\.watched) == [1, 1] && page.done.isEmpty)
     }
 
     @Test func unreadableProgressIsIgnoredButTheVideoIsImported() throws {

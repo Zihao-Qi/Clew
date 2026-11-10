@@ -189,7 +189,7 @@ public final class Gateway: @unchecked Sendable {
                                           result: result, needsUpdate: needsUpdate)
                 lock.withLock { reports[body.source] = report }
                 return json(200, API.ImportResponse(result: result, needsUpdate: needsUpdate,
-                                                    laterCount: (try? clew.laterCount()) ?? 0))
+                                                    listCount: (try? clew.collections().first { $0.source == body.source }?.onList) ?? 0))
             } catch {
                 return importFailure(error)
             }
@@ -202,6 +202,9 @@ public final class Gateway: @unchecked Sendable {
         switch error {
         case ClewError.notAllowed:
             failure(400, "source not importable")
+        case ClewError.listTurnedOff:
+            // The extension tells the user where to turn it back on.
+            failure(409, "list turned off in Clew")
         case ClewError.tooManyEntries:
             failure(413, "too many entries")
         default:

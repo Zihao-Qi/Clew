@@ -34,7 +34,7 @@ extension Clew {
         let today = LocalDay(of: now, in: zone, rolloverHour: rolloverHour)
         let summaries = try summaries()
         return try storeForQueries.read { r in
-            let items = try r.items(inStates: [.active])
+            let items = try r.items(inStates: [.active]).filter { !Self.isCollectionItem($0) }
             let ids = items.map(\.id)
             let recent = Dictionary(grouping: try r.checkIns(itemIds: ids, from: today.weekStart), by: \.itemId)
             let progress = try r.progressAmounts(itemIds: ids)
