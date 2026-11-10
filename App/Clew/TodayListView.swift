@@ -28,6 +28,8 @@ struct TodayListView: View {
     /// a row over the list, a block over the hours (user, 2026-11-10: the same thing,
     /// moving smoothly between the two).
     @State private var lifted: Lifted?
+    /// Where the dragged block was grabbed, below its top (points).
+    @State private var blockGrab: CGFloat = 0
     /// The task under the pointer (a row or a block): the Delete key deletes it.
     @State private var hoveredItem: UUID?
     /// Cleared by itself when a row drag ends or is cancelled.
@@ -174,12 +176,15 @@ struct TodayListView: View {
         let b = block.block
         if lifted == nil {
             dragFrames = model.listRows.map { rowFrames[$0.id] ?? .zero }
+            blockGrab = value.startLocation.y - blockFrame(start: b.start, minutes: b.minutes).minY
         }
         if isOverTimeline(value.location.y), let day = model.timeline {
-            let earliest = -Int(b.start.timeIntervalSince(day.start) / 60)
-            let latest = TimelineMetrics.room(after: b.start, in: day) - b.minutes
-            let move = block.canChange ? min(max(TimelineBlockView.snap(value.translation.height), earliest), latest) : 0
-            let start = b.start.addingTimeInterval(TimeInterval(move * 60))
+            // Measured on the hours under the pointer, so the block stays under it while
+            // the timeline scrolls at its edges (user, 2026-11-10).
+            let top = value.location.y - blockGrab - timelineGeo.contentTop
+            let start = block.canChange
+                ? Clew.blockStart(minutesIn: Double(top / TimelineMetrics.pointsPerMinute), minutes: b.minutes, day: day)
+                : b.start
             lifted = Lifted(itemId: b.itemId, blockId: b.id, title: block.title, overTimeline: true,
                             frame: blockFrame(start: start, minutes: b.minutes), start: start, minutes: b.minutes)
             scrollAtEdge(value.location.y)

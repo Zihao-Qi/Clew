@@ -441,6 +441,15 @@ private let tuesday = LocalDay(string: "2026-11-10")!
         #expect(Clew.snapMinutes(7) == 0 && Clew.snapMinutes(8) == 15 && Clew.snapMinutes(-23) == -30)
     }
 
+    @Test func aDraggedBlockStartsWhereThePointerIsOnTheHours() throws {
+        let day = try clew.timeline()
+        // Its top 6 h 8 min after 4 a.m. → 10:15 (nearest quarter).
+        #expect(Clew.blockStart(minutesIn: 6 * 60 + 8, minutes: 30, day: day) == at(10, 10, 15))
+        #expect(Clew.blockStart(minutesIn: 6 * 60 + 7, minutes: 30, day: day) == at(10, 10))
+        #expect(Clew.blockStart(minutesIn: -50, minutes: 30, day: day) == at(10, 4))           // above the day
+        #expect(Clew.blockStart(minutesIn: 24 * 60, minutes: 60, day: day) == at(11, 3))       // still fits
+    }
+
     @Test func theTimelineCanBeHidden() throws {
         #expect(try clew.timelineShown())
         try clew.setTimelineShown(false)

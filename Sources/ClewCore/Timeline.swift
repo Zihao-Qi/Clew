@@ -608,6 +608,17 @@ extension Clew {
         return day.start.addingTimeInterval(TimeInterval(q * blockStepMinutes * 60))
     }
 
+    /// Where a dragged block starts when its top is `minutesIn` after the day's start (the
+    /// pointer's place on the hours, less where the block was grabbed): the nearest
+    /// quarter hour, kept so that the whole block fits in the day. Measured on the hours,
+    /// not from how far the pointer moved, so it stays under the pointer while the
+    /// timeline scrolls (user, 2026-11-10).
+    public static func blockStart(minutesIn: Double, minutes: Int, day: TimelineDay) -> Date {
+        let length = Int(day.end.timeIntervalSince(day.start) / 60)
+        let offset = min(max(snapMinutes(minutesIn), 0), max(0, length - minutes))
+        return day.start.addingTimeInterval(TimeInterval(offset * 60))
+    }
+
     /// A drag of `minutes` as whole quarter hours, to the nearest one.
     public static func snapMinutes(_ minutes: Double) -> Int {
         Int((minutes / Double(blockStepMinutes)).rounded()) * blockStepMinutes
