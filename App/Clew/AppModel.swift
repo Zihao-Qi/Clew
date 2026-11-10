@@ -64,6 +64,15 @@ final class AppModel {
     private(set) var timeline: TimelineDay?
     private(set) var timelineShown = true
     private(set) var blockAlerts = true
+    /// The list's rows: today's tasks minus those on the timeline (SPEC 2026-11-10: a
+    /// placed task lives on the timeline only). `today` keeps them all, for done/total.
+    var listRows: [TodayRow] {
+        let rows = today?.rows ?? []
+        guard timelineShown, let placed = timeline?.placedItems, !placed.isEmpty else { return rows }
+        return rows.filter { !placed.contains($0.id) }
+    }
+    /// Today's row for a task, wherever it is shown.
+    func row(_ itemId: UUID) -> TodayRow? { today?.rows.first { $0.id == itemId } }
     /// Tasks ticked by a block for an earlier day while the Mac slept.
     private(set) var lateTicks: [LateTick] = []
     @ObservationIgnored private var blockEdgeTimer: Timer?
@@ -445,7 +454,7 @@ final class AppModel {
     /// lands after the target; from below, before it.
     @discardableResult
     func drop(_ dragged: UUID, onto target: TodayRow) -> Bool {
-        guard let order = today?.rows.map(\.id),
+        guard let order = Optional(listRows.map(\.id)),
               let (above, below) = Clew.dropNeighbours(dragged: dragged, onto: target.id, in: order)
         else { return false }
         return run { try $0.moveItem(id: dragged, after: above, before: below) }
@@ -453,7 +462,8 @@ final class AppModel {
 
     /// Move Up / Move Down: one place in today's list.
     func move(_ row: TodayRow, by step: Int) {
-        guard let rows = today?.rows, let index = rows.firstIndex(where: { $0.id == row.id }) else { return }
+        let rows = listRows
+        guard let index = rows.firstIndex(where: { $0.id == row.id }) else { return }
         let target = index + step
         guard rows.indices.contains(target) else { return }
         drop(row.id, onto: rows[target])

@@ -489,6 +489,7 @@ M = [
  ("TL49 another for any task", C+"Timeline.swift", "            let b = try liveBlock(id, today: today, w)\n            guard try todayList(w, on: today).rows.contains(where: { $0.id == b.itemId }) else {\n                throw ClewError.notAllowed\n            }\n", "            let b = try liveBlock(id, today: today, w)\n", TL),
  ("TL50 any length", C+"Timeline.swift", "guard minutes >= blockStepMinutes, minutes % blockStepMinutes == 0, minutes <= room else {", "guard minutes <= room else {", TL),
  ("TL51 drag not cut", C+"Timeline.swift", "minutes: minutes ?? min(open.minutes, room), today: today,", "minutes: minutes ?? open.minutes, today: today,", TL),
+ ("TL52 placed stay in list", C+"Timeline.swift", "public var placedItems: Set<UUID> { Set(blocks.map(\\.block.itemId)) }", "public var placedItems: Set<UUID> { [] }", TL),
  ("TL43 table allows 10", S+"Schema.swift", "CHECK (minutes BETWEEN 15 AND 1500 AND minutes % 15 = 0)", "CHECK (minutes BETWEEN 1 AND 1500)", "SQLiteStoreTests"),
  ("TL44 block can be deleted", S+"Schema.swift", "            CREATE TRIGGER timeBlock_no_delete BEFORE DELETE ON timeBlock\n            BEGIN SELECT RAISE(ABORT, 'time blocks are removed with a tombstone, never deleted'); END;\n", "", "SQLiteStoreTests"),
 ]

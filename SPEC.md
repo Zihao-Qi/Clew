@@ -210,22 +210,27 @@ stopped daily use, not adding features.
   it opens scrolled to now, with a quiet line at the current time; the menu grows taller
   by that much, but never past the screen (the list scrolls when it must). **Today
   only:** no tomorrow, nothing planned ahead. Nothing of Clew's own on it is red or says "missed".
-  - **Placing:** drag a task's row from Today's list onto an hour (the timeline scrolls
-    when the drag nears its top or bottom edge). It drops as a **30-minute block**,
-    snapped to 15 minutes; drag the block to move it and its bottom edge to resize it
-    (15 minutes at least, ending at 4 a.m. at the latest). Only tasks on Today can be
-    placed; the collection rows cannot. Blocks may overlap each other and events;
-    overlapping ones sit side by side. A task's row shows the start of its next block
-    not yet ended ("10:00"). **Unplacing:** drag the block back onto the list.
-  - **Without dragging** (and for VoiceOver): the row's right-click › **Put on
-    timeline…** and the block's right-click › **Move to…** open a small start-time and
-    length picker (Put on timeline… moves or adds by the same rule as dragging the
-    row, below); the block's right-click also has **Length** (15, 30, 45, 60, 90
-    minutes; lengths that would pass 4 a.m. are not offered) and **Remove block**. Each is also an accessibility action.
-  - **One block is the easy case:** dragging a task's row again **moves** its block
-    that has not ended (the earliest, if several); if all its blocks have ended, it
-    adds a new one. A second block before then comes only from the block's right-click
-    › **Add another block** (right after it; not offered when that would pass 4 a.m.).
+  - **Placing moves the task** (*changed* 2026-11-10 after first use: the row stayed in
+    the list too, so it looked copied, not moved). Drag a task's row from Today's list
+    onto an hour (the timeline scrolls when the drag nears its top or bottom edge): the
+    task **leaves the list and lives on the timeline** for the day, as a **30-minute
+    block** snapped to 15 minutes. Drag a block to move it and its bottom edge to resize
+    it (15 minutes at least, ending at 4 a.m. at the latest). **Dragging a block back
+    onto the list** removes it; a task with no blocks left is back in the list. The
+    dragged row or block floats above both, so it moves freely between them. Only tasks
+    on Today can be placed; the collection rows cannot. Blocks may overlap each other and
+    events; overlapping ones sit side by side. Tasks on the timeline still count in the
+    menu bar's `done/total`. With the timeline turned off, every task is in the list.
+  - **On a block** (right-click, also accessibility actions): **Done** / **+1** and
+    **Undo** (the row's tick, by hand; *user choice*: right-click only, no circle on the
+    block), **Focus** (the timer, with its controls there while it runs), **Move to…**
+    (a start-time and length picker), **Length** (15, 30, 45, 60, 90 minutes; lengths
+    that would pass 4 a.m. are not offered), **Add another block** (right after it, the
+    same length; not offered when that would pass 4 a.m.), **Not finished**, **Remove
+    block**. Clicking a block opens the task's details. The row's right-click › **Put on
+    timeline…** places it without dragging.
+  - **Several blocks** are allowed (Add another block); the first comes from dragging the
+    row or Put on timeline….
   - **A block's end ticks the task** (*new rule*: until now only the user and a
     finished external list ticked; the focus timer still never ticks by itself). It is a
     real tick, dated the block's day: the row is done, it counts on the heatmap and in
@@ -243,8 +248,8 @@ stopped daily use, not adding features.
     Done and that tick still stands (one sitting, one tick). If the Mac sleeps or Clew is not running at the end, the block decides
     when Clew runs again, still for its own day, even after 4 a.m.; a block ending at
     exactly 4:00 belongs to the day that ends then.
-  - **Undo:** right-click a block that ticked › **Not finished**, or untick the row as
-    usual; the block stays, quieter, and does not tick again. **Changing a block's end**
+  - **Undo:** right-click a block that ticked › **Not finished** (or Undo, which takes
+    back the task's latest tick today, as the row's undo does); the block stays, quieter, and does not tick again. **Changing a block's end**
     (move, resize) undoes its tick and lets it decide again, also after Not finished.
     **Removing** a block that ticked also undoes its tick (the tick belongs to the
     block); ticks made by hand are never touched. **Rounds:** once a counted goal's next

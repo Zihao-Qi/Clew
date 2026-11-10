@@ -56,7 +56,11 @@ struct DayTimelineView: View {
     let space: String
     @Binding var geometry: TimelineGeometry
     @Binding var topQuarter: Int?
+    @Binding var floating: FloatingBlock?
+    @Binding var hovered: UUID?
     let onMove: (TimelineBlock) -> Void
+    let onOpen: (UUID) -> Void
+    let onEdit: (Item) -> Void
 
     var body: some View {
         ScrollView(.vertical) {
@@ -66,7 +70,9 @@ struct DayTimelineView: View {
                     let width = g.size.width - TimelineMetrics.labelWidth - 6
                     ForEach(day.blocks) { block in
                         TimelineBlockView(model: model, block: block, day: day, space: space,
-                                          viewport: geometry.viewport, onMove: { onMove(block) })
+                                          viewport: geometry.viewport, floating: $floating, hovered: $hovered,
+                                          onMove: { onMove(block) }, onOpen: { onOpen(block.block.itemId) },
+                                          onEdit: onEdit)
                             .frame(width: max(20, width / CGFloat(block.lanes) - 2))
                             .offset(x: TimelineMetrics.labelWidth + CGFloat(block.lane) * width / CGFloat(block.lanes),
                                     y: TimelineMetrics.y(block.block.start, in: day))
@@ -159,7 +165,11 @@ struct TimelineBlockView: View {
     let day: TimelineDay
     let space: String
     let viewport: CGRect
+    @Binding var floating: FloatingBlock?
+    @Binding var hovered: UUID?
     let onMove: () -> Void
+    let onOpen: () -> Void
+    let onEdit: (Item) -> Void
 
     @State private var moveBy = 0          // minutes, while dragging
     @State private var resizeBy = 0
@@ -181,17 +191,32 @@ struct TimelineBlockView: View {
             .overlay(alignment: .topLeading) { label }
             .overlay(alignment: .bottom) { if block.canChange { resizeHandle } }
             .frame(height: max(height - 1, 6))
-            .opacity(overList ? 0.4 : 1)
+            // Off the timeline it floats at the pointer instead (TodayListView).
+            .opacity(overList ? 0 : 1)
             .offset(y: CGFloat(moveBy) * TimelineMetrics.pointsPerMinute)
             .contentShape(Rectangle())
+            // The same as a row: click opens the details, right-click the menu.
+            .onTapGesture(perform: onOpen)
             .gesture(moveGesture)
+            .onHover { inside in
+                if inside { hovered = b.id } else if hovered == b.id { hovered = nil }
+            }
             .contextMenu { menu }
             .help(Text(verbatim: "\(block.title) · \(range)"))
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Text("\(block.title), \(range)"))
             .accessibilityValue(stateText)
+            .accessibilityAction(named: Text("Details"), onOpen)
             .accessibilityAction(named: Text("Move to…"), onMove)
             .accessibilityAction(named: Text("Remove block")) { model.removeBlock(b.id) }
+            .accessibilityActions {
+                if let row, !row.isGoalReached, row.item.kind == .goal || !row.isDone {
+                    Button(row.item.kind == .goal ? "+1" : "Done") { model.tap(row) }
+                }
+                if let row, row.todayAmount > 0 {
+                    Button(row.item.kind == .goal ? "Undo +1" : "Undo") { model.undo(row) }
+                }
+            }
     }
 
     private var range: String {
@@ -217,7 +242,12 @@ struct TimelineBlockView: View {
                     .font(.caption)
                     .lineLimit(1)
                     .foregroundStyle(looksDone ? .secondary : .primary)
-                if height >= 30 {
+                if let timer {
+                    // Its focus timer counts down here, since the task is not in the list.
+                    Text(verbatim: (timer.phase == .rest ? "☕ " : "⏱ ") + RowView.clock(timer.remaining(at: model.clockTick)))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                } else if height >= 30 {
                     Text(verbatim: range)
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.secondary)
@@ -252,8 +282,9 @@ struct TimelineBlockView: View {
     private var moveGesture: some Gesture {
         DragGesture(minimumDistance: 3, coordinateSpace: .named(space))
             .onChanged { value in
-                // Dragged onto the list below: let go there to remove it (SPEC 2026-11-10).
+                // Dragged onto the list below: let go there to put it back (SPEC 2026-11-10).
                 overList = value.location.y > viewport.maxY + 4
+                floating = overList ? FloatingBlock(title: block.title, location: value.location) : nil
                 guard block.canChange, !overList else { return }
                 let earliest = -Int(b.start.timeIntervalSince(day.start) / 60)
                 let latest = TimelineMetrics.room(after: b.start, in: day) - b.minutes
@@ -263,6 +294,7 @@ struct TimelineBlockView: View {
                 let change = moveBy, remove = overList
                 moveBy = 0
                 overList = false
+                floating = nil
                 if remove {
                     model.removeBlock(b.id)
                 } else if change != 0 {
@@ -276,8 +308,43 @@ struct TimelineBlockView: View {
         Clew.snapMinutes(Double(points / TimelineMetrics.pointsPerMinute))
     }
 
+    /// The running focus timer, if it is this task's.
+    private var timer: FocusTimer? { model.focus?.itemId == b.itemId ? model.focus : nil }
+
+    /// The row's menu first (user, 2026-11-10: the same operations in the list and on the
+    /// timeline), then the block's own.
     @ViewBuilder
     private var menu: some View {
+        if let row {
+            if row.item.kind == .goal, !row.isGoalReached {
+                Button("+1") { model.tap(row) }
+            } else if !row.isDone {
+                Button("Done") { model.tap(row) }
+            }
+            if row.todayAmount > 0 {
+                Button(row.item.kind == .goal ? "Undo +1" : "Undo") { model.undo(row) }
+            }
+            Button("Details", action: onOpen)
+            Button("Edit…") { onEdit(row.item) }
+            if let timer {
+                if timer.phase == .focus, timer.isOver(at: Date()) {
+                    Button(row.item.kind == .goal ? "+1 and stop" : "Done and stop") { model.finishFocus(row) }
+                    Button("5 more min") { model.extendFocus() }
+                } else if timer.phase == .focus {
+                    Button(timer.isPaused ? "Resume the timer" : "Pause the timer") {
+                        timer.isPaused ? model.resumeFocus() : model.pauseFocus()
+                    }
+                }
+                Button("Stop the timer") { model.stopFocus() }
+            } else if model.focus?.phase != .focus, !row.isGoalReached {
+                Menu("Focus") {
+                    ForEach(Clew.focusMinutes, id: \.self) { m in
+                        Button("\(m) min") { model.startFocus(row, minutes: m) }
+                    }
+                }
+            }
+            Divider()
+        }
         if block.state == .ticked, block.canChange {
             Button("Not finished") { model.blockNotFinished(b.id) }
         }

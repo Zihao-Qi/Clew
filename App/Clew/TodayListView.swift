@@ -25,6 +25,10 @@ struct TodayListView: View {
     @State private var edgeScroll: Timer?
     /// The rows' full height, so a long list scrolls instead of passing the screen.
     @State private var rowsHeight: CGFloat = 0
+    /// A block dragged off the timeline, drawn above everything so it moves freely.
+    @State private var floating: FloatingBlock?
+    /// The block under the pointer: the Delete key removes it.
+    @State private var hoveredBlock: UUID?
 
     private static let listSpace = "todayList"
 
@@ -139,7 +143,6 @@ struct TodayListView: View {
                 RowView(row: row, model: model, onEdit: { screen = .edit(row.item, back: .list) },
                         onOpen: { screen = .detail(row.id) },
                         onPlace: showsTimeline ? { screen = .place(row.id, block: nil) } : nil,
-                        startTime: showsTimeline ? model.timeline?.nextStart(of: row.id, now: Date()) : nil,
                         canMoveUp: index > 0, canMoveDown: index < rows.count - 1,
                         isDragged: dragging == row.id)
                     .background(GeometryReader { g in
@@ -149,6 +152,8 @@ struct TodayListView: View {
                     .offset(y: offset(for: row, at: index, in: rows))
                     .zIndex(dragging == row.id ? 1 : 0)
                     .shadow(color: .black.opacity(dragging == row.id ? 0.18 : 0), radius: 6, y: 2)
+                    // Over the hours the row gives way to the block it would become.
+                    .opacity(dragging == row.id && ghost != nil ? 0 : 1)
                     .gesture(drag(row, in: rows))
             }
         }
@@ -160,14 +165,17 @@ struct TodayListView: View {
         VStack(alignment: .leading, spacing: 0) {
             if showsTimeline, let day = model.timeline {
                 DayTimelineView(model: model, day: day, ghost: ghost, space: Self.listSpace,
-                                geometry: $timelineGeo, topQuarter: $topQuarter,
-                                onMove: { block in screen = .place(block.block.itemId, block: block.id) })
+                                geometry: $timelineGeo, topQuarter: $topQuarter, floating: $floating,
+                                hovered: $hoveredBlock,
+                                onMove: { block in screen = .place(block.block.itemId, block: block.id) },
+                                onOpen: { screen = .detail($0) },
+                                onEdit: { item in screen = .edit(item, back: .list) })
                 Divider()
             }
             ForEach(model.lateTicks) { late in
                 LateTickLine(late: late, today: model.today?.day, model: model)
             }
-            if let rows = model.today?.rows, !rows.isEmpty {
+            if case let rows = model.listRows, !rows.isEmpty {
                 Group {
                     if rowsHeight > rowsLimit {
                         // A long list scrolls rather than pushing the menu past the screen.
@@ -181,10 +189,17 @@ struct TodayListView: View {
                 .zIndex(dragging != nil ? 1 : 0)
                 .onPreferenceChange(RowFrames.self) { rowFrames = $0 }
             } else {
-                Text("Nothing for today.")
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 20)
+                Group {
+                    if model.today?.rows.isEmpty == false {
+                        // Everything is placed; drag a block here to bring it back.
+                        Text("Everything is on the timeline.")
+                    } else {
+                        Text("Nothing for today.")
+                    }
+                }
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 20)
             }
 
             // Imported lists, below the tasks with no heading (SPEC 2026-11-09).
@@ -238,9 +253,42 @@ struct TodayListView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
         }
+        .overlay(alignment: .topLeading) {
+            // A block dragged down to the list floats at the pointer, unclipped.
+            if let floating {
+                Text(floating.title)
+                    .font(.callout)
+                    .lineLimit(1)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .windowBackgroundColor)))
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.25)).padding(-1))
+                    .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
+                    .frame(maxWidth: 280)
+                    .fixedSize()
+                    .position(x: floating.location.x, y: floating.location.y)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
+        .background {
+            // Delete removes the block under the pointer (user, 2026-11-10).
+            Button("Remove block") { if let hoveredBlock { model.removeBlock(hoveredBlock) } }
+                .keyboardShortcut(.delete, modifiers: [])
+                .opacity(0)
+                .frame(width: 0, height: 0)
+                .disabled(hoveredBlock == nil)
+                .accessibilityHidden(true)
+        }
         // One space for the timeline and the rows, so a row can be dragged onto an hour.
         .coordinateSpace(name: Self.listSpace)
     }
+}
+
+/// A block being dragged off the timeline toward the list.
+struct FloatingBlock: Equatable {
+    var title: String
+    var location: CGPoint
 }
 
 /// "Ticked for yesterday: Write intro · Not finished": a block that ended while the
@@ -292,8 +340,6 @@ struct RowView: View {
     let onOpen: () -> Void
     /// "Put on timeline…", when the timeline is shown.
     var onPlace: (() -> Void)? = nil
-    /// The start of the task's next block not ended ("10:00").
-    var startTime: Date? = nil
     var canMoveUp = false
     var canMoveDown = false
     /// This row is being dragged: it gets a solid background so rows sliding under it
@@ -527,16 +573,7 @@ struct RowView: View {
                 timerControls(now: now)
                     .fixedSize()
                     .layoutPriority(1)
-                if timer == nil, let startTime {
-                    // When its block starts (SPEC 2026-11-10); right after the title, like
-                    // the timer, so nothing else moves.
-                    Text(verbatim: TimelineMetrics.time(startTime))
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .fixedSize()
-                        .layoutPriority(1)
-                        .accessibilityLabel(Text("On the timeline at \(TimelineMetrics.time(startTime))"))
-                }
+
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
