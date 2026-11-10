@@ -18,6 +18,15 @@
         "content.js"
       ],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://x.com/*"
+      ],
+      "js": [
+        "content-x.js"
+      ],
+      "run_at": "document_idle"
     }
   ],
   "action": {

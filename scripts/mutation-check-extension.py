@@ -31,6 +31,17 @@ M = [
  ("E20 progress as percent", E+"youtube.ts", "Math.round(pct) / 100", "pct"),
  ("E21 progress dropped", E+"youtube.ts", "entries.push(progress === undefined ? { externalRef: id, title } : { externalRef: id, title, progress });", "entries.push({ externalRef: id, title });"),
  ("E22 turned off looks failed", E+"gateway.ts", "    if (r.status === 409) throw new GatewayError(\"turnedOff\", \"list turned off in Clew\", 409);\n", ""),
+ ("E23 always at top", E+"x.ts", "atTop: cells.length > 0 && cells[0]?.top === 0", "atTop: true"),
+ ("E24 rows unsorted", E+"x.ts", "    .sort((a, b) => (a.top ?? Infinity) - (b.top ?? Infinity));\n", "    ;\n"),
+ ("E25 quoted text", E+"x.ts", ".find((t) => !inQuote(post, t))", ".find(() => true)"),
+ ("E26 quoted id", E+"x.ts", "if (!link || inQuote(post, link)) continue;", "if (!link) continue;"),
+ ("E27 jump unseen", E+"x.ts", "} else if (this.state === \"running\" && !readable.some((p) => this.refs.has(p.externalRef))) {", "} else if (false) {"),
+ ("E28 run from anywhere", E+"x.ts", "this.state = window.atTop ? \"running\" : \"broken\";", "this.state = \"running\";"),
+ ("E29 unreadable hidden", E+"x.ts", "found: parsed + this.unreadable,", "found: parsed,"),
+ ("E30 click inverted", E+"x.ts", "const bookmarked = button.matches(SELECTORS.bookmark);", "const bookmarked = !button.matches(SELECTORS.bookmark);"),
+ ("E31 wrong endpoint", E+"gateway.ts", "this.post(pairing, \"/v1/bookmark\", request)", "this.post(pairing, \"/v1/import\", request)"),
+ ("E32 bookmark answer lax", E+"contract.ts", "return isObject(v) && isInt(v.listCount) && isImportResult(v.result);", "return isObject(v);"),
+ ("E33 zero id", E+"x.ts", "return id && !id.startsWith(\"0\") ? id : undefined;", "return id;"),
  ("E16 checks lax", E+"contract.ts", "[\"added\", \"renamed\", \"restored\", \"letGo\", \"skipped\", \"progressed\"].every((k) => isInt(r[k]))", "true"),
 ]
 results = []

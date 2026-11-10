@@ -108,9 +108,10 @@ struct TodayListView: View {
             NoticeView(text: model.notice ?? model.confirmation)
                 .animation(.easeOut(duration: 0.4), value: model.notice ?? model.confirmation)
 
-            if model.browser?.youTube?.needsUpdate == true {
+            if model.browser?.youTube?.needsUpdate == true || model.browser?.x?.needsUpdate == true {
                 // Health report, not silence (ARCHITECTURE §6). Quiet, never red.
-                Label("YouTube import needs an update", systemImage: "exclamationmark.triangle")
+                Label(model.browser?.youTube?.needsUpdate == true ? "YouTube import needs an update" : "X import needs an update",
+                      systemImage: "exclamationmark.triangle")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)

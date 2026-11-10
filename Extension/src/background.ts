@@ -1,12 +1,14 @@
-// Service worker: the only part that talks to Clew. The content script sends scans
-// here; the popup pairs and reads the status.
+// Service worker: the only part that talks to Clew. The content scripts send scans and
+// bookmark clicks here; the popup pairs and reads the status.
 
-import type { ImportRequest } from "./contract";
+import type { BookmarkRequest, ImportRequest, ListSource } from "./contract";
 import { Gateway, GatewayError, type Pairing } from "./gateway";
 
 export interface Status {
   at: number;
   ok: boolean;
+  /** The list the last import or click was for. */
+  source?: ListSource;
   /** "unreachable" → "Open Clew"; "revoked" → pair again; "turnedOff" → Clew's Settings. */
   problem?: "unreachable" | "revoked" | "turnedOff" | "refused" | "badAnswer";
   added?: number;
@@ -17,6 +19,8 @@ export interface Status {
 
 export type Message =
   | { type: "watchLater"; scan: ImportRequest }
+  | { type: "xBookmarks"; scan: ImportRequest }
+  | { type: "bookmark"; click: BookmarkRequest }
   | { type: "pair"; code: string }
   | { type: "forget" }
   | { type: "status" };
@@ -43,6 +47,7 @@ async function sendScan(scan: ImportRequest): Promise<Status | undefined> {
     status = {
       at: Date.now(),
       ok: true,
+      source: scan.source,
       added: response.result.added,
       letGo: response.result.letGo,
       listCount: response.listCount,
@@ -51,7 +56,23 @@ async function sendScan(scan: ImportRequest): Promise<Status | undefined> {
     await chrome.storage.local.set({ pairing: { ...pairing, port }, lastScan: key, lastScanAt: Date.now() });
   } catch (e) {
     const problem = e instanceof GatewayError ? e.kind : "unreachable";
-    status = { at: Date.now(), ok: false, problem };
+    status = { at: Date.now(), ok: false, source: scan.source, problem };
+  }
+  await chrome.storage.local.set({ status });
+  return status;
+}
+
+/** A bookmark click is sent at once; it is never deduplicated like scans. */
+async function sendBookmark(click: BookmarkRequest): Promise<Status | undefined> {
+  const { pairing } = await load();
+  if (!pairing) return undefined;
+  let status: Status;
+  try {
+    const { response, port } = await gateway.bookmark(pairing, click);
+    status = { at: Date.now(), ok: true, source: click.source, added: response.result.added, listCount: response.listCount };
+    await chrome.storage.local.set({ pairing: { ...pairing, port } });
+  } catch (e) {
+    status = { at: Date.now(), ok: false, source: click.source, problem: e instanceof GatewayError ? e.kind : "unreachable" };
   }
   await chrome.storage.local.set({ status });
   return status;
@@ -60,7 +81,10 @@ async function sendScan(scan: ImportRequest): Promise<Status | undefined> {
 async function handle(message: Message): Promise<unknown> {
   switch (message.type) {
     case "watchLater":
+    case "xBookmarks":
       return sendScan(message.scan);
+    case "bookmark":
+      return sendBookmark(message.click);
     case "pair": {
       try {
         const pairing = await gateway.pair(message.code, "Chrome");

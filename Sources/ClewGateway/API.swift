@@ -37,13 +37,28 @@ public enum API {
         public var listTotal: Int?
         public var entries: [ExternalEntry]
         public var scan: ScanReport
+        /// For a list without a count (X bookmarks): how many leading entries were seen
+        /// as one unbroken run from the top of the list (the gap rule).
+        public var fromTop: Int?
     }
 
     public struct ImportResponse: Codable, Hashable, Sendable {
         public var result: ImportResult
         public var needsUpdate: Bool
-        /// Items now in this source's collection.
-        /// Items now in this source's collection.
+        /// Items on this source's list now, ticked or not.
+        public var listCount: Int
+    }
+
+    /// `POST /v1/bookmark` (scope `import`): the bookmark button was clicked on a post.
+    public struct BookmarkRequest: Codable, Hashable, Sendable {
+        public var source: Source
+        public var entry: ExternalEntry
+        /// True when the post was bookmarked, false when the bookmark was removed.
+        public var bookmarked: Bool
+    }
+
+    public struct BookmarkResponse: Codable, Hashable, Sendable {
+        public var result: ImportResult
         public var listCount: Int
     }
 

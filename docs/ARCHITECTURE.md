@@ -311,8 +311,29 @@ values; unknown ones are dropped) refuses the import with `ClewError.listTurnedO
 before anything is read or written; the Gateway answers 409 and the extension shows
 "turned off in Clew".
 
+**X bookmarks (SPEC 2026-11-10).** `extension.x` refs are post ids (1–19 digits, no
+leading zero, within `Int64`); the URL is `https://x.com/i/status/<id>`. X is an
+*ordered source*: its scans are never `complete` (even with a stray `listTotal`).
+Removals come from:
+- **The gap rule**, on `ImportBatch.fromTop`, the leading entries the extension saw as
+  one unbroken run from the top. Only when the scan report agrees and nothing was
+  skipped (else the run is 0); a negative run is 0. `gapRule(previous:top:)` takes the
+  order Clew last saw (live items only) and the run: for each pair of consecutive
+  *known* posts in the run whose old positions are increasing, every post between
+  them in the old order that is not in the run was removed. Posts out of their old
+  order (bookmarked again, so at the top) are skipped, never read as gaps. The new
+  order is the run, then the rest as before. It is kept in the setting
+  `listOrder.extension.x` (a JSON array of refs; derived state, rewritten only when it
+  changes).
+- **The bookmark button**, `bookmarkChanged(source:entry:bookmarked:)` (Gateway
+  `POST /v1/bookmark`): bookmarked adds the post at the top of the order, or restores
+  it if it had left (to read again); unbookmarked makes a live post leave the list
+  like any removal (`leaveList`: tick unless ticked, the import's let-go). Unknown
+  posts are ignored when unbookmarked; a bookmark needs a title.
+Both refuse a list turned off (`listTurnedOff`, 409).
+
 **Collections (v1.1, SPEC 2026-11-09).** Items whose source is in
-`Clew.collectionSources` (YouTube now, X next) form one collection per source. There
+`Clew.collectionSources` (YouTube, then X) form one collection per source. There
 is no parent row: a collection is derived from `source`, so nothing needs migrating.
 Today, Later, Pick, reordering and notifications all filter collection items out
 (including ones picked before collections existed); `PlanForToday` refuses them;
@@ -331,7 +352,7 @@ today only. The Gateway's import answer reports `listCount`, the items on the li
 (`onList`; *changed from* `laterCount`).
 
 **Browser extension (v1.1, `Extension/`, TypeScript, built with Bun).** Chrome MV3.
-- **Scrapers are quarantined:** one module per site (`src/youtube.ts`), with selectors
+- **Scrapers are quarantined:** one module per site (`src/youtube.ts`, `src/x.ts`), with selectors
   in a single table and a `SELECTOR_VERSION`. Tests run against saved HTML snapshots.
   Verified on 2026-11-08: `ytd-playlist-video-renderer` for Watch Later rows and
   `.ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment` (style width %)
@@ -352,6 +373,17 @@ today only. The Gateway's import answer reports `listCount`, the items on the li
   the 2026-11-08 class is kept as a fallback). Progress is read only from the
   Watch Later page, not while a video plays (user decision 2026-11-09: no second
   scraper on the player). It does not compute anything else.
+- **X (`src/x.ts`, `src/content-x.ts`, on x.com only).** X keeps only the rows near
+  the screen, so `BookmarkScan` builds one scan from what it sees while you scroll
+  (rows sorted by their `translateY`). The run from the top starts only if the first
+  row seen is at `translateY(0px)`, and ends at the first look with no post in common
+  with what was seen (the page jumped); later rows are added, not compared. A row it
+  cannot read raises `found` above `parsed`, so Clew compares nothing. Looks are
+  throttled to every 250 ms and the scan is sent 1.5 s after the page settles. A
+  capture-phase click listener on `document` sees the bookmark button before X flips
+  it (`bookmark` = being bookmarked, `removeBookmark` = being removed) and posts to
+  `/v1/bookmark` at once. **Selectors unverified** as of 2026-11-10 (Chrome was signed
+  out of X); they must be checked on the signed-in page before this is relied on.
 
 **MCP server (v1.2).** `clew-mcp` is a tiny stdio executable. Its tools map 1:1 onto
 Gateway endpoints and are **read-only** (`get_today`, `get_history`, `get_later`,

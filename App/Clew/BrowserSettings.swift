@@ -40,30 +40,14 @@ struct BrowserSettings: View {
         } header: {
             Text("Chrome extension")
         } footer: {
-            Text("The extension copies your YouTube Watch Later into Clew, as one list below your tasks. It talks only to Clew on this Mac.")
+            Text("The extension copies your YouTube Watch Later and X bookmarks into Clew, each as one list below your tasks. It talks only to Clew on this Mac.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
 
         if !connection.clients.isEmpty {
             Section {
-                if let report = connection.youTube {
-                    LabeledContent {
-                        Text(report.at, style: .relative)
-                    } label: {
-                        Text("Last import")
-                        Text(Self.summary(report))
-                    }
-                    if report.needsUpdate {
-                        Text("YouTube changed its page, so Clew couldn't read it all. Nothing was removed; the extension needs an update.")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                    }
-                } else {
-                    Text("Open your Watch Later page in Chrome to import it.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
+                report(connection.youTube, site: "YouTube", open: Text("Open your Watch Later page in Chrome to import it."))
             } header: {
                 Text("YouTube Watch Later")
             } footer: {
@@ -71,6 +55,36 @@ struct BrowserSettings: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Section {
+                report(connection.x, site: "X", open: Text("Open your Bookmarks on x.com in Chrome to import them. Bookmarking a post in Chrome adds it right away."))
+            } header: {
+                Text("X bookmarks")
+            } footer: {
+                Text("A post you unbookmark counts as read: in Chrome right away, from your phone the next time you open Bookmarks in Chrome and scroll past where it was. If you didn't read it, right-click it in the list and choose Not read.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func report(_ report: ImportReport?, site: String, open: Text) -> some View {
+        if let report {
+            LabeledContent {
+                Text(report.at, style: .relative)
+            } label: {
+                Text("Last import")
+                Text(Self.summary(report))
+            }
+            if report.needsUpdate {
+                Text("\(site) changed its page, so Clew couldn't read it all. Nothing was removed; the extension needs an update.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+        } else {
+            open
+                .font(.callout)
+                .foregroundStyle(.secondary)
         }
     }
 

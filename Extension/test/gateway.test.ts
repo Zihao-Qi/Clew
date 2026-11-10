@@ -35,6 +35,16 @@ const clew: Server = async (url, init) => {
     const proof = url.searchParams.get("client") ? await hmac(SECRET, nonce) : undefined;
     return json(200, { app: "clew", api: 1, ...(proof ? { proof } : {}) });
   }
+  if (url.pathname === "/v1/bookmark") {
+    const auth = (init?.headers as Record<string, string>).Authorization;
+    if (auth !== "Bearer tok") return json(401, { error: "unknown token" });
+    const body = JSON.parse(String(init?.body));
+    if (body.source !== "extension.x" || typeof body.bookmarked !== "boolean") return json(400, { error: "bad request" });
+    return json(200, {
+      result: { added: body.bookmarked ? 1 : 0, renamed: 0, restored: 0, letGo: body.bookmarked ? 0 : 1, skipped: 0, progressed: 0, complete: false },
+      listCount: 3,
+    });
+  }
   if (url.pathname === "/v1/import") {
     const auth = (init?.headers as Record<string, string>).Authorization;
     if (auth !== "Bearer tok") return json(401, { error: "unknown token" });
@@ -140,6 +150,26 @@ describe("import", () => {
     const net = network({ [PORTS[0]]: clew });
     const { response } = await new Gateway(net.fetchFn).importList(pairing, scan);
     expect(response.listCount).toBe(1);
+  });
+});
+
+describe("bookmark clicks", () => {
+  const click = { source: "extension.x" as const, entry: { externalRef: "1850000000000000001", title: "p" }, bookmarked: false };
+
+  test("go to /v1/bookmark with the token, and the answer comes back checked", async () => {
+    const net = network({ [PORTS[0]]: clew });
+    const { response } = await new Gateway(net.fetchFn).bookmark(pairing, click);
+    expect(response.result.letGo).toBe(1);
+    expect(response.listCount).toBe(3);
+  });
+
+  test("a list turned off, a stale token and a bad answer are told apart", async () => {
+    const answer = (status: number, body: unknown): Server => async (url, init) =>
+      url.pathname === "/v1/hello" ? clew(url, init) : json(status, body);
+    const run = (s: Server) => new Gateway(network({ [PORTS[0]]: s }).fetchFn).bookmark(pairing, click);
+    await expect(run(answer(409, { error: "list turned off in Clew" }))).rejects.toMatchObject({ kind: "turnedOff" });
+    await expect(run(answer(401, { error: "unknown token" }))).rejects.toMatchObject({ kind: "revoked" });
+    await expect(run(answer(200, { listCount: 3 }))).rejects.toMatchObject({ kind: "badAnswer" });
   });
 });
 

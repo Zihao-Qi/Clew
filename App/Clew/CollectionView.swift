@@ -15,6 +15,16 @@ enum CollectionStyle {
     static func icon(_ source: Source) -> String {
         source == .extensionX ? "bookmark" : "play.rectangle"
     }
+
+    /// What is left: videos to watch, posts to read.
+    static func left(_ count: Int, _ source: Source) -> String {
+        source == .extensionX ? String(localized: "\(count) to read") : String(localized: "\(count) to watch")
+    }
+
+    /// The right-click item that undoes "removed means finished".
+    static func notDone(_ source: Source) -> String {
+        source == .extensionX ? String(localized: "Not read") : String(localized: "Not finished")
+    }
 }
 
 /// One imported list below the tasks: no circle, not counted toward today. Clicking it
@@ -40,7 +50,7 @@ struct CollectionRowView: View {
                     .lineLimit(1)
                     .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(Self.rowSpace)).minX } action: { titleInset = $0 }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Text("\(summary.toWatch) to watch")
+                Text(verbatim: CollectionStyle.left(summary.toWatch, summary.source))
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
                 Image(systemName: "chevron.right")
@@ -74,7 +84,7 @@ struct CollectionRowView: View {
         .onHover { hovering = $0 }
         .accessibilityElement(children: .ignore)
         .accessibilityAddTraits(.isButton)
-        .accessibilityLabel(Text("\(CollectionStyle.name(summary.source)), \(summary.toWatch) to watch, \(summary.done) done"))
+        .accessibilityLabel(Text(verbatim: "\(CollectionStyle.name(summary.source)), \(CollectionStyle.left(summary.toWatch, summary.source)), \(String(localized: "\(summary.done) done"))"))
         .accessibilityAction(.default, onOpen)
     }
 }
@@ -102,7 +112,7 @@ struct CollectionView: View {
                     Text(verbatim: CollectionStyle.name(source))
                         .font(.headline)
                         .accessibilityAddTraits(.isHeader)
-                    Text("\(page.toWatch) to watch, \(page.done.count) done")
+                    Text(verbatim: "\(CollectionStyle.left(page.toWatch, source)), \(String(localized: "\(page.done.count) done"))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -134,7 +144,8 @@ struct CollectionView: View {
                 group(Text("In progress"), page.inProgress)
             }
             if !page.notStarted.isEmpty {
-                group(Text("Not started"), page.notStarted)
+                // Posts have no progress: everything left is simply to read.
+                group(source == .extensionX ? Text("To read") : Text("Not started"), page.notStarted)
             }
             if !page.done.isEmpty {
                 DisclosureGroup(isExpanded: $showDone) {
@@ -218,10 +229,10 @@ struct CollectionEntryRow: View {
             if entry.onList {
                 Button("Delete", role: .destructive) { model.delete(item.id) }
             } else {
-                Button("Not finished", role: .destructive) { model.markNotFinished(item.id) }
+                Button(CollectionStyle.notDone(item.source), role: .destructive) { model.markNotFinished(item.id) }
             }
         }
-        .accessibilityAction(named: entry.onList ? Text("Delete") : Text("Not finished")) {
+        .accessibilityAction(named: entry.onList ? Text("Delete") : Text(verbatim: CollectionStyle.notDone(item.source))) {
             entry.onList ? model.delete(item.id) : model.markNotFinished(item.id)
         }
     }

@@ -1,7 +1,8 @@
 // The same files the Swift ContractTests decode (Contract/v1/README.md).
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { isFailure, isHello, isImportResponse, isPairResponse, type ImportRequest, type PairRequest } from "../src/contract";
+import { isBookmarkResponse, isFailure, isHello, isImportResponse, isPairResponse, type ImportRequest, type PairRequest } from "../src/contract";
+import { BookmarkScan, bookmarkClick, readWindow } from "../src/x";
 import { hmac } from "../src/gateway";
 import { scanWatchLater } from "../src/youtube";
 import { parseHTML } from "linkedom";
@@ -20,6 +21,8 @@ describe("contract", () => {
     expect(isHello(example("hello.response.json"))).toBe(true);
     expect(isPairResponse(example("pair.response.json"))).toBe(true);
     expect(isImportResponse(example("import.response.json"))).toBe(true);
+    expect(isImportResponse(example("import-x.response.json"))).toBe(true);
+    expect(isBookmarkResponse(example("bookmark.response.json"))).toBe(true);
     expect(isFailure(example("failure.response.json"))).toBe(true);
   });
 
@@ -27,6 +30,9 @@ describe("contract", () => {
     const r = example("import.response.json") as { result: Record<string, unknown> };
     delete r.result.letGo;
     expect(isImportResponse(r)).toBe(false);
+    const b = example("bookmark.response.json") as Record<string, unknown>;
+    delete b.listCount;
+    expect(isBookmarkResponse(b)).toBe(false);
     expect(isHello({ app: "other", api: 1 })).toBe(false);
   });
 
@@ -36,6 +42,12 @@ describe("contract", () => {
     const { document } = parseHTML(readFileSync(new URL("fixtures/watch-later.synthetic.html", import.meta.url), "utf8"));
     const scan: ImportRequest = scanWatchLater(document);
     expect(keys(scan)).toEqual(keys(example("import.request.json")));
+    const x = parseHTML(readFileSync(new URL("fixtures/x-bookmarks.synthetic.html", import.meta.url), "utf8")).document;
+    const xScan = new BookmarkScan();
+    xScan.add(readWindow(x, (h) => h));
+    expect(keys(xScan.request())).toEqual(keys(example("import-x.request.json")));
+    const click = bookmarkClick(x.getElementById("icon")!, (h) => h);
+    expect(keys(click)).toEqual(keys(example("bookmark.request.json")));
   });
 
   test("HMAC matches a fixed vector (Swift's ContractTests checks the same one)", async () => {

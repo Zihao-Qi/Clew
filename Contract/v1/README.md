@@ -10,7 +10,9 @@ test suites must pass again.
 |---|---|
 | `hello.response.json` | `GET /v1/hello?nonce=…&client=…` (`proof` only for a known client) |
 | `pair.request.json`, `pair.response.json` | `POST /v1/pair` |
-| `import.request.json`, `import.response.json` | `POST /v1/import`, `Authorization: Bearer <token>` |
+| `import.request.json`, `import.response.json` | `POST /v1/import`, `Authorization: Bearer <token>` (YouTube: `listTotal`) |
+| `import-x.request.json`, `import-x.response.json` | `POST /v1/import` for X bookmarks: no `listTotal`; `fromTop` is the unbroken run from the top |
+| `bookmark.request.json`, `bookmark.response.json` | `POST /v1/bookmark`, `Authorization: Bearer <token>`: the bookmark button was clicked (`bookmarked` false = removed) |
 | `failure.response.json` | any error: `{"error": "…"}` with a 4xx/5xx status |
 
 Every request must carry `Host: 127.0.0.1:<port>`; an `Origin`, if present, must be

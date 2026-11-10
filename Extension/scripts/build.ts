@@ -16,5 +16,6 @@ const run = async (entry: string, format: "esm" | "iife") => {
 await run("background.ts", "esm");
 await run("popup.ts", "esm");
 await run("content.ts", "iife"); // content scripts can't be modules
+await run("content-x.ts", "iife");
 cpSync(`${root}static`, `${root}dist`, { recursive: true });
 console.log(`Built ${root}dist`);

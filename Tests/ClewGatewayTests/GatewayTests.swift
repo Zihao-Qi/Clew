@@ -235,6 +235,25 @@ struct SystemClockForTests: ClewDomain.Clock { let source: Now; func now() -> Da
         #expect(try clew.collections().isEmpty)   // nothing was imported while it was off
     }
 
+    @Test func theBookmarkButtonNeedsATokenAndAnXPost() throws {
+        let paired = try pairClient()
+        let click: [String: Any] = ["source": "extension.x", "bookmarked": true,
+                                    "entry": ["externalRef": "1850000000000000001", "title": "a post"]]
+        #expect(request("POST", "/v1/bookmark", body: click).status == 401)
+        #expect(request("POST", "/v1/bookmark", body: click, token: paired.token, contentType: "text/plain").status == 415)
+        #expect(request("GET", "/v1/bookmark", token: paired.token).status == 405)
+        var youTube = click
+        youTube["source"] = "extension.youtube"
+        #expect(request("POST", "/v1/bookmark", body: youTube, token: paired.token).status == 400)
+        try clew.setCollection(.extensionX, on: false)
+        #expect(request("POST", "/v1/bookmark", body: click, token: paired.token).status == 409)
+        try clew.setCollection(.extensionX, on: true)
+        #expect(try clew.collections().isEmpty)    // nothing was added
+        let r = request("POST", "/v1/bookmark", body: click, token: paired.token)
+        #expect(r.status == 200)
+        #expect(try decode(API.BookmarkResponse.self, r).listCount == 1)
+    }
+
     @Test func aRevokedClientIsLockedOut() throws {
         let paired = try pairClient()
         try gateway.revoke(paired.clientId)

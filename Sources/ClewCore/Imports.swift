@@ -26,12 +26,17 @@ public struct ImportBatch: Hashable, Sendable {
     public var listTotal: Int?
     /// What the scraper saw on the page. Without it the batch is never the whole list.
     public var scan: ScanReport?
+    /// For a list without a count (X bookmarks): how many leading entries the scraper
+    /// saw as one unbroken run from the top of the list. Only that run is compared with
+    /// the order Clew last saw (the gap rule, SPEC 2026-11-10).
+    public var fromTop: Int?
 
-    public init(source: Source, entries: [ExternalEntry], listTotal: Int?, scan: ScanReport? = nil) {
+    public init(source: Source, entries: [ExternalEntry], listTotal: Int?, scan: ScanReport? = nil, fromTop: Int? = nil) {
         self.source = source
         self.entries = entries
         self.listTotal = listTotal
         self.scan = scan
+        self.fromTop = fromTop
     }
 }
 
@@ -96,7 +101,9 @@ extension Clew {
         // scraper must never cause removals. An empty read is never trusted, since "No
         // videos" also shows on a signed-out or failed page.
         let scanAgrees = batch.scan.map { $0.found == $0.parsed && $0.parsed == batch.entries.count } ?? false
-        result.complete = scanAgrees && !entries.isEmpty && batch.listTotal == entries.count && result.skipped == 0
+        // A list without a count (X) is never whole: a stray number must not stand in for one.
+        result.complete = !Self.orderedSources.contains(batch.source)
+            && scanAgrees && !entries.isEmpty && batch.listTotal == entries.count && result.skipped == 0
 
         let now = clockForQueries.now()
         let zone = zonesForQueries.current()
@@ -119,15 +126,7 @@ extension Clew {
                 if var item = existing[entry.ref] {
                     var changed = false
                     if item.deletedAt != nil {
-                        guard let review = try Self.automaticLetGo(of: item, source: batch.source, w) else { continue }
-                        try w.voidLaterReview(id: review.id, at: now)
-                        // Back on the list, it is to watch again: the tick the import gave
-                        // it when it left is voided; a tick the user made stays.
-                        let allTime = LocalDay(year: 1, month: 1, day: 1)!
-                        for tick in try w.checkIns(itemIds: [item.id], from: allTime) where tick.source == batch.source {
-                            try w.voidCheckIn(id: tick.id, at: now, reason: "back on the list")
-                        }
-                        item.deletedAt = nil
+                        guard try Self.restore(&item, source: batch.source, at: now, w) else { continue }
                         changed = true
                         result.restored += 1
                     }
@@ -154,47 +153,119 @@ extension Clew {
                 }
             }
 
-            guard result.complete else { return result }
-            let onList = Set(entries.map(\.ref))
-            // Everything that left the list leaves it for the collection's Done group:
-            // removed means finished, whether or not progress was ever seen. The user
-            // can say otherwise with "Not finished" (SPEC 2026-11-10).
-            let gone = existing.values.filter { item in
-                item.deletedAt == nil && !onList.contains(item.externalRef ?? "")
+            // A list with a count: removals only from a scan of the whole list.
+            if result.complete {
+                let onList = Set(entries.map(\.ref))
+                let gone = existing.values.filter { item in
+                    item.deletedAt == nil && !onList.contains(item.externalRef ?? "")
+                }
+                result.letGo += try leaveList(gone, source: batch.source, now: now, day: day, zone: zone, w)
             }
-            let allTime = LocalDay(year: 1, month: 1, day: 1)!
-            let ticked = Set(try w.checkIns(itemIds: gone.map(\.id), from: allTime).map(\.itemId))
-            for var item in gone {
-                if !ticked.contains(item.id) {
-                    try w.insert(CheckIn(id: newID(), itemId: item.id, localDay: day, at: now,
-                                         timeZoneId: zone.identifier, amount: 1, source: batch.source))
-                }
-                try w.insert(LaterReview(id: newID(), itemId: item.id, decision: .letGo, at: now, localDay: day,
-                                         source: batch.source))
-                item.deletedAt = now
-                item.updatedAt = now
-                try w.update(item)
-                if var reminder = try w.reminders().first(where: { $0.itemId == item.id }) {
-                    reminder.deletedAt = now
-                    reminder.updatedAt = now
-                    try w.save(reminder)
-                }
-                result.letGo += 1
+            // A list without a count (X bookmarks): the gap rule on the unbroken run.
+            if Self.orderedSources.contains(batch.source) {
+                let run = scanAgrees && result.skipped == 0 ? max(0, batch.fromTop ?? 0) : 0   // never trust the client's number
+                let live = Dictionary(uniqueKeysWithValues: try w.items(source: batch.source)
+                    .filter { $0.deletedAt == nil }.compactMap { i in i.externalRef.map { ($0, i) } })
+                let top = entries.prefix(run).map(\.ref)
+                let (order, gone) = Self.gapRule(previous: try Self.listOrder(batch.source, w).filter { live[$0] != nil },
+                                                 top: top)
+                result.letGo += try leaveList(gone.compactMap { live[$0] }, source: batch.source,
+                                                   now: now, day: day, zone: zone, w)
+                try Self.saveListOrder(order, batch.source, now: now, w)
             }
             return result
         }
     }
 
-    static let importSources: Set<Source> = [.extensionYouTube]
+    /// Items leave the list for the collection's Done group: removed means finished,
+    /// whether or not progress was ever seen, so one not ticked yet gets a tick dated
+    /// today (SPEC 2026-11-10). The user can say otherwise with "Not finished". The
+    /// let-go carries the import's source, so it is not counted as the user's.
+    func leaveList(_ items: [Item], source: Source, now: Date, day: LocalDay, zone: TimeZone,
+                   _ w: any StoreWriter) throws -> Int {
+        let allTime = LocalDay(year: 1, month: 1, day: 1)!
+        let ticked = Set(try w.checkIns(itemIds: items.map(\.id), from: allTime).map(\.itemId))
+        for var item in items {
+            if !ticked.contains(item.id) {
+                try w.insert(CheckIn(id: newID(), itemId: item.id, localDay: day, at: now,
+                                     timeZoneId: zone.identifier, amount: 1, source: source))
+            }
+            try w.insert(LaterReview(id: newID(), itemId: item.id, decision: .letGo, at: now, localDay: day, source: source))
+            item.deletedAt = now
+            item.updatedAt = now
+            try w.update(item)
+            if var reminder = try w.reminders().first(where: { $0.itemId == item.id }) {
+                reminder.deletedAt = now
+                reminder.updatedAt = now
+                try w.save(reminder)
+            }
+        }
+        return items.count
+    }
+
+    /// Brings back an item that left the list and reappeared: its let-go is voided, and
+    /// so are the ticks the import gave it, so it is to watch again; a tick the user made
+    /// stays. False if the user removed it (it stays gone).
+    static func restore(_ item: inout Item, source: Source, at now: Date, _ w: any StoreWriter) throws -> Bool {
+        guard let review = try automaticLetGo(of: item, source: source, w) else { return false }
+        try w.voidLaterReview(id: review.id, at: now)
+        let allTime = LocalDay(year: 1, month: 1, day: 1)!
+        for tick in try w.checkIns(itemIds: [item.id], from: allTime) where tick.source == source {
+            try w.voidCheckIn(id: tick.id, at: now, reason: "back on the list")
+        }
+        item.deletedAt = nil
+        return true
+    }
+
+    static let importSources: Set<Source> = [.extensionYouTube, .extensionX]
 
     /// Lists imported from a site, each shown as one collection below the tasks, in this
     /// order. Their items never appear on Today, in Later or in Pick.
-    public static let collectionSources: [Source] = [.extensionYouTube]
+    public static let collectionSources: [Source] = [.extensionYouTube, .extensionX]
+
+    /// Lists with no count on the page, read as they scroll (X bookmarks, newest first):
+    /// removals come from the gap rule and from the bookmark button, never from a
+    /// whole-list compare.
+    static let orderedSources: Set<Source> = [.extensionX]
+
+    /// The gap rule (SPEC 2026-11-10). `previous` is the list as Clew last saw it, top
+    /// first; `top` an unbroken run from the top of the list now. An item that was
+    /// between two consecutive known items of the run, and is not in the run, was
+    /// removed. Nothing below the run is decided. A bookmark made again moves to the
+    /// top, so known items out of their old order are skipped, not taken as gaps.
+    /// Returns the new order (the run, then the rest as before) and the removed refs.
+    public static func gapRule(previous: [String], top: [String]) -> (order: [String], removed: [String]) {
+        let position = Dictionary(previous.enumerated().map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
+        let inRun = Set(top)
+        let known = top.compactMap { position[$0] }
+        var removed: [String] = []
+        for (x, y) in zip(known, known.dropFirst()) where x < y {
+            for i in (x + 1)..<y where !inRun.contains(previous[i]) { removed.append(previous[i]) }
+        }
+        let gone = Set(removed)
+        var seen = Set<String>()
+        let order = (top + previous.filter { !inRun.contains($0) && !gone.contains($0) }).filter { seen.insert($0).inserted }
+        return (order, removed)
+    }
+
+    /// The order a list was last seen in, top first (derived state, kept in settings).
+    static func listOrder(_ source: Source, _ r: any StoreReader) throws -> [String] {
+        guard let json = try r.setting(listOrderKey(source)) else { return [] }
+        return (try? JSONDecoder().decode([String].self, from: Data(json.utf8))) ?? []
+    }
+
+    static func saveListOrder(_ order: [String], _ source: Source, now: Date, _ w: any StoreWriter) throws {
+        guard try listOrder(source, w) != order else { return }
+        let json = String(decoding: try JSONEncoder().encode(order), as: UTF8.self)
+        try w.saveSetting(listOrderKey(source), json: json, updatedAt: now)
+    }
+
+    static func listOrderKey(_ source: Source) -> String { "listOrder.\(source.rawValue)" }
 
     static func isCollectionItem(_ item: Item) -> Bool { collectionSources.contains(item.source) }
 
     /// The let-go that removed `item`, if the import made it (not the user).
-    private static func automaticLetGo(of item: Item, source: Source, _ r: any StoreReader) throws -> LaterReview? {
+    static func automaticLetGo(of item: Item, source: Source, _ r: any StoreReader) throws -> LaterReview? {
         let latest = try r.laterReviews(itemIds: [item.id])
             .filter { $0.decision == .letGo }
             .max { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) }
@@ -210,6 +281,10 @@ extension Clew {
                 ("A"..."Z").contains($0) || ("a"..."z").contains($0) || ("0"..."9").contains($0) || $0 == "_" || $0 == "-"
             }
             return ref.unicodeScalars.count == 11 && allowed ? ref : nil
+        case .extensionX:
+            // A post id: 1–19 digits, no leading zero (it fits in a signed 64-bit integer).
+            let digits = ref.unicodeScalars.allSatisfy { ("0"..."9").contains($0) }
+            return digits && (1...19).contains(ref.unicodeScalars.count) && !ref.hasPrefix("0") && Int64(ref) != nil ? ref : nil
         default:
             return nil
         }
@@ -218,6 +293,7 @@ extension Clew {
     static func externalURL(_ ref: String, source: Source) -> URL? {
         switch source {
         case .extensionYouTube: URL(string: "https://www.youtube.com/watch?v=\(ref)")
+        case .extensionX: URL(string: "https://x.com/i/status/\(ref)")
         default: nil
         }
     }
