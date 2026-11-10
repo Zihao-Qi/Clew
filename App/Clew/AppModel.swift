@@ -308,10 +308,12 @@ final class AppModel {
     func extendFocus() { run { try $0.extendFocus() } }
     func startBreak() { run { try $0.startBreak() } }
     func stopFocus() { run { try $0.stopFocus() } }
-    /// "Done" when time is up: the tick (or +1) the user asked for, then the timer ends.
+    /// "Done" when time is up: the tick (or +1) the user asked for, never an undo, then
+    /// the timer ends.
     func finishFocus(_ row: TodayRow) {
-        tap(row)
-        stopFocus()
+        var tick: CheckIn?
+        guard run({ tick = try $0.finishFocus() }) else { return }
+        if tick != nil { offerRating(itemId: row.id) }
     }
     func setFocusOffersBreak(_ on: Bool) { run { try $0.setFocusOffersBreak(on) } }
 

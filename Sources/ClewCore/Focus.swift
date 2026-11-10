@@ -86,10 +86,17 @@ extension Clew {
     @discardableResult
     public func startFocus(itemId: UUID, minutes: Int) throws -> FocusTimer {
         guard Self.focusMinutes.contains(minutes) else { throw ClewError.notAllowed }
+        // On today's list, not just active (an active item can be planned for another
+        // day; Gemini review 2026-11-10).
+        guard try today().rows.contains(where: { $0.id == itemId }) else {
+            let exists = try storeForQueries.read { try $0.item(id: itemId).map { $0.deletedAt == nil } ?? false }
+            throw exists ? ClewError.notAllowed : ClewError.itemNotFound
+        }
         let now = clockForQueries.now()
         return try storeForQueries.write { w in
+            // Today's list holds only active tasks, never a collection's items.
             guard let item = try w.item(id: itemId), item.deletedAt == nil else { throw ClewError.itemNotFound }
-            guard item.state == .active, !Self.isCollectionItem(item) else { throw ClewError.notAllowed }
+            _ = item
             if try Self.focusTimer(w)?.phase == .focus { throw ClewError.focusRunning }
             let timer = FocusTimer(phase: .focus, itemId: itemId, startedAt: now, length: TimeInterval(minutes * 60))
             try Self.save(timer, now: now, w)
@@ -110,6 +117,7 @@ extension Clew {
     /// "5 more min": the phase now ends 5 minutes from now (or from where it stands,
     /// if time is not up yet).
     public func extendFocus() throws {
+        guard try focusTimer()?.phase == .focus else { throw ClewError.notAllowed }   // breaks stay 5 minutes
         try changeTimer { t, now in
             t.length = max(t.length, t.elapsed(at: now)) + TimeInterval(Self.extraMinutes * 60)
         }
@@ -121,10 +129,29 @@ extension Clew {
         guard try focusOffersBreak() else { throw ClewError.notAllowed }
         let now = clockForQueries.now()
         try storeForQueries.write { w in
-            guard let running = try Self.focusTimer(w), running.phase == .focus else { throw ClewError.notAllowed }
+            // From a focus whose time is up (the row offers it then, SPEC 2026-11-10).
+            guard let running = try Self.focusTimer(w), running.phase == .focus, running.isOver(at: now)
+            else { throw ClewError.notAllowed }
             try Self.save(FocusTimer(phase: .rest, itemId: running.itemId, startedAt: now,
                                      length: TimeInterval(Self.breakMinutes * 60)), now: now, w)
         }
+    }
+
+    /// "Done" (or "+1") when focus time is up: ticks the task the way the circle would,
+    /// but never un-ticks it (a task ticked during the focus stays ticked; a goal at its
+    /// target gets no +1), then ends the timer (Gemini review 2026-11-10: it toggled).
+    @discardableResult
+    public func finishFocus() throws -> CheckIn? {
+        guard let running = try focusTimer(), running.phase == .focus else { throw ClewError.notAllowed }
+        var tick: CheckIn?
+        do {
+            // CheckIn is idempotent for a day's once-task or habit: an existing tick is kept.
+            tick = try checkIn(itemId: running.itemId)
+        } catch ClewError.goalReached {
+            tick = nil
+        }
+        try stopFocus()
+        return tick
     }
 
     /// Ends the timer, whatever its phase. Returns what was running.
@@ -165,7 +192,7 @@ extension Clew {
     /// The notification for the end of the running phase, if it is running and not over.
     func focusNotification(_ r: any StoreReader, now: Date) throws -> PlannedNotification? {
         guard let timer = try Self.focusTimer(r), let endsAt = timer.endsAt, endsAt > now,
-              let item = try r.item(id: timer.itemId), item.deletedAt == nil
+              let item = try r.item(id: timer.itemId), item.deletedAt == nil, item.state == .active
         else { return nil }
         return PlannedNotification(
             id: NotificationPlanner.idPrefix + "focus",

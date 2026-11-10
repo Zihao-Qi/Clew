@@ -55,7 +55,7 @@ private func local(_ h: Int, _ m: Int = 0, _ s: Int = 0) -> Date {
         try clew.startFocus(itemId: a, minutes: 10)
         #expect(throws: ClewError.focusRunning) { try clew.startFocus(itemId: b, minutes: 10) }
         #expect(throws: ClewError.focusRunning) { try clew.startFocus(itemId: a, minutes: 25) }
-        try clew.startBreak()
+        clock.set(local(10, 10)); try clew.startBreak()
         let t = try clew.startFocus(itemId: b, minutes: 45)
         #expect(t.itemId == b && t.phase == .focus)
     }
@@ -92,12 +92,61 @@ private func local(_ h: Int, _ m: Int = 0, _ s: Int = 0) -> Date {
         clock.set(local(10, 10)); try clew.startBreak()
         let t = try #require(try clew.focusTimer())
         #expect(t.phase == .rest && t.itemId == id && t.length == 5 * 60 && t.startedAt == local(10, 10))
+        clock.set(local(10, 16))                                   // the break is over too
         #expect(throws: ClewError.notAllowed) { try clew.startBreak() }   // not from a break
         try clew.stopFocus()
         try clew.setFocusOffersBreak(false)
         #expect(try !clew.focusOffersBreak())
         try clew.startFocus(itemId: id, minutes: 10)
+        clock.set(local(10, 26))                                   // time is up, but no breaks
         #expect(throws: ClewError.notAllowed) { try clew.startBreak() }
+    }
+
+    @Test func aBreakWaitsForTimeUpAndFiveMoreMinIsForFocusOnly() throws {
+        // Gemini review 2026-11-10: a break could start mid-focus, and "5 more min"
+        // stretched breaks.
+        try clew.startFocus(itemId: try task(), minutes: 10)
+        clock.set(local(10, 9, 59))
+        #expect(throws: ClewError.notAllowed) { try clew.startBreak() }
+        clock.set(local(10, 10)); try clew.startBreak()
+        #expect(throws: ClewError.notAllowed) { try clew.extendFocus() }
+        #expect(try clew.focusTimer()?.length == 5 * 60)
+    }
+
+    @Test func onlyWhatIsOnTodaysListCanBeFocusedOn() throws {
+        // Active but planned for another day: not on today's list (Gemini review).
+        let id = try task()
+        try store.write { w in
+            var i = try #require(try w.item(id: id))
+            i.plannedDay = LocalDay(string: "2026-11-11")!
+            try w.update(i)
+        }
+        #expect(throws: ClewError.notAllowed) { try clew.startFocus(itemId: id, minutes: 10) }
+        #expect(throws: ClewError.itemNotFound) { try clew.startFocus(itemId: UUID(), minutes: 10) }
+    }
+
+    @Test func doneTicksOnceAndNeverUnticks() throws {
+        // Gemini review: "Done" reused the circle's toggle, so a task ticked during the
+        // focus was un-ticked.
+        let id = try task()
+        try clew.startFocus(itemId: id, minutes: 10)
+        try clew.checkIn(itemId: id)                                // ticked during the focus
+        clock.set(local(10, 10))
+        try clew.finishFocus()
+        #expect(store.state.checkIns.values.filter { $0.voidedAt == nil }.count == 1)
+        #expect(try clew.focusTimer() == nil)
+        // Not ticked yet: Done ticks it.
+        let other = try task("other")
+        try clew.startFocus(itemId: other, minutes: 10)
+        #expect(try clew.finishFocus()?.itemId == other)
+        // A goal gets +1; one at its target gets nothing and no error.
+        let goal = try clew.addItem(NewItem(title: "pages", shape: .goal(target: 1, schedule: .daily))).id
+        try clew.startFocus(itemId: goal, minutes: 10)
+        #expect(try clew.finishFocus()?.amount == 1)
+        try clew.startFocus(itemId: goal, minutes: 10)
+        #expect(try clew.finishFocus() == nil && clew.focusTimer() == nil)
+        // Only from a focus.
+        #expect(throws: ClewError.notAllowed) { try clew.finishFocus() }
     }
 
     @Test func stopEndsItAndSaysWhatRan() throws {
@@ -143,5 +192,18 @@ private func local(_ h: Int, _ m: Int = 0, _ s: Int = 0) -> Date {
         try clew.startBreak()
         plan = try clew.plannedNotifications()
         #expect(plan.first?.content == .breakEnded(title: "write the essay") && plan.first?.fireAt == local(10, 35))
+        // Moved to Later: nothing to notify about (Gemini review).
+        try clew.moveToLater(itemId: id)
+        #expect(try clew.plannedNotifications().allSatisfy { $0.id != "clew.focus" })
+    }
+
+    @Test func theTimerStaysInsideTheSixtyFourPendingLimit() throws {
+        for i in 0..<12 {
+            let h = try clew.addItem(NewItem(title: "habit \(i)", shape: .habit(.daily))).id
+            try clew.setReminder(itemId: h, time: TimeOfDay(hour: 20, minute: i))
+        }
+        try clew.startFocus(itemId: try task(), minutes: 25)
+        let plan = try clew.plannedNotifications()
+        #expect(plan.count == NotificationPlanner.maxPending && plan.first?.id == "clew.focus")
     }
 }

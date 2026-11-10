@@ -370,12 +370,15 @@ click is never stale.
 kept in the setting `focusTimer` (JSON; `null` when none; an unreadable one is no
 timer), so it survives sleep and quitting. All times are absolute; elapsed time never
 goes below zero if the clock moves back. Commands: `startFocus(itemId:minutes:)`
-(only `focusMinutes` = 10/25/45, only live non-collection items on Today; a running
-focus throws `focusRunning`, a break is replaced), `pauseFocus`, `resumeFocus` (adds
-the paused span), `extendFocus` (+5 min from now, or from the planned end if not up
-yet), `startBreak` (from a focus only, only when breaks are offered), `stopFocus`
-(returns what ran). The end is a planned notification (`clew.focus`, first in the plan
-so the 64-pending cap never drops it), absent while paused or once over. The app ends
+(only `focusMinutes` = 10/25/45, only items on today's list, which never holds a
+collection's items; a running focus throws `focusRunning`, a break is replaced),
+`pauseFocus`, `resumeFocus` (adds the paused span), `extendFocus` (focus only: +5 min
+from now, or from the planned end if not up yet), `startBreak` (only from a focus whose
+time is up, only when breaks are offered), `finishFocus` ("Done/+1": the tick the
+circle would make but never an undo, since `checkIn` keeps a day's existing tick; no
++1 past a goal's target; then the timer ends), `stopFocus` (returns what ran). The end is a planned notification (`clew.focus`, first in the plan
+so the 64-pending cap never drops it), absent while paused, once over, or when its
+task is no longer active (moved to Later). The app ends
 a timer whose task left Today and a break that is over; it refreshes at `endsAt`, and
 only the timed row and the menu bar label redraw every second, from the model's
 one-second tick (`clockTick`, running only while a timer exists). Never a
