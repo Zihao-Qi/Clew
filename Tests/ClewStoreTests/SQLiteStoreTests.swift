@@ -99,9 +99,13 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         // A scan that only moved a video's progress still refreshes the list.
         try store.write { try $0.save(WatchProgress(itemId: goal.id, fraction: 0.5, observedAt: t0, source: .extensionYouTube)) }
         #expect(counter.value == 3)
+        // Focus time changes the details page, so it is heard too.
+        try store.write { try $0.insert(FocusSession(id: UUID(), itemId: goal.id, localDay: day("2026-11-10"), at: t0,
+                                                     minutes: 5, kind: .manual)) }
+        #expect(counter.value == 4)
         token.cancel()
         try store.write { try $0.insert(sampleItem()) }
-        #expect(counter.value == 3)
+        #expect(counter.value == 4)
     }
 
     @Test func fileDatabaseSurvivesReopening() throws {
@@ -183,6 +187,36 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
                 try store.writer.write { try $0.execute(sql: "DELETE FROM \(table)") }
             }
         }
+    }
+
+    @Test func focusSessionsAreFacts() throws {
+        // SPEC 2026-11-10: sessions round-trip, are never deleted or changed in substance,
+        // are voided once, and voided ones are not read back.
+        let store = try SQLiteStore.inMemory()
+        let item = sampleItem(.once)
+        let s = FocusSession(id: UUID(), itemId: item.id, localDay: day("2026-11-10"), at: t0, minutes: 25, kind: .timer)
+        let m = FocusSession(id: UUID(), itemId: item.id, localDay: day("2026-11-09"), at: t0 + 60, minutes: 40, kind: .manual)
+        try store.write { w in try w.insert(item); try w.insert(s); try w.insert(m) }
+        #expect(try store.read { try $0.focusSessions(itemIds: [item.id]) } == [s, m])
+        #expect(try store.read { try $0.focusSession(id: m.id) } == m)
+        #expect(throws: DatabaseError.self) { try store.writer.write { try $0.execute(sql: "DELETE FROM focusSession") } }
+        #expect(throws: DatabaseError.self) {
+            try store.writer.write { try $0.execute(sql: "UPDATE focusSession SET minutes = 99 WHERE id = ?", arguments: [s.id.uuidString]) }
+        }
+        try store.write { try $0.voidFocusSession(id: s.id, at: t0 + 120) }
+        #expect(throws: DatabaseError.self) { try store.write { try $0.voidFocusSession(id: s.id, at: t0 + 180) } }
+        #expect(try store.read { try $0.focusSessions(itemIds: [item.id]) } == [m])
+        // Export keeps every row, voided too; the table refuses impossible lengths.
+        #expect(try store.read { try $0.allRecords() }.focusSessions.map(\.id) == [s.id, m.id])
+        #expect(throws: DatabaseError.self) {
+            try store.write { try $0.insert(FocusSession(id: UUID(), itemId: item.id, localDay: day("2026-11-10"), at: t0,
+                                                         minutes: 721, kind: .manual)) }
+        }
+    }
+
+    @Test func exportsFromBeforeFocusSessionsStillOpen() throws {
+        let json = #"{"items":[],"checkIns":[],"plans":[],"goalRounds":[]}"#
+        #expect(try JSONDecoder().decode(ExportRecords.self, from: Data(json.utf8)).focusSessions.isEmpty)
     }
 
     @Test func voidsAreMonotonic() throws {

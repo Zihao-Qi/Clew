@@ -20,6 +20,8 @@ public enum ClewError: Error, Equatable, Sendable {
     case listTurnedOff
     /// A focus timer is already running: stop it before starting another.
     case focusRunning
+    /// Focus time added by hand must be 1 to `max` minutes.
+    case invalidMinutes(max: Int)
 }
 
 /// What the user chose in `+ add`. Each case is a valid shape, so invalid

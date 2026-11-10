@@ -125,6 +125,38 @@ public enum LaterAge {
     }
 }
 
+/// Time spent focusing on a task (SPEC decision 2026-11-10): one finished or stopped
+/// focus timer, or time added by hand. A fact: inserted, never changed in substance,
+/// removed only by voiding.
+public struct FocusSession: Hashable, Sendable, Identifiable, Codable {
+    public enum Kind: String, Codable, Sendable, CaseIterable {
+        /// Recorded by the focus timer.
+        case timer
+        /// Added by hand on the task's details.
+        case manual
+    }
+
+    public let id: UUID
+    public let itemId: UUID
+    /// The day the time counts for (the timer's start; the day chosen by hand).
+    public let localDay: LocalDay
+    /// When it started (timer) or was added (by hand).
+    public let at: Date
+    public let minutes: Int
+    public let kind: Kind
+    public var voidedAt: Date?
+
+    public init(id: UUID, itemId: UUID, localDay: LocalDay, at: Date, minutes: Int, kind: Kind, voidedAt: Date? = nil) {
+        self.id = id
+        self.itemId = itemId
+        self.localDay = localDay
+        self.at = at
+        self.minutes = minutes
+        self.kind = kind
+        self.voidedAt = voidedAt
+    }
+}
+
 /// How much of a video was watched, as last seen on its site (ARCHITECTURE §4.2).
 /// Latest state, not a fact: one row per item, and an older observation never
 /// replaces a newer one. It never ticks anything (SPEC decision 2026-11-09).

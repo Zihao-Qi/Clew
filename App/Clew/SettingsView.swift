@@ -19,6 +19,7 @@ struct SettingsView: View {
     @State private var barStyle = Clew.defaultBarStyle
     @State private var listsOff: Set<Source> = []
     @State private var offersBreak = true
+    @State private var recordsTime = true
     @State private var pane: Pane?
 
     /// A plain column of sections; selected one highlighted, keyboard and VoiceOver
@@ -133,10 +134,14 @@ struct SettingsView: View {
                         offersBreak = on
                         model.setFocusOffersBreak(on)
                     }))
+                    Toggle("Record focus time", isOn: Binding(get: { recordsTime }, set: { on in
+                        recordsTime = on
+                        model.setFocusRecordsTime(on)
+                    }))
                 } header: {
                     Text("Focus timer")
                 } footer: {
-                    Text("Right-click a task and choose Focus to work on it for 10, 25 or 45 minutes. When time is up, it asks whether you're done; it never ticks by itself.")
+                    Text("Right-click a task and choose Focus to work on it for 10, 25 or 45 minutes. When time is up, it asks whether you're done; it never ticks by itself. Recorded time shows on the task's details, where you can also add time you worked without the timer.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -295,6 +300,7 @@ struct SettingsView: View {
         barStyle = model.barStyle
         listsOff = model.collectionsOff()
         offersBreak = model.focusOffersBreak
+        recordsTime = model.focusRecordsTime
     }
 
     private func setOpenAtLogin(_ on: Bool) {

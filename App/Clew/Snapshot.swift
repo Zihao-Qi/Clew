@@ -285,6 +285,11 @@ enum Snapshot {
             try seed(clew, clock: clock)
             let model = AppModel(clew: clew, notify: false)
             let editing = try clew.today().rows[2].item
+            // Focus time on the task whose details are rendered (SPEC 2026-11-10).
+            let today = clew.currentDay()
+            try clew.addFocusTime(itemId: editing.id, day: today, minutes: 25)
+            try clew.addFocusTime(itemId: editing.id, day: today.adding(days: -1), minutes: 50)
+            try clew.addFocusTime(itemId: editing.id, day: today.adding(days: -9), minutes: 90)
             // Rating dots on, and "Stretch" just ticked, so the list shows them.
             model.setRatingsEnabled(true)
             model.refresh()

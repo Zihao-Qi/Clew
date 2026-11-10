@@ -54,6 +54,19 @@ public struct FocusTimer: Codable, Hashable, Sendable {
     public var endsAt: Date? { isPaused ? nil : startedAt.addingTimeInterval(length + pausedFor) }
 }
 
+/// A task's focus time, for its details page.
+public struct FocusSummary: Hashable, Sendable {
+    public let thisWeek: Int
+    public let total: Int
+    public let recent: [FocusSession]
+
+    public init(thisWeek: Int, total: Int, recent: [FocusSession]) {
+        self.thisWeek = thisWeek
+        self.total = total
+        self.recent = recent
+    }
+}
+
 extension Clew {
     /// The lengths offered when starting (user, 2026-11-10: fixed choices).
     public static let focusMinutes = [10, 25, 45]
@@ -128,10 +141,14 @@ extension Clew {
     public func startBreak() throws {
         guard try focusOffersBreak() else { throw ClewError.notAllowed }
         let now = clockForQueries.now()
+        let records = try focusRecordsTime()
+        let zone = zonesForQueries.current()
         try storeForQueries.write { w in
             // From a focus whose time is up (the row offers it then, SPEC 2026-11-10).
             guard let running = try Self.focusTimer(w), running.phase == .focus, running.isOver(at: now)
             else { throw ClewError.notAllowed }
+            // The focus that just ended is time worked, even though no Stop was pressed.
+            if records { try record(running, at: now, zone: zone, w) }
             try Self.save(FocusTimer(phase: .rest, itemId: running.itemId, startedAt: now,
                                      length: TimeInterval(Self.breakMinutes * 60)), now: now, w)
         }
@@ -154,15 +171,93 @@ extension Clew {
         return tick
     }
 
-    /// Ends the timer, whatever its phase. Returns what was running.
+    /// Ends the timer, whatever its phase. Returns what was running. A focus is
+    /// recorded as a session of its real minutes (pauses left out) when Settings ›
+    /// "Record focus time" is on and it ran at least half a minute; a break never is.
     @discardableResult
     public func stopFocus() throws -> FocusTimer? {
         let now = clockForQueries.now()
+        let records = try focusRecordsTime()
+        let zone = zonesForQueries.current()
         return try storeForQueries.write { w in
-            let running = try Self.focusTimer(w)
-            if running != nil { try Self.save(nil, now: now, w) }
+            guard let running = try Self.focusTimer(w) else { return nil }
+            try Self.save(nil, now: now, w)
+            if records { try record(running, at: now, zone: zone, w) }
             return running
         }
+    }
+
+    /// Saves a focus that ended as a session of its real minutes, if it ran at least
+    /// half a minute; a break is never time worked.
+    private func record(_ timer: FocusTimer, at now: Date, zone: TimeZone, _ w: any StoreWriter) throws {
+        let minutes = min(Self.maxFocusMinutes, Int((timer.elapsed(at: now) / 60).rounded()))
+        guard timer.phase == .focus, minutes >= 1,
+              let item = try w.item(id: timer.itemId), item.deletedAt == nil else { return }
+        try w.insert(FocusSession(
+            id: newID(), itemId: item.id,
+            localDay: LocalDay(of: timer.startedAt, in: zone, rolloverHour: rolloverHour),
+            at: timer.startedAt, minutes: minutes, kind: .timer))
+    }
+
+    // MARK: Focus time (SPEC 2026-11-10, step 2)
+
+    /// The most one session can hold: 12 hours.
+    public static let maxFocusMinutes = 720
+
+    /// Adds time worked by hand ("I forgot the timer", "the Mac wasn't there"): always
+    /// allowed, even with recording off, since it is a deliberate act. 1–720 minutes,
+    /// on a day up to today, for a task (not a collection's video or post).
+    @discardableResult
+    public func addFocusTime(itemId: UUID, day: LocalDay, minutes: Int) throws -> FocusSession {
+        guard (1...Self.maxFocusMinutes).contains(minutes) else { throw ClewError.invalidMinutes(max: Self.maxFocusMinutes) }
+        guard day <= currentDay() else { throw ClewError.notAllowed }
+        let now = clockForQueries.now()
+        return try storeForQueries.write { w in
+            guard let item = try w.item(id: itemId), item.deletedAt == nil else { throw ClewError.itemNotFound }
+            guard !Self.isCollectionItem(item) else { throw ClewError.notAllowed }
+            let session = FocusSession(id: newID(), itemId: itemId, localDay: day, at: now, minutes: minutes, kind: .manual)
+            try w.insert(session)
+            return session
+        }
+    }
+
+    /// Removes a session (timer or by hand): a void, so the fact stays. Removing one
+    /// already removed changes nothing.
+    public func removeFocusSession(id: UUID) throws {
+        let now = clockForQueries.now()
+        try storeForQueries.write { w in
+            guard let session = try w.focusSession(id: id) else { throw ClewError.notAllowed }
+            guard session.voidedAt == nil else { return }
+            try w.voidFocusSession(id: id, at: now)
+        }
+    }
+
+    /// What a task's details show: minutes this week and all time (days up to today),
+    /// and the latest sessions, newest first.
+    public func focusSummary(itemId: UUID, recent: Int = 10) throws -> FocusSummary {
+        let today = currentDay()
+        let sessions = try storeForQueries.read { try $0.focusSessions(itemIds: [itemId]) }.filter { $0.localDay <= today }
+        return FocusSummary(
+            thisWeek: sessions.filter { $0.localDay.isInSameWeek(as: today) }.reduce(0) { $0 + $1.minutes },
+            total: sessions.reduce(0) { $0 + $1.minutes },
+            recent: Array(sessions.sorted { ($0.localDay, $0.at, $0.id.uuidString) > ($1.localDay, $1.at, $1.id.uuidString) }.prefix(recent))
+        )
+    }
+
+    static let focusRecordsTimeKey = "focusRecordsTime"
+
+    /// Settings › Focus timer › "Record focus time" (default on). Off: the timer saves
+    /// nothing new; sessions already saved and time added by hand stay.
+    public func focusRecordsTime() throws -> Bool {
+        try storeForQueries.read { r in
+            guard let json = try r.setting(Self.focusRecordsTimeKey) else { return true }
+            return json != "false"
+        }
+    }
+
+    public func setFocusRecordsTime(_ on: Bool) throws {
+        let now = clockForQueries.now()
+        try storeForQueries.write { try $0.saveSetting(Self.focusRecordsTimeKey, json: on ? "true" : "false", updatedAt: now) }
     }
 
     private func changeTimer(_ change: (inout FocusTimer, Date) -> Void) throws {
