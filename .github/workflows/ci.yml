@@ -1,10 +1,14 @@
 # ARCHITECTURE §15: Domain and Core on Linux; one macOS job builds the app per pull
 # request (macOS minutes cost 10x on private repos).
 name: CI
+# A change to Markdown alone (SPEC, docs, READMEs) builds and tests nothing, so it
+# skips CI. main has no required checks, so a skipped run never blocks a merge.
 on:
   pull_request:
+    paths-ignore: ['**.md']
   push:
     branches: [main]
+    paths-ignore: ['**.md']
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
