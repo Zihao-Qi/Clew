@@ -49,12 +49,16 @@ public struct CollectionDetails: Hashable, Sendable {
 }
 
 extension Clew {
-    /// The collections that have something on them, in `collectionSources` order.
+    /// The collections that have something on them, or something finished in the past
+    /// (so an emptied list keeps its heatmap reachable), in `collectionSources` order.
     public func collections() throws -> [CollectionSummary] {
         try storeForQueries.read { r in
             try Self.collectionSources.compactMap { source in
-                let live = try r.items(source: source).filter { $0.deletedAt == nil }
-                guard !live.isEmpty else { return nil }
+                let all = try r.items(source: source)
+                let live = all.filter { $0.deletedAt == nil }
+                let allTime = LocalDay(year: 1, month: 1, day: 1)!
+                let hasHistory = try !r.checkIns(itemIds: all.map(\.id), from: allTime).isEmpty
+                guard !live.isEmpty || hasHistory else { return nil }
                 let ticked = try r.progressAmounts(itemIds: live.map(\.id)).filter { $0.value > 0 }.count
                 return CollectionSummary(source: source, total: live.count, done: ticked)
             }
@@ -67,8 +71,12 @@ extension Clew {
         return try storeForQueries.read { r in
             let all = try r.items(source: source)
             let allTime = LocalDay(year: 1, month: 1, day: 1)!
-            let ticks = try r.checkIns(itemIds: all.map(\.id), from: allTime).filter { $0.localDay <= today }
-            let lastTick = Dictionary(grouping: ticks, by: \.itemId).mapValues { $0.max { $0.at < $1.at }! }
+            let allTicks = try r.checkIns(itemIds: all.map(\.id), from: allTime)
+            // Done-ness uses every live tick, as the row's count and CheckIn do, even one
+            // dated after today (e.g. the clock or time zone moved back); the heatmap and
+            // counts below only show days up to today.
+            let lastTick = Dictionary(grouping: allTicks, by: \.itemId).mapValues { $0.max { $0.at < $1.at }! }
+            let ticks = allTicks.filter { $0.localDay <= today }
             let live = all.filter { $0.deletedAt == nil }
             let watched = try r.watchProgress(itemIds: live.map(\.id))
 
@@ -84,7 +92,9 @@ extension Clew {
             let newestFirst = { (a: CollectionEntry, b: CollectionEntry) in
                 (a.item.createdAt, a.item.id.uuidString) > (b.item.createdAt, b.item.id.uuidString)
             }
-            inProgress.sort { ($0.watched ?? 0, $0.item.createdAt) > ($1.watched ?? 0, $1.item.createdAt) }
+            inProgress.sort {
+                ($0.watched ?? 0, $0.item.createdAt, $0.item.id.uuidString) > ($1.watched ?? 0, $1.item.createdAt, $1.item.id.uuidString)
+            }
             notStarted.sort(by: newestFirst)
             done.sort { ($0.doneAt ?? .distantPast, $0.item.id.uuidString) > ($1.doneAt ?? .distantPast, $1.item.id.uuidString) }
 

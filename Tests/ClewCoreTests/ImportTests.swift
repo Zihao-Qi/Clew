@@ -143,9 +143,21 @@ private let a = "aaaaaaaaaaa", b = "bbbbbbbbbbb", c = "ccccccccccc", d = "dddddd
         #expect(try clew.today().rows.isEmpty)
         // Picked before collections existed: still not on Today.
         try store.write { w in
-            var i = try #require(try w.item(id: item.id)); i.state = .active; i.plannedDay = clew.currentDay(); try w.update(i)
+            var i = try #require(try w.item(id: item.id))
+            i.state = .active; i.plannedDay = clew.currentDay(); i.sortKey = 0.5   // off the 1, 2, 3… grid
+            try w.update(i)
         }
         #expect(try clew.today().rows.isEmpty)
+        // ...is left out when Today's order is renumbered (80 moves into one gap force it)...
+        let sortKey = try #require(imported(a)).sortKey
+        let first = try clew.addItem(NewItem(title: "first", shape: .habit(.daily)))
+        var below = try clew.addItem(NewItem(title: "last", shape: .habit(.daily))).id
+        for i in 0..<80 {
+            let x = try clew.addItem(NewItem(title: "x\(i)", shape: .habit(.daily)))
+            try clew.moveItem(id: x.id, after: first.id, before: below)
+            below = x.id
+        }
+        #expect(imported(a)?.sortKey == sortKey)
         // ...and never reminds about it.
         try clew.setReminder(itemId: item.id, time: TimeOfDay(hour: 23, minute: 0))
         #expect(try clew.plannedNotifications().isEmpty)

@@ -87,6 +87,26 @@ private func video(_ ref: String, watched: Double? = nil) -> ExternalEntry {
         #expect(page.finishedLast30 == 1 && page.finishedAllTime == 2)
     }
 
+    @Test func theRowAndThePageAgreeWhenTheClockMovesBack() throws {
+        try load([video("aaaaaaaaaaa")])
+        clock.set(local(9)); try clew.checkIn(itemId: try id("aaaaaaaaaaa"))
+        clock.set(local(8))                                             // e.g. time zone moved back
+        #expect(try clew.collections().first?.done == 1)
+        let page = try #require(try clew.collection(.extensionYouTube))
+        #expect(page.done.count == 1 && page.notStarted.isEmpty)
+        #expect(page.finishedAllTime == 0)                              // the heatmap shows up to today only
+    }
+
+    @Test func anEmptiedListKeepsItsRowWhileItHasHistory() throws {
+        try load([video("aaaaaaaaaaa"), video("bbbbbbbbbbb")])
+        try clew.checkIn(itemId: try id("aaaaaaaaaaa"))
+        try clew.deleteItem(itemId: try id("bbbbbbbbbbb"))
+        try clew.deleteItem(itemId: try id("aaaaaaaaaaa"))
+        let row = try #require(try clew.collections().first)
+        #expect(row.total == 0 && row.done == 0)
+        #expect(try clew.collection(.extensionYouTube)?.finishedAllTime == 1)
+    }
+
     @Test func aTickCanBeUndoneTheSameDay() throws {
         try load([video("aaaaaaaaaaa")])
         let a = try id("aaaaaaaaaaa")

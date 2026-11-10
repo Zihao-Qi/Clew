@@ -122,7 +122,8 @@ stopped daily use, not adding features.
 
 - **Watch Later import (v1.1, 2026-11-09):** a paired Chrome extension copies
   YouTube's Watch Later into Clew when the Watch Later page is opened. A video removed
-  from Watch Later leaves Clew too, ticked or not (its tick stays in the heatmap),
+  from Watch Later leaves Clew too, ticked or not (its tick stays in the heatmap;
+  *changed* 2026-11-09 with collections: before, a video on Today or ticked stayed),
   but only when the page showed the whole list (never from an empty list); it comes
   back if re-added. What the user deleted stays gone. These automatic removals are
   not counted as the user's "let go". Pairing: Settings › Browser shows a 6-digit code.
@@ -130,7 +131,9 @@ stopped daily use, not adding features.
   task per video: a row below the tasks, after a thin divider and with no heading
   ("YouTube Watch Later  1 of 3 ›", X bookmarks next). It has no circle and does not
   count toward today's `done/total`. Its videos never appear on Today, in Later or in
-  Pick. Clicking it opens its page: a heatmap of days a video was ticked, ticked this
+  Pick (*changed*: they were Later items with their own details page). The row stays
+  while the collection has anything finished, even if the list is emptied, so its
+  heatmap stays reachable. Clicking it opens its page: a heatmap of days a video was ticked, ticked this
   week / last 30 days / all time, and the whole list (In progress, most watched first;
   Not started, newest first; Done, folded). Each video has a circle (undo is for
   today's tick) and a title that opens it.
@@ -146,7 +149,7 @@ stopped daily use, not adding features.
   YouTube videos.
   The same bar will show a focus timer's time later.
 - **One-off details (2026-11-09):** once-tasks and saved links have no
-  heatmap. Their details show where the item is (In Later, On Today, Done Nov 9),
+  heatmap (videos had this page too until they moved to their collection's page). Their details show where the item is (In Later, On Today, Done Nov 9),
   watch progress for videos, a short history (saved, picked, kept, done · felt), and
   Open video / Open link.
 
