@@ -52,6 +52,11 @@ final class AppModel {
     @ObservationIgnored private var observation: (any StoreObservation)?
     @ObservationIgnored private var rolloverTimer: Timer?
     @ObservationIgnored private var focusEndTimer: Timer?
+    @ObservationIgnored private var focusTick: Timer?
+    /// The current second while a timer runs, so the timed row and the menu bar count
+    /// down. A TimelineView inside the menu bar label made SwiftUI redraw the status
+    /// item without end (100% CPU, seen 2026-11-10); one tick a second does not.
+    private(set) var clockTick = Date()
     /// The running focus timer or break (SPEC 2026-11-10), if any.
     private(set) var focus: FocusTimer?
     private(set) var focusOffersBreak = true
@@ -135,6 +140,7 @@ final class AppModel {
         }
         scheduleRollover()
         scheduleFocusEnd()
+        tickWhileFocusing()
         reconcileNotifications()
         backUpIfNeeded()
     }
@@ -480,6 +486,22 @@ final class AppModel {
         timer.tolerance = 1
         RunLoop.main.add(timer, forMode: .common)
         focusEndTimer = timer
+    }
+
+    private func tickWhileFocusing() {
+        guard focus != nil else {
+            focusTick?.invalidate()
+            focusTick = nil
+            return
+        }
+        clockTick = Date()
+        guard focusTick == nil else { return }
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.clockTick = Date() }
+        }
+        timer.tolerance = 0.1
+        RunLoop.main.add(timer, forMode: .common)
+        focusTick = timer
     }
 
     private func observeSystemTime() {

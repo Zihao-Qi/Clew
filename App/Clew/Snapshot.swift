@@ -308,7 +308,7 @@ enum Snapshot {
                     render(RootView(model: model, screen: .list), appearance: appearance,
                            to: dir.appendingPathComponent("timer-\(appearance == .aqua ? "light" : "dark").png"))
                 }
-                render(MenuBarLabel(today: model.today, focus: model.focus).padding(4), appearance: .aqua,
+                render(MenuBarLabel(today: model.today, focus: model.focus, now: Date()).padding(4), appearance: .aqua,
                        to: dir.appendingPathComponent("label-timer.png"))
                 model.stopFocus()
                 clock.date = Date().addingTimeInterval(-11 * 60)

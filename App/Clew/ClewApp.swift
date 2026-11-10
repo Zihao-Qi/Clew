@@ -44,7 +44,7 @@ struct ClewApp: App {
         MenuBarExtra {
             RootView(model: model)
         } label: {
-            MenuBarLabel(today: model.today, focus: model.focus)
+            MenuBarLabel(today: model.today, focus: model.focus, now: model.clockTick)
         }
         .menuBarExtraStyle(.window)
 
@@ -60,18 +60,19 @@ struct ClewApp: App {
 struct MenuBarLabel: View {
     let today: TodayList?
     var focus: FocusTimer? = nil
+    /// The model's one-second tick (never a TimelineView here: inside a menu bar label
+    /// it redraws the status item without end).
+    var now = Date()
 
     var body: some View {
         if let focus {
             // The countdown, so it can be seen with the list closed (SPEC 2026-11-10).
-            TimelineView(.periodic(from: .now, by: 1)) { context in
-                let left = RowView.clock(focus.remaining(at: context.date))
-                let symbol = focus.phase == .rest ? "cup.and.saucer" : focus.isPaused ? "pause.circle" : "timer"
-                Text("\(Image(systemName: symbol)) \(left)")
-                    .monospacedDigit()
-                    .accessibilityLabel(focus.phase == .rest ? Text("Clew, break, \(left) left")
-                                                             : Text("Clew, focus, \(left) left"))
-            }
+            let left = RowView.clock(focus.remaining(at: now))
+            let symbol = focus.phase == .rest ? "cup.and.saucer" : focus.isPaused ? "pause.circle" : "timer"
+            Text("\(Image(systemName: symbol)) \(left)")
+                .monospacedDigit()
+                .accessibilityLabel(focus.phase == .rest ? Text("Clew, break, \(left) left")
+                                                         : Text("Clew, focus, \(left) left"))
         } else if let today, today.total > 0 {
             Text("\(Image(systemName: "checklist")) \(today.done)/\(today.total)")
                 .accessibilityLabel(Text("Clew, \(today.done) of \(today.total) done"))

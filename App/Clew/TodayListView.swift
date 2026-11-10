@@ -201,9 +201,10 @@ struct RowView: View {
     }
 
     var body: some View {
-        // Only the row with the running timer redraws every second.
+        // Only the row with the running timer reads the model's tick, so only it
+        // redraws every second.
         if timer != nil {
-            TimelineView(.periodic(from: .now, by: 1)) { context in content(now: context.date) }
+            content(now: model.clockTick)
         } else {
             content(now: Date())
         }

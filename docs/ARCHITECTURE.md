@@ -377,7 +377,10 @@ yet), `startBreak` (from a focus only, only when breaks are offered), `stopFocus
 (returns what ran). The end is a planned notification (`clew.focus`, first in the plan
 so the 64-pending cap never drops it), absent while paused or once over. The app ends
 a timer whose task left Today and a break that is over; it refreshes at `endsAt`, and
-only the timed row and the menu bar label redraw every second.
+only the timed row and the menu bar label redraw every second, from the model's
+one-second tick (`clockTick`, running only while a timer exists). Never a
+`TimelineView` in the menu bar label: SwiftUI then redraws the status item without
+end (measured 2026-11-10: 99% CPU in a minimal MenuBarExtra, 0.1–2% with the tick).
 
 **Site order (2026-11-10).** Every collection keeps the order its site shows in the
 setting `listOrder.<source>`, and its page lists what is left in that order (items
