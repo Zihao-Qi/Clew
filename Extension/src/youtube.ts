@@ -4,13 +4,20 @@
 
 import type { ExternalEntry, ImportRequest } from "./contract";
 
-export const SELECTOR_VERSION = "youtube-2026-11-09b";
+export const SELECTOR_VERSION = "youtube-2026-11-09c";
 
 export const SELECTORS = {
   /** One per video in the list. */
   row: "ytd-playlist-video-renderer",
   /** Inside a row: the title link, href `/watch?v=<id>&list=WL&index=<n>`. */
   titleLink: "a#video-title",
+  /** Inside a row: the red "watched" bar on the thumbnail, `style="width: 11%"`.
+   * Absent when the video was never started. First one seen on the Watch Later page
+   * 2026-11-09; the second seen on YouTube 2026-11-08. */
+  progress: [
+    "ytw-thumbnail-overlay-resume-playback-renderer .ytwThumbnailOverlayResumePlaybackRendererThumbnailOverlayResumePlaybackProgress",
+    ".ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment",
+  ],
   /** Text holding the list's own count, e.g. "12 videos" or "No videos". Only
    * selectors seen on the real page (2026-11-09): a broad guess could pick up some
    * other "3 videos" and make a partial page look whole. */
@@ -52,6 +59,22 @@ export function parseCount(text: string): number | undefined {
   return Number.isSafeInteger(n) ? n : undefined;
 }
 
+/** "width: 11%" → 0.11; undefined unless it is a percentage from 0 to 100. */
+export function parseProgress(style: string | null): number | undefined {
+  const m = /(?:^|;)\s*width:\s*(\d{1,3}(?:\.\d+)?)%/i.exec(style ?? "");
+  if (!m?.[1]) return undefined;
+  const pct = Number(m[1]);
+  return pct >= 0 && pct <= 100 ? Math.round(pct) / 100 : undefined;
+}
+
+function rowProgress(row: Element): number | undefined {
+  for (const selector of SELECTORS.progress) {
+    const bar = row.querySelector(selector);
+    if (bar) return parseProgress(bar.getAttribute("style"));
+  }
+  return undefined;
+}
+
 export function listTotal(root: ParentNode): number | undefined {
   for (const selector of SELECTORS.count) {
     for (const el of Array.from(root.querySelectorAll(selector))) {
@@ -70,7 +93,9 @@ export function scanWatchLater(root: ParentNode): ImportRequest {
     const link = row.querySelector(SELECTORS.titleLink);
     const id = videoId(link?.getAttribute("href") ?? null);
     const title = (link?.getAttribute("title") || link?.textContent || "").replace(/\s+/g, " ").trim();
-    if (id && title) entries.push({ externalRef: id, title });
+    if (!id || !title) continue;
+    const progress = rowProgress(row);
+    entries.push(progress === undefined ? { externalRef: id, title } : { externalRef: id, title, progress });
   }
   const total = listTotal(root);
   return {

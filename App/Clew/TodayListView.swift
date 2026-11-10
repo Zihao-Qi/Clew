@@ -295,6 +295,15 @@ struct RowView: View {
     /// Clicking the title (or anywhere in the row's free space) opens the details; the
     /// link mark is the button that opens the link (SPEC §3).
     private var titleView: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            titleLine
+            if let watched = model.watched[row.id], watched > 0 {
+                WatchBar(fraction: watched)
+            }
+        }
+    }
+
+    private var titleLine: some View {
         HStack(spacing: 4) {
             Text(item.title)
                 .lineLimit(1)
@@ -323,6 +332,24 @@ struct RowView: View {
         if row.isGoalReached { return Text("\(item.title), goal reached") }
         if item.kind == .goal { return Text("Add one to \(item.title)") }
         return row.isDone ? Text("Undo \(item.title)") : Text("Mark \(item.title) done")
+    }
+}
+
+/// How much of a video was watched, read from YouTube's Watch Later page: a thin bar
+/// under the title (Today and the Pick list). Only what was done is shown, so a video
+/// never started has no bar at all.
+struct WatchBar: View {
+    let fraction: Double
+    var width: CGFloat = 96
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            Capsule().fill(Color.primary.opacity(0.12))
+            Capsule().fill(Color.accentColor).frame(width: width * min(max(fraction, 0), 1))
+        }
+        .frame(width: width, height: 3)
+        .accessibilityElement()
+        .accessibilityLabel(Text("\(Int((fraction * 100).rounded())) percent watched"))
     }
 }
 

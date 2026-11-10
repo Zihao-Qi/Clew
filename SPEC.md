@@ -78,10 +78,11 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
    browser is paired (v1.1), Clew also listens on this Mac only (`127.0.0.1`) for
    its extension.
 9. **Launch at login** (`SMAppService`), toggled in a small Settings window.
-10. **Task details.** Clicking a row opens its details: a 16-week heatmap (done days
+10. **Task details.** Clicking a row opens its details. Habits and goals: a 16-week heatmap (done days
     filled, other days a quiet gray, never red), days done this week / in the last
     30 days / all time (goals: this round, rounds done, all-time total), and Edit /
-    Delete. No streak counts.
+    Delete. Once-tasks, links and videos: where it is, watch progress, a short
+    history, and Open (see Decisions, 2026-11-09). No streak counts.
 11. **Your order.** Drag rows to reorder them (or Move Up / Move Down). Ticking never
     moves a row. Sorting rules wait until manual order isn't enough.
 12. **Backups.** A compressed copy every day on this Mac (the last 14 days, plus 8
@@ -126,8 +127,14 @@ stopped daily use, not adding features.
   the page showed the whole list (never from an empty list); it comes back if re-added. What the user deleted or
   let go stays gone. These automatic removals are not counted as the user's "let go".
   Pairing: Settings › Browser shows a 6-digit code.
-- Watch progress (v1.1, next): read while watching, sent on pause, seek, tab switch,
-  each 10% and at most every 30 s; about 90% ticks the video done.
+- **Watch progress (v1.1, 2026-11-09):** read only from the red bars on the Watch
+  Later page, when it is opened (not while a video plays: simpler, and it covers
+  videos watched on other devices). Shown as a thin bar under the video's title in
+  Today and in Pick, and as "40% watched" on its details. It never ticks anything.
+- **One-off details (2026-11-09):** once-tasks, saved links and videos have no
+  heatmap. Their details show where the item is (In Later, On Today, Done Nov 9),
+  watch progress for videos, a short history (saved, picked, kept, done · felt), and
+  Open video / Open link.
 
 - Weeks start on **Monday**; "N× per week" items reset then.
 - A counted goal's step is always **+1** per click.

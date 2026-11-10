@@ -20,6 +20,8 @@ struct SystemTimeZone: TimeZoneSource {
 final class AppModel {
     private(set) var today: TodayList?
     private(set) var laterCount = 0
+    /// How much of each video on today's list was watched (0–1), from Watch Later.
+    private(set) var watched: [UUID: Double] = [:]
     /// Set when the database cannot be opened; the list is replaced by this message.
     private(set) var fatalMessage: String?
     /// A short, transient message for a rejected action.
@@ -102,6 +104,7 @@ final class AppModel {
             today = list
             ratingsOn = (try? clew.ratingsEnabled()) ?? false
             laterCount = try clew.laterCount()
+            watched = try clew.watchProgress(itemIds: list.rows.map(\.id))
             // A closed congratulation stays closed only while that goal stays reached, so
             // reaching a raised target or a next round congratulates again.
             let reached = Set(list.rows.filter(\.isGoalReached).map(\.id))

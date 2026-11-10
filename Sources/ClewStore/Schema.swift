@@ -10,7 +10,20 @@ enum Schema {
         migrator.registerMigration("v3-reminders-settings", migrate: v3)
         migrator.registerMigration("v4-later-reviews", migrate: v4)
         migrator.registerMigration("v5-five-point-ratings", migrate: v5)
+        migrator.registerMigration("v6-watch-progress", migrate: v6)
         return migrator
+    }
+
+    /// Watch progress (v1.1): latest state, one row per item (ARCHITECTURE §4.2).
+    private static func v6(_ db: Database) throws {
+        try db.execute(sql: """
+            CREATE TABLE watchProgress (
+                itemId      TEXT PRIMARY KEY NOT NULL REFERENCES item(id),
+                fraction    REAL NOT NULL CHECK (fraction BETWEEN 0 AND 1),
+                observedAt  DATETIME NOT NULL,
+                source      TEXT NOT NULL
+            );
+            """)
     }
 
     /// Ratings go from 3 points to 5 (rough, meh, okay, good, great). SQLite cannot

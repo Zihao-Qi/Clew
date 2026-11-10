@@ -28,6 +28,7 @@ final class FakeStore: ClewStore, @unchecked Sendable {
         var reminders: [UUID: Reminder] = [:]
         var settings: [String: SettingRecord] = [:]
         var laterReviews: [UUID: LaterReview] = [:]
+        var watchProgress: [UUID: WatchProgress] = [:]
     }
 
     enum FactViolation: Error { case revoid, duplicate, missingItem }
@@ -119,7 +120,8 @@ final class FakeStore: ClewStore, @unchecked Sendable {
                 goalRounds: state.rounds.values.sorted { ($0.startedAt, $0.id.uuidString) < ($1.startedAt, $1.id.uuidString) },
                 reminders: state.reminders.values.sorted { ($0.updatedAt, $0.id.uuidString) < ($1.updatedAt, $1.id.uuidString) },
                 settings: state.settings.values.sorted { $0.key < $1.key },
-                laterReviews: state.laterReviews.values.sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) }
+                laterReviews: state.laterReviews.values.sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) },
+                watchProgress: state.watchProgress.values.sorted { $0.itemId.uuidString < $1.itemId.uuidString }
             )
         }
         func reminders() throws -> [Reminder] {
@@ -135,6 +137,14 @@ final class FakeStore: ClewStore, @unchecked Sendable {
         }
         func items(source: Source) throws -> [Item] {
             state.items.values.filter { $0.source == source }.sorted { $0.sortKey < $1.sortKey }
+        }
+        func watchProgress(itemIds: [UUID]) throws -> [UUID: WatchProgress] {
+            state.watchProgress.filter { itemIds.contains($0.key) }
+        }
+        func save(_ progress: WatchProgress) throws {
+            guard state.items[progress.itemId] != nil else { throw FactViolation.missingItem }
+            if let old = state.watchProgress[progress.itemId], old.observedAt > progress.observedAt { return }
+            state.watchProgress[progress.itemId] = progress
         }
         func voidLaterReview(id: UUID, at: Date) throws {
             guard var r = state.laterReviews[id] else { return }

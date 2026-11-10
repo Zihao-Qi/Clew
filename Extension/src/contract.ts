@@ -26,6 +26,8 @@ export interface PairResponse {
 export interface ExternalEntry {
   externalRef: string;
   title: string;
+  /** How much was watched, 0–1, when the page shows it. */
+  progress?: number;
 }
 
 export interface ScanReport {
@@ -47,6 +49,8 @@ export interface ImportResult {
   restored: number;
   letGo: number;
   skipped: number;
+  /** Videos whose watch progress changed. */
+  progressed: number;
   complete: boolean;
 }
 
@@ -84,7 +88,7 @@ export function isImportResponse(v: unknown): v is ImportResponse {
   if (!isObject(v) || typeof v.needsUpdate !== "boolean" || !isInt(v.laterCount) || !isObject(v.result)) return false;
   const r = v.result;
   return (
-    ["added", "renamed", "restored", "letGo", "skipped"].every((k) => isInt(r[k])) && typeof r.complete === "boolean"
+    ["added", "renamed", "restored", "letGo", "skipped", "progressed"].every((k) => isInt(r[k])) && typeof r.complete === "boolean"
   );
 }
 

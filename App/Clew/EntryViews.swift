@@ -359,6 +359,9 @@ struct PickView: View {
                                         .compactMap { $0 }.joined(separator: " · "))
                                         .font(.caption).foregroundStyle(.secondary)
                                 }
+                                if let watched = entry.watched, watched > 0 {
+                                    WatchBar(fraction: watched).padding(.top, 2)
+                                }
                             }
                         }
                         .toggleStyle(.checkbox)

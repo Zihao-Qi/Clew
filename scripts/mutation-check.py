@@ -245,7 +245,7 @@ M = [
  ("G13 felt worst first", D+"ItemStats.swift", "stride(from: 5, through: 1, by: -1).compactMap", "stride(from: 1, through: 5, by: 1).compactMap", "ClewDomainTests"),
  ("G14 goals hint too", C+"Ratings.swift", "        item.progress.target == nil\n", "        item.progress.target == nil || true\n", "ClewCoreTests"),
  # Imports (v1.1)
- ("X1 no dedupe", C+"Imports.swift", "if seen.insert(ref).inserted { entries.append((ref, title, url)) }", "entries.append((ref, title, url))", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X1 no dedupe", C+"Imports.swift", "if seen.insert(ref).inserted { entries.append(", "do { entries.append(", "ImportTests|ImportStoreTests|ScanHealthTests"),
  ("X2 complete despite skips", C+"Imports.swift", "batch.listTotal == entries.count && result.skipped == 0", "batch.listTotal == entries.count", "ImportTests|ImportStoreTests|ScanHealthTests"),
  ("X3 complete without total", C+"Imports.swift", "batch.listTotal == entries.count && result.skipped == 0", "(batch.listTotal ?? entries.count) == entries.count && result.skipped == 0", "ImportTests|ImportStoreTests|ScanHealthTests"),
  ("X4 lets go Today items", C+"Imports.swift", "item.deletedAt == nil && item.state == .later && !onList", "item.deletedAt == nil && !onList", "ImportTests|ImportStoreTests|ScanHealthTests"),
@@ -295,6 +295,21 @@ M = [
  ("X24 found ignored", C+"Imports.swift", "$0.found == $0.parsed && ", "", "ImportTests|ImportStoreTests|ScanHealthTests"),
  ("X25 empty trusted", C+"Imports.swift", "scanAgrees && !entries.isEmpty && ", "scanAgrees && ", "ImportTests|ImportStoreTests|ScanHealthTests"),
  ("W23 swap doesn't wait", W+"Gateway.swift", "importLock.withLock { lock.withLock { currentClew = clew } }", "lock.withLock { currentClew = clew }", "ClewGatewayTests"),
+ # v1.1 step 2: watch progress and the one-off details page.
+ ("P1 rewrites unchanged", C+"Imports.swift", "guard let fraction, watched[itemId]?.fraction != fraction else { return }", "guard let fraction else { return }", "ImportTests|ImportStoreTests|DetailsTests"),
+ ("P2 no range check", C+"Imports.swift", "guard let value, value.isFinite, (0...1).contains(value) else { return nil }", "guard let value else { return nil }", "ImportTests|ImportStoreTests|DetailsTests"),
+ ("P3 not rounded", C+"Imports.swift", "return (value * 100).rounded() / 100", "return value", "ImportTests|ImportStoreTests|DetailsTests"),
+ ("P4 deleted gets progress", C+"Imports.swift", "guard let review = try Self.automaticLetGo(of: item, source: batch.source, w) else { continue }", "guard let review = try Self.automaticLetGo(of: item, source: batch.source, w) else { try record(entry.progress, for: item.id); continue }", "ImportTests|ImportStoreTests|DetailsTests"),
+ ("P5 progress ticks", C+"Imports.swift", "                result.progressed += 1\n", "                result.progressed += 1\n                if fraction >= 0.9, let item = existing.values.first(where: { $0.id == itemId }), item.state == .active { try w.insert(CheckIn(id: newID(), itemId: itemId, localDay: day, at: now, timeZoneId: \"UTC\", amount: 1, source: batch.source)) }\n", "ImportTests|ImportStoreTests|DetailsTests"),
+ ("P6 older wins", S+"SQLiteStore.swift", "            WHERE excluded.observedAt >= watchProgress.observedAt\n", "", "ImportStoreTests"),
+ ("P7 not exported", S+"SQLiteStore.swift", "watchProgress: try Row.fetchAll(db, sql: \"SELECT * FROM watchProgress ORDER BY itemId\").map(Self.watchProgress)", "watchProgress: []", "ImportStoreTests"),
+ ("P8 oldest lines kept", C+"Details.swift", ".suffix(Self.historyLength)", ".prefix(Self.historyLength)", "DetailsTests"),
+ ("P9 history unsorted", C+"Details.swift", "history.sorted { $0.at < $1.at }", "history", "DetailsTests"),
+ ("P10 once not one-off", C+"Details.swift", "    public var isOneOff: Bool { item.kind == .once || item.kind == .link }", "    public var isOneOff: Bool { item.kind == .link }", "DetailsTests"),
+ ("P11 no history for once", C+"Details.swift", "            if item.kind == .once || item.kind == .link {", "            if item.kind == .link {", "DetailsTests"),
+ ("P12 later pile no watch", C+"LaterReviews.swift", "                                      watched: watched[item.id]?.fraction)", "                                      watched: nil)", "ImportTests|LaterReviewTests"),
+ ("P13 kept missing", C+"Details.swift", "                history += try r.laterReviews(itemIds: [itemId]).filter { $0.decision == .keep }\n                    .map { HistoryEntry(at: $0.at, event: .kept) }\n", "", "DetailsTests"),
+ ("P14 rating dropped", C+"Details.swift", "event: .done(rating: $0.rating)", "event: .done(rating: nil)", "DetailsTests"),
  ("W24 stop is a no-op", W+"Listener.swift", "            listener?.cancel()\n", "", "ClewGatewayTests"),
 ]
 
