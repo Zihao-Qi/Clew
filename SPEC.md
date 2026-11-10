@@ -105,8 +105,6 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
 
 - **Daruma goals and badges.** Paint one eye when a counted goal starts and the
   second when it's finished. Levels come from lifetime totals.
-- Browser extension import: YouTube Watch Later watch %, and X bookmarks (v1.1, next
-  steps; the Watch Later list itself landed first, see Decisions).
 - Opt-in AI coach: recap, Later suggestions, quick start (see docs/AGENT.md).
 - Sync with Dayflow (its local JSON API: `GET /api/day`, `PATCH /api/tasks/:id`).
 - iPhone, iCloud sync, Obsidian export.
@@ -128,22 +126,46 @@ stopped daily use, not adding features.
   stays in the collection's Done group. "Not finished" (right-click) takes it out of
   Done and the heatmap. This happens only when the page showed the whole list (never
   from an empty list); a video re-added comes back, to watch again (its automatic tick
-  is undone; one the user made stays). What the user deleted stays gone.
+  is undone; one the user made stays). What the user deleted stays gone (for X, a
+  bookmark click is the one exception; see "X bookmarks").
+- **X bookmarks (v1.1, 2026-11-10):** the second collection ("X bookmarks  5 to
+  read ›"). A post's title is the title of the X Article it shares, else its own text
+  (not a quoted post's), else "Post by @name". **Adding:** opening Bookmarks in Chrome
+  (x.com/i/history, where X moved it; the Likes tab is ignored) reads the posts
+  as you scroll (newest first, so new ones are seen at once), and bookmarking a post
+  anywhere on x.com in Chrome adds it right away. **Removing = read** (same rule as
+  Watch Later): unbookmarking in Chrome marks it read at once. The page shows no count
+  and loads as you scroll, so it is never compared as a whole list; instead the **gap
+  rule**: Clew remembers the order it last saw, and a post missing from *between* two
+  posts still on the page (seen without a break from the top) was removed, so a
+  removal on the phone is caught the next time Bookmarks is opened in Chrome and
+  scrolled past where it was. Nothing below what was seen is decided. A post its author
+  deleted also disappears, so it counts as read (accepted). A post deleted in Clew
+  comes back when bookmarked again with a click (*changed* 2026-11-10: it stayed
+  gone); a scan never brings it back, since it cannot tell "still bookmarked" from
+  "bookmarked again". A scan also cannot undo a removal made in the last 10 minutes
+  (a stale tab, or rows read just before the click); a click can. Posts bookmarked again on
+  the phone jump to the top and are never taken as a gap; in the rare case where only
+  such posts were seen, a post can wrongly count as read ("Not read" undoes it). Bookmarked again: back to
+  read. "Not read" (right-click) undoes an automatic "read".
   These automatic removals are not counted as the user's "let go". The same rule will
   apply to X: unbookmarking a post means it was read. Pairing: Settings › Browser
   shows a 6-digit code.
 - **Collections (v1.1, 2026-11-09):** an imported list is **one collection**, not one
   task per video: a row below the tasks, after a thin divider and with no heading
-  ("YouTube Watch Later  9 to watch ›", X bookmarks next; *changed* 2026-11-10 from
+  ("YouTube Watch Later  9 to watch ›", "X bookmarks  5 to read ›"; *changed* 2026-11-10 from
   "1 of 3", since Done keeps growing). It has no circle and does not
   count toward today's `done/total`. Its videos never appear on Today, in Later or in
   Pick (*changed*: they were Later items with their own details page). The row stays
   while the collection has anything finished, even if the list is emptied, so its
   heatmap stays reachable. Clicking it opens its page: a heatmap of days a video was ticked, ticked this
   week / last 30 days / all time, and the whole list (In progress, most watched first;
-  Not started, newest first; Done, folded, including videos that left the list).
+  Not started (posts: To read) in the site's own order, Watch Later's or X's newest
+  bookmark first (*changed* 2026-11-10 from "newest first", which gave no order to
+  videos imported together); Done, folded, including videos that left the list).
   Each video has a circle (undo is for today's tick, and only while it is on the list)
-  and a title that opens it. Each list can be turned **off** in Settings › General ›
+  and a title that opens it. Deleting an item in Clew takes it out of the heatmap and
+  the counts too (*changed* 2026-11-10). Each list can be turned **off** in Settings › General ›
   Lists (2026-11-10): its row is hidden and imports are refused (the extension says
   so); what it holds stays and comes back when it is turned on.
 - **Watch progress (v1.1, 2026-11-09):** read only from the red bars on the Watch

@@ -1,20 +1,77 @@
 {
-  "extName": { "message": "Clew" },
-  "extDescription": { "message": "Copies your YouTube Watch Later into Clew, on this Mac." },
-  "pairHint": { "message": "In Clew, open Settings › Browser and click Pair Chrome. Type the code here." },
-  "codeLabel": { "message": "Pairing code" },
-  "pairButton": { "message": "Pair" },
-  "pairErrorCode": { "message": "That code didn't work. Check it in Clew's Settings, or start pairing again there." },
-  "openWatchLater": { "message": "Open Watch Later" },
-  "forget": { "message": "Unpair" },
-  "statusWaiting": { "message": "Paired. Open your Watch Later page to import it." },
-  "statusOpenClew": { "message": "Open Clew: it isn't running." },
-  "statusTurnedOff": { "message": "This list is turned off in Clew. Turn it on in Clew's Settings › General › Lists." },
-  "statusRevoked": { "message": "Clew no longer knows this browser. Unpair, then pair again." },
-  "statusFailed": { "message": "The last import didn't work. It will try again on your next visit." },
-  "statusNeedsUpdate": { "message": "YouTube changed its page. Nothing was removed; this extension needs an update." },
+  "extName": {
+    "message": "Clew"
+  },
+  "extDescription": {
+    "message": "Copies your YouTube Watch Later and X bookmarks into Clew, on this Mac."
+  },
+  "pairHint": {
+    "message": "In Clew, open Settings › Browser and click Pair Chrome. Type the code here."
+  },
+  "codeLabel": {
+    "message": "Pairing code"
+  },
+  "pairButton": {
+    "message": "Pair"
+  },
+  "pairErrorCode": {
+    "message": "That code didn't work. Check it in Clew's Settings, or start pairing again there."
+  },
+  "openWatchLater": {
+    "message": "Open Watch Later"
+  },
+  "forget": {
+    "message": "Unpair"
+  },
+  "statusWaiting": {
+    "message": "Paired. Open your Watch Later page or your X bookmarks to import them."
+  },
+  "statusOpenClew": {
+    "message": "Open Clew: it isn't running."
+  },
+  "statusTurnedOff": {
+    "message": "This list is turned off in Clew. Turn it on in Clew's Settings › General › Lists."
+  },
+  "statusRevoked": {
+    "message": "Clew no longer knows this browser. Unpair, then pair again."
+  },
+  "statusFailed": {
+    "message": "The last import didn't work. It will try again on your next visit."
+  },
+  "statusNeedsUpdate": {
+    "message": "YouTube changed its page. Nothing was removed; this extension needs an update."
+  },
   "statusImported": {
     "message": "Imported: $ADDED$ new. $LIST$ in Clew's Watch Later.",
-    "placeholders": { "added": { "content": "$1" }, "list": { "content": "$2" } }
+    "placeholders": {
+      "added": {
+        "content": "$1"
+      },
+      "list": {
+        "content": "$2"
+      }
+    }
+  },
+  "statusNeedsUpdateX": {
+    "message": "X changed its page. Nothing was removed; this extension needs an update."
+  },
+  "statusImportedX": {
+    "message": "Imported: $ADDED$ new. $LIST$ in Clew's X bookmarks.",
+    "placeholders": {
+      "added": {
+        "content": "$1"
+      },
+      "list": {
+        "content": "$2"
+      }
+    }
+  },
+  "postBy": {
+    "message": "Post by $HANDLE$",
+    "placeholders": {
+      "handle": {
+        "content": "$1"
+      }
+    }
   }
 }

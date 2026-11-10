@@ -291,7 +291,8 @@ enum Snapshot {
             if let stretch = model.today?.rows.first(where: { $0.item.title == "Stretch" }) { model.tap(stretch) }
             for (name, screen) in [("list", Screen.list), ("add", .add), ("pick", .pick),
                                    ("edit", .edit(editing, back: .list)), ("detail", .detail(editing.id)),
-                                   ("collection", .collection(.extensionYouTube))] {
+                                   ("collection", .collection(.extensionYouTube)),
+                                   ("collection-x", .collection(.extensionX))] {
                 for appearance in [NSAppearance.Name.aqua, .darkAqua] {
                     let file = dir.appendingPathComponent("\(name)-\(appearance == .aqua ? "light" : "dark").png")
                     render(RootView(model: model, screen: screen), appearance: appearance, to: file)
@@ -372,6 +373,16 @@ enum Snapshot {
             ExternalEntry(externalRef: "ccccccccccc", title: "Building a compiler in a weekend"),
             ExternalEntry(externalRef: "ddddddddddd", title: "A video since removed from Watch Later"),
         ], listTotal: 4))
+        // X bookmarks: three posts; the middle one was unbookmarked on the phone.
+        let posts = [("1850000000000000001", "Thread on spaced repetition for engineers"),
+                     ("1850000000000000002", "Post by @someone"),
+                     ("1850000000000000003", "Notes from a talk on calm technology")]
+        try clew.importExternal(ImportBatch(source: .extensionX, entries: posts.map { ExternalEntry(externalRef: $0.0, title: $0.1) },
+            listTotal: nil, scan: ScanReport(found: 3, parsed: 3, selectorVersion: "snapshot"), fromTop: 3))
+        clock.date = now.addingTimeInterval(-1 * 86_400)
+        let kept = [posts[0], posts[2]].map { ExternalEntry(externalRef: $0.0, title: $0.1) }
+        try clew.importExternal(ImportBatch(source: .extensionX, entries: kept, listTotal: nil,
+            scan: ScanReport(found: 2, parsed: 2, selectorVersion: "snapshot"), fromTop: 2))
         clock.date = now.addingTimeInterval(-2 * 86_400)
         // The fourth video left Watch Later: it counts as finished (SPEC 2026-11-10).
         try clew.importExternal(ImportBatch(source: .extensionYouTube, entries: [

@@ -305,14 +305,77 @@ means finished** (SPEC 2026-11-10): in the same transaction, each one without a 
 check-in gets one (`amount` 1, the import's `source`, today's `localDay`); one already
 ticked is not ticked again. An item let go that way comes back if it reappears: its
 let-go is voided, and so are the ticks the import gave it (source = the import's), so
-it is to watch again; a tick the user made stays. Anything the user deleted stays gone. A source
+it is to watch again; a tick the user made stays. Anything the user deleted stays gone
+for scans; only an X bookmark click brings a deleted post back (see the state table). A source
 turned off (`collectionsOff`, setting `collectionsOff`: a JSON array of source raw
 values; unknown ones are dropped) refuses the import with `ClewError.listTurnedOff`
 before anything is read or written; the Gateway answers 409 and the extension shows
 "turned off in Clew".
 
+**X bookmarks (SPEC 2026-11-10).** `extension.x` refs are post ids (1–19 digits, no
+leading zero, within `Int64`); the URL is `https://x.com/i/status/<id>`. X is an
+*ordered source*: its scans are never `complete` (even with a stray `listTotal`).
+Removals come from:
+- **The gap rule**, on `ImportBatch.fromTop`, the leading entries the extension saw as
+  one unbroken run from the top. Only when the scan report agrees and nothing was
+  skipped (else the run is 0); a negative run is 0. `gapRule(previous:top:)` takes the
+  order Clew last saw (live items only) and the run. A post bookmarked again on the
+  phone (unseen) jumps to the top, so the list is a block of moved posts above the
+  rest in its old order. Only the part of the run *after its last step backwards* in
+  the old order is trusted (Gemini review 2026-11-10: pairs inside the moved block
+  prove nothing). For each pair of consecutive known posts there, every post between
+  them in the old order that is not in the run was removed. With nothing out of order,
+  the top of the list is a bound too, so the newest bookmark removed on the phone is
+  caught. Once the run reaches the
+  posts that never moved, every gap is real; a run lying wholly inside a moved block
+  of two or more posts is the remaining blind spot ("Not read" undoes it). The new
+  order is the run, then the rest as before. It is kept in the setting
+  `listOrder.extension.x` (a JSON array of refs; derived state, rewritten only when it
+  changes).
+- **The bookmark button**, `bookmarkChanged(source:entry:bookmarked:)` (Gateway
+  `POST /v1/bookmark`): bookmarked adds the post at the top of the order, restores it
+  if it had left (to read again), or brings it back if the user had deleted it (ticks
+  voided); posts no longer live are dropped from the order;
+  unbookmarked makes a live post leave the list
+  like any removal (`leaveList`: tick unless ticked, the import's let-go). Unknown
+  posts are ignored when unbookmarked; a bookmark needs a title.
+Both refuse a list turned off (`listTurnedOff`, 409).
+
+**Collection item states (2026-11-10).** Every rule above is one cell of this table,
+so no two of them can disagree. States: **to do** (on the list, not ticked), **done
+on list** (ticked, still on the list), **left** (the import's let-go is the latest;
+ticked, so in Done), **not read** (left, ticks voided by "Not finished/Not read":
+hidden), **deleted** (deleted by the user: hidden, its ticks out of the heatmap and
+counts).
+
+| Event ↓ / state → | to do | done on list | left | not read | deleted |
+|---|---|---|---|---|---|
+| Scan sees it | — | — | to do*, keeps a user tick; only if it left ≥ 10 min ago | to do, same wait | stays deleted |
+| Scan says it is gone (whole list / gap rule) | left + tick | left (no 2nd tick) | — | — | — |
+| Bookmark click (X) | to top | to top | to do*, at once | to do, at once | to do, ticks voided |
+| Unbookmark click (X) | left + tick | left | — | — | — |
+| Tick / undo today | done on list | undo today only | — | — | — |
+| Not finished / Not read | — | — | not read | — | — |
+| Delete | deleted | deleted | — | — | — |
+| List turned off | everything refused; nothing changes | | | | |
+
+\* "to do" unless the user had ticked it themselves: then done on list. Auto ticks
+(source = the import's) are voided on the way back; the user's never are. The
+10-minute wait (`Clew.restoreAfter`) is what keeps a stale scan, such as another tab
+still showing the post or rows read just before a click, from undoing a removal; a
+click is never stale.
+
+**Site order (2026-11-10).** Every collection keeps the order its site shows in the
+setting `listOrder.<source>`, and its page lists what is left in that order (items
+not placed yet last, newest first). X's comes from the gap rule and the button.
+Watch Later's is rewritten by each scan: the live items it saw, in page order, then
+the live items it did not see, as before (so a partial scan moves nothing it did not
+see). The extension drops a post from the visit's scan when it is unbookmarked there,
+and never counts a row that shows the "Bookmark" button: before, a scan sent after
+the click brought the post straight back (seen 19 → 18 → 19).
+
 **Collections (v1.1, SPEC 2026-11-09).** Items whose source is in
-`Clew.collectionSources` (YouTube now, X next) form one collection per source. There
+`Clew.collectionSources` (YouTube, then X) form one collection per source. There
 is no parent row: a collection is derived from `source`, so nothing needs migrating.
 Today, Later, Pick, reordering and notifications all filter collection items out
 (including ones picked before collections existed); `PlanForToday` refuses them;
@@ -322,8 +385,9 @@ Queries: `collections()` (the rows below the tasks, for sources turned on:
 items left keeps its row while it has any tick) and `collection(source)` (the page:
 groups, and ticks per day including items since removed). The Done group is ticked
 items that are live or **left the list** (removed, and the import's let-go is their
-latest); items the user deleted are not in it, though their ticks stay in the
-heatmap. `markNotFinished(itemId:)` voids every live tick of an item that left the
+latest). Items the user deleted are not in it, and their ticks are out of the heatmap
+and counts too (*changed* 2026-11-10, user: a deleted article still coloured the
+heatmap while Done said 0); the facts themselves stay. `markNotFinished(itemId:)` voids every live tick of an item that left the
 list (reason "not finished"), taking it out of Done and the heatmap; it refuses items
 still on the list, ones the user deleted, and tasks. Done-ness uses every live tick, like the row and `CheckIn`, even one dated
 after today (clock or time zone moved back); the heatmap and counts show days up to
@@ -331,7 +395,7 @@ today only. The Gateway's import answer reports `listCount`, the items on the li
 (`onList`; *changed from* `laterCount`).
 
 **Browser extension (v1.1, `Extension/`, TypeScript, built with Bun).** Chrome MV3.
-- **Scrapers are quarantined:** one module per site (`src/youtube.ts`), with selectors
+- **Scrapers are quarantined:** one module per site (`src/youtube.ts`, `src/x.ts`), with selectors
   in a single table and a `SELECTOR_VERSION`. Tests run against saved HTML snapshots.
   Verified on 2026-11-08: `ytd-playlist-video-renderer` for Watch Later rows and
   `.ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment` (style width %)
@@ -352,6 +416,23 @@ today only. The Gateway's import answer reports `listCount`, the items on the li
   the 2026-11-08 class is kept as a fallback). Progress is read only from the
   Watch Later page, not while a video plays (user decision 2026-11-09: no second
   scraper on the player). It does not compute anything else.
+- **X (`src/x.ts`, `src/content-x.ts`, on x.com only).** X keeps only the rows near
+  the screen, so `BookmarkScan` builds one scan from what it sees while you scroll
+  (rows sorted by their `translateY`). The run from the top starts only if the first
+  row seen is at `translateY(0px)`, and ends at the first look with no post in common
+  with what was seen (the page jumped); later rows are added, not compared. A row it
+  cannot read raises `found` above `parsed`, so Clew compares nothing. Looks are
+  throttled to every 250 ms and the scan is sent 1.5 s after the page settles. A
+  capture-phase click listener on `document` sees the bookmark button before X flips
+  it (`bookmark` = being bookmarked, `removeBookmark` = being removed) and posts to
+  `/v1/bookmark` at once. Checked on the signed-in page 2026-11-10: Bookmarks lives
+  at `/i/history` (its Bookmarks tab; `/i/history/likes` is Likes and is ignored;
+  `/i/bookmarks` still accepted); rows are `cellInnerDiv` with `translateY` (fractions
+  too); the button is `<button data-testid="bookmark|removeBookmark">`; quotes are in
+  `div[role="link"]` with their own time link. An X Article has no `tweetText`: its
+  title is the first `[dir="auto"]` text in the card around `article-cover-image`
+  (never the author's name, never a quoted article's), and it is preferred to the
+  post's own text.
 
 **MCP server (v1.2).** `clew-mcp` is a tiny stdio executable. Its tools map 1:1 onto
 Gateway endpoints and are **read-only** (`get_today`, `get_history`, `get_later`,

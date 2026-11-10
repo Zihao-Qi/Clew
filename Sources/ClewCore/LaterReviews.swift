@@ -5,8 +5,6 @@ import Foundation
 public struct LaterEntry: Hashable, Sendable, Identifiable {
     public let item: Item
     public let daysWaiting: Int
-    /// How much of the video was watched (0–1), if seen.
-    public var watched: Double?
     /// SPEC §5: waited 6+ weeks untouched, so the picker asks "still want this?".
     public var asksStillWant: Bool { LaterAge.asksStillWant(daysWaiting: daysWaiting) }
     public var id: UUID { item.id }
@@ -29,7 +27,6 @@ extension Clew {
         let today = currentDay()
         return try storeForQueries.read { r in
             let items = try r.items(inStates: [.later]).filter { !Self.isCollectionItem($0) }
-            let watched = try r.watchProgress(itemIds: items.map(\.id))
             let kept = Dictionary(grouping: try r.laterReviews(itemIds: items.map(\.id)).filter { $0.decision == .keep },
                                   by: \.itemId)
             return items
@@ -38,8 +35,7 @@ extension Clew {
                     let lastKeep = kept[item.id]?.map(\.at).max()
                     let touched = max(item.updatedAt, lastKeep ?? item.updatedAt)
                     let day = LocalDay(of: touched, in: zone, rolloverHour: rolloverHour)
-                    return LaterEntry(item: item, daysWaiting: LaterAge.daysWaiting(lastTouched: day, today: today),
-                                      watched: watched[item.id]?.fraction)
+                    return LaterEntry(item: item, daysWaiting: LaterAge.daysWaiting(lastTouched: day, today: today))
                 }
         }
     }

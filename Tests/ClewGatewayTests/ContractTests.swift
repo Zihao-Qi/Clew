@@ -27,6 +27,10 @@ import Testing
         try roundTrips(API.PairResponse.self, "pair.response.json")
         try roundTrips(API.ImportRequest.self, "import.request.json")
         try roundTrips(API.ImportResponse.self, "import.response.json")
+        try roundTrips(API.ImportRequest.self, "import-x.request.json")
+        try roundTrips(API.ImportResponse.self, "import-x.response.json")
+        try roundTrips(API.BookmarkRequest.self, "bookmark.request.json")
+        try roundTrips(API.BookmarkResponse.self, "bookmark.response.json")
         try roundTrips(API.Failure.self, "failure.response.json")
     }
 
@@ -35,8 +39,9 @@ import Testing
         #expect(Crypto.hmac(secret: "c2VjcmV0", message: "abcdefghijklmnop") == "khZw39NRSnJr9gReScOR4gC1Ho_Nev73PUGL2JjG0V0")
     }
 
-    @Test func theImportExampleIsWhatTheGatewayAnswers() throws {
-        // The response example is the real answer to the request example.
+    @Test(arguments: [("/v1/import", "import"), ("/v1/import", "import-x"), ("/v1/bookmark", "bookmark")])
+    func eachRequestExampleGetsItsResponseExample(path: String, name: String) throws {
+        // The response example is the real answer to the request example, from a new Clew.
         let now = Now()
         let clew = Clew(store: try SQLiteStore.inMemory(), clock: SystemClockForTests(source: now), zones: UTCZone())
         let credentials = MemoryCredentials()
@@ -48,11 +53,11 @@ import Testing
             headers: ["host": "127.0.0.1:39271", "content-type": "application/json"],
             body: try JSONEncoder().encode(API.PairRequest(code: code, name: "contract"))))
         let token = try JSONDecoder().decode(API.PairResponse.self, from: pairing.body).token
-        let response = gateway.handle(HTTPRequest(method: "POST", path: "/v1/import",
+        let response = gateway.handle(HTTPRequest(method: "POST", path: path,
             headers: ["host": "127.0.0.1:39271", "content-type": "application/json", "authorization": "Bearer \(token)"],
-            body: try Data(contentsOf: Self.directory.appendingPathComponent("import.request.json"))))
+            body: try Data(contentsOf: Self.directory.appendingPathComponent("\(name).request.json"))))
         let expected = try JSONSerialization.jsonObject(
-            with: Data(contentsOf: Self.directory.appendingPathComponent("import.response.json"))) as! NSDictionary
+            with: Data(contentsOf: Self.directory.appendingPathComponent("\(name).response.json"))) as! NSDictionary
         #expect(response.status == 200)
         #expect(try JSONSerialization.jsonObject(with: response.body) as! NSDictionary == expected)
     }

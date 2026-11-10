@@ -118,7 +118,9 @@ public final class Gateway: @unchecked Sendable {
         case ("GET", "/v1/hello"): response = hello(request)
         case ("POST", "/v1/pair"): response = pair(request)
         case ("POST", "/v1/import"): response = importList(request)
-        case (_, "/v1/hello"), (_, "/v1/pair"), (_, "/v1/import"): response = failure(405, "method not allowed")
+        case ("POST", "/v1/bookmark"): response = bookmark(request)
+        case (_, "/v1/hello"), (_, "/v1/pair"), (_, "/v1/import"), (_, "/v1/bookmark"):
+            response = failure(405, "method not allowed")
         default: response = failure(404, "not found")
         }
         response.headers += cors
@@ -183,13 +185,34 @@ public final class Gateway: @unchecked Sendable {
             guard let clew else { return failure(503, "Clew is busy; try again") }
             do {
                 let result = try clew.importExternal(ImportBatch(source: body.source, entries: body.entries,
-                                                                 listTotal: body.listTotal, scan: body.scan))
+                                                                 listTotal: body.listTotal, scan: body.scan,
+                                                                 fromTop: body.fromTop))
                 let needsUpdate = body.scan.needsUpdate(listTotal: body.listTotal, result: result)
                 let report = ImportReport(at: now(), source: body.source, listTotal: body.listTotal, scan: body.scan,
                                           result: result, needsUpdate: needsUpdate)
                 lock.withLock { reports[body.source] = report }
                 return json(200, API.ImportResponse(result: result, needsUpdate: needsUpdate,
                                                     listCount: (try? clew.collections().first { $0.source == body.source }?.onList) ?? 0))
+            } catch {
+                return importFailure(error)
+            }
+        }
+        if response.status == 200 { changed() }
+        return response
+    }
+
+    private func bookmark(_ request: HTTPRequest) -> HTTPResponse {
+        if let denied = authorize(request, .import) { return denied }
+        guard isJSON(request) else { return failure(415, "JSON only") }
+        guard let body = try? JSONDecoder().decode(API.BookmarkRequest.self, from: request.body) else {
+            return failure(400, "bad request")
+        }
+        let response: HTTPResponse = importLock.withLock {
+            guard let clew else { return failure(503, "Clew is busy; try again") }
+            do {
+                let result = try clew.bookmarkChanged(source: body.source, entry: body.entry, bookmarked: body.bookmarked)
+                return json(200, API.BookmarkResponse(
+                    result: result, listCount: (try? clew.collections().first { $0.source == body.source }?.onList) ?? 0))
             } catch {
                 return importFailure(error)
             }

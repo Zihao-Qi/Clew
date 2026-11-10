@@ -13,8 +13,9 @@ function describe(status: Status | undefined): string {
     if (status.problem === "turnedOff") return t("statusTurnedOff");
     return t("statusFailed");
   }
-  if (status.needsUpdate) return t("statusNeedsUpdate");
-  return t("statusImported", String(status.added ?? 0), String(status.listCount ?? 0));
+  const x = status.source === "extension.x";
+  if (status.needsUpdate) return t(x ? "statusNeedsUpdateX" : "statusNeedsUpdate");
+  return t(x ? "statusImportedX" : "statusImported", String(status.added ?? 0), String(status.listCount ?? 0));
 }
 
 async function render(): Promise<void> {

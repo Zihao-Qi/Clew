@@ -41,12 +41,12 @@ public struct CollectionDetails: Hashable, Sendable {
     public let today: LocalDay
     /// Started, not ticked: most watched first.
     public let inProgress: [CollectionEntry]
-    /// Not started, not ticked: newest first.
+    /// Not started, not ticked: in the site's order.
     public let notStarted: [CollectionEntry]
     /// Ticked: most recent first.
     public let done: [CollectionEntry]
-    /// Items ticked per day, all time, including items since removed from the list: the
-    /// heatmap keeps what got done.
+    /// Items ticked per day, all time, including items that left the list (they are in
+    /// Done); never items the user deleted.
     public let finishedByDay: [LocalDay: Int]
     public let finishedThisWeek: Int
     public let finishedLast30: Int
@@ -66,12 +66,14 @@ extension Clew {
             try Self.collectionSources.filter { !off.contains($0) }.compactMap { source in
                 let all = try r.items(source: source)
                 let allTime = LocalDay(year: 1, month: 1, day: 1)!
-                let ticks = try r.checkIns(itemIds: all.map(\.id), from: allTime)
+                let left = try Self.leftTheList(all, source: source, r)
+                // What the user deleted is gone from the collection, its ticks too.
+                let kept = all.filter { $0.deletedAt == nil || left.contains($0.id) }
+                let ticks = try r.checkIns(itemIds: kept.map(\.id), from: allTime)
                 let live = all.filter { $0.deletedAt == nil }
                 guard !live.isEmpty || !ticks.isEmpty else { return nil }
                 let ticked = Set(ticks.map(\.itemId))
-                let left = try Self.leftTheList(all, source: source, r)
-                let done = all.filter { ticked.contains($0.id) && ($0.deletedAt == nil || left.contains($0.id)) }.count
+                let done = kept.filter { ticked.contains($0.id) }.count
                 return CollectionSummary(source: source, toWatch: live.filter { !ticked.contains($0.id) }.count,
                                          done: done, onList: live.count)
             }
@@ -82,7 +84,10 @@ extension Clew {
         guard Self.collectionSources.contains(source) else { return nil }
         let today = currentDay()
         return try storeForQueries.read { r in
-            let all = try r.items(source: source)
+            let left = try Self.leftTheList(try r.items(source: source), source: source, r)
+            // What the user deleted is gone from the page, heatmap and counts included
+            // (user, 2026-11-10: a deleted article still coloured the heatmap).
+            let all = try r.items(source: source).filter { $0.deletedAt == nil || left.contains($0.id) }
             let allTime = LocalDay(year: 1, month: 1, day: 1)!
             let allTicks = try r.checkIns(itemIds: all.map(\.id), from: allTime)
             // Done-ness uses every live tick, as the row's count and CheckIn do, even one
@@ -90,11 +95,10 @@ extension Clew {
             // counts below only show days up to today.
             let lastTick = Dictionary(grouping: allTicks, by: \.itemId).mapValues { $0.max { $0.at < $1.at }! }
             let ticks = allTicks.filter { $0.localDay <= today }
-            let left = try Self.leftTheList(all, source: source, r)
             let watched = try r.watchProgress(itemIds: all.map(\.id))
 
             var inProgress: [CollectionEntry] = [], notStarted: [CollectionEntry] = [], done: [CollectionEntry] = []
-            for item in all where item.deletedAt == nil || left.contains(item.id) {
+            for item in all {
                 let tick = lastTick[item.id]
                 // Removed by the import and marked "Not finished": gone from the page.
                 if item.deletedAt != nil && tick == nil { continue }
@@ -104,13 +108,18 @@ extension Clew {
                 else if (entry.watched ?? 0) > 0 { inProgress.append(entry) }
                 else { notStarted.append(entry) }
             }
-            let newestFirst = { (a: CollectionEntry, b: CollectionEntry) in
-                (a.item.createdAt, a.item.id.uuidString) > (b.item.createdAt, b.item.id.uuidString)
+            // What is left follows the site's own order (Watch Later's, X's newest bookmark
+            // first); anything not placed yet goes last, newest first.
+            let rank = Dictionary(try Self.listOrder(source, r).enumerated().map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
+            let siteOrder = { (a: CollectionEntry, b: CollectionEntry) in
+                let ra = rank[a.item.externalRef ?? ""] ?? Int.max, rb = rank[b.item.externalRef ?? ""] ?? Int.max
+                if ra != rb { return ra < rb }
+                return (a.item.createdAt, a.item.id.uuidString) > (b.item.createdAt, b.item.id.uuidString)
             }
             inProgress.sort {
                 ($0.watched ?? 0, $0.item.createdAt, $0.item.id.uuidString) > ($1.watched ?? 0, $1.item.createdAt, $1.item.id.uuidString)
             }
-            notStarted.sort(by: newestFirst)
+            notStarted.sort(by: siteOrder)
             done.sort { ($0.doneAt ?? .distantPast, $0.item.id.uuidString) > ($1.doneAt ?? .distantPast, $1.item.id.uuidString) }
 
             var byDay: [LocalDay: Int] = [:]

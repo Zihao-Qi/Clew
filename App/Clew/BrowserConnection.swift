@@ -59,6 +59,7 @@ final class BrowserConnection {
     private(set) var clients: [PairedClient] = []
     private(set) var pairing: (code: String, expiresAt: Date)?
     private(set) var youTube: ImportReport?
+    private(set) var x: ImportReport?
     private(set) var port: UInt16?
     /// Set when Clew could not listen (all ports taken) or read the Keychain.
     private(set) var problem: String?
@@ -110,6 +111,7 @@ final class BrowserConnection {
         clients = gateway.clients
         pairing = gateway.pendingPairing
         youTube = gateway.lastImport(from: .extensionYouTube)
+        x = gateway.lastImport(from: .extensionX)
         let wanted = !clients.isEmpty || pairing != nil
         if wanted, listener == nil {
             let listener = GatewayListener(gateway: gateway)

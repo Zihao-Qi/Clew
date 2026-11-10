@@ -192,6 +192,7 @@ private let a = "aaaaaaaaaaa", b = "bbbbbbbbbbb", c = "ccccccccccc", d = "dddddd
         // Imported, let go by the import, restored, then let go by the user: stays gone.
         try clew.importExternal(batch([video(a)], total: 1))
         try clew.importExternal(batch([video(d)], total: 1))
+        clock.set(local(11, 10))
         try clew.importExternal(batch([video(a)], total: 1))
         try clew.letGo(itemId: try #require(imported(a)).id)
         #expect(try clew.importExternal(batch([video(a)], total: 1)).restored == 0)

@@ -3,11 +3,14 @@
 // A process squatting on the port cannot, so it never sees the token.
 
 import {
+  isBookmarkResponse,
   isFailure,
   isHello,
   isImportResponse,
   isPairResponse,
   PORTS,
+  type BookmarkRequest,
+  type BookmarkResponse,
   type ImportRequest,
   type ImportResponse,
   type PairResponse,
@@ -109,8 +112,21 @@ export class Gateway {
 
   /** Sends a scan. Returns the answer and the port Clew was found on. */
   async importList(pairing: Pairing, request: ImportRequest): Promise<{ response: ImportResponse; port: number }> {
+    const { body, port } = await this.post(pairing, "/v1/import", request);
+    if (!isImportResponse(body)) throw new GatewayError("badAnswer", "unexpected answer");
+    return { response: body, port };
+  }
+
+  /** Tells Clew a post was bookmarked or unbookmarked. */
+  async bookmark(pairing: Pairing, request: BookmarkRequest): Promise<{ response: BookmarkResponse; port: number }> {
+    const { body, port } = await this.post(pairing, "/v1/bookmark", request);
+    if (!isBookmarkResponse(body)) throw new GatewayError("badAnswer", "unexpected answer");
+    return { response: body, port };
+  }
+
+  private async post(pairing: Pairing, path: string, request: unknown): Promise<{ body: unknown; port: number }> {
     const port = await this.find(pairing);
-    const r = await this.fetchFn(`http://127.0.0.1:${port}/v1/import`, {
+    const r = await this.fetchFn(`http://127.0.0.1:${port}${path}`, {
       ...NO_REDIRECTS,
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${pairing.token}` },
@@ -121,7 +137,6 @@ export class Gateway {
     // The user turned this list off in Clew's Settings.
     if (r.status === 409) throw new GatewayError("turnedOff", "list turned off in Clew", 409);
     if (!r.ok) throw new GatewayError("refused", isFailure(body) ? body.error : `HTTP ${r.status}`, r.status);
-    if (!isImportResponse(body)) throw new GatewayError("badAnswer", "unexpected answer");
-    return { response: body, port };
+    return { body, port };
   }
 }

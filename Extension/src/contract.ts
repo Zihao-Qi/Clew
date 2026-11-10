@@ -36,11 +36,24 @@ export interface ScanReport {
   selectorVersion: string;
 }
 
+export type ListSource = "extension.youtube" | "extension.x";
+
 export interface ImportRequest {
-  source: "extension.youtube";
+  source: ListSource;
+  /** The page's own count (YouTube). */
   listTotal?: number;
   entries: ExternalEntry[];
   scan: ScanReport;
+  /** X: how many leading entries were seen as one unbroken run from the top. */
+  fromTop?: number;
+}
+
+/** `POST /v1/bookmark`: the bookmark button was clicked on a post. */
+export interface BookmarkRequest {
+  source: "extension.x";
+  entry: ExternalEntry;
+  /** False when the bookmark was removed. */
+  bookmarked: boolean;
 }
 
 export interface ImportResult {
@@ -57,6 +70,11 @@ export interface ImportResult {
 export interface ImportResponse {
   result: ImportResult;
   needsUpdate: boolean;
+  listCount: number;
+}
+
+export interface BookmarkResponse {
+  result: ImportResult;
   listCount: number;
 }
 
@@ -84,12 +102,20 @@ export function isPairResponse(v: unknown): v is PairResponse {
   );
 }
 
-export function isImportResponse(v: unknown): v is ImportResponse {
-  if (!isObject(v) || typeof v.needsUpdate !== "boolean" || !isInt(v.listCount) || !isObject(v.result)) return false;
-  const r = v.result;
+function isImportResult(r: unknown): r is ImportResult {
   return (
-    ["added", "renamed", "restored", "letGo", "skipped", "progressed"].every((k) => isInt(r[k])) && typeof r.complete === "boolean"
+    isObject(r) &&
+    ["added", "renamed", "restored", "letGo", "skipped", "progressed"].every((k) => isInt(r[k])) &&
+    typeof r.complete === "boolean"
   );
+}
+
+export function isImportResponse(v: unknown): v is ImportResponse {
+  return isObject(v) && typeof v.needsUpdate === "boolean" && isInt(v.listCount) && isImportResult(v.result);
+}
+
+export function isBookmarkResponse(v: unknown): v is BookmarkResponse {
+  return isObject(v) && isInt(v.listCount) && isImportResult(v.result);
 }
 
 export function isFailure(v: unknown): v is Failure {
