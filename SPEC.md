@@ -229,8 +229,8 @@ stopped daily use, not adding features.
   - **On a block** (right-click, also accessibility actions): **Done** / **+1** and
     **Undo** (the row's tick, by hand; *user choice*: right-click only, no circle on the
     block), **Focus** (the timer, with its controls there while it runs), **Move to…**
-    (a start-time and length picker), **Length** (15, 30, 45, 60, 90 minutes; lengths
-    that would pass 4 a.m. are not offered), **Add another block** (right after it, the
+    (a start-time and length picker), **Length** (15, 30, 45, 60, 90, 120 minutes;
+    lengths that would pass 4 a.m. are not offered), **Add another block** (right after it, the
     same length; not offered when that would pass 4 a.m.), **Not finished**, **Remove
     block**, **Delete**. Clicking a block opens the task's details. The row's right-click ›
     **Put on timeline…** places it without dragging.
@@ -281,13 +281,61 @@ stopped daily use, not adding features.
     block. The rollover is not leaving Today: a block that ended the evening before still
     decides.
   - **Start alert:** "Write intro · Now until 10:30" when a block starts (no buttons,
-    like the focus timer's). Settings › General › Day timeline › "Alert when a block
-    starts" (default on; *changed* while building: Settings has no Notifications pane,
+    like the focus timer's). Settings › General › Day timeline › "Block alerts" (the
+    start alert, and a slot block's "Done?"; renamed from "Alert when a block starts"
+    when slots arrived; default on; *changed* while building: Settings has no Notifications pane,
     and a menu bar list cannot be opened from a notification). None
     for a block placed after its start or a task that needs nothing (done today, not a
     counted goal; a goal: total reached). Notification permission
     is asked when the first block is placed (if this is on); if it is denied, Settings
     says so.
+  - **A repeating task's time slot** (*user*, 2026-11-10). A habit or a counted goal
+    can have a slot, set in Add and Edit: "On the timeline: at 8:00 for 60 min" (a
+    start on a quarter hour of the wall clock, a length of 15, 30, 45, 60, 90 or 120
+    minutes; off by default). Clew then places that block by itself.
+    - **When:** a slot block is placed when the task has a slot, is on Today and still
+      needs something (a habit not done today; a goal not reached, even after a +1
+      today), the timeline is on, the
+      slot's **start is still ahead**, and the task has had **no block today** (live or
+      removed). Clew checks at the day's start, whenever it runs, and right after the
+      slot is saved, so a slot set at 7:00 for 8:00 appears today. A Mac opened at 8:30
+      for an 8–9 slot gets no block that day; the task stays in the list (*user*).
+      Blocks of earlier days decide first. On a day the task is not due (a weekday not
+      chosen, a weekly target met) there is none.
+    - **It never ticks by itself** (*user*: a slot that ticked daily would fill the
+      heatmap and active days with no action). Otherwise it is a block like any other;
+      where a hand block would tick at its end, a slot block **asks** instead (where a
+      hand block would skip or be covered, it does so quietly): it shows "Done?", a
+      notification "Done with Write intro?" offers **Done** (or **+1**), and right-click
+      › Done / +1 works as on any block. Done is a hand tick that answers the block for
+      good (undoing it leaves the block quiet; Not finished is not offered). Any hand
+      tick made after it asks answers it the same way (a goal: the first one no other
+      block used), and its notification is withdrawn. Unanswered,
+      the task stays undone that day and nothing is counted; **the question ends at the
+      rollover** (the notification is withdrawn, nothing is ticked late). While the
+      timeline is off, slot blocks neither alert nor ask; one that ended meanwhile shows
+      "Done?" when the timeline is back on, without a notification. The start alert and "Done?"
+      share one switch: Settings › General › Day timeline › "Block alerts". A focus
+      timer's Done adds nothing when the task got a block's tick or an answer to a slot
+      block while the timer ran, and that tick still stands. Blocks placed by hand keep ticking at their end.
+    - **Direct changes are for today only** (*user*): moving, resizing, removing it or
+      dragging it back to the list changes today's block; tomorrow it is at the slot
+      again. A block removed today does not come back today.
+    - **The repeating slot changes only in Edit** (*user*). A change applies to today's
+      block too if that block is untouched (not moved, resized or removed by hand) and
+      has not started: it moves to the new slot, or is removed if the new slot has
+      already started (nothing ticks). Turning the slot off removes an untouched block
+      that has not started. Otherwise the change starts tomorrow.
+    - **Time:** the slot is wall-clock time in the current zone. On a DST day a time
+      that does not exist moves to the next quarter hour, a time that occurs twice is
+      the first one, and the length is real minutes. A slot is cut at 4 a.m., like a
+      dropped block. Once-tasks and links have no slot. Notification permission is asked
+      when a slot is saved.
+  - **A goal that reaches its total on the timeline goes back to the list** (*user*,
+    2026-11-10, for every block): its row there shows the congratulation and Next round /
+    Raise target / Done; its block stays on the timeline, done. The row stays in the list
+    (after Next round or Raise target too, so nothing moves under the pointer) until it
+    is placed again, and cannot be placed while the goal is reached.
   - **Calendar events (step 2)** show on the timeline as **read-only** blocks in their
     calendar's colour: title and time, nothing to click, never ticked, never counted,
     never alerted by Clew (Calendar has its own alerts). All-day events sit as a thin
