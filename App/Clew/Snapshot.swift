@@ -306,6 +306,15 @@ enum Snapshot {
                 }
                 _ = try? clew.placeOnTimeline(itemId: intro, start: quarterNow, minutes: 45)
                 _ = try? clew.placeOnTimeline(itemId: long, start: quarterNow.addingTimeInterval(1800), minutes: 60)
+                // A habit with a time slot that ended an hour ago: it asks "Done?".
+                let calendar = Calendar.current
+                let slotStart = quarterNow.addingTimeInterval(-1800)
+                let c = calendar.dateComponents([.hour, .minute], from: slotStart)
+                if slotStart >= day.start, let slot = TimeSlot(hour: c.hour ?? 8, minute: c.minute ?? 0, minutes: 15) {
+                    clock.date = slotStart.addingTimeInterval(-600)
+                    _ = try? clew.addItem(NewItem(title: "Morning pages", shape: .habit(.daily), slot: slot))
+                    _ = try? clew.settleBlocks()
+                }
                 clock.date = Date()
                 _ = try? clew.settleBlocks()
             }
@@ -313,6 +322,10 @@ enum Snapshot {
             model.setRatingsEnabled(true)
             model.refresh()
             if let stretch = model.today?.rows.first(where: { $0.item.title == "Stretch" }) { model.tap(stretch) }
+            if let pages = model.today?.rows.first(where: { $0.item.title == "Morning pages" }) {
+                render(RootView(model: model, screen: .edit(pages.item, back: .list)), appearance: .aqua,
+                       to: dir.appendingPathComponent("edit-slot-light.png"))
+            }
             if let papers = model.today?.rows.first(where: { $0.item.title == "Write intro" }) {
                 render(RootView(model: model, screen: .place(papers.id, block: nil)), appearance: .aqua,
                        to: dir.appendingPathComponent("place-light.png"))

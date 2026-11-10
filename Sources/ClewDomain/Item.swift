@@ -73,6 +73,8 @@ public struct Item: Hashable, Sendable, Identifiable, Codable {
     public var sortKey: Double
     public var source: Source
     public var externalRef: String?
+    /// A repeating task's place on the day timeline (SPEC 2026-11-10); nil for none.
+    public var slot: TimeSlot?
     public var createdAt: Date
     public var updatedAt: Date
     public var deletedAt: Date?
@@ -81,7 +83,7 @@ public struct Item: Hashable, Sendable, Identifiable, Codable {
         id: UUID, kind: ItemKind, title: String, titleOrigin: TitleOrigin = .typed, url: URL? = nil, note: String? = nil,
         parentId: UUID? = nil, schedule: Schedule, progress: ProgressSpec, state: ItemState,
         plannedDay: LocalDay? = nil, sortKey: Double, source: Source, externalRef: String? = nil,
-        createdAt: Date, updatedAt: Date, deletedAt: Date? = nil
+        slot: TimeSlot? = nil, createdAt: Date, updatedAt: Date, deletedAt: Date? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -97,10 +99,30 @@ public struct Item: Hashable, Sendable, Identifiable, Codable {
         self.sortKey = sortKey
         self.source = source
         self.externalRef = externalRef
+        self.slot = slot
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.deletedAt = deletedAt
     }
+}
+
+/// "On the timeline: at 8:00 for 60 min": a wall-clock start on a quarter hour and a
+/// length (SPEC 2026-11-10, a repeating task's time slot).
+public struct TimeSlot: Hashable, Sendable, Codable {
+    public static let lengths = [15, 30, 45, 60, 90, 120]
+
+    public let hour: Int
+    public let minute: Int
+    public let minutes: Int
+
+    public init?(hour: Int, minute: Int, minutes: Int) {
+        guard (0...23).contains(hour), [0, 15, 30, 45].contains(minute), Self.lengths.contains(minutes) else { return nil }
+        self.hour = hour
+        self.minute = minute
+        self.minutes = minutes
+    }
+
+    public var time: TimeOfDay { TimeOfDay(hour: hour, minute: minute)! }
 }
 
 // MARK: - Versioned JSON for value-typed columns

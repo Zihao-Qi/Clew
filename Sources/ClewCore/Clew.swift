@@ -40,13 +40,23 @@ public struct NewItem: Hashable, Sendable {
     public var titleOrigin: TitleOrigin
     public var url: URL?
     public var shape: NewItemShape
+    /// A habit's or goal's time slot on the day timeline (SPEC 2026-11-10).
+    public var slot: TimeSlot?
 
-    public init(title: String, titleOrigin: TitleOrigin = .typed, url: URL? = nil, shape: NewItemShape) {
+    public init(title: String, titleOrigin: TitleOrigin = .typed, url: URL? = nil, shape: NewItemShape,
+                slot: TimeSlot? = nil) {
         self.title = title
         self.titleOrigin = titleOrigin
         self.url = url
         self.shape = shape
+        self.slot = slot
     }
+}
+
+/// What Edit does to a task's time slot: leave it, or set it (nil turns it off).
+public enum SlotEdit: Hashable, Sendable {
+    case keep
+    case set(TimeSlot?)
 }
 
 /// The editable fields of an item, as a full replacement. `schedule` applies to
@@ -56,12 +66,15 @@ public struct ItemEdit: Hashable, Sendable {
     public var url: URL?
     public var schedule: Schedule?
     public var target: Int?
+    /// Habits and goals only; `.keep` leaves the slot as it is.
+    public var slot: SlotEdit
 
-    public init(title: String, url: URL?, schedule: Schedule? = nil, target: Int? = nil) {
+    public init(title: String, url: URL?, schedule: Schedule? = nil, target: Int? = nil, slot: SlotEdit = .keep) {
         self.title = title
         self.url = url
         self.schedule = schedule
         self.target = target
+        self.slot = slot
     }
 }
 
@@ -171,12 +184,14 @@ public final class Clew: Sendable {
                 (.goal, try Self.validSchedule(s), .counter(target: try Self.validTarget(target)), .active, nil)
         }
 
+        // Only repeating tasks have a slot.
+        guard new.slot == nil || kind == .habit || kind == .goal else { throw ClewError.notAllowed }
         return try store.write { w in
             let item = Item(
                 id: makeID(), kind: kind, title: title, titleOrigin: new.titleOrigin, url: url,
                 schedule: schedule, progress: progress,
                 state: state, plannedDay: planned, sortKey: (try w.maxSortKey() ?? 0) + 1, source: source,
-                createdAt: now, updatedAt: now
+                slot: new.slot, createdAt: now, updatedAt: now
             )
             try w.insert(item)
             return item
@@ -193,6 +208,7 @@ public final class Clew: Sendable {
             switch item.kind {
             case .once, .link:
                 guard edit.schedule == nil, edit.target == nil else { throw ClewError.notAllowed }
+                if case .set(let slot) = edit.slot, slot != nil { throw ClewError.notAllowed }
             case .habit:
                 guard edit.target == nil, let s = edit.schedule else { throw ClewError.invalidSchedule }
                 item.schedule = try Self.validSchedule(s)
@@ -206,6 +222,10 @@ public final class Clew: Sendable {
             item.title = title
             item.url = url
             item.updatedAt = now
+            if case .set(let slot) = edit.slot, slot != item.slot {
+                item.slot = slot
+                try slotChanged(item, now: now, w)
+            }
             try w.update(item)
             return item
         }

@@ -19,6 +19,8 @@ public enum PlannedContent: Hashable, Sendable {
     case breakEnded(title: String)
     /// A task's time block on the day timeline starts (SPEC 2026-11-10).
     case blockStarts(itemId: UUID, title: String, until: Date)
+    /// A slot block ended: "Done with Write intro?" with Done or +1 (SPEC 2026-11-10).
+    case slotAsks(blockId: UUID, itemId: UUID, title: String, isGoal: Bool)
 }
 
 public struct PlannedNotification: Hashable, Sendable {

@@ -261,14 +261,16 @@ private struct Access: StoreWriter {
         try db.execute(
             sql: """
                 INSERT INTO timeBlock (id, itemId, localDay, start, minutes, placedAt, updatedAt, decidedAt, tickId,
-                                       coverId, removedAt)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                       coverId, removedAt, origin, touchedAt, askedAt, releasedAt)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET start = excluded.start, minutes = excluded.minutes,
                     updatedAt = excluded.updatedAt, decidedAt = excluded.decidedAt, tickId = excluded.tickId,
-                    coverId = excluded.coverId, removedAt = excluded.removedAt
+                    coverId = excluded.coverId, removedAt = excluded.removedAt, touchedAt = excluded.touchedAt,
+                    askedAt = excluded.askedAt, releasedAt = excluded.releasedAt
                 """,
             arguments: [b.id.uuidString, b.itemId.uuidString, b.localDay.description, b.start, b.minutes, b.placedAt,
-                        b.updatedAt, b.decidedAt, b.tickId?.uuidString, b.coverId?.uuidString, b.removedAt]
+                        b.updatedAt, b.decidedAt, b.tickId?.uuidString, b.coverId?.uuidString, b.removedAt,
+                        b.origin.rawValue, b.touchedAt, b.askedAt, b.releasedAt]
         )
     }
 
@@ -340,8 +342,8 @@ private struct Access: StoreWriter {
         try db.execute(
             sql: """
                 INSERT INTO item (id, kind, title, url, note, parentId, schedule, progress, state, plannedDay,
-                                  sortKey, source, externalRef, createdAt, updatedAt, deletedAt, titleOrigin)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                  sortKey, source, externalRef, createdAt, updatedAt, deletedAt, titleOrigin, slot)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
             arguments: try Self.itemArguments(item)
         )
@@ -354,7 +356,7 @@ private struct Access: StoreWriter {
             sql: """
                 UPDATE item SET id = ?, kind = ?, title = ?, url = ?, note = ?, parentId = ?, schedule = ?,
                     progress = ?, state = ?, plannedDay = ?, sortKey = ?, source = ?, externalRef = ?,
-                    createdAt = ?, updatedAt = ?, deletedAt = ?, titleOrigin = ?
+                    createdAt = ?, updatedAt = ?, deletedAt = ?, titleOrigin = ?, slot = ?
                 WHERE id = ?
                 """,
             arguments: args
@@ -418,7 +420,7 @@ private struct Access: StoreWriter {
             i.id.uuidString, i.kind.rawValue, i.title, i.url?.absoluteString, i.note, i.parentId?.uuidString,
             try json(i.schedule), try json(i.progress), i.state.rawValue, i.plannedDay?.description,
             i.sortKey, i.source.rawValue, i.externalRef, i.createdAt, i.updatedAt, i.deletedAt,
-            i.titleOrigin.rawValue,
+            i.titleOrigin.rawValue, try i.slot.map(json),
         ]
     }
 
@@ -439,6 +441,7 @@ private struct Access: StoreWriter {
             sortKey: try required(row, "sortKey", table: t),
             source: try raw(row, "source", table: t),
             externalRef: row["externalRef"],
+            slot: try (row["slot"] as String?).map { try JSONDecoder().decode(TimeSlot.self, from: Data($0.utf8)) },
             createdAt: try required(row, "createdAt", table: t),
             updatedAt: try required(row, "updatedAt", table: t),
             deletedAt: row["deletedAt"]
@@ -512,7 +515,11 @@ private struct Access: StoreWriter {
             decidedAt: row["decidedAt"],
             tickId: try optionalUUID(row, "tickId", table: t),
             coverId: try optionalUUID(row, "coverId", table: t),
-            removedAt: row["removedAt"]
+            removedAt: row["removedAt"],
+            origin: try raw(row, "origin", table: t),
+            touchedAt: row["touchedAt"],
+            askedAt: row["askedAt"],
+            releasedAt: row["releasedAt"]
         )
     }
 
