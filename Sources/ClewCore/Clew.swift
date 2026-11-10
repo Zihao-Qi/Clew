@@ -18,6 +18,8 @@ public enum ClewError: Error, Equatable, Sendable {
     case tooManyEntries(max: Int)
     /// The user turned this imported list off in Settings.
     case listTurnedOff
+    /// A focus timer is already running: stop it before starting another.
+    case focusRunning
 }
 
 /// What the user chose in `+ add`. Each case is a valid shape, so invalid

@@ -109,6 +109,15 @@ final class NotificationsAdapter: NSObject, UNUserNotificationCenterDelegate {
             content.sound = .default
             content.userInfo["itemId"] = itemId.uuidString
             category = Self.category(open: canOpen, later: canMoveToLater)
+        case .focusEnded(let itemId, let title):
+            content.title = String(localized: "Time's up: \(title)")
+            content.body = String(localized: "Open Clew to tick it, add 5 minutes or take a break.")
+            content.sound = .default
+            content.userInfo["itemId"] = itemId.uuidString
+        case .breakEnded(let title):
+            content.title = String(localized: "Break's over")
+            content.body = String(localized: "Back to \(title) when you're ready.")
+            content.sound = .default
         }
         content.categoryIdentifier = category
         // The fingerprint: same time and text means nothing to change.

@@ -365,6 +365,20 @@ counts).
 still showing the post or rows read just before a click, from undoing a removal; a
 click is never stale.
 
+**Focus timer (v1.2, SPEC 2026-11-10).** Not a fact: the one running timer,
+`FocusTimer {phase: focus | rest, itemId, startedAt, length, pausedAt?, pausedFor}`, is
+kept in the setting `focusTimer` (JSON; `null` when none; an unreadable one is no
+timer), so it survives sleep and quitting. All times are absolute; elapsed time never
+goes below zero if the clock moves back. Commands: `startFocus(itemId:minutes:)`
+(only `focusMinutes` = 10/25/45, only live non-collection items on Today; a running
+focus throws `focusRunning`, a break is replaced), `pauseFocus`, `resumeFocus` (adds
+the paused span), `extendFocus` (+5 min from now, or from the planned end if not up
+yet), `startBreak` (from a focus only, only when breaks are offered), `stopFocus`
+(returns what ran). The end is a planned notification (`clew.focus`, first in the plan
+so the 64-pending cap never drops it), absent while paused or once over. The app ends
+a timer whose task left Today and a break that is over; it refreshes at `endsAt`, and
+only the timed row and the menu bar label redraw every second.
+
 **Site order (2026-11-10).** Every collection keeps the order its site shows in the
 setting `listOrder.<source>`, and its page lists what is left in that order (items
 not placed yet last, newest first). X's comes from the gap rule and the button.

@@ -298,6 +298,25 @@ enum Snapshot {
                     render(RootView(model: model, screen: screen), appearance: appearance, to: file)
                 }
             }
+            // The focus timer (SPEC 2026-11-10): running, then time up.
+            if let task = model.today?.rows.first(where: { $0.item.title == "Read papers" }) {
+                let real = clock.date
+                clock.date = Date().addingTimeInterval(-9 * 60)
+                model.startFocus(task, minutes: 25)
+                clock.date = real
+                for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+                    render(RootView(model: model, screen: .list), appearance: appearance,
+                           to: dir.appendingPathComponent("timer-\(appearance == .aqua ? "light" : "dark").png"))
+                }
+                render(MenuBarLabel(today: model.today, focus: model.focus).padding(4), appearance: .aqua,
+                       to: dir.appendingPathComponent("label-timer.png"))
+                model.stopFocus()
+                clock.date = Date().addingTimeInterval(-11 * 60)
+                model.startFocus(task, minutes: 10)
+                clock.date = real
+                render(RootView(model: model, screen: .list), appearance: .aqua, to: dir.appendingPathComponent("timeup-light.png"))
+                model.stopFocus()
+            }
             // The other progress bar style.
             model.setBarStyle(.underTitle)
             model.refresh()

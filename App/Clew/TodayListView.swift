@@ -185,9 +185,14 @@ struct RowView: View {
 
     private var item: Item { row.item }
 
-    /// How far along the row is, drawn in the chosen style: a goal's count this round,
-    /// or how much of a video was watched. Nil: nothing to draw.
-    private var fraction: Double? {
+    /// This row's focus timer or break, if it has the running one.
+    private var timer: FocusTimer? { model.focus?.itemId == row.id ? model.focus : nil }
+
+    /// How far along the row is, drawn in the chosen style: while a timer runs, the
+    /// time (SPEC 2026-11-10); else a goal's count this round, or how much of a video
+    /// was watched. Nil: nothing to draw.
+    private func fraction(now: Date) -> Double? {
+        if let timer { return timer.fraction(at: now) }
         if let target = item.progress.target, target > 0 {
             return Double(min(row.progressAmount, target)) / Double(target)
         }
@@ -196,8 +201,18 @@ struct RowView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            mainLine
+        // Only the row with the running timer redraws every second.
+        if timer != nil {
+            TimelineView(.periodic(from: .now, by: 1)) { context in content(now: context.date) }
+        } else {
+            content(now: Date())
+        }
+    }
+
+    private func content(now: Date) -> some View {
+        let fraction = fraction(now: now)
+        return VStack(alignment: .leading, spacing: 4) {
+            mainLine(now: now)
                 .background {
                     // Fills the title line only, out to the row's rounded edges, so a
                     // "goal reached" block below it stays plain.
@@ -213,6 +228,9 @@ struct RowView: View {
                 ProgressLine(fraction: fraction)
                     .padding(.leading, titleInset)
                     .padding(.top, -2)
+            }
+            if let timer, timer.phase == .focus, timer.isOver(at: now) {
+                timeUp
             }
             if row.isGoalReached, !model.dismissedCelebrations.contains(row.id) {
                 celebration
@@ -253,6 +271,13 @@ struct RowView: View {
             }
             Button("Details", action: onOpen)
             Button("Edit…", action: onEdit)
+            if timer == nil, model.focus?.phase != .focus, !row.isGoalReached {
+                Menu("Focus") {
+                    ForEach(Clew.focusMinutes, id: \.self) { m in
+                        Button("\(m) min") { model.startFocus(row, minutes: m) }
+                    }
+                }
+            }
             if (item.kind == .once || item.kind == .link), row.progressAmount == 0 {
                 Button("Move to Later") { model.moveToLater(row) }
             }
@@ -284,7 +309,75 @@ struct RowView: View {
         .padding(.leading, 28)
     }
 
-    private var mainLine: some View {
+    /// Time is up (SPEC 2026-11-10): the row asks, it never ticks by itself.
+    private var timeUp: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Time's up.")
+                .font(.callout.weight(.semibold))
+            HStack(spacing: 8) {
+                Button(item.kind == .goal ? "+1" : "Done") { model.finishFocus(row) }
+                    .accessibilityLabel(item.kind == .goal ? Text("Add one to \(item.title) and stop") : Text("Mark \(item.title) done and stop"))
+                Button("5 more min") { model.extendFocus() }
+                    .accessibilityLabel(Text("Five more minutes on \(item.title)"))
+                if model.focusOffersBreak {
+                    Button("Break") { model.startBreak() }
+                        .accessibilityLabel(Text("Take a five-minute break"))
+                }
+                Button("Stop") { model.stopFocus() }
+                    .accessibilityLabel(Text("Stop the timer"))
+            }
+            .controlSize(.small)
+        }
+        .padding(.leading, 28)
+    }
+
+    /// The running timer's controls at the row's end: time left (☕ in a break), pause
+    /// or resume, stop. Hovering a row with no timer shows ▶ to start one.
+    @ViewBuilder
+    private func timerControls(now: Date) -> some View {
+        if let timer {
+            HStack(spacing: 6) {
+                Text(verbatim: (timer.phase == .rest ? "☕ " : "") + Self.clock(timer.remaining(at: now)))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel(timer.phase == .rest
+                        ? Text("Break, \(Self.clock(timer.remaining(at: now))) left")
+                        : Text("\(Self.clock(timer.remaining(at: now))) left on \(item.title)"))
+                if timer.phase == .focus, !timer.isOver(at: now) {
+                    Button { timer.isPaused ? model.resumeFocus() : model.pauseFocus() } label: {
+                        Image(systemName: timer.isPaused ? "play.fill" : "pause.fill").imageScale(.small)
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(timer.isPaused ? Text("Resume the timer") : Text("Pause the timer"))
+                }
+                Button { model.stopFocus() } label: { Image(systemName: "stop.fill").imageScale(.small) }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(timer.phase == .rest ? Text("End the break") : Text("Stop the timer"))
+            }
+        } else if hovering, model.focus?.phase != .focus, !row.isGoalReached {
+            Menu {
+                ForEach(Clew.focusMinutes, id: \.self) { m in
+                    Button("\(m) min") { model.startFocus(row, minutes: m) }
+                }
+            } label: {
+                Image(systemName: "play.circle").foregroundStyle(.secondary)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help(Text("Focus on this"))
+            .accessibilityLabel(Text("Focus on \(item.title)"))
+        }
+    }
+
+    /// "12:34", or "1:02:03" past an hour.
+    static func clock(_ seconds: TimeInterval) -> String {
+        let s = Int(seconds.rounded(.up))
+        return s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60)
+                         : String(format: "%d:%02d", s / 60, s % 60)
+    }
+
+    private func mainLine(now: Date) -> some View {
         HStack(spacing: 8) {
             Button { model.tap(row) } label: {
                 Image(systemName: row.isDone ? "checkmark.circle.fill" : "circle")
@@ -299,6 +392,8 @@ struct RowView: View {
 
             titleView
                 .frame(maxWidth: .infinity, alignment: .leading)
+
+            timerControls(now: now)
 
             if let target = item.progress.target {
                 // Fixed widths, so every goal's bar starts in the same column.
