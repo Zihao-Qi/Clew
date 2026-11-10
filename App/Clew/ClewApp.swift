@@ -90,6 +90,8 @@ enum Screen: Equatable {
     case collection(Source)
     /// `back` is where Save or Cancel returns to: the list or that item's details.
     case edit(Item, back: Back)
+    /// "Put on timeline…" (block nil) or a block's "Move to…" (SPEC 2026-11-10).
+    case place(UUID, block: UUID?)
 
     enum Back: Equatable { case list, detail }
 }
@@ -120,6 +122,8 @@ struct RootView: View {
                     CollectionView(model: model, source: source) { screen = .list }
                 case .edit(let item, let back):
                     EditView(model: model, item: item) { screen = back == .detail ? .detail(item.id) : .list }
+                case .place(let itemId, let block):
+                    PlaceView(model: model, itemId: itemId, blockId: block) { screen = .list }
                 }
             }
         }

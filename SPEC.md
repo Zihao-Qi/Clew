@@ -204,8 +204,8 @@ stopped daily use, not adding features.
   forgotten or the Mac not there. Details show "N this week · N in all" and the latest
   sessions, each removable (a void).
 - **Day timeline (v1.2, 2026-11-10):** today's hours, **above the list in the menu**,
-  so a plan and the list are one glance. Settings › General › "Show the day timeline"
-  (default on) turns it off and the menu is as before. About **4 hours show** (about
+  so a plan and the list are one glance. Settings › General › Day timeline › "Show the
+  day timeline" (default on) turns it off and the menu is as before. About **4 hours show** (about
   60 points an hour), it scrolls up and down through Clew's day (4 a.m. to 4 a.m.), and
   it opens scrolled to now, with a quiet line at the current time; the menu grows taller
   by that much, but never past the screen (the list scrolls when it must). **Today
@@ -265,8 +265,10 @@ stopped daily use, not adding features.
     timeline starts empty and an unfinished task rolls forward as usual, without its
     block. The rollover is not leaving Today: a block that ended the evening before still
     decides.
-  - **Start alert:** "Write intro · now until 10:30" when a block starts, with **Open
-    Clew**. Settings › Notifications › "Alert when a block starts" (default on). None
+  - **Start alert:** "Write intro · Now until 10:30" when a block starts (no buttons,
+    like the focus timer's). Settings › General › Day timeline › "Alert when a block
+    starts" (default on; *changed* while building: Settings has no Notifications pane,
+    and a menu bar list cannot be opened from a notification). None
     for a block placed after its start or a task that needs nothing (done today, not a
     counted goal; a goal: total reached). Notification permission
     is asked when the first block is placed (if this is on); if it is denied, Settings

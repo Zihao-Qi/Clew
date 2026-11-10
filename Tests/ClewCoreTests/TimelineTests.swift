@@ -406,6 +406,15 @@ private let tuesday = LocalDay(string: "2026-11-10")!
         #expect(day.nextStart(of: c, now: at(10, 11)) == nil)
     }
 
+    @Test func aDragLandsOnTheQuarterHourUnderThePointer() throws {
+        let day = try clew.timeline()
+        #expect(Clew.quarterStart(minutesIn: 6 * 60 + 14, day: day) == at(10, 10))      // 10:14 → 10:00
+        #expect(Clew.quarterStart(minutesIn: 6 * 60 + 15, day: day) == at(10, 10, 15))
+        #expect(Clew.quarterStart(minutesIn: -40, day: day) == at(10, 4))                 // above the day
+        #expect(Clew.quarterStart(minutesIn: 30 * 60, day: day) == at(11, 3, 45))        // below it
+        #expect(Clew.snapMinutes(7) == 0 && Clew.snapMinutes(8) == 15 && Clew.snapMinutes(-23) == -30)
+    }
+
     @Test func theTimelineCanBeHidden() throws {
         #expect(try clew.timelineShown())
         try clew.setTimelineShown(false)

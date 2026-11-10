@@ -451,6 +451,19 @@ extension Clew {
         return ids.compactMap(UUID.init(uuidString:))
     }
 
+    /// The quarter hour `minutes` after the day's start (where a dragged row is over the
+    /// hours), kept inside the day.
+    public static func quarterStart(minutesIn minutes: Double, day: TimelineDay) -> Date {
+        let quarters = Int(day.end.timeIntervalSince(day.start) / 60) / blockStepMinutes
+        let q = min(max(Int((minutes / Double(blockStepMinutes)).rounded(.down)), 0), quarters - 1)
+        return day.start.addingTimeInterval(TimeInterval(q * blockStepMinutes * 60))
+    }
+
+    /// A drag of `minutes` as whole quarter hours, to the nearest one.
+    public static func snapMinutes(_ minutes: Double) -> Int {
+        Int((minutes / Double(blockStepMinutes)).rounded()) * blockStepMinutes
+    }
+
     /// Columns for overlapping spans (sorted by start): each span takes the first column
     /// free at its start; a group of spans that overlap one another shares a count.
     public static func lanes(_ spans: [(start: Date, end: Date)]) -> [(lane: Int, lanes: Int)] {

@@ -446,7 +446,7 @@ M = [
  ("W24 stop is a no-op", W+"Listener.swift", "            listener?.cancel()\n", "", "ClewGatewayTests"),
  # Day timeline (SPEC 2026-11-10)
  ("TL1 decides before end", C+"Timeline.swift", "for b in try w.pendingTimeBlocks() where b.end <= now {", "for b in try w.pendingTimeBlocks() {", TL),
- ("TL2 never decided", C+"Timeline.swift", "        b.decidedAt = now\n        // A hand tick", "        // A hand tick", TL),
+ ("TL2 never decided", C+"Timeline.swift", "        b.decidedAt = now\n        let progress", "        let progress", TL),
  ("TL4 old hand covers", C+"Timeline.swift", "$0.at >= b.placedAt && ", "", TL),
  ("TL5 hand reused", C+"Timeline.swift", " && !used.contains($0.id)", "", TL),
  ("TL7 own tick covers", C+"Timeline.swift", "$0.source != .timeline && ", "", TL),
@@ -482,6 +482,9 @@ M = [
  ("TL40 another is 30", C+"Timeline.swift", "start: b.end, minutes: b.minutes,", "start: b.end, minutes: 30,", TL),
  ("TL41 4:00 waits", C+"Timeline.swift", "for b in try w.pendingTimeBlocks() where b.end <= now {", "for b in try w.pendingTimeBlocks() where b.end < now {", TL),
  ("TL42 another past 4", C+"Timeline.swift", "<= dayBounds(block.localDay).end", "<= dayBounds(block.localDay).end.addingTimeInterval(3600)", TL),
+ ("TL45 drop rounds to nearest", C+"Timeline.swift", "(minutes / Double(blockStepMinutes)).rounded(.down)", "(minutes / Double(blockStepMinutes)).rounded()", TL),
+ ("TL46 drop past the day", C+"Timeline.swift", "let q = min(max(Int((minutes / Double(blockStepMinutes)).rounded(.down)), 0), quarters - 1)", "let q = Int((minutes / Double(blockStepMinutes)).rounded(.down))", TL),
+ ("TL47 snap down", C+"Timeline.swift", "Int((minutes / Double(blockStepMinutes)).rounded()) * blockStepMinutes", "Int((minutes / Double(blockStepMinutes)).rounded(.towardZero)) * blockStepMinutes", TL),
  ("TL43 table allows 10", S+"Schema.swift", "CHECK (minutes BETWEEN 15 AND 1500 AND minutes % 15 = 0)", "CHECK (minutes BETWEEN 1 AND 1500)", "SQLiteStoreTests"),
  ("TL44 block can be deleted", S+"Schema.swift", "            CREATE TRIGGER timeBlock_no_delete BEFORE DELETE ON timeBlock\n            BEGIN SELECT RAISE(ABORT, 'time blocks are removed with a tombstone, never deleted'); END;\n", "", "SQLiteStoreTests"),
 ]
