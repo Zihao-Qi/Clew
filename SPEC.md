@@ -139,7 +139,11 @@ stopped daily use, not adding features.
   posts still on the page (seen without a break from the top) was removed, so a
   removal on the phone is caught the next time Bookmarks is opened in Chrome and
   scrolled past where it was. Nothing below what was seen is decided. A post its author
-  deleted also disappears, so it counts as read (accepted). Posts bookmarked again on
+  deleted also disappears, so it counts as read (accepted). A post deleted in Clew
+  comes back when bookmarked again with a click (*changed* 2026-11-10: it stayed
+  gone); a scan never brings it back, since it cannot tell "still bookmarked" from
+  "bookmarked again". A scan also cannot undo a removal made in the last 10 minutes
+  (a stale tab, or rows read just before the click); a click can. Posts bookmarked again on
   the phone jump to the top and are never taken as a gap; in the rare case where only
   such posts were seen, a post can wrongly count as read ("Not read" undoes it). Bookmarked again: back to
   read. "Not read" (right-click) undoes an automatic "read".
@@ -159,7 +163,8 @@ stopped daily use, not adding features.
   bookmark first (*changed* 2026-11-10 from "newest first", which gave no order to
   videos imported together); Done, folded, including videos that left the list).
   Each video has a circle (undo is for today's tick, and only while it is on the list)
-  and a title that opens it. Each list can be turned **off** in Settings › General ›
+  and a title that opens it. Deleting an item in Clew takes it out of the heatmap and
+  the counts too (*changed* 2026-11-10). Each list can be turned **off** in Settings › General ›
   Lists (2026-11-10): its row is hidden and imports are refused (the extension says
   so); what it holds stays and comes back when it is turned on.
 - **Watch progress (v1.1, 2026-11-09):** read only from the red bars on the Watch

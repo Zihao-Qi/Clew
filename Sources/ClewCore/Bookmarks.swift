@@ -6,7 +6,8 @@ extension Clew {
     /// 2026-11-10). Bookmarked: the post joins the collection at the top of its list, or
     /// comes back if it had left it (to read again). Unbookmarked: it leaves the list and
     /// counts as read, like a removal the import saw. A post the user deleted in Clew
-    /// stays gone; one Clew never saw is ignored when unbookmarked.
+    /// comes back too (the click is a fresh choice); one Clew never saw is ignored when
+    /// unbookmarked.
     @discardableResult
     public func bookmarkChanged(source: Source, entry: ExternalEntry, bookmarked: Bool) throws -> ImportResult {
         guard Self.orderedSources.contains(source) else { throw ClewError.notAllowed }
@@ -32,7 +33,17 @@ extension Clew {
             if bookmarked, let title {
                 if var item = existing {
                     if item.deletedAt != nil {
-                        guard try Self.restore(&item, source: source, at: now, w) else { return result }
+                        if try !Self.restore(&item, source: source, at: now, w) {
+                            // Deleted in Clew, then bookmarked again: a click is a fresh
+                            // choice, so it comes back to read, with its old ticks voided
+                            // (user, 2026-11-10). A scan cannot tell this apart from "still
+                            // bookmarked", so only the click does it.
+                            let allTime = LocalDay(year: 1, month: 1, day: 1)!
+                            for tick in try w.checkIns(itemIds: [item.id], from: allTime) {
+                                try w.voidCheckIn(id: tick.id, at: now, reason: "bookmarked again")
+                            }
+                            item.deletedAt = nil
+                        }
                         item.updatedAt = now
                         try w.update(item)
                         result.restored = 1

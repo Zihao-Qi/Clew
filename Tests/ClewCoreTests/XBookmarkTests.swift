@@ -177,10 +177,38 @@ private let a = "1850000000000000001", b = "1850000000000000002", c = "185000000
         try clew.bookmarkChanged(source: .extensionX, entry: post(a), bookmarked: false)
         let r = try clew.bookmarkChanged(source: .extensionX, entry: post(a), bookmarked: true)
         #expect(try r.restored == 1 && toRead() == [a, b] && read().isEmpty)
-        // What the user deleted in Clew stays gone.
+        // Deleted in Clew, then bookmarked again: the click brings it back, to read
+        // (user, 2026-11-10), even if it had been ticked before.
+        try clew.checkIn(itemId: try #require(item(b)).id)
         try clew.deleteItem(itemId: try #require(item(b)).id)
-        #expect(try clew.bookmarkChanged(source: .extensionX, entry: post(b), bookmarked: true).restored == 0)
-        #expect(item(b)?.deletedAt != nil && store.state.items.count == 2)
+        #expect(try clew.bookmarkChanged(source: .extensionX, entry: post(b), bookmarked: true).restored == 1)
+        #expect(try toRead() == [a, b] && read().isEmpty && store.state.items.count == 2)
+        #expect(store.state.checkIns.values.filter { $0.voidedAt == nil }.isEmpty)
+    }
+
+    @Test func aStaleScanCannotUndoAnUnbookmarkButAClickCan() throws {
+        // Seen 19 → 18 → 19: a scan read before the click (or another tab) still lists it.
+        try scan([a, b])
+        clock.set(local(9, 12))
+        try clew.bookmarkChanged(source: .extensionX, entry: post(a), bookmarked: false)
+        clock.set(local(9, 12).addingTimeInterval(Clew.restoreAfter - 1))
+        #expect(try scan([a, b]).restored == 0 && read() == [a])
+        // Long enough after, it is really back on the list (bookmarked again on the phone).
+        clock.set(local(9, 12).addingTimeInterval(Clew.restoreAfter + 1))
+        #expect(try scan([a, b]).restored == 1 && toRead() == [a, b])
+        // A click never waits, and it is a restore: a tick the user made stays.
+        try clew.checkIn(itemId: try #require(item(b)).id)
+        try clew.bookmarkChanged(source: .extensionX, entry: post(b), bookmarked: false)
+        #expect(try clew.bookmarkChanged(source: .extensionX, entry: post(b), bookmarked: true).restored == 1)
+        #expect(try read() == [b] && store.state.checkIns.values.contains { $0.itemId == item(b)?.id && $0.voidedAt == nil })
+    }
+
+    @Test func aScanNeverBringsBackWhatTheUserDeleted() throws {
+        // A scan cannot tell "still bookmarked" from "bookmarked again": only a click can.
+        try scan([a, b])
+        try clew.deleteItem(itemId: try #require(item(b)).id)
+        #expect(try scan([a, b]).restored == 0)
+        #expect(item(b)?.deletedAt != nil)
     }
 
     @Test func aBookmarkNeedsATitleAndAValidId() throws {

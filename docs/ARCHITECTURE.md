@@ -339,6 +339,30 @@ Removals come from:
   posts are ignored when unbookmarked; a bookmark needs a title.
 Both refuse a list turned off (`listTurnedOff`, 409).
 
+**Collection item states (2026-11-10).** Every rule above is one cell of this table,
+so no two of them can disagree. States: **to do** (on the list, not ticked), **done
+on list** (ticked, still on the list), **left** (the import's let-go is the latest;
+ticked, so in Done), **not read** (left, ticks voided by "Not finished/Not read":
+hidden), **deleted** (deleted by the user: hidden, its ticks out of the heatmap and
+counts).
+
+| Event ↓ / state → | to do | done on list | left | not read | deleted |
+|---|---|---|---|---|---|
+| Scan sees it | — | — | to do*, keeps a user tick; only if it left ≥ 10 min ago | to do, same wait | stays deleted |
+| Scan says it is gone (whole list / gap rule) | left + tick | left (no 2nd tick) | — | — | — |
+| Bookmark click (X) | to top | to top | to do*, at once | to do, at once | to do, ticks voided |
+| Unbookmark click (X) | left + tick | left | — | — | — |
+| Tick / undo today | done on list | undo today only | — | — | — |
+| Not finished / Not read | — | — | not read | — | — |
+| Delete | deleted | deleted | — | — | — |
+| List turned off | everything refused; nothing changes | | | | |
+
+\* "to do" unless the user had ticked it themselves: then done on list. Auto ticks
+(source = the import's) are voided on the way back; the user's never are. The
+10-minute wait (`Clew.restoreAfter`) is what keeps a stale scan, such as another tab
+still showing the post or rows read just before a click, from undoing a removal; a
+click is never stale.
+
 **Site order (2026-11-10).** Every collection keeps the order its site shows in the
 setting `listOrder.<source>`, and its page lists what is left in that order (items
 not placed yet last, newest first). X's comes from the gap rule and the button.
@@ -359,8 +383,9 @@ Queries: `collections()` (the rows below the tasks, for sources turned on:
 items left keeps its row while it has any tick) and `collection(source)` (the page:
 groups, and ticks per day including items since removed). The Done group is ticked
 items that are live or **left the list** (removed, and the import's let-go is their
-latest); items the user deleted are not in it, though their ticks stay in the
-heatmap. `markNotFinished(itemId:)` voids every live tick of an item that left the
+latest). Items the user deleted are not in it, and their ticks are out of the heatmap
+and counts too (*changed* 2026-11-10, user: a deleted article still coloured the
+heatmap while Done said 0); the facts themselves stay. `markNotFinished(itemId:)` voids every live tick of an item that left the
 list (reason "not finished"), taking it out of Done and the heatmap; it refuses items
 still on the list, ones the user deleted, and tasks. Done-ness uses every live tick, like the row and `CheckIn`, even one dated
 after today (clock or time zone moved back); the heatmap and counts show days up to

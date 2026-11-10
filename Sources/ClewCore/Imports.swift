@@ -126,7 +126,11 @@ extension Clew {
                 if var item = existing[entry.ref] {
                     var changed = false
                     if item.deletedAt != nil {
-                        guard try Self.restore(&item, source: batch.source, at: now, w) else { continue }
+                        // A scan may be stale (sent from another tab, or read just before
+                        // a click), so it cannot undo a removal for a while; a click can.
+                        guard try Self.restore(&item, source: batch.source, at: now,
+                                               leftBefore: now.addingTimeInterval(-Self.restoreAfter), w)
+                        else { continue }
                         changed = true
                         result.restored += 1
                     }
@@ -212,11 +216,14 @@ extension Clew {
         return items.count
     }
 
-    /// Brings back an item that left the list and reappeared: its let-go is voided, and
+    /// Brings back an item that left the list and reappeared (for a scan, only if it left
+    /// before `leftBefore`): its let-go is voided, and
     /// so are the ticks the import gave it, so it is to watch again; a tick the user made
     /// stays. False if the user removed it (it stays gone).
-    static func restore(_ item: inout Item, source: Source, at now: Date, _ w: any StoreWriter) throws -> Bool {
+    static func restore(_ item: inout Item, source: Source, at now: Date, leftBefore: Date? = nil,
+                        _ w: any StoreWriter) throws -> Bool {
         guard let review = try automaticLetGo(of: item, source: source, w) else { return false }
+        if let leftBefore, review.at > leftBefore { return false }
         try w.voidLaterReview(id: review.id, at: now)
         let allTime = LocalDay(year: 1, month: 1, day: 1)!
         for tick in try w.checkIns(itemIds: [item.id], from: allTime) where tick.source == source {
@@ -227,6 +234,12 @@ extension Clew {
     }
 
     static let importSources: Set<Source> = [.extensionYouTube, .extensionX]
+
+    /// How long after leaving the list an item can be brought back by a scan. A scan
+    /// can be stale: another tab still showing the post, or rows read just before an
+    /// unbookmark click (seen 19 → 18 → 19, 2026-11-10). A bookmark click is never
+    /// stale and restores at once.
+    public static let restoreAfter: TimeInterval = 10 * 60
 
     /// Lists imported from a site, each shown as one collection below the tasks, in this
     /// order. Their items never appear on Today, in Later or in Pick.

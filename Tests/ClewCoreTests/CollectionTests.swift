@@ -108,15 +108,28 @@ private func video(_ ref: String, watched: Double? = nil) -> ExternalEntry {
         #expect(page.finishedAllTime == 0)                              // the heatmap shows up to today only
     }
 
-    @Test func anEmptiedListKeepsItsRowWhileItHasHistory() throws {
+    @Test func anEmptiedListKeepsItsRowWhileItHasSomethingDone() throws {
+        try load([video("aaaaaaaaaaa"), video("bbbbbbbbbbb"), video("ccccccccccc")])
+        clock.set(local(3)); try load([video("bbbbbbbbbbb"), video("ccccccccccc")])   // a left: finished
+        try clew.deleteItem(itemId: try id("bbbbbbbbbbb"))
+        try clew.deleteItem(itemId: try id("ccccccccccc"))
+        let row = try #require(try clew.collections().first)
+        #expect(row.toWatch == 0 && row.done == 1 && row.onList == 0)
+        #expect(try clew.collection(.extensionYouTube)?.finishedAllTime == 1)
+    }
+
+    @Test func whatTheUserDeletedLeavesTheHeatmapToo() throws {
+        // User, 2026-11-10: a deleted article still coloured the heatmap while Done said 0.
         try load([video("aaaaaaaaaaa"), video("bbbbbbbbbbb")])
         try clew.checkIn(itemId: try id("aaaaaaaaaaa"))
-        try clew.deleteItem(itemId: try id("bbbbbbbbbbb"))
         try clew.deleteItem(itemId: try id("aaaaaaaaaaa"))
-        let row = try #require(try clew.collections().first)
-        #expect(row.toWatch == 0 && row.done == 0 && row.onList == 0)
         let page = try #require(try clew.collection(.extensionYouTube))
-        #expect(page.done.isEmpty && page.finishedAllTime == 1)    // deleted by the user: not in Done
+        #expect(page.done.isEmpty && page.finishedByDay.isEmpty)
+        #expect(page.finishedThisWeek == 0 && page.finishedLast30 == 0 && page.finishedAllTime == 0)
+        #expect(try clew.collections().first?.done == 0)
+        // With nothing left and nothing done, the row goes.
+        try clew.deleteItem(itemId: try id("bbbbbbbbbbb"))
+        #expect(try clew.collections().isEmpty)
     }
 
     @Test func aTickCanBeUndoneTheSameDay() throws {
@@ -164,7 +177,7 @@ private func video(_ ref: String, watched: Double? = nil) -> ExternalEntry {
         try clew.letGo(itemId: task.id)                              // removed by a let-go, but the user's
         #expect(throws: ClewError.notAllowed) { try clew.markNotFinished(itemId: task.id) }
         // Back on Watch Later, it is to watch again.
-        try load([video("aaaaaaaaaaa"), video("bbbbbbbbbbb")])
+        clock.set(local(3)); try load([video("aaaaaaaaaaa"), video("bbbbbbbbbbb")])
         #expect(try clew.collection(.extensionYouTube)?.notStarted.map(\.item.externalRef).contains("bbbbbbbbbbb") == true)
     }
 
