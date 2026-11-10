@@ -76,6 +76,8 @@ private func local(_ d: Int, _ h: Int) -> Date {
         let once = try clew.addItem(NewItem(title: "o", shape: .today))
         let o = try #require(try clew.details(itemId: once.id))
         #expect(o.isOneOff && o.history.first?.event == .added(.user))
+        try clew.checkIn(itemId: once.id)
+        #expect(try clew.details(itemId: once.id)?.history.last?.event == .done(rating: nil))   // not rated
 
         try clew.importExternal(ImportBatch(source: .extensionYouTube,
                                             entries: [ExternalEntry(externalRef: "aaaaaaaaaaa", title: "v", progress: 0.4)],

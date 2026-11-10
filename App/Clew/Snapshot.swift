@@ -298,6 +298,17 @@ enum Snapshot {
                     render(RootView(model: model, screen: screen), appearance: appearance, to: file)
                 }
             }
+            // The other progress bar style.
+            model.setBarStyle(.underTitle)
+            model.refresh()
+            for (name, screen) in [("list-under", Screen.list), ("pick-under", .pick)] {
+                for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+                    let file = dir.appendingPathComponent("\(name)-\(appearance == .aqua ? "light" : "dark").png")
+                    render(RootView(model: model, screen: screen), appearance: appearance, to: file)
+                }
+            }
+            model.setBarStyle(Clew.defaultBarStyle)
+            model.refresh()
             render(MenuBarLabel(today: model.today).padding(4), appearance: .aqua, to: dir.appendingPathComponent("label.png"))
             for pane in SettingsView.Pane.allCases {
                 render(SettingsView(model: model, pane: pane), appearance: .aqua,

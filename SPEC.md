@@ -131,6 +131,11 @@ stopped daily use, not adding features.
   Later page, when it is opened (not while a video plays: simpler, and it covers
   videos watched on other devices). Shown as a thin bar under the video's title in
   Today and in Pick, and as "40% watched" on its details. It never ticks anything.
+- **Progress bars (2026-11-09):** Settings › General › Progress bars picks one of two
+  styles for counted goals and started videos: *behind the title* (the row's rounded
+  background fills from the left, default) or *under the title* (a long bar under the
+  name, almost to the row's end). The short bar beside the count is gone; `10/30` stays.
+  The same bar will show a focus timer's time later.
 - **One-off details (2026-11-09):** once-tasks, saved links and videos have no
   heatmap. Their details show where the item is (In Later, On Today, Done Nov 9),
   watch progress for videos, a short history (saved, picked, kept, done · felt), and

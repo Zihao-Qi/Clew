@@ -310,6 +310,12 @@ M = [
  ("P12 later pile no watch", C+"LaterReviews.swift", "                                      watched: watched[item.id]?.fraction)", "                                      watched: nil)", "ImportTests|LaterReviewTests"),
  ("P13 kept missing", C+"Details.swift", "                history += try r.laterReviews(itemIds: [itemId]).filter { $0.decision == .keep }\n                    .map { HistoryEntry(at: $0.at, event: .kept) }\n", "", "DetailsTests"),
  ("P14 rating dropped", C+"Details.swift", "event: .done(rating: $0.rating)", "event: .done(rating: nil)", "DetailsTests"),
+ ("P15 progress not observed", S+"SQLiteStore.swift", ",\n                                                     Table(\"watchProgress\"))", ")", "ClewStoreTests"),
+ ("P16 old exports refused", C+"ClewStore.swift", "watchProgress: try c.decodeIfPresent([WatchProgress].self, forKey: .watchProgress) ?? []", "watchProgress: try c.decode([WatchProgress].self, forKey: .watchProgress)", "ExportTests"),
+ ("P17 unrated as rated", C+"Details.swift", "event: .done(rating: $0.rating)", "event: .done(rating: $0.rating ?? 3)", "DetailsTests"),
+ ("B1 wrong default", C+"BarStyle.swift", "public static let defaultBarStyle = ProgressBarStyle.behindTitle", "public static let defaultBarStyle = ProgressBarStyle.underTitle", "BarStyleTests"),
+ ("B2 unknown throws", C+"BarStyle.swift", "return (try? JSONDecoder().decode(ProgressBarStyle.self, from: Data(json.utf8))) ?? Self.defaultBarStyle", "return try JSONDecoder().decode(ProgressBarStyle.self, from: Data(json.utf8))", "BarStyleTests"),
+ ("B3 not saved", C+"BarStyle.swift", "try storeForQueries.write { try $0.saveSetting(Self.barStyleKey, json: json, updatedAt: now) }", "_ = (json, now)", "BarStyleTests"),
  ("W24 stop is a no-op", W+"Listener.swift", "            listener?.cancel()\n", "", "ClewGatewayTests"),
 ]
 

@@ -164,9 +164,32 @@ struct RowView: View {
 
     private var item: Item { row.item }
 
+    /// How far along the row is, drawn in the chosen style: a goal's count this round,
+    /// or how much of a video was watched. Nil: nothing to draw.
+    private var fraction: Double? {
+        if let target = item.progress.target, target > 0 {
+            return Double(min(row.progressAmount, target)) / Double(target)
+        }
+        if let watched = model.watched[row.id], watched > 0 { return watched }
+        return nil
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             mainLine
+                .background {
+                    // Fills the title line only, out to the row's rounded edges, so a
+                    // "goal reached" block below it stays plain.
+                    if model.barStyle == .behindTitle, let fraction {
+                        ProgressFill(fraction: fraction)
+                            .padding(.horizontal, -6)
+                            .padding(.vertical, -5)
+                    }
+                }
+            if model.barStyle == .underTitle, let fraction {
+                ProgressLine(fraction: fraction)
+                    .padding(.leading, 28)
+            }
             if row.isGoalReached, !model.dismissedCelebrations.contains(row.id) {
                 celebration
             }
@@ -174,16 +197,17 @@ struct RowView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
         .background {
-            if isDragged {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color(nsColor: .windowBackgroundColor))
-                    .overlay(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.12)))
-                    .padding(.horizontal, 6)
-            } else {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.primary.opacity(hovering ? 0.06 : 0))
-                    .padding(.horizontal, 6)
+            ZStack {
+                if isDragged {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color(nsColor: .windowBackgroundColor))
+                        .overlay(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.12)))
+                } else {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.primary.opacity(hovering ? 0.06 : 0))
+                }
             }
+            .padding(.horizontal, 6)
         }
         // The whole row, margins included, opens the details; the circle, link mark,
         // − and celebration buttons are buttons and keep their own clicks.
@@ -253,21 +277,18 @@ struct RowView: View {
                 HStack(spacing: 4) {
                     // Hovering the bar and count shows the rating dots in their place;
                     // "−" stays put (SPEC §4: undo is always one click away).
+                    // The bar itself is drawn in the chosen style (behind or under the
+                    // title); this column keeps the count, with room for the dots.
                     ZStack(alignment: .trailing) {
-                        HStack(spacing: 4) {
-                            ProgressView(value: Double(min(row.progressAmount, target)), total: Double(target))
-                                .progressViewStyle(.linear)
-                                .frame(width: 64)
-                                .accessibilityHidden(true)
-                            Text(verbatim: "\(row.progressAmount)/\(target)")
-                                .font(.caption.monospacedDigit())
-                                .foregroundStyle(.secondary)
-                                .frame(minWidth: Self.countWidth, alignment: .trailing)
-                                .accessibilityLabel(Text("\(row.progressAmount) of \(target)"))
-                        }
-                        .opacity(showsDots ? 0 : 1)
+                        Text(verbatim: "\(row.progressAmount)/\(target)")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .frame(minWidth: Self.countWidth, alignment: .trailing)
+                            .accessibilityLabel(Text("\(row.progressAmount) of \(target)"))
+                            .opacity(showsDots ? 0 : 1)
                         if showsDots { dots }
                     }
+                    .frame(minWidth: RatingDots.width, alignment: .trailing)
                     .contentShape(Rectangle())
                     .onHover { hoveringDots = $0 }
                     // Undo is one click away (SPEC §4), and kept apart from the circle so
@@ -295,21 +316,13 @@ struct RowView: View {
     /// Clicking the title (or anywhere in the row's free space) opens the details; the
     /// link mark is the button that opens the link (SPEC §3).
     private var titleView: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            titleLine
-            if let watched = model.watched[row.id], watched > 0 {
-                WatchBar(fraction: watched)
-            }
-        }
-    }
-
-    private var titleLine: some View {
         HStack(spacing: 4) {
             Text(item.title)
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .foregroundStyle(row.isDone ? .secondary : .primary)
                 .accessibilityAddTraits(row.isDone ? .isSelected : [])
+                .accessibilityValue(watchedValue)
                 .accessibilityAction(named: Text("Details"), onOpen)
             if let url = item.url {
                 Button { model.open(url) } label: {
@@ -328,6 +341,12 @@ struct RowView: View {
     static let countWidth: CGFloat = 44
     static let undoWidth: CGFloat = 12
 
+    /// "40 percent watched" for a started video, read with the title.
+    private var watchedValue: Text {
+        guard item.progress.target == nil, let watched = model.watched[row.id], watched > 0 else { return Text(verbatim: "") }
+        return Text("\(Int((watched * 100).rounded())) percent watched")
+    }
+
     private var tapLabel: Text {
         if row.isGoalReached { return Text("\(item.title), goal reached") }
         if item.kind == .goal { return Text("Add one to \(item.title)") }
@@ -335,21 +354,39 @@ struct RowView: View {
     }
 }
 
-/// How much of a video was watched, read from YouTube's Watch Later page: a thin bar
-/// under the title (Today and the Pick list). Only what was done is shown, so a video
-/// never started has no bar at all.
-struct WatchBar: View {
+/// Progress drawn behind a row's title: the row's rounded background fills from the
+/// left (Settings › General › Progress bars). `fraction` is 0–1; a timer can drive it
+/// by changing it over time.
+struct ProgressFill: View {
     let fraction: Double
-    var width: CGFloat = 96
 
     var body: some View {
-        ZStack(alignment: .leading) {
-            Capsule().fill(Color.primary.opacity(0.12))
-            Capsule().fill(Color.accentColor).frame(width: width * min(max(fraction, 0), 1))
+        GeometryReader { geo in
+            Rectangle()
+                .fill(Color.accentColor.opacity(0.18))
+                .frame(width: geo.size.width * min(max(fraction, 0), 1))
         }
-        .frame(width: width, height: 3)
-        .accessibilityElement()
-        .accessibilityLabel(Text("\(Int((fraction * 100).rounded())) percent watched"))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .animation(.easeOut(duration: 0.25), value: fraction)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Progress drawn as a long bar under a row's title, almost to the row's end
+/// (Settings › General › Progress bars), and as the bar on a video's details.
+struct ProgressLine: View {
+    let fraction: Double
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.primary.opacity(0.12))
+                Capsule().fill(Color.accentColor).frame(width: geo.size.width * min(max(fraction, 0), 1))
+            }
+        }
+        .frame(height: 4)
+        .animation(.easeOut(duration: 0.25), value: fraction)
+        .accessibilityHidden(true)
     }
 }
 

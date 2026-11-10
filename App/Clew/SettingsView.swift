@@ -16,6 +16,7 @@ struct SettingsView: View {
     @State private var activeDays: ActiveDays?
     @State private var letGoCount = 0
     @State private var ratingDots = false
+    @State private var barStyle = Clew.defaultBarStyle
     @State private var pane: Pane?
 
     /// A plain column of sections; selected one highlighted, keyboard and VoiceOver
@@ -105,6 +106,21 @@ struct SettingsView: View {
                     }))
                 } footer: {
                     Text("Five dots for how it felt: rough, meh, okay, good, great. They show after a tick and when you hover there, so you can rate or change it later.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section {
+                    Picker("Progress bars", selection: Binding(get: { barStyle }, set: { style in
+                        barStyle = style
+                        model.setBarStyle(style)
+                    })) {
+                        Text("Behind the title").tag(ProgressBarStyle.behindTitle)
+                        Text("Under the title").tag(ProgressBarStyle.underTitle)
+                    }
+                    .pickerStyle(.radioGroup)
+                } footer: {
+                    Text("How counted goals and started videos show their progress: the row fills up behind its name, or a long bar runs under it.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -245,6 +261,7 @@ struct SettingsView: View {
         backupList = model.backupList()
         letGoCount = model.lettingGoCount()
         ratingDots = model.ratingsOn
+        barStyle = model.barStyle
     }
 
     private func setOpenAtLogin(_ on: Bool) {

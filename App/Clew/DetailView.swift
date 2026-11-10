@@ -140,7 +140,7 @@ struct OneOffDetails: View {
             if let watch = details.watch, watch.fraction > 0 {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 8) {
-                        WatchBar(fraction: watch.fraction, width: 180)
+                        ProgressLine(fraction: watch.fraction).frame(width: 180)
                         Text("\(Int((watch.fraction * 100).rounded()))% watched")
                             .font(.callout.monospacedDigit())
                     }

@@ -96,9 +96,12 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
                                     target: 30, source: .user))
         }
         #expect(counter.value == 2)
+        // A scan that only moved a video's progress still refreshes the list.
+        try store.write { try $0.save(WatchProgress(itemId: goal.id, fraction: 0.5, observedAt: t0, source: .extensionYouTube)) }
+        #expect(counter.value == 3)
         token.cancel()
         try store.write { try $0.insert(sampleItem()) }
-        #expect(counter.value == 2)
+        #expect(counter.value == 3)
     }
 
     @Test func fileDatabaseSurvivesReopening() throws {
