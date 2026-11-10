@@ -149,6 +149,9 @@ struct RowView: View {
 
     @State private var hovering = false
     @State private var hoveringDots = false
+    /// Where the title text starts in the row, so the under-title bar lines up with it.
+    @State private var titleInset: CGFloat = 26
+    private static let rowSpace = "row"
 
     /// Rating dots are on and there is a live tick today to rate.
     private var canRate: Bool { model.ratingsOn && row.lastTickToday != nil }
@@ -187,13 +190,17 @@ struct RowView: View {
                     }
                 }
             if model.barStyle == .underTitle, let fraction {
+                // Starts where the title's text starts and sits just under it, so it
+                // reads as this row's bar, not the next one's.
                 ProgressLine(fraction: fraction)
-                    .padding(.leading, 28)
+                    .padding(.leading, titleInset)
+                    .padding(.top, -2)
             }
             if row.isGoalReached, !model.dismissedCelebrations.contains(row.id) {
                 celebration
             }
         }
+        .coordinateSpace(.named(Self.rowSpace))
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
         .background {
@@ -209,6 +216,8 @@ struct RowView: View {
             }
             .padding(.horizontal, 6)
         }
+        // A little clear space between rows, so two filled rows don't run together.
+        .padding(.vertical, 2)
         // The whole row, margins included, opens the details; the circle, link mark,
         // − and celebration buttons are buttons and keep their own clicks.
         .contentShape(Rectangle())
@@ -318,6 +327,7 @@ struct RowView: View {
     private var titleView: some View {
         HStack(spacing: 4) {
             Text(item.title)
+                .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(Self.rowSpace)).minX } action: { titleInset = $0 }
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .foregroundStyle(row.isDone ? .secondary : .primary)

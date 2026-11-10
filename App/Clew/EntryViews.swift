@@ -360,7 +360,7 @@ struct PickView: View {
                                         .font(.caption).foregroundStyle(.secondary)
                                 }
                                 if model.barStyle == .underTitle, let watched = entry.watched, watched > 0 {
-                                    ProgressLine(fraction: watched).padding(.top, 2)
+                                    ProgressLine(fraction: watched).padding(.top, 1)
                                 }
                             }
                         }
