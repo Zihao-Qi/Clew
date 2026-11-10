@@ -318,16 +318,21 @@ Removals come from:
 - **The gap rule**, on `ImportBatch.fromTop`, the leading entries the extension saw as
   one unbroken run from the top. Only when the scan report agrees and nothing was
   skipped (else the run is 0); a negative run is 0. `gapRule(previous:top:)` takes the
-  order Clew last saw (live items only) and the run: for each pair of consecutive
-  *known* posts in the run whose old positions are increasing, every post between
-  them in the old order that is not in the run was removed. Posts out of their old
-  order (bookmarked again, so at the top) are skipped, never read as gaps. The new
+  order Clew last saw (live items only) and the run. A post bookmarked again on the
+  phone (unseen) jumps to the top, so the list is a block of moved posts above the
+  rest in its old order. Only the part of the run *after its last step backwards* in
+  the old order is trusted (Gemini review 2026-11-10: pairs inside the moved block
+  prove nothing). For each pair of consecutive known posts there, every post between
+  them in the old order that is not in the run was removed. Once the run reaches the
+  posts that never moved, every gap is real; a run lying wholly inside a moved block
+  of two or more posts is the remaining blind spot ("Not read" undoes it). The new
   order is the run, then the rest as before. It is kept in the setting
   `listOrder.extension.x` (a JSON array of refs; derived state, rewritten only when it
   changes).
 - **The bookmark button**, `bookmarkChanged(source:entry:bookmarked:)` (Gateway
   `POST /v1/bookmark`): bookmarked adds the post at the top of the order, or restores
-  it if it had left (to read again); unbookmarked makes a live post leave the list
+  it if it had left (to read again), and drops posts no longer live from the order;
+  unbookmarked makes a live post leave the list
   like any removal (`leaveList`: tick unless ticked, the import's let-go). Unknown
   posts are ignored when unbookmarked; a bookmark needs a title.
 Both refuse a list turned off (`listTurnedOff`, 409).

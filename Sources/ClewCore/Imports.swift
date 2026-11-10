@@ -231,15 +231,26 @@ extension Clew {
     /// The gap rule (SPEC 2026-11-10). `previous` is the list as Clew last saw it, top
     /// first; `top` an unbroken run from the top of the list now. An item that was
     /// between two consecutive known items of the run, and is not in the run, was
-    /// removed. Nothing below the run is decided. A bookmark made again moves to the
-    /// top, so known items out of their old order are skipped, not taken as gaps.
+    /// removed. Nothing below the run is decided.
+    ///
+    /// A post bookmarked again (on the phone, unseen) jumps to the top, so the list is a
+    /// block of moved posts above the rest in its old order. Pairs inside the moved block
+    /// prove nothing (Gemini review, 2026-11-10: re-bookmark E then C, and a run [C, E]
+    /// would wrongly take D as gone). Only the part of the run after its last step
+    /// backwards in the old order is trusted: once the run reaches the posts that never
+    /// moved, every gap there is real. A run that lies wholly inside a moved block of
+    /// two or more posts is the remaining blind spot ("Not read" undoes it).
     /// Returns the new order (the run, then the rest as before) and the removed refs.
     public static func gapRule(previous: [String], top: [String]) -> (order: [String], removed: [String]) {
         let position = Dictionary(previous.enumerated().map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
         let inRun = Set(top)
         let known = top.compactMap { position[$0] }
+        let lastStepBack = known.indices.dropLast().last { known[$0] > known[$0 + 1] }
+        let trusted = lastStepBack.map { Array(known[($0 + 1)...]) } ?? known
+        // `trusted` never steps back, so the ranges below do not overlap: each post is
+        // removed at most once.
         var removed: [String] = []
-        for (x, y) in zip(known, known.dropFirst()) where x < y {
+        for (x, y) in zip(trusted, trusted.dropFirst()) where x < y {
             for i in (x + 1)..<y where !inRun.contains(previous[i]) { removed.append(previous[i]) }
         }
         let gone = Set(removed)

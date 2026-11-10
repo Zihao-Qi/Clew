@@ -115,6 +115,24 @@ private let a = "1850000000000000001", b = "1850000000000000002", c = "185000000
 
     // MARK: The bookmark button
 
+    @Test func bookmarkingAPostAlreadyThereMovesItToTheTop() throws {
+        try scan([a, b, c])
+        try clew.bookmarkChanged(source: .extensionX, entry: post(c), bookmarked: true)
+        #expect(store.state.items.count == 3)
+        // c is now on top: a run [c, b] says a was removed; with c still in its old
+        // place, that run would have been a step back and proven nothing.
+        try scan([c, b])
+        #expect(try read() == [a])
+    }
+
+    @Test func aPostDeletedInClewLeavesTheOrderOnTheNextClick() throws {
+        try scan([a, b, c])
+        try clew.deleteItem(itemId: try #require(item(b)).id)
+        try clew.bookmarkChanged(source: .extensionX, entry: post(n, "new"), bookmarked: true)
+        let order = try store.read { try $0.setting("listOrder.extension.x") }
+        #expect(order == #"["\#(n)","\#(a)","\#(c)"]"#)
+    }
+
     @Test func bookmarkingAddsAtTheTopOfTheList() throws {
         try scan([a, b, c])
         let r = try clew.bookmarkChanged(source: .extensionX, entry: post(n, "just saved"), bookmarked: true)
@@ -183,5 +201,11 @@ private let a = "1850000000000000001", b = "1850000000000000002", c = "185000000
         #expect(rule("ABC", "").order == ["A", "B", "C"])
         #expect(rule("ABC", "AAC") == (["A", "C"], ["B"]))         // a repeated row counts once
         #expect(rule("ABCD", "ACBD").removed.isEmpty)               // what is on the page is never removed
+        // Gemini review: E then C bookmarked again on the phone, so the list is C E A B D.
+        // Once the run reaches the posts that never moved, D is safe and real gaps count.
+        #expect(rule("ABCDE", "CEAB").removed.isEmpty)
+        #expect(rule("ABCDE", "CEABD").removed.isEmpty)
+        #expect(rule("ABCDE", "CEAD").removed == ["B"])
+        #expect(rule("AXB", "ABAB").removed == ["X"])               // never twice
     }
 }

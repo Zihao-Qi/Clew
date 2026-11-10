@@ -138,7 +138,9 @@ stopped daily use, not adding features.
   posts still on the page (seen without a break from the top) was removed, so a
   removal on the phone is caught the next time Bookmarks is opened in Chrome and
   scrolled past where it was. Nothing below what was seen is decided. A post its author
-  deleted also disappears, so it counts as read (accepted). Bookmarked again: back to
+  deleted also disappears, so it counts as read (accepted). Posts bookmarked again on
+  the phone jump to the top and are never taken as a gap; in the rare case where only
+  such posts were seen, a post can wrongly count as read ("Not read" undoes it). Bookmarked again: back to
   read. "Not read" (right-click) undoes an automatic "read".
   These automatic removals are not counted as the user's "let go". The same rule will
   apply to X: unbookmarking a post means it was read. Pairing: Settings › Browser
