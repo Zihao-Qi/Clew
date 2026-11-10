@@ -106,7 +106,8 @@ struct CollectionView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                Heatmap(today: page.today, amountByDay: page.finishedByDay)
+                // Deeper for more videos finished in a day, like a goal's +1s.
+                Heatmap(today: page.today, amountByDay: page.finishedByDay, graded: true)
                 HStack(alignment: .top, spacing: 8) {
                     StatTile(value: "\(page.finishedThisWeek)", label: Text("This week"))
                     StatTile(value: "\(page.finishedLast30)", label: Text("Last 30 days"))
