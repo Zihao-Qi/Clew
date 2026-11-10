@@ -209,7 +209,7 @@ stopped daily use, not adding features.
   60 points an hour), it scrolls up and down through Clew's day (4 a.m. to 4 a.m.), and
   it opens scrolled to now, with a quiet line at the current time; the menu grows taller
   by that much, but never past the screen (the list scrolls when it must). **Today
-  only:** no tomorrow, nothing planned ahead. Nothing on it is red or says "missed".
+  only:** no tomorrow, nothing planned ahead. Nothing of Clew's own on it is red or says "missed".
   - **Placing:** drag a task's row from Today's list onto an hour (the timeline scrolls
     when the drag nears its top or bottom edge). It drops as a **30-minute block**,
     snapped to 15 minutes; drag the block to move it and its bottom edge to resize it
@@ -219,8 +219,9 @@ stopped daily use, not adding features.
     not yet ended ("10:00"). **Unplacing:** drag the block back onto the list.
   - **Without dragging** (and for VoiceOver): the row's right-click › **Put on
     timeline…** and the block's right-click › **Move to…** open a small start-time and
-    length picker; the block's right-click also has **Length** (15, 30, 45, 60, 90
-    minutes) and **Remove block**. Each is also an accessibility action.
+    length picker (Put on timeline… moves or adds by the same rule as dragging the
+    row, below); the block's right-click also has **Length** (15, 30, 45, 60, 90
+    minutes; lengths that would pass 4 a.m. are not offered) and **Remove block**. Each is also an accessibility action.
   - **One block is the easy case:** dragging a task's row again **moves** its block
     that has not ended (the earliest, if several); if all its blocks have ended, it
     adds a new one. A second block before then comes only from the block's right-click
@@ -233,26 +234,30 @@ stopped daily use, not adding features.
     ticks, or it skips. The outcome is kept; only changing its end makes it decide
     again. It **skips** when the task needs nothing: a task already done today (not a
     counted goal), a counted goal whose total is reached, or a tick **made by hand since
-    the block was placed** that no earlier block used (each hand tick covers one block,
-    so ticking by hand before the end never counts twice; the circle, `+1`, a
+    the block was placed**, not undone, that no other block used (each hand tick covers
+    one block, so ticking by hand before the end never counts twice; a hand tick a block
+    used stays with that block: it covers it again after a move and is not freed when
+    the block is removed; the circle, `+1`, a
     reminder's Done and a focus timer's Done are all "by hand"). A focus timer's Done
-    adds nothing when a block of the same task ticked while that timer ran (one sitting,
-    one tick). If the Mac sleeps or Clew is not running at the end, the block decides
+    adds nothing when a block of the same task ticked between that timer's start and its
+    Done and that tick still stands (one sitting, one tick). If the Mac sleeps or Clew is not running at the end, the block decides
     when Clew runs again, still for its own day, even after 4 a.m.; a block ending at
-    exactly 4:00 belongs to the day it ends.
+    exactly 4:00 belongs to the day that ends then.
   - **Undo:** right-click a block that ticked › **Not finished**, or untick the row as
     usual; the block stays, quieter, and does not tick again. **Changing a block's end**
     (move, resize) undoes its tick and lets it decide again, also after Not finished.
     **Removing** a block that ticked also undoes its tick (the tick belongs to the
     block); ticks made by hand are never touched. **Rounds:** once a counted goal's next
-    round has started (or its target was raised), a block whose tick came before that
+    round has started, a block whose tick came before that
     keeps the tick: it can still be removed (tick kept) but not moved or un-finished.
-    **Yesterday:** a tick made after 4 a.m. for the day before (the Mac was asleep)
-    shows one line above the list, "Ticked for yesterday: Write intro · Not finished",
-    until dismissed or the next rollover.
+    **Earlier days:** a tick made for an earlier day (the Mac was asleep past 4 a.m.)
+    shows one line per task above the list, "Ticked for yesterday: Write intro · Not
+    finished" (or "for Friday"), until dismissed or the next rollover; Not finished is
+    left out when the rule above keeps the tick.
   - Blocks are **not focus time**: only the focus timer and time added by hand are
     recorded. A focus timer can run on a task with a block.
-  - **Leaving Today:** moving a task to Later or deleting it removes its blocks for
+  - **Leaving Today:** moving a task to Later, deleting it, or editing it so it is not
+    due today removes its blocks for
     good (blocks not ended never tick; ticks already made stay). If it comes back the
     same day, it comes back without blocks. Blocks belong to their day: at 4 a.m. the
     timeline starts empty and an unfinished task rolls forward as usual, without its
@@ -260,7 +265,8 @@ stopped daily use, not adding features.
     decides.
   - **Start alert:** "Write intro · now until 10:30" when a block starts, with **Open
     Clew**. Settings › Notifications › "Alert when a block starts" (default on). None
-    for a block placed after its start or a task already done. Notification permission
+    for a block placed after its start or a task that needs nothing (done today; a
+    goal: total reached). Notification permission
     is asked when the first block is placed (if this is on); if it is denied, Settings
     says so.
   - **Calendar events (step 2)** show on the timeline as **read-only** blocks in their
