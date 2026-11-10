@@ -10,6 +10,15 @@ public struct LaterEntry: Hashable, Sendable, Identifiable {
     /// SPEC §5: waited 6+ weeks untouched, so the picker asks "still want this?".
     public var asksStillWant: Bool { LaterAge.asksStillWant(daysWaiting: daysWaiting) }
     public var id: UUID { item.id }
+
+    /// The site shown under a saved link's title in Pick, e.g. "medium.com". None for
+    /// YouTube: those are videos, which the title already says (user, 2026-11-09).
+    public var siteLabel: String? {
+        guard let host = item.url?.host?.lowercased(), !host.isEmpty else { return nil }
+        let site = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        let youTube = site == "youtube.com" || site.hasSuffix(".youtube.com") || site == "youtu.be"
+        return youTube ? nil : site
+    }
 }
 
 extension Clew {

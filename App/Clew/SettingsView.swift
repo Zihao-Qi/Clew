@@ -117,10 +117,11 @@ struct SettingsView: View {
                     })) {
                         Text("Behind the title").tag(ProgressBarStyle.behindTitle)
                         Text("Under the title").tag(ProgressBarStyle.underTitle)
+                        Text("No bar").tag(ProgressBarStyle.off)
                     }
                     .pickerStyle(.radioGroup)
                 } footer: {
-                    Text("How counted goals and started videos show their progress: the row fills up behind its name, or a long bar runs under it.")
+                    Text("How counted goals and started videos show their progress: the row fills up behind its name, a long bar runs under it, or no bar (goals keep their count).")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

@@ -8,6 +8,8 @@ public enum ProgressBarStyle: String, Codable, Sendable, CaseIterable {
     case behindTitle
     /// A long bar under the title, reaching almost to the end of the row.
     case underTitle
+    /// No bar: goals show their count only, videos nothing.
+    case off
 }
 
 extension Clew {

@@ -11,6 +11,8 @@ import Testing
         #expect(try clew.barStyle() == .behindTitle)
         try clew.setBarStyle(.underTitle)
         #expect(try clew.barStyle() == .underTitle)
+        try clew.setBarStyle(.off)
+        #expect(try clew.barStyle() == .off)
         try clew.setBarStyle(.behindTitle)
         #expect(try clew.barStyle() == .behindTitle)
     }

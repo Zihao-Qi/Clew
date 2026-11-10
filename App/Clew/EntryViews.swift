@@ -353,9 +353,9 @@ struct PickView: View {
                         Toggle(isOn: binding(for: item.id)) {
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(item.title).lineLimit(1)
-                                let host = item.url?.host
-                                if host != nil || entry.asksStillWant {
-                                    Text(verbatim: [host, entry.asksStillWant ? Self.weeks(entry.daysWaiting) : nil]
+                                let site = entry.siteLabel
+                                if site != nil || entry.asksStillWant {
+                                    Text(verbatim: [site, entry.asksStillWant ? Self.weeks(entry.daysWaiting) : nil]
                                         .compactMap { $0 }.joined(separator: " · "))
                                         .font(.caption).foregroundStyle(.secondary)
                                 }
