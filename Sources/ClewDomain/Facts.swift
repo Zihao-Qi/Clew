@@ -157,6 +157,46 @@ public struct FocusSession: Hashable, Sendable, Identifiable, Codable {
     }
 }
 
+/// A task placed on the day timeline (SPEC decision 2026-11-10). A definition, not a
+/// fact: it moves and resizes, and is removed with a tombstone (`removedAt`). Its end
+/// ticks the task once (`decidedAt`); see ARCHITECTURE §6 "Day timeline".
+public struct TimeBlock: Hashable, Sendable, Identifiable, Codable {
+    public let id: UUID
+    public let itemId: UUID
+    /// The Clew day it belongs to.
+    public let localDay: LocalDay
+    public var start: Date
+    public var minutes: Int
+    /// When it was placed: hand ticks from then on can cover it.
+    public let placedAt: Date
+    public var updatedAt: Date
+    /// When its end passed and it ticked or skipped; nil while it waits.
+    public var decidedAt: Date?
+    /// Its own tick (`source = timeline`), if it made one.
+    public var tickId: UUID?
+    /// The hand tick it used instead; stays with the block.
+    public var coverId: UUID?
+    public var removedAt: Date?
+
+    public init(id: UUID, itemId: UUID, localDay: LocalDay, start: Date, minutes: Int, placedAt: Date,
+                updatedAt: Date, decidedAt: Date? = nil, tickId: UUID? = nil, coverId: UUID? = nil,
+                removedAt: Date? = nil) {
+        self.id = id
+        self.itemId = itemId
+        self.localDay = localDay
+        self.start = start
+        self.minutes = minutes
+        self.placedAt = placedAt
+        self.updatedAt = updatedAt
+        self.decidedAt = decidedAt
+        self.tickId = tickId
+        self.coverId = coverId
+        self.removedAt = removedAt
+    }
+
+    public var end: Date { start.addingTimeInterval(TimeInterval(minutes * 60)) }
+}
+
 /// How much of a video was watched, as last seen on its site (ARCHITECTURE §4.2).
 /// Latest state, not a fact: one row per item, and an older observation never
 /// replaces a newer one. It never ticks anything (SPEC decision 2026-11-09).

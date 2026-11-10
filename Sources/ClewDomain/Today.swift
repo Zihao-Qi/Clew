@@ -125,12 +125,19 @@ public struct TodayList: Hashable, Sendable {
 /// Pure: Today's list. Visible rows are `.due` and `.doneToday`; ticked rows stay
 /// until rollover so undo is one click away and nothing vanishes under the pointer.
 /// Order is stable (`sortKey`, then creation), so a row never moves when ticked.
-public func todayList(items: [Item], facts: [UUID: ItemFacts], on day: LocalDay) -> TodayList {
+/// `keepReached`: goals reached by a time block's tick made today for an earlier day
+/// (the Mac slept through it) stay, so their congratulation shows (SPEC 2026-11-10).
+public func todayList(items: [Item], facts: [UUID: ItemFacts], on day: LocalDay,
+                      keepReached: Set<UUID> = []) -> TodayList {
     let rows = items
         .sorted { ($0.sortKey, $0.createdAt, $0.id.uuidString) < ($1.sortKey, $1.createdAt, $1.id.uuidString) }
         .compactMap { item -> TodayRow? in
             let f = facts[item.id] ?? .empty
-            let state = dueState(item: item, on: day, facts: f)
+            var state = dueState(item: item, on: day, facts: f)
+            if state == .notDue, keepReached.contains(item.id), item.state == .active, item.deletedAt == nil,
+               let target = item.progress.target, f.progressAmount >= target {
+                state = .doneToday
+            }
             guard state == .due || state == .doneToday else { return nil }
             return TodayRow(item: item, state: state, todayAmount: f.amount(on: day), progressAmount: f.progressAmount,
                             lastTickToday: f.lastTick(on: day))

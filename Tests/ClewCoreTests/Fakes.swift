@@ -30,6 +30,7 @@ final class FakeStore: ClewStore, @unchecked Sendable {
         var laterReviews: [UUID: LaterReview] = [:]
         var watchProgress: [UUID: WatchProgress] = [:]
         var focusSessions: [UUID: FocusSession] = [:]
+        var timeBlocks: [UUID: TimeBlock] = [:]
     }
 
     enum FactViolation: Error { case revoid, duplicate, missingItem, outOfRange }
@@ -123,7 +124,8 @@ final class FakeStore: ClewStore, @unchecked Sendable {
                 settings: state.settings.values.sorted { $0.key < $1.key },
                 laterReviews: state.laterReviews.values.sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) },
                 watchProgress: state.watchProgress.values.sorted { $0.itemId.uuidString < $1.itemId.uuidString },
-                focusSessions: state.focusSessions.values.sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) }
+                focusSessions: state.focusSessions.values.sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) },
+                timeBlocks: state.timeBlocks.values.sorted { ($0.placedAt, $0.id.uuidString) < ($1.placedAt, $1.id.uuidString) }
             )
         }
         func reminders() throws -> [Reminder] {
@@ -149,6 +151,20 @@ final class FakeStore: ClewStore, @unchecked Sendable {
                 .sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) }
         }
         func focusSession(id: UUID) throws -> FocusSession? { state.focusSessions[id] }
+        func timeBlocks(from: LocalDay) throws -> [TimeBlock] {
+            state.timeBlocks.values.filter { $0.localDay >= from }.sorted { ($0.start, $0.id.uuidString) < ($1.start, $1.id.uuidString) }
+        }
+        func pendingTimeBlocks() throws -> [TimeBlock] {
+            state.timeBlocks.values.filter { $0.decidedAt == nil && $0.removedAt == nil }
+                .sorted { ($0.start, $0.id.uuidString) < ($1.start, $1.id.uuidString) }
+        }
+        func timeBlock(id: UUID) throws -> TimeBlock? { state.timeBlocks[id] }
+        func save(_ block: TimeBlock) throws {
+            guard state.items[block.itemId] != nil else { throw FactViolation.missingItem }
+            // As the table's CHECK: whole quarter hours, 15 minutes to a long (DST) day.
+            guard (15...1500).contains(block.minutes), block.minutes % 15 == 0 else { throw FactViolation.outOfRange }
+            state.timeBlocks[block.id] = block
+        }
         func insert(_ session: FocusSession) throws {
             guard state.focusSessions[session.id] == nil else { throw FactViolation.duplicate }
             // As the table's CHECK (minutes BETWEEN 1 AND 720).

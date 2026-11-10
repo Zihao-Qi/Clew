@@ -161,11 +161,22 @@ extension Clew {
     public func finishFocus() throws -> CheckIn? {
         guard let running = try focusTimer(), running.phase == .focus else { throw ClewError.notAllowed }
         var tick: CheckIn?
-        do {
-            // CheckIn is idempotent for a day's once-task or habit: an existing tick is kept.
-            tick = try checkIn(itemId: running.itemId)
-        } catch ClewError.goalReached {
-            tick = nil
+        // One sitting, one tick: a time block of this task that ticked while the timer ran
+        // already counted it, if that tick still stands (SPEC 2026-11-10).
+        let now = clockForQueries.now()
+        let blockTicked = try storeForQueries.read { r in
+            try r.timeBlocks(from: currentDay().adding(days: -1)).contains { b in
+                guard b.itemId == running.itemId, let id = b.tickId, let t = try r.checkIn(id: id) else { return false }
+                return !t.isVoided && t.at >= running.startedAt && t.at <= now
+            }
+        }
+        if !blockTicked {
+            do {
+                // CheckIn is idempotent for a day's once-task or habit: an existing tick is kept.
+                tick = try checkIn(itemId: running.itemId)
+            } catch ClewError.goalReached {
+                tick = nil
+            }
         }
         try stopFocus()
         return tick

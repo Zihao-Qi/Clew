@@ -17,6 +17,8 @@ public enum PlannedContent: Hashable, Sendable {
     case focusEnded(itemId: UUID, title: String)
     /// The 5-minute break is over.
     case breakEnded(title: String)
+    /// A task's time block on the day timeline starts (SPEC 2026-11-10).
+    case blockStarts(itemId: UUID, title: String, until: Date)
 }
 
 public struct PlannedNotification: Hashable, Sendable {

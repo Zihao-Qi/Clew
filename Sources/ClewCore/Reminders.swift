@@ -24,7 +24,11 @@ extension Clew {
             let live = Set(try r.items(inStates: [.active, .later, .paused]).map(\.id))
             return try r.reminders().contains { $0.enabled && live.contains($0.itemId) }
         }
-        return s.morningEnabled || s.eveningEnabled || anyReminder
+        let now = clockForQueries.now()
+        let anyBlock = try blockAlerts() && storeForQueries.read { r in
+            try r.timeBlocks(from: currentDay()).contains { $0.removedAt == nil && $0.start > now }
+        }
+        return s.morningEnabled || s.eveningEnabled || anyReminder || anyBlock
     }
 
     /// The notifications that should be pending now (ARCHITECTURE §6).
@@ -43,12 +47,14 @@ extension Clew {
             for id in ids {
                 facts[id] = ItemFacts(recent: recent[id] ?? [], progressAmount: progress[id] ?? 0, roundStart: rounds[id])
             }
-            let planned = NotificationPlanner.plan(
+            let planned = (NotificationPlanner.plan(
                 now: now, zone: zone, rolloverHour: rolloverHour, items: items, facts: facts,
                 reminders: try r.reminders(), summaries: summaries
-            )
+            ) + (try blockNotifications(r, now: now, today: today)))
+                .sorted { ($0.fireAt, $0.id) < ($1.fireAt, $1.id) }
+                .prefix(NotificationPlanner.maxPending)
             // The running timer's end comes first: it is minutes away and asked for.
-            guard let focus = try focusNotification(r, now: now) else { return planned }
+            guard let focus = try focusNotification(r, now: now) else { return Array(planned) }
             return [focus] + planned.prefix(NotificationPlanner.maxPending - 1)
         }
     }
