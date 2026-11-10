@@ -308,13 +308,16 @@ stopped daily use, not adding features.
       hand block would skip or be covered, it does so quietly): it shows "Done?", a
       notification "Done with Write intro?" offers **Done** (or **+1**), and right-click
       › Done / +1 works as on any block. Done is a hand tick that answers the block for
-      good (undoing it leaves the block quiet; Not finished is not offered). Unanswered,
+      good (undoing it leaves the block quiet; Not finished is not offered). Any hand
+      tick made after it asks answers it the same way (a goal: the first one no other
+      block used), and its notification is withdrawn. Unanswered,
       the task stays undone that day and nothing is counted; **the question ends at the
       rollover** (the notification is withdrawn, nothing is ticked late). While the
-      timeline is off, slot blocks neither alert nor ask. The start alert and "Done?"
+      timeline is off, slot blocks neither alert nor ask; one that ended meanwhile shows
+      "Done?" when the timeline is back on, without a notification. The start alert and "Done?"
       share one switch: Settings › General › Day timeline › "Block alerts". A focus
       timer's Done adds nothing when the task got a block's tick or an answer to a slot
-      block while the timer ran. Blocks placed by hand keep ticking at their end.
+      block while the timer ran, and that tick still stands. Blocks placed by hand keep ticking at their end.
     - **Direct changes are for today only** (*user*): moving, resizing, removing it or
       dragging it back to the list changes today's block; tomorrow it is at the slot
       again. A block removed today does not come back today.
@@ -331,8 +334,8 @@ stopped daily use, not adding features.
   - **A goal that reaches its total on the timeline goes back to the list** (*user*,
     2026-11-10, for every block): its row there shows the congratulation and Next round /
     Raise target / Done; its block stays on the timeline, done. The row stays in the list
-    for the rest of the day (after Next round or Raise target too, so nothing moves under
-    the pointer), and cannot be placed while the goal is reached.
+    (after Next round or Raise target too, so nothing moves under the pointer) until it
+    is placed again, and cannot be placed while the goal is reached.
   - **Calendar events (step 2)** show on the timeline as **read-only** blocks in their
     calendar's colour: title and time, nothing to click, never ticked, never counted,
     never alerted by Clew (Calendar has its own alerts). All-day events sit as a thin
