@@ -281,8 +281,9 @@ stopped daily use, not adding features.
     block. The rollover is not leaving Today: a block that ended the evening before still
     decides.
   - **Start alert:** "Write intro · Now until 10:30" when a block starts (no buttons,
-    like the focus timer's). Settings › General › Day timeline › "Alert when a block
-    starts" (default on; *changed* while building: Settings has no Notifications pane,
+    like the focus timer's). Settings › General › Day timeline › "Block alerts" (the
+    start alert, and a slot block's "Done?"; renamed from "Alert when a block starts"
+    when slots arrived; default on; *changed* while building: Settings has no Notifications pane,
     and a menu bar list cannot be opened from a notification). None
     for a block placed after its start or a task that needs nothing (done today, not a
     counted goal; a goal: total reached). Notification permission
@@ -293,7 +294,8 @@ stopped daily use, not adding features.
     start on a quarter hour of the wall clock, a length of 15, 30, 45, 60, 90 or 120
     minutes; off by default). Clew then places that block by itself.
     - **When:** a slot block is placed when the task has a slot, is on Today and still
-      needs something (not done today; a goal not reached), the timeline is on, the
+      needs something (a habit not done today; a goal not reached, even after a +1
+      today), the timeline is on, the
       slot's **start is still ahead**, and the task has had **no block today** (live or
       removed). Clew checks at the day's start, whenever it runs, and right after the
       slot is saved, so a slot set at 7:00 for 8:00 appears today. A Mac opened at 8:30
@@ -301,11 +303,18 @@ stopped daily use, not adding features.
       Blocks of earlier days decide first. On a day the task is not due (a weekday not
       chosen, a weekly target met) there is none.
     - **It never ticks by itself** (*user*: a slot that ticked daily would fill the
-      heatmap and active days with no action). At its end the block asks: it shows
-      "Done?", a notification "Done with Write intro?" offers **Done** (or **+1**), and
-      right-click › Done / +1 works as on any block. Unanswered, it stays an asking
-      block and the task stays undone, rolling forward as usual; nothing is counted.
-      Blocks placed by hand keep ticking at their end.
+      heatmap and active days with no action). Otherwise it is a block like any other;
+      where a hand block would tick at its end, a slot block **asks** instead (where a
+      hand block would skip or be covered, it does so quietly): it shows "Done?", a
+      notification "Done with Write intro?" offers **Done** (or **+1**), and right-click
+      › Done / +1 works as on any block. Done is a hand tick that answers the block for
+      good (undoing it leaves the block quiet; Not finished is not offered). Unanswered,
+      the task stays undone that day and nothing is counted; **the question ends at the
+      rollover** (the notification is withdrawn, nothing is ticked late). While the
+      timeline is off, slot blocks neither alert nor ask. The start alert and "Done?"
+      share one switch: Settings › General › Day timeline › "Block alerts". A focus
+      timer's Done adds nothing when the task got a block's tick or an answer to a slot
+      block while the timer ran. Blocks placed by hand keep ticking at their end.
     - **Direct changes are for today only** (*user*): moving, resizing, removing it or
       dragging it back to the list changes today's block; tomorrow it is at the slot
       again. A block removed today does not come back today.
@@ -321,7 +330,9 @@ stopped daily use, not adding features.
       when a slot is saved.
   - **A goal that reaches its total on the timeline goes back to the list** (*user*,
     2026-11-10, for every block): its row there shows the congratulation and Next round /
-    Raise target; its block stays on the timeline, done.
+    Raise target / Done; its block stays on the timeline, done. The row stays in the list
+    for the rest of the day (after Next round or Raise target too, so nothing moves under
+    the pointer), and cannot be placed while the goal is reached.
   - **Calendar events (step 2)** show on the timeline as **read-only** blocks in their
     calendar's colour: title and time, nothing to click, never ticked, never counted,
     never alerted by Clew (Calendar has its own alerts). All-day events sit as a thin
