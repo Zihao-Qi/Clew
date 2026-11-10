@@ -39,6 +39,10 @@ public struct TimelineDay: Hashable, Sendable {
     public let end: Date
     public let blocks: [TimelineBlock]
 
+    /// Tasks with a block today: they live on the timeline, not in the list (SPEC
+    /// 2026-11-10, changed after first use).
+    public var placedItems: Set<UUID> { Set(blocks.map(\.block.itemId)) }
+
     /// The start of the task's next block that has not ended, for its row ("10:00").
     public func nextStart(of itemId: UUID, now: Date) -> Date? {
         blocks.filter { $0.block.itemId == itemId && $0.block.end > now }.map(\.block.start).min()

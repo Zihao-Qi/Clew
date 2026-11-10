@@ -413,13 +413,18 @@ public final class Clew: Sendable {
 
     /// Where a dragged row lands when dropped onto `target` in `order` (today's visible
     /// ids): it takes the target's place, so coming from above it goes after the target
-    /// and from below it goes before. Nil when the drop changes nothing.
-    public static func dropNeighbours(dragged: UUID, onto target: UUID, in order: [UUID]) -> (after: UUID?, before: UUID?)? {
+    /// and from below it goes before. Nil when the drop changes nothing. `all` is the
+    /// whole list when some rows are hidden (tasks on the day timeline): the neighbours
+    /// come from it, so the new place never lands on a hidden row's (Gemini review).
+    public static func dropNeighbours(dragged: UUID, onto target: UUID, in order: [UUID],
+                                      within all: [UUID]? = nil) -> (after: UUID?, before: UUID?)? {
         guard dragged != target, let from = order.firstIndex(of: dragged),
               let to = order.firstIndex(of: target) else { return nil }
+        let others = (all ?? order).filter { $0 != dragged }
+        guard let t = others.firstIndex(of: target) else { return nil }
         return from < to
-            ? (target, to + 1 < order.count ? order[to + 1] : nil)
-            : (to > 0 ? order[to - 1] : nil, target)
+            ? (target, t + 1 < others.count ? others[t + 1] : nil)
+            : (t > 0 ? others[t - 1] : nil, target)
     }
 
     /// Delete: a tombstone (`deletedAt`), never a hard delete. The item disappears

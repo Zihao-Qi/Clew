@@ -450,8 +450,10 @@ are every source but `timeline`.
   first block is placed.
 - **Display** (`timeline()`): the day's start and end, and today's live blocks of
   tasks on the list with title, state, `canChange` (the rounds rule) and a lane, so
-  overlapping blocks sit side by side. The setting `timelineShown` (default on) hides
-  it. The table `timeBlock` (v8) has no-delete; exports carry it (older read as none).
+  overlapping blocks sit side by side. `placedItems` = tasks with a live block today:
+  while the timeline shows, the app leaves them out of the list's rows (they still
+  count in `done/total`, which Core computes from the whole list). The setting
+  `timelineShown` (default on) hides the timeline and puts every task back in the list. The table `timeBlock` (v8) has no-delete; exports carry it (older read as none).
 
 **Site order (2026-11-10).** Every collection keeps the order its site shows in the
 setting `listOrder.<source>`, and its page lists what is left in that order (items

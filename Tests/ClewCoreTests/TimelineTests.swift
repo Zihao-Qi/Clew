@@ -420,6 +420,10 @@ private let tuesday = LocalDay(string: "2026-11-10")!
         #expect(day.blocks.map(\.title) == ["a", "b", "c", "d"])
         #expect(day.blocks.map(\.lane) == [0, 1, 1, 0] && day.blocks.map(\.lanes) == [2, 2, 2, 1])
         #expect(day.blocks.allSatisfy { $0.state == .pending && $0.canChange })
+        #expect(day.placedItems == [a, b, c, d])
+        try clew.removeBlock(id: try #require(day.blocks.first { $0.block.itemId == d }).id)
+        #expect(try clew.timeline().placedItems == [a, b, c])               // d is back in the list
+        #expect(try clew.today().rows.count == 4)                           // all still count
         #expect(day.nextStart(of: c, now: at(10, 9)) == at(10, 10, 30))
         #expect(day.nextStart(of: c, now: at(10, 11)) == nil)
     }
