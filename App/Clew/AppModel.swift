@@ -324,6 +324,19 @@ final class AppModel {
         return try? clew?.focusSummary(itemId: itemId)
     }
 
+    /// Clew's today as a date for the picker: before the 4 a.m. rollover it is still
+    /// yesterday, so the picker never offers a day Clew counts as the future (Gemini
+    /// review 2026-11-10).
+    var focusLatestDay: Date {
+        guard let day = clew?.currentDay() else { return Date() }
+        var c = DateComponents()
+        c.year = day.year
+        c.month = day.month
+        c.day = day.day
+        c.hour = 12
+        return Calendar.current.date(from: c) ?? Date()
+    }
+
     /// Time worked by hand on `date`'s calendar day.
     @discardableResult
     func addFocusTime(_ itemId: UUID, on date: Date, minutes: Int) -> Bool {

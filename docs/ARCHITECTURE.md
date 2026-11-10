@@ -384,9 +384,10 @@ a timer whose task left Today and a break that is over, and refreshes at `endsAt
 
 `stopFocus`, `finishFocus` and `startBreak` save the focus that ended as a
 `FocusSession` (kind `timer`: real minutes rounded, pauses left out, at least 1; `at`
-and `localDay` from its start; never a break) when the setting `focusRecordsTime` is on
-(default). `addFocusTime(itemId:day:minutes:)` adds a `manual` one (1–720 minutes, a day
-up to today, a live task, not a collection item; allowed with recording off).
+and `localDay` from its start; never a break; nothing if the task was deleted, since
+its details are gone) when the setting `focusRecordsTime` is on (default). `addFocusTime(itemId:day:minutes:)` adds a `manual` one (1–720 minutes, a day
+up to today, a live task, not a collection item; allowed with recording off; the app's
+picker stops at Clew's today, which before the 4 a.m. rollover is still yesterday).
 `removeFocusSession(id:)` voids one (twice changes nothing). `focusSummary(itemId:)`:
 minutes this week and in all (days up to today, voided left out) and the latest
 sessions, newest day first. The table has the fact triggers (no delete, substance

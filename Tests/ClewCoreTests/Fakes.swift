@@ -32,7 +32,7 @@ final class FakeStore: ClewStore, @unchecked Sendable {
         var focusSessions: [UUID: FocusSession] = [:]
     }
 
-    enum FactViolation: Error { case revoid, duplicate, missingItem }
+    enum FactViolation: Error { case revoid, duplicate, missingItem, outOfRange }
 
     private let lock = NSRecursiveLock()
     private(set) var state = State()
@@ -151,6 +151,8 @@ final class FakeStore: ClewStore, @unchecked Sendable {
         func focusSession(id: UUID) throws -> FocusSession? { state.focusSessions[id] }
         func insert(_ session: FocusSession) throws {
             guard state.focusSessions[session.id] == nil else { throw FactViolation.duplicate }
+            // As the table's CHECK (minutes BETWEEN 1 AND 720).
+            guard (1...720).contains(session.minutes) else { throw FactViolation.outOfRange }
             guard state.items[session.itemId] != nil else { throw FactViolation.missingItem }
             state.focusSessions[session.id] = session
         }

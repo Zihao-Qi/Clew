@@ -39,6 +39,23 @@ private func local(_ d: Int, _ h: Int, _ m: Int = 0, _ s: Int = 0) -> Date {
         #expect(sessions.map(\.localDay) == [LocalDay(string: "2026-11-10")!])
     }
 
+    @Test func aTimerOnATaskThatIsDeletedSavesNothing() throws {
+        // Its details are gone, so there is nowhere to show the time (Gemini review).
+        let id = try task()
+        try clew.startFocus(itemId: id, minutes: 10)
+        clock.set(local(10, 10, 8)); try clew.deleteItem(itemId: id)
+        try clew.stopFocus()
+        #expect(sessions.isEmpty)
+    }
+
+    @Test func beforeTheRolloverTodaysCalendarDateIsStillTheFuture() throws {
+        // At 2 a.m. on the 11th, Clew's day is the 10th: the 11th cannot get time yet.
+        let id = try task()
+        clock.set(local(11, 2))
+        #expect(throws: ClewError.notAllowed) { try clew.addFocusTime(itemId: id, day: LocalDay(string: "2026-11-11")!, minutes: 10) }
+        try clew.addFocusTime(itemId: id, day: LocalDay(string: "2026-11-10")!, minutes: 10)
+    }
+
     @Test func doneRecordsTheWholeFocus() throws {
         let id = try task()
         try clew.startFocus(itemId: id, minutes: 10)

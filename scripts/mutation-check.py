@@ -441,6 +441,7 @@ M = [
  ("FR17 not exported", S+"SQLiteStore.swift", "focusSessions: try Row.fetchAll(db, sql: \"SELECT * FROM focusSession ORDER BY at, id\").map(Self.focusSession)", "focusSessions: []", "SQLiteStoreTests"),
  ("FR18 not observed", S+"SQLiteStore.swift", "Table(\"watchProgress\"), Table(\"focusSession\"))", "Table(\"watchProgress\"))", "SQLiteStoreTests"),
  ("FR19 old exports refused", C+"ClewStore.swift", "focusSessions: try c.decodeIfPresent([FocusSession].self, forKey: .focusSessions) ?? []", "focusSessions: try c.decode([FocusSession].self, forKey: .focusSessions)", "SQLiteStoreTests"),
+ ("FR20 deleted task recorded", C+"Focus.swift", "let item = try w.item(id: timer.itemId), item.deletedAt == nil else { return }", "let item = try w.item(id: timer.itemId) else { return }", "FocusRecordTests|FocusTests"),
  ("W24 stop is a no-op", W+"Listener.swift", "            listener?.cancel()\n", "", "ClewGatewayTests"),
 ]
 

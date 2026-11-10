@@ -304,7 +304,7 @@ struct FocusSection: View {
                 Spacer()
                 if !adding {
                     Button("Add time…") {
-                        day = Date()
+                        day = model.focusLatestDay
                         minutes = 25
                         adding = true
                     }
@@ -342,7 +342,7 @@ struct FocusSection: View {
 
     private var form: some View {
         VStack(alignment: .leading, spacing: 6) {
-            DatePicker("Day", selection: $day, in: ...Date(), displayedComponents: .date)
+            DatePicker("Day", selection: $day, in: ...model.focusLatestDay, displayedComponents: .date)
                 .datePickerStyle(.field)
             Stepper(value: $minutes, in: 1...Clew.maxFocusMinutes, step: 5) {
                 HStack(spacing: 4) {
