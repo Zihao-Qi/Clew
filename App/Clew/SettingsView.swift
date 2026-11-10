@@ -153,7 +153,7 @@ struct SettingsView: View {
                         timelineShown = on
                         model.setTimelineShown(on)
                     }))
-                    Toggle("Alert when a block starts", isOn: Binding(get: { blockAlerts }, set: { on in
+                    Toggle("Block alerts", isOn: Binding(get: { blockAlerts }, set: { on in
                         blockAlerts = on
                         model.setBlockAlerts(on)
                     }))
@@ -163,7 +163,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Day timeline")
                 } footer: {
-                    Text("Today's hours above the list. Drag a task onto an hour; when its block ends, the task is ticked. Right-click a block to undo, move or remove it.")
+                    Text("Today's hours above the list. Drag a task onto an hour; when its block ends, the task is ticked. A habit or goal can have its own time in Edit: it appears there each day and asks \"Done?\" at its end. Block alerts: when a block starts, and that question.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

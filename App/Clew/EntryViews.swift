@@ -119,6 +119,7 @@ struct AddView: View {
     @State private var kind: AddKind = .today
     @State private var schedule = ScheduleDraft()
     @State private var target = 30
+    @State private var slot = SlotDraft()
     /// The title fetched for the pasted link, if any; it is put into the field so it
     /// can be edited, and recorded as `.fetched` only if left as fetched.
     @State private var fetchedTitle: String?
@@ -158,6 +159,9 @@ struct AddView: View {
             }
             if kind == .goal {
                 TargetField(target: $target)
+            }
+            if kind == .habit || kind == .goal {
+                SlotRow(draft: $slot)
             }
 
             NoticeView(text: model.notice)
@@ -208,7 +212,8 @@ struct AddView: View {
         case .goal: .goal(target: target, schedule: schedule.schedule)
         }
         let origin: TitleOrigin = parsed.title == fetchedTitle ? .fetched : .typed
-        if model.add(NewItem(title: parsed.title, titleOrigin: origin, url: parsed.url, shape: shape)) {
+        let timeSlot = kind == .habit || kind == .goal ? slot.slot : nil
+        if model.add(NewItem(title: parsed.title, titleOrigin: origin, url: parsed.url, shape: shape, slot: timeSlot)) {
             done()
             if kind == .later { model.confirmSavedToLater() }
         }
@@ -226,6 +231,7 @@ struct EditView: View {
     @State private var target: Int
     @State private var remind: Bool
     @State private var remindAt: TimeOfDay
+    @State private var slot: SlotDraft
     private let existingReminder: Reminder?
 
     init(model: AppModel, item: Item, done: @escaping () -> Void) {
@@ -236,6 +242,7 @@ struct EditView: View {
         _link = State(initialValue: item.url?.absoluteString ?? "")
         _schedule = State(initialValue: ScheduleDraft(item.schedule))
         _target = State(initialValue: item.progress.target ?? 30)
+        _slot = State(initialValue: SlotDraft(item.slot))
         let reminder = model.reminder(for: item.id)
         existingReminder = reminder
         _remind = State(initialValue: reminder != nil)
@@ -257,6 +264,9 @@ struct EditView: View {
             }
             if item.kind == .goal {
                 TargetField(target: $target)
+            }
+            if hasSchedule {
+                SlotRow(draft: $slot)
             }
             ReminderRow(enabled: $remind, time: $remindAt)
             if model.notificationsDenied, remind {
@@ -290,7 +300,8 @@ struct EditView: View {
         let edit = ItemEdit(
             title: title, url: url,
             schedule: hasSchedule ? schedule.schedule : nil,
-            target: item.kind == .goal ? target : nil
+            target: item.kind == .goal ? target : nil,
+            slot: hasSchedule ? .set(slot.slot) : .keep
         )
         guard model.edit(item.id, edit) else { return }
         let wanted: TimeOfDay? = remind ? remindAt : nil
@@ -435,6 +446,66 @@ extension TimeOfDay {
     init(pickerDate date: Date) {
         let c = Calendar.current.dateComponents([.hour, .minute], from: date)
         self = TimeOfDay(hour: c.hour ?? 9, minute: c.minute ?? 0) ?? TimeOfDay(hour: 9, minute: 0)!
+    }
+}
+
+/// A repeating task's time slot as edited: on or off, a start and a length.
+struct SlotDraft: Equatable {
+    var enabled = false
+    var hour = 8
+    var quarter = 0
+    var minutes = 60
+
+    init() {}
+
+    init(_ slot: TimeSlot?) {
+        guard let slot else { return }
+        enabled = true
+        hour = slot.hour
+        quarter = slot.minute / 15
+        minutes = slot.minutes
+    }
+
+    var slot: TimeSlot? { enabled ? TimeSlot(hour: hour, minute: quarter * 15, minutes: minutes) : nil }
+}
+
+/// "On the timeline [8 AM] [:00] [60 min]": the block Clew places by itself each day the
+/// task is due (SPEC 2026-11-10). Moving it on the timeline changes only that day.
+struct SlotRow: View {
+    @Binding var draft: SlotDraft
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle("On the timeline", isOn: $draft.enabled)
+                .accessibilityLabel(Text("Put it on the timeline each day it is due"))
+            if draft.enabled {
+                HStack(spacing: 6) {
+                    Picker(selection: $draft.hour) {
+                        ForEach(0..<24, id: \.self) { h in Text(verbatim: Self.hourText(h)).tag(h) }
+                    } label: { EmptyView() }
+                    .labelsHidden()
+                    .fixedSize()
+                    .accessibilityLabel(Text("Slot hour"))
+                    Picker(selection: $draft.quarter) {
+                        ForEach(0..<4, id: \.self) { q in Text(verbatim: String(format: ":%02d", q * 15)).tag(q) }
+                    } label: { EmptyView() }
+                    .labelsHidden()
+                    .fixedSize()
+                    .accessibilityLabel(Text("Slot minutes"))
+                    Picker(selection: $draft.minutes) {
+                        ForEach(TimeSlot.lengths, id: \.self) { m in Text("\(m) min").tag(m) }
+                    } label: { EmptyView() }
+                    .labelsHidden()
+                    .fixedSize()
+                    .accessibilityLabel(Text("Slot length"))
+                    Spacer()
+                }
+            }
+        }
+    }
+
+    static func hourText(_ hour: Int) -> String {
+        (Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: Date()) ?? Date()).formatted(.dateTime.hour())
     }
 }
 

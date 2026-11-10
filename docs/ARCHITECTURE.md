@@ -455,6 +455,34 @@ are every source but `timeline`.
   count in `done/total`, which Core computes from the whole list). The setting
   `timelineShown` (default on) hides the timeline and puts every task back in the list. The table `timeBlock` (v8) has no-delete; exports carry it (older read as none).
 
+**Time slots (v1.2, SPEC 2026-11-10).** `Item.slot: TimeSlot? {hour, minute, minutes}`
+(a definition field, JSON column `slot`, migration v9; habits and goals only; `ItemEdit.slot`
+is `.keep` or `.set(slot?)` so older edit paths never clear it). `TimeBlock` gains
+`origin: hand | slot`, `touchedAt` (moved, resized or removed by hand: today's own),
+`askedAt` (a slot block asking "Done?") and `releasedAt` (a goal that reached its total
+went back to the list); exports from before read `origin` as `hand`.
+- **settleBlocks, in order:** earlier days' blocks decide (a slot block's question ends:
+  `decidedAt`, no tick); today's blocks whose task left the list are removed, and those
+  of a goal now reached are released; today's blocks whose end passed decide; then, while
+  the timeline shows, slot blocks are placed (`placeSlotBlocks`): a task with a slot, on
+  the list, needing something, with no block today (removed ones count), whose slot
+  starts after now.
+- **A slot block never ticks.** `decide` computes one outcome (skip / cover / tick); a
+  slot block turns *tick* into asking (`askedAt`, only while the timeline shows) and is
+  answered when a later evaluation gives skip or cover (any hand tick). Asking blocks
+  stay pending (`decidedAt` nil), and asking again writes nothing.
+- **Edit** (`slotChanged`, inside the edit's write) moves today's slot block only if
+  untouched and not started, else removes it when the new slot has started or the slot
+  is off. Hand changes set `touchedAt` and clear `askedAt` and `releasedAt`.
+- **Wall clock:** `slotPlacement` takes `LocalDay.instant(at:)`; a time a DST change
+  skipped moves to the end of the gap; cut at the day's end.
+- **Notifications:** `clew.ask.<blockId>` at a waiting slot block's end ("Done with …?",
+  Done or +1), under `blockAlerts` and only while the timeline shows. Its action answers by
+  block (`answerSlotBlock`), never for an earlier day; the app removes delivered
+  questions for blocks no longer asking (`askingBlockIds`).
+- `placedItems` leaves out released blocks; placing a reached goal is refused; a hand
+  move un-releases.
+
 **Site order (2026-11-10).** Every collection keeps the order its site shows in the
 setting `listOrder.<source>`, and its page lists what is left in that order (items
 not placed yet last, newest first). X's comes from the gap rule and the button.

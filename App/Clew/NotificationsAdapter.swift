@@ -9,7 +9,9 @@ import UserNotifications
 /// pending, and changes only the difference. It schedules nothing on its own.
 @MainActor
 final class NotificationsAdapter: NSObject, UNUserNotificationCenterDelegate {
-    enum Action: Sendable { case done(UUID), later(UUID), open(UUID) }
+    /// `answer`: Done (or +1) on a slot block's "Done?", by block, so it never ticks a
+    /// later day (SPEC 2026-11-10).
+    enum Action: Sendable { case done(UUID), later(UUID), open(UUID), answer(UUID) }
 
     private let center = UNUserNotificationCenter.current()
     private let onAction: @MainActor (Action) -> Void
@@ -118,6 +120,12 @@ final class NotificationsAdapter: NSObject, UNUserNotificationCenterDelegate {
             content.title = String(localized: "Break's over")
             content.body = String(localized: "Back to \(title) when you're ready.")
             content.sound = .default
+        case .slotAsks(let blockId, let itemId, let title, let isGoal):
+            content.title = String(localized: "Done with \(title)?")
+            content.sound = .default
+            content.userInfo["itemId"] = itemId.uuidString
+            content.userInfo["blockId"] = blockId.uuidString
+            category = isGoal ? Self.askGoalCategory : Self.askCategory
         case .blockStarts(let itemId, let title, let until):
             // "Write intro · now until 10:30" (SPEC 2026-11-10); clicking it opens Clew.
             content.title = title
@@ -155,6 +163,18 @@ final class NotificationsAdapter: NSObject, UNUserNotificationCenterDelegate {
     private static let openAction = UNNotificationAction(identifier: "open", title: String(localized: "Open"),
                                                          options: [.foreground])
 
+    private static let askCategory = "clew.ask"
+    private static let askGoalCategory = "clew.ask.goal"
+    private static let plusOneAction = UNNotificationAction(identifier: "done", title: String(localized: "+1"))
+
+    /// A slot block's question goes once it is answered or its day is over: delivered
+    /// "Done?" notifications for blocks no longer asking are removed.
+    func withdrawQuestions(keeping asking: Set<UUID>) async {
+        let delivered = await center.deliveredNotifications()
+        let stale = NotificationPlanner.staleQuestions(delivered: delivered.map(\.request.identifier), asking: asking)
+        if !stale.isEmpty { center.removeDeliveredNotifications(withIdentifiers: stale) }
+    }
+
     private static func category(open: Bool, later: Bool) -> String {
         "clew.reminder\(open ? ".open" : "")\(later ? ".later" : "")"
     }
@@ -171,12 +191,19 @@ final class NotificationsAdapter: NSObject, UNUserNotificationCenterDelegate {
                                                      actions: actions, intentIdentifiers: []))
             }
         }
+        result.insert(UNNotificationCategory(identifier: askCategory, actions: [doneAction], intentIdentifiers: []))
+        result.insert(UNNotificationCategory(identifier: askGoalCategory, actions: [plusOneAction], intentIdentifiers: []))
         return result
     }
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
                                             didReceive response: UNNotificationResponse) async {
         let actionId = response.actionIdentifier
+        if actionId == "done", let raw = response.notification.request.content.userInfo["blockId"] as? String,
+           let blockId = UUID(uuidString: raw) {
+            await MainActor.run { onAction(.answer(blockId)) }
+            return
+        }
         guard let raw = response.notification.request.content.userInfo["itemId"] as? String,
               let itemId = UUID(uuidString: raw) else { return }
         let action: Action? = switch actionId {

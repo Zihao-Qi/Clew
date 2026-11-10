@@ -262,6 +262,32 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         #expect(try JSONDecoder().decode(ExportRecords.self, from: Data(old.utf8)).timeBlocks.isEmpty)
     }
 
+    @Test func slotsAndBlockOriginsRoundTrip() throws {
+        // SPEC 2026-11-10, a repeating task's time slot (migration v9).
+        let store = try SQLiteStore.inMemory()
+        var item = sampleItem(.habit)
+        item.slot = TimeSlot(hour: 8, minute: 15, minutes: 120)
+        try store.write { try $0.insert(item) }
+        #expect(try store.read { try $0.item(id: item.id) }?.slot == item.slot)
+        item.slot = nil
+        try store.write { try $0.update(item) }
+        #expect(try store.read { try $0.item(id: item.id) }?.slot == nil)
+        var b = TimeBlock(id: UUID(), itemId: item.id, localDay: day("2026-11-10"), start: t0, minutes: 60,
+                          placedAt: t0, updatedAt: t0, origin: .slot)
+        try store.write { try $0.save(b) }
+        b.touchedAt = t0 + 60
+        b.askedAt = t0 + 3600
+        b.releasedAt = t0 + 3700
+        try store.write { try $0.save(b) }
+        #expect(try store.read { try $0.timeBlock(id: b.id) } == b)
+        #expect(throws: DatabaseError.self) {
+            try store.writer.write { try $0.execute(sql: "UPDATE timeBlock SET origin = 'agent'") }
+        }
+        // A block exported before slots reads as placed by hand.
+        let old = #"{"id":"\#(UUID().uuidString)","itemId":"\#(item.id.uuidString)","localDay":"2026-11-10","start":0,"minutes":30,"placedAt":0,"updatedAt":0}"#
+        #expect(try JSONDecoder().decode(TimeBlock.self, from: Data(old.utf8)).origin == .hand)
+    }
+
     @Test func voidsAreMonotonic() throws {
         let (store, c, p) = try seeded()
         try store.write { try $0.voidCheckIn(id: c.id, at: t0, reason: "undo") }

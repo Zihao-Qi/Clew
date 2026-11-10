@@ -177,10 +177,23 @@ public struct TimeBlock: Hashable, Sendable, Identifiable, Codable {
     /// The hand tick it used instead; stays with the block.
     public var coverId: UUID?
     public var removedAt: Date?
+    /// Placed by the task's slot, or by hand. A slot block never ticks by itself.
+    public var origin: Origin
+    /// When the user moved, resized or removed it by hand (a slot block is then today's
+    /// own; Edit no longer moves it).
+    public var touchedAt: Date?
+    /// A slot block whose end passed asks "Done?" from then until answered or the day ends.
+    public var askedAt: Date?
+    /// A goal that reached its total while placed goes back to the list: its blocks are
+    /// released and no longer hold it on the timeline.
+    public var releasedAt: Date?
+
+    public enum Origin: String, Codable, Sendable { case hand, slot }
 
     public init(id: UUID, itemId: UUID, localDay: LocalDay, start: Date, minutes: Int, placedAt: Date,
                 updatedAt: Date, decidedAt: Date? = nil, tickId: UUID? = nil, coverId: UUID? = nil,
-                removedAt: Date? = nil) {
+                removedAt: Date? = nil, origin: Origin = .hand, touchedAt: Date? = nil, askedAt: Date? = nil,
+                releasedAt: Date? = nil) {
         self.id = id
         self.itemId = itemId
         self.localDay = localDay
@@ -192,6 +205,33 @@ public struct TimeBlock: Hashable, Sendable, Identifiable, Codable {
         self.tickId = tickId
         self.coverId = coverId
         self.removedAt = removedAt
+        self.origin = origin
+        self.touchedAt = touchedAt
+        self.askedAt = askedAt
+        self.releasedAt = releasedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, itemId, localDay, start, minutes, placedAt, updatedAt, decidedAt, tickId, coverId, removedAt,
+             origin, touchedAt, askedAt, releasedAt
+    }
+
+    /// Exports from before slots have no origin: those blocks were placed by hand.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try c.decode(UUID.self, forKey: .id), itemId: try c.decode(UUID.self, forKey: .itemId),
+            localDay: try c.decode(LocalDay.self, forKey: .localDay), start: try c.decode(Date.self, forKey: .start),
+            minutes: try c.decode(Int.self, forKey: .minutes), placedAt: try c.decode(Date.self, forKey: .placedAt),
+            updatedAt: try c.decode(Date.self, forKey: .updatedAt),
+            decidedAt: try c.decodeIfPresent(Date.self, forKey: .decidedAt),
+            tickId: try c.decodeIfPresent(UUID.self, forKey: .tickId),
+            coverId: try c.decodeIfPresent(UUID.self, forKey: .coverId),
+            removedAt: try c.decodeIfPresent(Date.self, forKey: .removedAt),
+            origin: try c.decodeIfPresent(Origin.self, forKey: .origin) ?? .hand,
+            touchedAt: try c.decodeIfPresent(Date.self, forKey: .touchedAt),
+            askedAt: try c.decodeIfPresent(Date.self, forKey: .askedAt),
+            releasedAt: try c.decodeIfPresent(Date.self, forKey: .releasedAt))
     }
 
     public var end: Date { start.addingTimeInterval(TimeInterval(minutes * 60)) }

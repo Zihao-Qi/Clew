@@ -14,6 +14,8 @@ public enum BlockState: String, Sendable, Hashable {
     case covered
     /// The task needed nothing when it ended.
     case skipped
+    /// A slot block that ended and asks "Done?" (it never ticks by itself).
+    case asking
 }
 
 /// A block as the timeline shows it.
@@ -41,7 +43,8 @@ public struct TimelineDay: Hashable, Sendable {
 
     /// Tasks with a block today: they live on the timeline, not in the list (SPEC
     /// 2026-11-10, changed after first use).
-    public var placedItems: Set<UUID> { Set(blocks.map(\.block.itemId)) }
+    /// A goal that reached its total goes back to the list (its blocks are released).
+    public var placedItems: Set<UUID> { Set(blocks.filter { $0.block.releasedAt == nil }.map(\.block.itemId)) }
 
     /// The start of the task's next block that has not ended, for its row ("10:00").
     public func nextStart(of itemId: UUID, now: Date) -> Date? {
@@ -69,7 +72,7 @@ extension Clew {
     /// A dropped task's length (SPEC 2026-11-10).
     public static let blockDefaultMinutes = 30
     /// Lengths offered without dragging.
-    public static let blockLengths = [15, 30, 45, 60, 90]
+    public static let blockLengths = TimeSlot.lengths
     /// How far back a block may tick late (the Mac asleep for weeks is still covered).
     static let lateTickWindowDays = 60
 
@@ -101,7 +104,7 @@ extension Clew {
             for (b, lane) in zip(live, lanes) {
                 let tick = try b.tickId.flatMap { try r.checkIn(id: $0) }
                 let cover = try b.coverId.flatMap { try r.checkIn(id: $0) }
-                let state: BlockState = b.decidedAt == nil ? .pending
+                let state: BlockState = b.decidedAt == nil ? (b.askedAt == nil ? .pending : .asking)
                     : tick.map { $0.isVoided ? .undone : .ticked }
                     ?? (cover.map { !$0.isVoided } == true ? .covered : .skipped)
                 blocks.append(TimelineBlock(
@@ -146,9 +149,11 @@ extension Clew {
 
     // MARK: - Settling (a block's end ticks the task)
 
-    /// Removes today's blocks whose task left Today, then lets every block whose end has
-    /// passed decide, once. Writes only when something changes, so the app can call it
-    /// on every refresh. Returns whether anything changed.
+    /// In this order: blocks of earlier days decide (a slot block's question ends);
+    /// today's blocks whose task left Today are removed; goals reached on the timeline go
+    /// back to the list; every block whose end has passed decides once (a slot block
+    /// asks instead of ticking); slot blocks are placed. Writes only when something
+    /// changes, so the app can call it on every refresh. Returns whether anything changed.
     @discardableResult
     public func settleBlocks() throws -> Bool {
         let now = clockForQueries.now()
@@ -156,63 +161,179 @@ extension Clew {
         let today = LocalDay(of: now, in: zone, rolloverHour: rolloverHour)
         return try storeForQueries.write { w in
             var changed = false
-            let onList = Set(try todayList(w, on: today).rows.map(\.id))
-            for var b in try w.timeBlocks(from: today)
-            where b.localDay == today && b.removedAt == nil && !onList.contains(b.itemId) {
-                b.removedAt = now
+            let shown = try w.setting(Self.timelineShownKey) != "false"
+            for b in try w.pendingTimeBlocks().filter({ $0.end <= now })
+                .sorted(by: { ($0.localDay, $0.start, $0.id.uuidString) < ($1.localDay, $1.start, $1.id.uuidString) })
+            where b.localDay < today {
+                changed = try decide(b, now: now, zone: zone, today: today, asks: shown, w) || changed
+            }
+            let rows = Dictionary(uniqueKeysWithValues: try todayList(w, on: today).rows.map { ($0.id, $0) })
+            for var b in try w.timeBlocks(from: today) where b.localDay == today && b.removedAt == nil {
+                if rows[b.itemId] == nil {
+                    b.removedAt = now
+                } else if b.releasedAt == nil, rows[b.itemId]?.isGoalReached == true {
+                    b.releasedAt = now          // a reached goal goes back to the list
+                } else {
+                    continue
+                }
                 b.updatedAt = now
                 try w.save(b)
                 changed = true
             }
-            for b in try w.pendingTimeBlocks() where b.end <= now {
-                try decide(b, now: now, zone: zone, w)
-                changed = true
+            for b in try w.pendingTimeBlocks() where b.localDay == today && b.end <= now {
+                changed = try decide(b, now: now, zone: zone, today: today, asks: shown, w) || changed
             }
+            if shown { changed = try placeSlotBlocks(rows: try todayList(w, on: today).rows, today: today, now: now, w) || changed }
             return changed
         }
     }
 
-    /// One block's end: tick, or skip when the task needs nothing (SPEC 2026-11-10).
-    private func decide(_ block: TimeBlock, now: Date, zone: TimeZone, _ w: any StoreWriter) throws {
+    /// What a block's end does when it decides now.
+    private enum Outcome { case skip, cover(UUID), tick }
+
+    private func outcome(_ b: TimeBlock, item: Item, _ r: any StoreReader) throws -> Outcome {
+        let progress = try r.progressAmounts(itemIds: [b.itemId])[b.itemId] ?? 0
+        let onDay = try r.checkIns(itemIds: [b.itemId], from: b.localDay).filter { $0.localDay == b.localDay }
+        if let target = item.progress.target {
+            if progress >= target { return .skip }
+            // Each hand tick covers one block: the earliest one made since this block was
+            // placed that no other block (removed ones too) used. The one this block used
+            // before a move is still its own, so it covers it again.
+            let others = try r.timeBlocks(from: b.localDay).filter { $0.itemId == b.itemId && $0.id != b.id }
+            let used = Set(others.compactMap(\.coverId))
+            if let hand = onDay.filter({ $0.source != .timeline && $0.at >= b.placedAt && !used.contains($0.id) })
+                .min(by: { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) }) {
+                return .cover(hand.id)
+            }
+            return .tick
+        }
+        // A once-task or link done on any day, or a habit ticked on the block's day.
+        let done = item.kind == .once || item.kind == .link ? progress > 0 : !onDay.isEmpty
+        return done ? .skip : .tick
+    }
+
+    /// One block's end (SPEC 2026-11-10). A hand block ticks, or skips when the task
+    /// needs nothing, or is covered by a hand tick. A slot block never ticks: where a
+    /// hand block would tick it asks "Done?" (only while the timeline shows), and any
+    /// later hand tick answers it; its question ends at the rollover. Returns whether
+    /// anything was written.
+    private func decide(_ block: TimeBlock, now: Date, zone: TimeZone, today: LocalDay, asks: Bool,
+                        _ w: any StoreWriter) throws -> Bool {
         var b = block
         b.updatedAt = now
         guard let item = try w.item(id: b.itemId), item.deletedAt == nil, item.state == .active else {
             b.removedAt = now
             try w.save(b)
-            return
+            return true
+        }
+        let result = try outcome(b, item: item, w)
+        if b.origin == .slot {
+            switch result {
+            case .skip:
+                b.decidedAt = now
+            case .cover(let id):
+                b.coverId = id
+                b.decidedAt = now
+            case .tick where b.localDay < today:
+                b.decidedAt = now               // the question ends at the rollover
+            case .tick:
+                guard asks, b.askedAt == nil else { return false }
+                b.askedAt = now
+            }
+            try w.save(b)
+            return true
         }
         b.decidedAt = now
-        let progress = try w.progressAmounts(itemIds: [b.itemId])[b.itemId] ?? 0
-        let onDay = try w.checkIns(itemIds: [b.itemId], from: b.localDay).filter { $0.localDay == b.localDay }
-        if let target = item.progress.target {
-            if progress >= target {
-                try w.save(b)
-                return
-            }
-            // Each hand tick covers one block: the earliest one made since this block was
-            // placed that no other block (removed ones too) used. The one this block used
-            // before a move is still its own, so it covers it again.
-            let others = try w.timeBlocks(from: b.localDay).filter { $0.itemId == b.itemId && $0.id != b.id }
-            let used = Set(others.compactMap(\.coverId))
-            if let hand = onDay.filter({ $0.source != .timeline && $0.at >= b.placedAt && !used.contains($0.id) })
-                .min(by: { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) }) {
-                b.coverId = hand.id
-                try w.save(b)
-                return
-            }
-        } else {
-            // A once-task or link done on any day, or a habit ticked on the block's day.
-            let done = item.kind == .once || item.kind == .link ? progress > 0 : !onDay.isEmpty
-            if done {
-                try w.save(b)
-                return
-            }
+        switch result {
+        case .skip: break
+        case .cover(let id): b.coverId = id
+        case .tick:
+            let tick = CheckIn(id: newID(), itemId: b.itemId, localDay: b.localDay, at: now,
+                               timeZoneId: zone.identifier, amount: 1, source: .timeline)
+            try w.insert(tick)
+            b.tickId = tick.id
         }
-        let tick = CheckIn(id: newID(), itemId: b.itemId, localDay: b.localDay, at: now,
-                           timeZoneId: zone.identifier, amount: 1, source: .timeline)
-        try w.insert(tick)
-        b.tickId = tick.id
         try w.save(b)
+        return true
+    }
+
+    // MARK: - Time slots (SPEC 2026-11-10)
+
+    /// Where `slot` falls on `day`: its wall-clock start (a time a DST change skipped
+    /// moves to the first time after the gap), cut at the day's end. Nil when nothing of
+    /// it fits.
+    public func slotPlacement(_ slot: TimeSlot, on day: LocalDay) -> (start: Date, minutes: Int)? {
+        let zone = zonesForQueries.current()
+        var start = day.instant(at: slot.time, in: zone, rolloverHour: rolloverHour)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        let wall = calendar.dateComponents([.hour, .minute], from: start)
+        if wall.hour != slot.hour || wall.minute != slot.minute,
+           let gapEnd = zone.nextDaylightSavingTimeTransition(after: start.addingTimeInterval(-4 * 3600)),
+           gapEnd <= start {
+            start = gapEnd
+        }
+        let bounds = dayBounds(day)
+        let room = Int(bounds.end.timeIntervalSince(start) / 60)
+        let minutes = min(slot.minutes, room / Self.blockStepMinutes * Self.blockStepMinutes)
+        guard (try? Self.checkStart(start, bounds)) != nil, minutes >= Self.blockStepMinutes else { return nil }
+        return (start, minutes)
+    }
+
+    /// Places today's slot blocks: a task with a slot, on Today and still needing
+    /// something, whose slot has not started, and that has had no block today.
+    private func placeSlotBlocks(rows: [TodayRow], today: LocalDay, now: Date, _ w: any StoreWriter) throws -> Bool {
+        let had = Set(try w.timeBlocks(from: today).filter { $0.localDay == today }.map(\.itemId))
+        var changed = false
+        for row in rows where row.item.slot != nil && !had.contains(row.id) {
+            let needs = row.item.progress.target != nil ? !row.isGoalReached : !row.isDone
+            guard needs, let slot = row.item.slot, let place = slotPlacement(slot, on: today), place.start > now
+            else { continue }
+            try w.save(TimeBlock(id: newID(), itemId: row.id, localDay: today, start: place.start,
+                                 minutes: place.minutes, placedAt: now, updatedAt: now, origin: .slot))
+            changed = true
+        }
+        return changed
+    }
+
+    /// Edit changed a task's slot: today's slot block follows only if it is untouched
+    /// and has not started (moved to the new slot, or removed if that has started or
+    /// the slot is off). Called inside Edit's write.
+    func slotChanged(_ item: Item, now: Date, _ w: any StoreWriter) throws {
+        let today = LocalDay(of: now, in: zonesForQueries.current(), rolloverHour: rolloverHour)
+        guard var b = try w.timeBlocks(from: today).first(where: {
+            $0.itemId == item.id && $0.localDay == today && $0.origin == .slot && $0.removedAt == nil
+        }), b.touchedAt == nil, b.start > now else { return }
+        if let slot = item.slot, let place = slotPlacement(slot, on: today), place.start > now {
+            b.start = place.start
+            b.minutes = place.minutes
+        } else {
+            b.removedAt = now
+        }
+        b.updatedAt = now
+        try w.save(b)
+    }
+
+    /// The notification's Done on an asking (or still waiting) slot block of today: a
+    /// hand tick, which answers it. Never for an earlier day.
+    public func answerSlotBlock(id: UUID, source: Source = .notification) throws {
+        let today = currentDay()
+        guard let b = try storeForQueries.read({ try $0.timeBlock(id: id) }), b.origin == .slot,
+              b.localDay == today, b.removedAt == nil, b.decidedAt == nil else { throw ClewError.notAllowed }
+        do {
+            _ = try checkIn(itemId: b.itemId, source: source)
+        } catch ClewError.goalReached {}
+        try settleBlocks()
+    }
+
+    /// Today's slot blocks asking "Done?": their delivered notifications stay; others go.
+    public func askingBlockIds() throws -> Set<UUID> {
+        let today = currentDay()
+        return try storeForQueries.read { r in
+            Set(try r.timeBlocks(from: today).filter {
+                $0.localDay == today && $0.removedAt == nil && $0.decidedAt == nil && $0.askedAt != nil
+            }.map(\.id))
+        }
     }
 
     // MARK: - Commands
@@ -226,7 +347,8 @@ extension Clew {
         let bounds = dayBounds(today)
         try Self.checkStart(start, bounds)
         return try storeForQueries.write { w in
-            guard try todayList(w, on: today).rows.contains(where: { $0.id == itemId }) else {
+            // A reached goal stays in the list until a next round or a higher target.
+            guard let row = try todayList(w, on: today).rows.first(where: { $0.id == itemId }), !row.isGoalReached else {
                 throw ClewError.notAllowed
             }
             let open = try w.timeBlocks(from: today)
@@ -305,6 +427,7 @@ extension Clew {
                 try w.voidCheckIn(id: tick.id, at: now, reason: "blockRemoved")
             }
             b.removedAt = now
+            b.touchedAt = now
             b.updatedAt = now
             try w.save(b)
         }
@@ -360,7 +483,8 @@ extension Clew {
     /// Settings › General › "Show the day timeline" (default on).
     public func timelineShown() throws -> Bool { try flag(Self.timelineShownKey) }
     public func setTimelineShown(_ on: Bool) throws { try setFlag(Self.timelineShownKey, on) }
-    /// Settings › Notifications › "Alert when a block starts" (default on).
+    /// Settings › General › Day timeline › "Block alerts": a block's start, and a slot
+    /// block's "Done?" (default on).
     public func blockAlerts() throws -> Bool { try flag(Self.blockAlertsKey) }
     public func setBlockAlerts(_ on: Bool) throws { try setFlag(Self.blockAlertsKey, on) }
 
@@ -384,6 +508,21 @@ extension Clew {
             else { return nil }
             return PlannedNotification(id: NotificationPlanner.idPrefix + "block." + b.id.uuidString, fireAt: b.start,
                                        content: .blockStarts(itemId: b.itemId, title: row.item.title, until: b.end))
+        } + slotQuestions(r, now: now, today: today, rows: rows)
+    }
+
+    /// "Done with Write intro?" at the end of each of today's slot blocks still waiting,
+    /// while the timeline shows and the task still needs something.
+    private func slotQuestions(_ r: any StoreReader, now: Date, today: LocalDay,
+                               rows: [UUID: TodayRow]) throws -> [PlannedNotification] {
+        guard try r.setting(Self.timelineShownKey) != "false" else { return [] }
+        return try r.timeBlocks(from: today).compactMap { b in
+            guard b.localDay == today, b.origin == .slot, b.removedAt == nil, b.decidedAt == nil, b.end > now,
+                  let row = rows[b.itemId], row.item.progress.target != nil ? !row.isGoalReached : !row.isDone
+            else { return nil }
+            return PlannedNotification(id: NotificationPlanner.idPrefix + "ask." + b.id.uuidString, fireAt: b.end,
+                                       content: .slotAsks(blockId: b.id, itemId: b.itemId, title: row.item.title,
+                                                          isGoal: row.item.progress.target != nil))
         }
     }
 
@@ -420,6 +559,9 @@ extension Clew {
         b.minutes = minutes
         b.decidedAt = nil
         b.tickId = nil
+        b.askedAt = nil             // a moved slot block asks again at its new end
+        b.touchedAt = now           // today's own now: Edit no longer moves it
+        b.releasedAt = nil          // placed again: the task lives on the timeline again
         b.updatedAt = now
         try w.save(b)
         return try decideIfEnded(b, now: now, w)
@@ -427,7 +569,8 @@ extension Clew {
 
     private func decideIfEnded(_ b: TimeBlock, now: Date, _ w: any StoreWriter) throws -> TimeBlock {
         guard b.end <= now else { return b }
-        try decide(b, now: now, zone: zonesForQueries.current(), w)
+        _ = try decide(b, now: now, zone: zonesForQueries.current(), today: b.localDay,
+                       asks: try w.setting(Self.timelineShownKey) != "false", w)
         return try w.timeBlock(id: b.id) ?? b
     }
 
@@ -463,6 +606,17 @@ extension Clew {
         let quarters = Int(day.end.timeIntervalSince(day.start) / 60) / blockStepMinutes
         let q = min(max(Int((minutes / Double(blockStepMinutes)).rounded(.down)), 0), quarters - 1)
         return day.start.addingTimeInterval(TimeInterval(q * blockStepMinutes * 60))
+    }
+
+    /// Where a dragged block starts when its top is `minutesIn` after the day's start (the
+    /// pointer's place on the hours, less where the block was grabbed): the nearest
+    /// quarter hour, kept so that the whole block fits in the day. Measured on the hours,
+    /// not from how far the pointer moved, so it stays under the pointer while the
+    /// timeline scrolls (user, 2026-11-10).
+    public static func blockStart(minutesIn: Double, minutes: Int, day: TimelineDay) -> Date {
+        let length = Int(day.end.timeIntervalSince(day.start) / 60)
+        let offset = min(max(snapMinutes(minutesIn), 0), max(0, length - minutes))
+        return day.start.addingTimeInterval(TimeInterval(offset * 60))
     }
 
     /// A drag of `minutes` as whole quarter hours, to the nearest one.

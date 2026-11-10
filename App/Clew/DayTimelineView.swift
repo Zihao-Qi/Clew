@@ -5,7 +5,7 @@ import SwiftUI
 /// Where the timeline is, in the list's coordinate space, so a dragged row can tell
 /// which hour it is over.
 struct TimelineGeometry: Equatable {
-    /// The visible part (about 4 hours).
+    /// The visible part (about 6 hours).
     var viewport: CGRect = .zero
     /// The top of the whole day's content (moves as it scrolls).
     var contentTop: CGFloat = 0
@@ -14,8 +14,8 @@ struct TimelineGeometry: Equatable {
 enum TimelineMetrics {
     /// 60 points an hour.
     static let pointsPerMinute: CGFloat = 1
-    /// About 4 hours show (SPEC 2026-11-10).
-    static let height: CGFloat = 240
+    /// About 6 hours show (user, 2026-11-10; was 4).
+    static let height: CGFloat = 360
     static let labelWidth: CGFloat = 40
     static let quarter = Clew.blockStepMinutes
 
@@ -172,7 +172,8 @@ struct TimelineBlockView: View {
     var body: some View {
         RoundedRectangle(cornerRadius: 4)
             .fill(looksDone ? Color.secondary.opacity(0.14)
-                  : block.state == .pending ? Color.accentColor.opacity(0.22) : Color.secondary.opacity(0.08))
+                  : block.state == .pending || block.state == .asking ? Color.accentColor.opacity(0.22)
+                  : Color.secondary.opacity(0.08))
             .overlay(alignment: .topLeading) { label }
             .overlay(alignment: .bottom) { if block.canChange { resizeHandle } }
             .frame(height: max(height - 1, 6))
@@ -221,6 +222,7 @@ struct TimelineBlockView: View {
     private var stateText: Text {
         switch block.state {
         case .pending: Text("Not ended yet")
+        case .asking: Text("Ended. Done?")
         case .ticked, .covered: Text("Done")
         case .undone: Text("Not finished")
         case .skipped: looksDone ? Text("Done") : Text("Ended")
@@ -237,7 +239,12 @@ struct TimelineBlockView: View {
                     .font(.caption)
                     .lineLimit(1)
                     .foregroundStyle(looksDone ? .secondary : .primary)
-                if let timer {
+                if block.state == .asking {
+                    // A slot block never ticks by itself: it asks (SPEC 2026-11-10).
+                    Text("Done?")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                } else if let timer {
                     // Its focus timer counts down here, since the task is not in the list.
                     Text(verbatim: (timer.phase == .rest ? "☕ " : "⏱ ") + RowView.clock(timer.remaining(at: model.clockTick)))
                         .font(.caption2.monospacedDigit())

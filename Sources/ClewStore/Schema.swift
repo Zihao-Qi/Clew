@@ -13,7 +13,19 @@ enum Schema {
         migrator.registerMigration("v6-watch-progress", migrate: v6)
         migrator.registerMigration("v7-focus-sessions", migrate: v7)
         migrator.registerMigration("v8-time-blocks", migrate: v8)
+        migrator.registerMigration("v9-time-slots", migrate: v9)
         return migrator
+    }
+
+    /// A repeating task's time slot, and where a block came from (SPEC 2026-11-10).
+    private static func v9(_ db: Database) throws {
+        try db.execute(sql: """
+            ALTER TABLE item ADD COLUMN slot TEXT;
+            ALTER TABLE timeBlock ADD COLUMN origin TEXT NOT NULL DEFAULT 'hand' CHECK (origin IN ('hand', 'slot'));
+            ALTER TABLE timeBlock ADD COLUMN touchedAt DATETIME;
+            ALTER TABLE timeBlock ADD COLUMN askedAt DATETIME;
+            ALTER TABLE timeBlock ADD COLUMN releasedAt DATETIME;
+            """)
     }
 
     /// The day timeline's blocks (v1.2): definitions, removed with a tombstone, never

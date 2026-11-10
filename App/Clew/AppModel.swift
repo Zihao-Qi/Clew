@@ -223,6 +223,9 @@ final class AppModel {
     private func reconcileNotifications() {
         guard let clew, let notifications, let plan = try? clew.plannedNotifications() else { return }
         notifications.reconcile(plan)
+        if let asking = try? clew.askingBlockIds() {
+            Task { await notifications.withdrawQuestions(keeping: asking) }
+        }
     }
 
     // MARK: - Notifications
@@ -262,6 +265,7 @@ final class AppModel {
     private func handle(_ action: NotificationsAdapter.Action) {
         switch action {
         case .done(let id): run { try $0.checkIn(itemId: id, source: .notification) }
+        case .answer(let blockId): run { try $0.answerSlotBlock(id: blockId) }
         case .later(let id): run { try $0.moveToLater(itemId: id) }
         case .open(let id):
             // From the database, not today's rows: the notification may be clicked after
@@ -526,10 +530,16 @@ final class AppModel {
     }
 
     @discardableResult
-    func add(_ new: NewItem) -> Bool { run { try $0.addItem(new) } }
+    func add(_ new: NewItem) -> Bool {
+        if new.slot != nil, blockAlerts { askForNotifications() }      // asked when a slot is saved
+        return run { try $0.addItem(new) }
+    }
 
     @discardableResult
-    func edit(_ id: UUID, _ edit: ItemEdit) -> Bool { run { try $0.editItem(id: id, edit) } }
+    func edit(_ id: UUID, _ edit: ItemEdit) -> Bool {
+        if case .set(let slot) = edit.slot, slot != nil, blockAlerts { askForNotifications() }
+        return run { try $0.editItem(id: id, edit) }
+    }
 
     @discardableResult
     func pick(_ ids: [UUID]) -> Bool { run { try $0.planForToday(itemIds: ids) } }
