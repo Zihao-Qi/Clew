@@ -13,7 +13,7 @@
   "statusFailed": { "message": "The last import didn't work. It will try again on your next visit." },
   "statusNeedsUpdate": { "message": "YouTube changed its page. Nothing was removed; this extension needs an update." },
   "statusImported": {
-    "message": "Imported: $ADDED$ new. Later has $LATER$.",
-    "placeholders": { "added": { "content": "$1" }, "later": { "content": "$2" } }
+    "message": "Imported: $ADDED$ new. $LIST$ in Clew's Watch Later.",
+    "placeholders": { "added": { "content": "$1" }, "list": { "content": "$2" } }
   }
 }

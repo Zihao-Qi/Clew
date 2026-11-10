@@ -120,25 +120,32 @@ stopped daily use, not adding features.
 
 ## Decisions (2026-11-08)
 
-- **Watch Later import (v1.1, 2026-11-09):** a paired Chrome extension adds each
-  video in YouTube's Watch Later to the **Later pile** as a saved link, when the Watch
-  Later page is opened. A video removed from Watch Later leaves the Later pile too,
-  but only if it is still untouched there (not on Today, never done), and only when
-  the page showed the whole list (never from an empty list); it comes back if re-added. What the user deleted or
-  let go stays gone. These automatic removals are not counted as the user's "let go".
-  Pairing: Settings › Browser shows a 6-digit code.
+- **Watch Later import (v1.1, 2026-11-09):** a paired Chrome extension copies
+  YouTube's Watch Later into Clew when the Watch Later page is opened. A video removed
+  from Watch Later leaves Clew too, ticked or not (its tick stays in the heatmap),
+  but only when the page showed the whole list (never from an empty list); it comes
+  back if re-added. What the user deleted stays gone. These automatic removals are
+  not counted as the user's "let go". Pairing: Settings › Browser shows a 6-digit code.
+- **Collections (v1.1, 2026-11-09):** an imported list is **one collection**, not one
+  task per video: a row below the tasks, after a thin divider and with no heading
+  ("YouTube Watch Later  1 of 3 ›", X bookmarks next). It has no circle and does not
+  count toward today's `done/total`. Its videos never appear on Today, in Later or in
+  Pick. Clicking it opens its page: a heatmap of days a video was ticked, ticked this
+  week / last 30 days / all time, and the whole list (In progress, most watched first;
+  Not started, newest first; Done, folded). Each video has a circle (undo is for
+  today's tick) and a title that opens it.
 - **Watch progress (v1.1, 2026-11-09):** read only from the red bars on the Watch
   Later page, when it is opened (not while a video plays: simpler, and it covers
-  videos watched on other devices). Shown as a thin bar under the video's title in
-  Today and in Pick, and as "40% watched" on its details. It never ticks anything.
+  videos watched on other devices). Shown on the video's row in its collection, in
+  the chosen bar style. It never ticks anything.
 - **Progress bars (2026-11-09):** Settings › General › Progress bars picks one of two
-  styles for counted goals and started videos: *behind the title* (the row's rounded
+  styles for counted goals, collections and started videos: *behind the title* (the row's rounded
   background fills from the left, default) or *under the title* (a long bar under the
   name, almost to the row's end) or *no bar*. The short bar beside the count is gone;
   `10/30` stays. Pick shows a link's site ("medium.com", no "www.") but not for
   YouTube videos.
   The same bar will show a focus timer's time later.
-- **One-off details (2026-11-09):** once-tasks, saved links and videos have no
+- **One-off details (2026-11-09):** once-tasks and saved links have no
   heatmap. Their details show where the item is (In Later, On Today, Done Nov 9),
   watch progress for videos, a short history (saved, picked, kept, done · felt), and
   Open video / Open link.

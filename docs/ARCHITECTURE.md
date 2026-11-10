@@ -297,11 +297,22 @@ from the client; titles are cleaned, cut to 200 characters and stored as `fetche
 **whole list** only when the page's own count, the rows on the page and the entries
 read all agree, no entry was malformed, and the list is not empty (a "No videos" page
 also shows when signed out or broken, so an empty read is never trusted: emptying
-Watch Later entirely leaves the Later pile as it is). Only then are Later items from that source that left the list, and
-were never done, let go (a `LaterReview` with the import's source, so Settings'
-"let go" count, which counts the user's own, skips it). An item let go that way
-comes back if it reappears (its let-go is voided); anything the user deleted or let
-go stays gone; items on Today or done are never touched.
+Watch Later entirely leaves the collection as it is). Only then are items from that
+source that left the list let go, ticked or not (a `LaterReview` with the import's
+source, so Settings' "let go" count, which counts the user's own, skips it); their
+check-ins stay, so the collection's heatmap keeps them. An item let go that way comes
+back if it reappears (its let-go is voided); anything the user deleted stays gone.
+
+**Collections (v1.1, SPEC 2026-11-09).** Items whose source is in
+`Clew.collectionSources` (YouTube now, X next) form one collection per source. There
+is no parent row: a collection is derived from `source`, so nothing needs migrating.
+Today, Later, Pick, reordering and notifications all filter collection items out
+(including ones picked before collections existed); `PlanForToday` refuses them;
+`CheckIn` accepts them in any state, since they are ticked on the collection's page.
+Queries: `collections()` (the rows below the tasks: total and ticked) and
+`collection(source)` (the page: groups, and ticks per day including items since
+removed). The Gateway's import answer reports `listCount`, the collection's size
+(*changed from* `laterCount`).
 
 **Browser extension (v1.1, `Extension/`, TypeScript, built with Bun).** Chrome MV3.
 - **Scrapers are quarantined:** one module per site (`src/youtube.ts`), with selectors

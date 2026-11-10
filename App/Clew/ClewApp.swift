@@ -73,6 +73,8 @@ struct MenuBarLabel: View {
 enum Screen: Equatable {
     case list, add, pick
     case detail(UUID)
+    /// An imported list's page (YouTube Watch Later).
+    case collection(Source)
     /// `back` is where Save or Cancel returns to: the list or that item's details.
     case edit(Item, back: Back)
 
@@ -101,6 +103,8 @@ struct RootView: View {
                     DetailView(model: model, itemId: id,
                                onEdit: { screen = .edit($0, back: .detail) },
                                onBack: { screen = .list })
+                case .collection(let source):
+                    CollectionView(model: model, source: source) { screen = .list }
                 case .edit(let item, let back):
                     EditView(model: model, item: item) { screen = back == .detail ? .detail(item.id) : .list }
                 }

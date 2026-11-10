@@ -94,6 +94,17 @@ struct TodayListView: View {
                     .padding(.vertical, 20)
             }
 
+            // Imported lists, below the tasks with no heading (SPEC 2026-11-09).
+            if !model.collections.isEmpty {
+                Divider().padding(.horizontal, 12)
+                VStack(spacing: 0) {
+                    ForEach(model.collections) { summary in
+                        CollectionRowView(summary: summary, model: model) { screen = .collection(summary.source) }
+                    }
+                }
+                .padding(.vertical, 6)
+            }
+
             NoticeView(text: model.notice ?? model.confirmation)
                 .animation(.easeOut(duration: 0.4), value: model.notice ?? model.confirmation)
 
@@ -134,6 +145,12 @@ struct TodayListView: View {
             .padding(.vertical, 8)
         }
     }
+}
+
+/// Shared column widths, so a collection's name lines up with the task titles.
+enum TaskColumns {
+    /// The tick circle (`circle` at `.title3`, measured 19 pt on a 2x render).
+    static let circleWidth: CGFloat = 19
 }
 
 struct RowView: View {
@@ -271,6 +288,7 @@ struct RowView: View {
             Button { model.tap(row) } label: {
                 Image(systemName: row.isDone ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
+                    .frame(width: TaskColumns.circleWidth)
                     .foregroundStyle(row.isDone ? Color.accentColor : Color.secondary)
                     .contentTransition(.symbolEffect(.replace))
             }

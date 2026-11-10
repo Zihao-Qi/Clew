@@ -13,7 +13,7 @@ function describe(status: Status | undefined): string {
     return t("statusFailed");
   }
   if (status.needsUpdate) return t("statusNeedsUpdate");
-  return t("statusImported", String(status.added ?? 0), String(status.laterCount ?? 0));
+  return t("statusImported", String(status.added ?? 0), String(status.listCount ?? 0));
 }
 
 async function render(): Promise<void> {

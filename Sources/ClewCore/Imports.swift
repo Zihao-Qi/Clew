@@ -148,11 +148,12 @@ extension Clew {
 
             guard result.complete else { return result }
             let onList = Set(entries.map(\.ref))
+            // Everything that left the list leaves its collection, ticked or not; its
+            // ticks stay, so the collection's heatmap keeps them (SPEC 2026-11-09).
             let gone = existing.values.filter { item in
-                item.deletedAt == nil && item.state == .later && !onList.contains(item.externalRef ?? "")
+                item.deletedAt == nil && !onList.contains(item.externalRef ?? "")
             }
-            let done = try w.progressAmounts(itemIds: gone.map(\.id))
-            for var item in gone where (done[item.id] ?? 0) == 0 {
+            for var item in gone {
                 try w.insert(LaterReview(id: newID(), itemId: item.id, decision: .letGo, at: now, localDay: day,
                                          source: batch.source))
                 item.deletedAt = now
@@ -170,6 +171,12 @@ extension Clew {
     }
 
     static let importSources: Set<Source> = [.extensionYouTube]
+
+    /// Lists imported from a site, each shown as one collection below the tasks, in this
+    /// order. Their items never appear on Today, in Later or in Pick.
+    public static let collectionSources: [Source] = [.extensionYouTube]
+
+    static func isCollectionItem(_ item: Item) -> Bool { collectionSources.contains(item.source) }
 
     /// The let-go that removed `item`, if the import made it (not the user).
     private static func automaticLetGo(of item: Item, source: Source, _ r: any StoreReader) throws -> LaterReview? {

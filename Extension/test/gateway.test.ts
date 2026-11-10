@@ -41,7 +41,7 @@ const clew: Server = async (url, init) => {
     return json(200, {
       result: { added: 1, renamed: 0, restored: 0, letGo: 0, skipped: 0, progressed: 0, complete: true },
       needsUpdate: false,
-      laterCount: 1,
+      listCount: 1,
     });
   }
   return json(404, { error: "not found" });
@@ -127,7 +127,7 @@ describe("import", () => {
   test("Clew's answer comes back checked", async () => {
     const net = network({ [PORTS[0]]: clew });
     const { response } = await new Gateway(net.fetchFn).importList(pairing, scan);
-    expect(response.laterCount).toBe(1);
+    expect(response.listCount).toBe(1);
   });
 });
 

@@ -22,6 +22,8 @@ final class AppModel {
     private(set) var laterCount = 0
     /// How much of each video on today's list was watched (0–1), from Watch Later.
     private(set) var watched: [UUID: Double] = [:]
+    /// Imported lists (YouTube Watch Later), shown below the tasks.
+    private(set) var collections: [CollectionSummary] = []
     /// How rows draw progress (Settings › General).
     private(set) var barStyle = Clew.defaultBarStyle
     /// Set when the database cannot be opened; the list is replaced by this message.
@@ -108,6 +110,7 @@ final class AppModel {
             laterCount = try clew.laterCount()
             watched = try clew.watchProgress(itemIds: list.rows.map(\.id))
             barStyle = (try? clew.barStyle()) ?? Clew.defaultBarStyle
+            collections = try clew.collections()
             // A closed congratulation stays closed only while that goal stays reached, so
             // reaching a raised target or a next round congratulates again.
             let reached = Set(list.rows.filter(\.isGoalReached).map(\.id))
@@ -250,6 +253,19 @@ final class AppModel {
         } else {
             run { try $0.undoToday(itemId: row.id) }
             if ratingPrompt?.itemId == row.id { ratingPrompt = nil }
+        }
+    }
+
+    // MARK: - Collections (SPEC 2026-11-09)
+
+    func collection(_ source: Source) -> CollectionDetails? { (try? clew?.collection(source)) ?? nil }
+
+    /// The circle on a collection's video: tick it, or undo a tick made today.
+    func toggleFinished(_ entry: CollectionEntry) {
+        if entry.doneToday {
+            run { try $0.undoToday(itemId: entry.id) }
+        } else if entry.doneAt == nil {
+            run { try $0.checkIn(itemId: entry.id) }
         }
     }
 

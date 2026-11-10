@@ -187,22 +187,22 @@ struct SystemClockForTests: ClewDomain.Clock { let source: Now; func now() -> Da
             headers: ["host": "127.0.0.1:\(port)", "authorization": "Bearer reader-token", "content-type": "application/json"],
             body: try JSONSerialization.data(withJSONObject: body)))
         #expect(denied.status == 403)
-        #expect(try clew.laterCount() == 0)
+        #expect(try clew.collections().isEmpty)   // nothing was imported
     }
 
-    @Test func importAddsToLaterAndReportsHealth() throws {
+    @Test func importAddsToTheCollectionAndReportsHealth() throws {
         let paired = try pairClient()
         let r = request("POST", "/v1/import", body: importBody(["aaaaaaaaaaa", "bbbbbbbbbbb"], total: 2),
                         token: paired.token)
         #expect(r.status == 200)
         let response = try decode(API.ImportResponse.self, r)
-        #expect(response.result.added == 2 && response.laterCount == 2 && !response.needsUpdate)
+        #expect(response.result.added == 2 && response.listCount == 2 && !response.needsUpdate)
         #expect(gateway.lastImport(from: .extensionYouTube)?.result.added == 2)
 
         // The page said 12 videos but nothing could be read: flagged, nothing removed.
         let broken = try decode(API.ImportResponse.self, request(
             "POST", "/v1/import", body: importBody([], total: 12, found: 0, parsed: 0), token: paired.token))
-        #expect(broken.needsUpdate && broken.result.letGo == 0 && broken.laterCount == 2)
+        #expect(broken.needsUpdate && broken.result.letGo == 0 && broken.listCount == 2)
         #expect(gateway.lastImport(from: .extensionYouTube)?.needsUpdate == true)
     }
 
@@ -216,7 +216,7 @@ struct SystemClockForTests: ClewDomain.Clock { let source: Now; func now() -> Da
         #expect(request("POST", "/v1/import", body: ["entries": 3], token: paired.token).status == 400)
         #expect(request("GET", "/v1/import", token: paired.token).status == 405)
         #expect(request("GET", "/v1/items").status == 404)
-        #expect(try clew.laterCount() == 0)
+        #expect(try clew.collections().isEmpty)   // nothing was imported
     }
 
     @Test func aRevokedClientIsLockedOut() throws {

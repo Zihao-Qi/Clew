@@ -11,7 +11,7 @@ export interface Status {
   problem?: "unreachable" | "revoked" | "refused" | "badAnswer";
   added?: number;
   letGo?: number;
-  laterCount?: number;
+  listCount?: number;
   needsUpdate?: boolean;
 }
 
@@ -45,7 +45,7 @@ async function sendScan(scan: ImportRequest): Promise<Status | undefined> {
       ok: true,
       added: response.result.added,
       letGo: response.result.letGo,
-      laterCount: response.laterCount,
+      listCount: response.listCount,
       needsUpdate: response.needsUpdate,
     };
     await chrome.storage.local.set({ pairing: { ...pairing, port }, lastScan: key, lastScanAt: Date.now() });

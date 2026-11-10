@@ -52,7 +52,7 @@ struct ParisZone: TimeZoneSource { func current() -> TimeZone { TimeZone(identif
         clock.advance()
         let back = try clew.importExternal(batch(["aaaaaaaaaaa", "bbbbbbbbbbb"]))
         #expect(back.restored == 1 && back.added == 0)
-        #expect(try clew.laterCount() == 2)
+        #expect(try clew.collections().first?.total == 2)
         // The let-go was voided through the monotonic-void trigger.
         let reviews = try store.read { try $0.allRecords() }.laterReviews
         try #require(reviews.count == 1)
@@ -75,8 +75,8 @@ struct ParisZone: TimeZoneSource { func current() -> TimeZone { TimeZone(identif
     @Test func onlyTheUsersLetGosAreCounted() throws {
         try clew.importExternal(batch(["aaaaaaaaaaa", "bbbbbbbbbbb"]))
         try clew.importExternal(batch(["aaaaaaaaaaa"]))                 // import lets b go
-        let a = try #require(try clew.laterItems().first)
-        try clew.letGo(itemId: a.id)                                    // the user lets a go
+        let own = try clew.addItem(NewItem(title: "mine", shape: .later))
+        try clew.letGo(itemId: own.id)                                  // the user lets one go
         #expect(try clew.lettingGoCount() == 1)
     }
 }
