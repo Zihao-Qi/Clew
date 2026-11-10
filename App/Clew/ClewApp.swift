@@ -14,6 +14,9 @@ struct ClewApp: App {
         if ProcessInfo.processInfo.environment["CLEW_RECONCILE_TEST"] != nil {
             Snapshot.reconcileTestAndExit()
         }
+        if ProcessInfo.processInfo.environment["CLEW_GATEWAY_TEST"] != nil {
+            Snapshot.gatewayTestAndExit()
+        }
         if ProcessInfo.processInfo.environment["CLEW_RESTORE_TEST"] != nil {
             Snapshot.restoreTestAndExit()
         }

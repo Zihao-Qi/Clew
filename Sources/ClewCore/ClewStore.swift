@@ -43,8 +43,12 @@ public protocol StoreReader {
     func setting(_ key: String) throws -> String?
     /// Non-voided "still want this?" answers for these items.
     func laterReviews(itemIds: [UUID]) throws -> [LaterReview]
-    /// How many items were let go (non-voided), all time.
+    /// How many items the user let go (non-voided), all time. Let-gos made by an
+    /// import (an item that left an external list) are not the user's, so not counted.
     func letGoCount() throws -> Int
+    /// Every item from `source`, soft-deleted ones included (imports are keyed by
+    /// `(source, externalRef)`).
+    func items(source: Source) throws -> [Item]
 }
 
 /// Everything Clew stores, as it is stored.
@@ -102,6 +106,8 @@ public protocol StoreWriter: StoreReader {
     func save(_ reminder: Reminder) throws
     func saveSetting(_ key: String, json: String, updatedAt: Date) throws
     func insert(_ review: LaterReview) throws
+    /// Sets the review's `voidedAt`. Voids are monotonic: voiding twice is an error.
+    func voidLaterReview(id: UUID, at: Date) throws
 }
 
 /// A row of the `settings` table: a definition with last-writer-wins by `updatedAt`.

@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "__MSG_extName__",
+  "description": "__MSG_extDescription__",
+  "version": "0.1.0",
+  "default_locale": "en",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuAR/AxLSNzyDWf62dr8tyKGZYjqSSe0JpI861KYvbCGLEneT3lf5/P0nnhnqP2MrHvqZuGo1X811FL2m7Pn/n1i0dw0hiMBruubL7YI6BSotGeRam76A0j3WxqvHbPSUuZ4Y1j4oKGlnPRXe0l/Ve33K3zj8RojB/Hqre+Y1f/fB9JKMm0kWh4j2UUjJiL+gvtyyExF/Wldj6USnUZ+uZojIT+6YSHFmgJZA5zQiZbOiSwBX/9p6u9+zn9DQ1aYRcpb5DnIBxXBn0khv9enaLMFEYWHb/fvUsCPY7OQvOI0Qsp0C17frPwCFtYMYMgOIKdSO3SDvrt5G2CIm1lzrMQIDAQAB",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.youtube.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Clew"
+  },
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1/*"
+  ]
+}

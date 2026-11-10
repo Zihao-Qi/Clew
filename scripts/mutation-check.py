@@ -12,7 +12,7 @@ source file is always restored, even on error.
 import json, pathlib, re, subprocess, sys
 
 repo = pathlib.Path(sys.argv[1])
-D, C, S = "Sources/ClewDomain/", "Sources/ClewCore/", "Sources/ClewStore/"
+D, C, S, W = "Sources/ClewDomain/", "Sources/ClewCore/", "Sources/ClewStore/", "Sources/ClewGateway/"
 M = [
  # Domain
  ("D1 naive instant-4h", D+"LocalDay.swift", "self = hour < rolloverHour ? wallDay.adding(days: -1) : wallDay",
@@ -244,6 +244,58 @@ M = [
  ("G12 felt three-point order", D+"ItemStats.swift", "stride(from: 5, through: 1, by: -1).compactMap", "[3, 2, 1].compactMap", "ClewDomainTests"),
  ("G13 felt worst first", D+"ItemStats.swift", "stride(from: 5, through: 1, by: -1).compactMap", "stride(from: 1, through: 5, by: 1).compactMap", "ClewDomainTests"),
  ("G14 goals hint too", C+"Ratings.swift", "        item.progress.target == nil\n", "        item.progress.target == nil || true\n", "ClewCoreTests"),
+ # Imports (v1.1)
+ ("X1 no dedupe", C+"Imports.swift", "if seen.insert(ref).inserted { entries.append((ref, title, url)) }", "entries.append((ref, title, url))", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X2 complete despite skips", C+"Imports.swift", "batch.listTotal == entries.count && result.skipped == 0", "batch.listTotal == entries.count", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X3 complete without total", C+"Imports.swift", "batch.listTotal == entries.count && result.skipped == 0", "(batch.listTotal ?? entries.count) == entries.count && result.skipped == 0", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X4 lets go Today items", C+"Imports.swift", "item.deletedAt == nil && item.state == .later && !onList", "item.deletedAt == nil && !onList", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X5 lets go done items", C+"Imports.swift", "for var item in gone where (done[item.id] ?? 0) == 0 {", "for var item in gone {", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X6 revives user deletes", C+"Imports.swift", "guard let latest, latest.source == source else { return nil }", "guard let latest else { return nil }", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X7 restore keeps let-go", C+"Imports.swift", "                        try w.voidLaterReview(id: review.id, at: now)\n", "", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X8 renames typed titles", C+"Imports.swift", "if item.titleOrigin == .fetched, item.title != entry.title {", "if item.title != entry.title {", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X9 any source", C+"Imports.swift", "guard Self.importSources.contains(batch.source) else", "guard true else", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X10 no batch limit", C+"Imports.swift", "guard batch.entries.count <= Self.maxImportEntries else", "guard true else", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X11 any id length", C+"Imports.swift", "return ref.unicodeScalars.count == 11 && allowed ? ref : nil", "return allowed ? ref : nil", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X12 slash allowed", C+"Imports.swift", "|| $0 == \"_\" || $0 == \"-\"\n", "|| $0 == \"_\" || $0 == \"-\" || $0 == \"/\"\n", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X13 no title cut", C+"Imports.swift", "guard title.count > maxTitleLength else { return title }", "return title", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X14 newlines kept", C+"Imports.swift", "CharacterSet.controlCharacters.contains($0) || CharacterSet.whitespacesAndNewlines.contains($0) ? \" \" : $0", "$0", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X15 typed origin", C+"Imports.swift", "kind: .link, title: entry.title, titleOrigin: .fetched,", "kind: .link, title: entry.title, titleOrigin: .typed,", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X16 reminder kept", C+"Imports.swift", "                    reminder.deletedAt = now\n", "", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X17 health: unread rows", C+"Imports.swift", "parsed < found || result.skipped > 0", "result.skipped > 0", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X18 health: skips", C+"Imports.swift", "parsed < found || result.skipped > 0 ||", "parsed < found ||", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X19 health: empty page", C+"Imports.swift", "((listTotal ?? 0) > 0 && parsed == 0)", "false", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X20 import let-go counted", S+"SQLiteStore.swift", "AND voidedAt IS NULL AND source = 'user'", "AND voidedAt IS NULL", "ImportStoreTests"),
+ ("X21 bySource hides deleted", S+"SQLiteStore.swift", "\"SELECT * FROM item WHERE source = ?\"", "\"SELECT * FROM item WHERE source = ? AND deletedAt IS NULL\"", "ImportStoreTests"),
+ # Gateway (v1.1)
+ ("W1 any host", W+"Gateway.swift", "guard request.headers[\"host\"] == \"127.0.0.1:\\(listeningPort)\" else", "guard request.headers[\"host\"] != nil else", "ClewGatewayTests"),
+ ("W2 any origin", W+"Gateway.swift", "if let origin, !allowedOrigins.contains(origin) {", "if let origin, origin.isEmpty {", "ClewGatewayTests"),
+ ("W3 proof for strangers", W+"Gateway.swift", "let client = clients.first(where: { $0.id == id })", "let client = clients.first", "ClewGatewayTests"),
+ ("W4 any code", W+"Gateway.swift", "if Crypto.equal(p.code, body.code) { pairing = nil; return .ok }", "if true { pairing = nil; return .ok }", "ClewGatewayTests"),
+ ("W5 unlimited tries", W+"Gateway.swift", "pairing = left > 0 ? (p.code, p.expiresAt, left) : nil", "pairing = (p.code, p.expiresAt, max(left, 1))", "ClewGatewayTests"),
+ ("W6 reusable code", W+"Gateway.swift", "if Crypto.equal(p.code, body.code) { pairing = nil; return .ok }", "if Crypto.equal(p.code, body.code) { return .ok }", "ClewGatewayTests"),
+ ("W7 never expires", W+"Gateway.swift", "guard let p = pairing, p.expiresAt > now() else { pairing = nil; return .noPairing }", "guard let p = pairing else { pairing = nil; return .noPairing }", "ClewGatewayTests"),
+ ("W8 raw token kept", W+"Gateway.swift", "tokenHash: Crypto.sha256Hex(token),", "tokenHash: token,", "ClewGatewayTests"),
+ ("W9 scope ignored", W+"Gateway.swift", "return client.scopes.contains(scope) ? nil :", "return true ? nil :", "ClewGatewayTests"),
+ ("W10 revoke not saved", W+"Gateway.swift", "            try credentials.save(remaining)\n", "", "ClewGatewayTests"),
+ ("W11 no auth", W+"Gateway.swift", "        if let denied = authorize(request, .import) { return denied }\n", "", "ClewGatewayTests"),
+ ("W12 equal always", W+"Credentials.swift", "return zip(x, y).reduce(0) { $0 | ($1.0 ^ $1.1) } == 0", "return true", "ClewGatewayTests"),
+ ("W13 proof of other text", W+"Gateway.swift", "proof = Crypto.hmac(secret: client.secret, message: nonce)", "proof = Crypto.hmac(secret: client.secret, message: nonce + \"x\")", "ClewGatewayTests"),
+ ("W14 any nonce length", W+"Gateway.swift", "(16...128).contains(s.count) && ", "", "ClewGatewayTests"),
+ ("W15 dup headers", W+"HTTP.swift", "            guard headers[name] == nil else { return .invalid(400) }\n", "", "ClewGatewayTests"),
+ ("W16 chunked", W+"HTTP.swift", "        if headers[\"transfer-encoding\"] != nil { return .invalid(501) }\n", "", "ClewGatewayTests"),
+ ("W17 any body size", W+"HTTP.swift", "            guard n <= maxBodyBytes else { return .invalid(413) }\n", "", "ClewGatewayTests"),
+ ("W18 absolute target", W+"HTTP.swift", "guard target.hasPrefix(\"/\"), let components", "guard let components", "ClewGatewayTests"),
+ ("W19 no fallback port", W+"Listener.swift", "        for port in ports {\n", "        for port in ports.prefix(1) {\n", "ClewGatewayTests"),
+ ("W20 json not required", W+"Gateway.swift", "request.headers[\"content-type\"]?.lowercased().hasPrefix(\"application/json\") == true", "true", "ClewGatewayTests"),
+ ("W21 no CORS", W+"Gateway.swift", "        if let origin { cors = [(\"Access-Control-Allow-Origin\", origin), (\"Vary\", \"Origin\")] }\n", "", "ClewGatewayTests"),
+ ("W22 busy ignored", W+"Gateway.swift", "importLock.withLock { lock.withLock { currentClew = clew } }", "importLock.withLock { lock.withLock { if let clew { currentClew = clew } } }", "ClewGatewayTests"),
+ # Review of v1.1 step 1 (Gemini 3.8): each fix must be pinned by a test.
+ ("X22 rows not checked", C+"Imports.swift", "result.complete = scanAgrees && ", "result.complete = ", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X23 no scan trusted", C+"Imports.swift", "$0.parsed == batch.entries.count } ?? false", "$0.parsed == batch.entries.count } ?? true", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X24 found ignored", C+"Imports.swift", "$0.found == $0.parsed && ", "", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("X25 empty trusted", C+"Imports.swift", "scanAgrees && !entries.isEmpty && ", "scanAgrees && ", "ImportTests|ImportStoreTests|ScanHealthTests"),
+ ("W23 swap doesn't wait", W+"Gateway.swift", "importLock.withLock { lock.withLock { currentClew = clew } }", "lock.withLock { currentClew = clew }", "ClewGatewayTests"),
+ ("W24 stop is a no-op", W+"Listener.swift", "            listener?.cancel()\n", "", "ClewGatewayTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

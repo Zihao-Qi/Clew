@@ -131,7 +131,16 @@ final class FakeStore: ClewStore, @unchecked Sendable {
             return state.laterReviews.values.filter { ids.contains($0.itemId) && $0.voidedAt == nil }.sorted { $0.at < $1.at }
         }
         func letGoCount() throws -> Int {
-            state.laterReviews.values.filter { $0.decision == .letGo && $0.voidedAt == nil }.count
+            state.laterReviews.values.filter { $0.decision == .letGo && $0.voidedAt == nil && $0.source == .user }.count
+        }
+        func items(source: Source) throws -> [Item] {
+            state.items.values.filter { $0.source == source }.sorted { $0.sortKey < $1.sortKey }
+        }
+        func voidLaterReview(id: UUID, at: Date) throws {
+            guard var r = state.laterReviews[id] else { return }
+            guard r.voidedAt == nil else { throw FactViolation.revoid }
+            r.voidedAt = at
+            state.laterReviews[id] = r
         }
         func insert(_ review: LaterReview) throws {
             guard state.laterReviews[review.id] == nil else { throw FactViolation.duplicate }
@@ -152,6 +161,11 @@ final class FakeStore: ClewStore, @unchecked Sendable {
 
         func insert(_ item: Item) throws {
             guard state.items[item.id] == nil else { throw FactViolation.duplicate }
+            // Mirrors the unique (source, externalRef) index.
+            if let ref = item.externalRef,
+               state.items.values.contains(where: { $0.source == item.source && $0.externalRef == ref }) {
+                throw FactViolation.duplicate
+            }
             state.items[item.id] = item
         }
         func update(_ item: Item) throws {

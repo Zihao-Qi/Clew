@@ -8,6 +8,10 @@
 	<!-- Outgoing only, for one thing: fetching a pasted link's page title (SPEC §8). -->
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<!-- Incoming, on 127.0.0.1 only, while a browser is paired: the extension's
+	     Watch Later import (ARCHITECTURE §6 Gateway). -->
+	<key>com.apple.security.network.server</key>
+	<true/>
 	<!-- Export writes only where the user picks in the save panel. -->
 	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>

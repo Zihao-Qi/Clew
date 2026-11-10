@@ -73,8 +73,10 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
    at 21:00, both changeable. Short, friendly, never a list of failures. A day
    with no ticks gets an encouraging line instead of "0/6".
 8. **Local data.** A SQLite database (GRDB) in Application Support. One-click JSON
-   export. No account. The only network use is fetching a pasted link's title: one
-   load of that page (and its redirects), no cookies, nothing else sent.
+   export. No account. The only internet use is fetching a pasted link's title: one
+   load of that page (and its redirects), no cookies, nothing else sent. While a
+   browser is paired (v1.1), Clew also listens on this Mac only (`127.0.0.1`) for
+   its extension.
 9. **Launch at login** (`SMAppService`), toggled in a small Settings window.
 10. **Task details.** Clicking a row opens its details: a 16-week heatmap (done days
     filled, other days a quiet gray, never red), days done this week / in the last
@@ -102,8 +104,8 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
 
 - **Daruma goals and badges.** Paint one eye when a counted goal starts and the
   second when it's finished. Levels come from lifetime totals.
-- Browser extension import: YouTube Watch Later (list + watch %, verified feasible
-  2026-11-08) and X bookmarks.
+- Browser extension import: YouTube Watch Later watch %, and X bookmarks (v1.1, next
+  steps; the Watch Later list itself landed first, see Decisions).
 - Opt-in AI coach: recap, Later suggestions, quick start (see docs/AGENT.md).
 - Sync with Dayflow (its local JSON API: `GET /api/day`, `PATCH /api/tasks/:id`).
 - iPhone, iCloud sync, Obsidian export.
@@ -116,6 +118,16 @@ shows them only in Settings. Until that bar is met, the next work is fixing what
 stopped daily use, not adding features.
 
 ## Decisions (2026-11-08)
+
+- **Watch Later import (v1.1, 2026-11-09):** a paired Chrome extension adds each
+  video in YouTube's Watch Later to the **Later pile** as a saved link, when the Watch
+  Later page is opened. A video removed from Watch Later leaves the Later pile too,
+  but only if it is still untouched there (not on Today, never done), and only when
+  the page showed the whole list (never from an empty list); it comes back if re-added. What the user deleted or
+  let go stays gone. These automatic removals are not counted as the user's "let go".
+  Pairing: Settings › Browser shows a 6-digit code.
+- Watch progress (v1.1, next): read while watching, sent on pause, seek, tab switch,
+  each 10% and at most every 30 s; about 90% ticks the video done.
 
 - Weeks start on **Monday**; "N× per week" items reset then.
 - A counted goal's step is always **+1** per click.
@@ -135,7 +147,7 @@ stopped daily use, not adding features.
 - A pasted link goes to Today by default, not Later; `↗` is replaced by a clickable
   title with a link mark (2026-11-08, after first use).
 - Pasted links get their page title fetched (2026-11-08, after first use); this is
-  the app's only network use.
+  the app's only internet use (the v1.1 extension connection stays on this Mac).
 - The menu bar title is an icon plus `done/total`, not the word "Clew" (2026-11-08, v1a).
 - A counted goal's undo is a small `−` beside its count, shown only after a `+1` today;
   it removes the last `+1`. It sits apart from the circle so rapid ticks can't hit it

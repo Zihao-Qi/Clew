@@ -51,13 +51,14 @@ struct SettingsView: View {
 
     /// The sidebar's sections.
     enum Pane: String, CaseIterable, Identifiable {
-        case general, summaries, progress, data
+        case general, summaries, progress, browser, data
         var id: String { rawValue }
         var title: Text {
             switch self {
             case .general: Text("General")
             case .summaries: Text("Summaries")
             case .progress: Text("Progress")
+            case .browser: Text("Browser")
             case .data: Text("Data")
             }
         }
@@ -66,6 +67,7 @@ struct SettingsView: View {
             case .general: "gearshape"
             case .summaries: "bell"
             case .progress: "chart.bar"
+            case .browser: "puzzlepiece.extension"
             case .data: "externaldrive"
             }
         }
@@ -146,6 +148,13 @@ struct SettingsView: View {
                     Text("A day with at least one tick. Letting go of what you no longer want counts as a win.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+
+                case .browser:
+                if let browser = model.browser {
+                    BrowserSettings(connection: browser)
+                } else {
+                    Text("Not available in this window.").foregroundStyle(.secondary)
                 }
 
                 case .data:

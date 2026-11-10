@@ -1,0 +1,218 @@
+import ClewCore
+import ClewDomain
+import Foundation
+import Testing
+
+private func local(_ m: Int, _ d: Int, _ h: Int = 10) -> Date {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = TimeZone(identifier: "America/New_York")!
+    return cal.date(from: DateComponents(year: 2026, month: m, day: d, hour: h))!
+}
+
+private func video(_ ref: String, _ title: String = "A video") -> ExternalEntry {
+    ExternalEntry(externalRef: ref, title: title)
+}
+
+private let a = "aaaaaaaaaaa", b = "bbbbbbbbbbb", c = "ccccccccccc", d = "ddddddddddd"
+
+@Suite struct ImportTests {
+    let store = FakeStore()
+    let clock = TestClock(local(11, 9))
+    var clew: Clew { Clew(store: store, clock: clock, zones: FixedZone("America/New_York")) }
+
+    private func batch(_ entries: [ExternalEntry], total: Int?) -> ImportBatch {
+        ImportBatch(source: .extensionYouTube, entries: entries, listTotal: total,
+                    scan: ScanReport(found: entries.count, parsed: entries.count, selectorVersion: "t"))
+    }
+    private func imported(_ ref: String) -> Item? {
+        store.state.items.values.first { $0.externalRef == ref }
+    }
+
+    @Test func newVideosBecomeLinksInLaterWithTheirOwnURL() throws {
+        let r = try clew.importExternal(batch([video(a, "  First\n video "), video(b)], total: 2))
+        #expect(r.added == 2 && r.complete)
+        let item = try #require(imported(a))
+        #expect(item.kind == .link && item.state == .later && item.source == .extensionYouTube)
+        #expect(item.title == "First video")
+        #expect(item.titleOrigin == .fetched)                    // stranger-written (AGENT §4)
+        #expect(item.url == URL(string: "https://www.youtube.com/watch?v=aaaaaaaaaaa"))
+        #expect(try clew.laterCount() == 2)
+        #expect(try clew.today().rows.isEmpty)
+    }
+
+    @Test func rescanningNeverDuplicates() throws {
+        try clew.importExternal(batch([video(a), video(b)], total: 2))
+        let again = try clew.importExternal(batch([video(a), video(b), video(a)], total: 2))
+        #expect(again == ImportResult(complete: true))
+        #expect(store.state.items.count == 2)
+    }
+
+    @Test func malformedEntriesAreSkippedAndBlockRemovals() throws {
+        try clew.importExternal(batch([video(a), video(b)], total: 2))
+        // A bad id or an empty title means the scraper misread the page.
+        let r = try clew.importExternal(batch([video(a), video("short"), video(c, " \n ")], total: 1))
+        #expect(r.skipped == 2 && !r.complete && r.letGo == 0)
+        #expect(imported(b)?.deletedAt == nil)
+        #expect(imported("short") == nil && imported(c) == nil)
+    }
+
+    @Test func idsWithOtherCharactersAreRejected() throws {
+        let r = try clew.importExternal(batch([video("aaaaaaaaaa/"), video("aaaaaaaaaa?"), video("aaaaaaaaaaaa")], total: 3))
+        #expect(r.skipped == 3 && r.added == 0)
+    }
+
+    @Test func aRenamedVideoUpdatesOnlyTitlesTheUserNeverEdited() throws {
+        try clew.importExternal(batch([video(a, "old"), video(b, "old")], total: 2))
+        let edited = try #require(imported(b))
+        try clew.editItem(id: edited.id, ItemEdit(title: "mine", url: edited.url))
+        let r = try clew.importExternal(batch([video(a, "new"), video(b, "new")], total: 2))
+        #expect(r.renamed == 1)
+        #expect(imported(a)?.title == "new" && imported(b)?.title == "mine")
+    }
+
+    @Test func aWholeListScanLetsGoUntouchedLaterItemsThatLeftIt() throws {
+        try clew.importExternal(batch([video(a), video(b), video(c)], total: 3))
+        let r = try clew.importExternal(batch([video(a)], total: 1))
+        #expect(r.letGo == 2 && r.complete)
+        #expect(imported(b)?.deletedAt != nil && imported(c)?.deletedAt != nil)
+        #expect(try clew.laterCount() == 1)
+        // Recorded as the import's decision, not counted as the user's win.
+        #expect(store.state.laterReviews.values.allSatisfy { $0.decision == .letGo && $0.source == .extensionYouTube })
+        #expect(try clew.lettingGoCount() == 0)
+    }
+
+    @Test func aLetGoItemTakesItsReminderWithIt() throws {
+        try clew.importExternal(batch([video(a)], total: 1))
+        let item = try #require(imported(a))
+        try clew.setReminder(itemId: item.id, time: TimeOfDay(hour: 18, minute: 0))
+        try clew.importExternal(batch([video(d)], total: 1))
+        #expect(try clew.reminder(forItem: item.id) == nil)
+        #expect(store.state.reminders.values.allSatisfy { $0.deletedAt != nil })
+    }
+
+    @Test func aPartialScanNeverLetsGo() throws {
+        try clew.importExternal(batch([video(a), video(b), video(c)], total: 3))
+        // The page has loaded 1 of its 3 rows, or its count could not be read.
+        #expect(try clew.importExternal(batch([video(a)], total: 3)).letGo == 0)
+        #expect(try clew.importExternal(batch([video(a)], total: nil)).letGo == 0)
+        #expect(try clew.importExternal(batch([], total: nil)).letGo == 0)
+        #expect(try clew.laterCount() == 3)
+    }
+
+    @Test func anEmptyListNeverLetsGo() throws {
+        // "No videos" also shows on a signed-out or broken page; an empty read is never
+        // trusted as the whole list (review of v1.1 step 1).
+        try clew.importExternal(batch([video(a), video(b)], total: 2))
+        let r = try clew.importExternal(batch([], total: 0))
+        #expect(!r.complete && r.letGo == 0)
+        #expect(try clew.laterCount() == 2)
+    }
+
+    @Test func rowsTheScraperCouldNotReadMeanNotTheWholeList() throws {
+        try clew.importExternal(batch([video(a), video(b)], total: 2))
+        // 2 rows on the page, 1 read, and a stray count that happens to say 1.
+        let scan = ScanReport(found: 2, parsed: 1, selectorVersion: "t")
+        let r = try clew.importExternal(ImportBatch(source: .extensionYouTube, entries: [video(a)], listTotal: 1, scan: scan))
+        #expect(!r.complete && r.letGo == 0)
+        // No scan report at all: not trusted either.
+        #expect(try !clew.importExternal(ImportBatch(source: .extensionYouTube, entries: [video(a)], listTotal: 1)).complete)
+        #expect(try clew.laterCount() == 2)
+    }
+
+    @Test func itemsOnTodayDoneOrFromTheUserAreNeverLetGo() throws {
+        try clew.importExternal(batch([video(a), video(b), video(c)], total: 3))
+        let onToday = try #require(imported(b)), done = try #require(imported(c))
+        try clew.planForToday(itemIds: [onToday.id, done.id])
+        try clew.checkIn(itemId: done.id)
+        let own = try clew.addItem(NewItem(title: "mine", url: URL(string: "https://www.youtube.com/watch?v=ccccccccccc"),
+                                           shape: .later))
+        let r = try clew.importExternal(batch([video(d)], total: 1))
+        #expect(r.letGo == 1)                                   // only a, untouched in Later
+        #expect(imported(a)?.deletedAt != nil)
+        #expect(imported(b)?.deletedAt == nil)                  // on Today, not done yet
+        #expect(imported(c)?.deletedAt == nil)                  // on Today, done
+        #expect(store.state.items[own.id]?.deletedAt == nil)    // the user's own item
+    }
+
+    @Test func aPickedItemMovedBackToLaterIsLaterAgain() throws {
+        try clew.importExternal(batch([video(a)], total: 1))
+        let item = try #require(imported(a))
+        try clew.planForToday(itemIds: [item.id])
+        try clew.moveToLater(itemId: item.id)
+        #expect(try clew.importExternal(batch([video(d)], total: 1)).letGo == 1)
+    }
+
+    @Test func aDoneItemBackInLaterStaysWhenItLeavesTheList() throws {
+        try clew.importExternal(batch([video(a)], total: 1))
+        let item = try #require(imported(a))
+        try clew.planForToday(itemIds: [item.id])
+        try clew.checkIn(itemId: item.id)
+        // Force it back to Later the way a future command might (e.g. sync).
+        try store.write { w in
+            var i = try #require(try w.item(id: item.id)); i.state = .later; try w.update(i)
+        }
+        #expect(try clew.importExternal(batch([video(d)], total: 1)).letGo == 0)
+    }
+
+    @Test func aVideoBackOnTheListIsRestored() throws {
+        try clew.importExternal(batch([video(a), video(b)], total: 2))
+        clock.set(local(11, 10))
+        try clew.importExternal(batch([video(a)], total: 1))
+        clock.set(local(11, 11))
+        let r = try clew.importExternal(batch([video(a), video(b)], total: 2))
+        #expect(r.restored == 1 && r.added == 0)
+        let item = try #require(imported(b))
+        #expect(item.deletedAt == nil && item.state == .later)
+        #expect(store.state.laterReviews.values.allSatisfy { $0.voidedAt != nil })
+        #expect(store.state.items.count == 2)
+    }
+
+    @Test func whatTheUserDeletedOrLetGoStaysGone() throws {
+        try clew.importExternal(batch([video(a), video(b)], total: 2))
+        try clew.deleteItem(itemId: try #require(imported(a)).id)
+        try clew.letGo(itemId: try #require(imported(b)).id)
+        let r = try clew.importExternal(batch([video(a), video(b)], total: 2))
+        #expect(r.restored == 0 && r.added == 0)
+        #expect(imported(a)?.deletedAt != nil && imported(b)?.deletedAt != nil)
+        #expect(try clew.laterCount() == 0)
+    }
+
+    @Test func aLetGoAfterTheImportsOwnIsTheUsers() throws {
+        // Imported, let go by the import, restored, then let go by the user: stays gone.
+        try clew.importExternal(batch([video(a)], total: 1))
+        try clew.importExternal(batch([video(d)], total: 1))
+        try clew.importExternal(batch([video(a)], total: 1))
+        try clew.letGo(itemId: try #require(imported(a)).id)
+        #expect(try clew.importExternal(batch([video(a)], total: 1)).restored == 0)
+        #expect(imported(a)?.deletedAt != nil)
+    }
+
+    @Test func onlyImportSourcesAndBoundedBatches() throws {
+        #expect(throws: ClewError.notAllowed) {
+            try clew.importExternal(ImportBatch(source: .user, entries: [video(a)], listTotal: 1))
+        }
+        let many = (0...Clew.maxImportEntries).map { video(String(format: "v%010d", $0)) }
+        #expect(throws: ClewError.tooManyEntries(max: Clew.maxImportEntries)) {
+            try clew.importExternal(batch(many, total: nil))
+        }
+    }
+
+    @Test func longTitlesAreCut() throws {
+        try clew.importExternal(batch([video(a, String(repeating: "x", count: 500))], total: 1))
+        let title = try #require(imported(a)).title
+        #expect(title.count == Clew.maxTitleLength && title.hasSuffix("…"))
+    }
+}
+
+@Suite struct ScanHealthTests {
+    @Test func aPageThatShouldHaveItemsButParsedNoneNeedsAnUpdate() {
+        let ok = ImportResult(complete: true)
+        #expect(!ScanReport(found: 3, parsed: 3, selectorVersion: "1").needsUpdate(listTotal: 3, result: ok))
+        #expect(!ScanReport(found: 0, parsed: 0, selectorVersion: "1").needsUpdate(listTotal: 0, result: ok))
+        #expect(!ScanReport(found: 0, parsed: 0, selectorVersion: "1").needsUpdate(listTotal: nil, result: ok))
+        // Rows found but unreadable, a count with no rows read, or entries Clew rejected.
+        #expect(ScanReport(found: 3, parsed: 2, selectorVersion: "1").needsUpdate(listTotal: 3, result: ok))
+        #expect(ScanReport(found: 0, parsed: 0, selectorVersion: "1").needsUpdate(listTotal: 12, result: ok))
+        #expect(ScanReport(found: 2, parsed: 2, selectorVersion: "1").needsUpdate(listTotal: 2, result: ImportResult(skipped: 1)))
+    }
+}

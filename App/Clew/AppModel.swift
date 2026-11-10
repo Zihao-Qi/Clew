@@ -31,6 +31,9 @@ final class AppModel {
     /// the list at rollover anyway.
     private(set) var dismissedCelebrations: Set<UUID> = []
 
+    /// The Chrome extension's connection (live app only).
+    private(set) var browser: BrowserConnection?
+
     /// True when the user turned Clew's notifications off in System Settings.
     private(set) var notificationsDenied = false
 
@@ -48,6 +51,7 @@ final class AppModel {
     convenience init() {
         do {
             self.init(databaseAt: try Self.databaseURL())
+            if let clew { browser = BrowserConnection(clew: clew) }
         } catch {
             self.init(clew: nil)
             fatalMessage = String(localized: "Clew couldn't open its data. Quit and reopen Clew.")
@@ -139,6 +143,7 @@ final class AppModel {
         }
         observation?.cancel()
         observation = nil
+        browser?.use(nil)
         self.clew = nil
         self.store = nil
         do {
@@ -147,6 +152,7 @@ final class AppModel {
             let fresh = Clew(store: reopened, clock: SystemClock(), zones: SystemTimeZone())
             self.store = reopened
             self.clew = fresh
+            browser?.use(fresh)
             observation = fresh.observeChanges { [weak self] in Task { @MainActor in self?.refresh() } }
             refresh()
             let date = SettingsView.dayText(entry.day)
@@ -374,7 +380,7 @@ final class AppModel {
         case .invalidSchedule: String(localized: "Pick at least one day.")
         case .pickCount: String(localized: "Pick 1 to 3 items.")
         case .goalReached: String(localized: "Goal reached! Start a next round or raise the target.")
-        case .itemNotFound, .checkInNotFound, .notAllowed: String(localized: "That can't be done right now.")
+        case .itemNotFound, .checkInNotFound, .notAllowed, .tooManyEntries: String(localized: "That can't be done right now.")
         }
     }
 

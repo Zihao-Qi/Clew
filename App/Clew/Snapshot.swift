@@ -2,6 +2,7 @@
 import AppKit
 import ClewCore
 import ClewDomain
+import ClewGateway
 import ClewStore
 import SwiftUI
 import UserNotifications
@@ -197,6 +198,56 @@ enum Snapshot {
 
     /// `CLEW_RESTORE_TEST=1`: the app model's real restore path on a temporary
     /// database (never the user's): back up, change, restore, then undo the restore.
+    /// `CLEW_GATEWAY_TEST=1`: inside the sandbox, listen on 127.0.0.1, pair and import
+    /// one video over real HTTP, with a throwaway Keychain item and an in-memory
+    /// database. Prints each step and exits.
+    static func gatewayTestAndExit() -> Never {
+        Task { @MainActor in
+            do {
+                let clew = Clew(store: try SQLiteStore.inMemory(), clock: SystemClock(), zones: SystemTimeZone())
+                let keychain = KeychainCredentials(account: "debug-gateway-test")
+                keychain.remove()
+                defer { keychain.remove() }
+                let gateway = try Gateway(clew: clew, credentials: keychain, allowedOrigins: [BrowserConnection.extensionOrigin])
+                let listener = GatewayListener(gateway: gateway)
+                let port = try await listener.start()
+                print("listening on 127.0.0.1:\(port)")
+                let base = "http://127.0.0.1:\(port)/v1"
+                let session = URLSession(configuration: .ephemeral)
+                func post(_ path: String, _ body: [String: Any], token: String? = nil) async throws -> (Int, [String: Any]) {
+                    var r = URLRequest(url: URL(string: base + path)!)
+                    r.httpMethod = "POST"
+                    r.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    r.setValue(BrowserConnection.extensionOrigin, forHTTPHeaderField: "Origin")
+                    if let token { r.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+                    r.httpBody = try JSONSerialization.data(withJSONObject: body)
+                    let (data, response) = try await session.data(for: r)
+                    return ((response as! HTTPURLResponse).statusCode,
+                            (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:])
+                }
+                let code = gateway.startPairing().code
+                let (pairStatus, paired) = try await post("/pair", ["code": code, "name": "debug"])
+                print("pair:", pairStatus, "keychain clients:", (try? keychain.load().count) ?? -1)
+                guard let token = paired["token"] as? String else { print("FAIL: no token"); exit(1) }
+                let (importStatus, answer) = try await post("/import", [
+                    "source": "extension.youtube", "listTotal": 1,
+                    "entries": [["externalRef": "dQw4w9WgXcQ", "title": "Debug video"]],
+                    "scan": ["found": 1, "parsed": 1, "selectorVersion": "debug"],
+                ], token: token)
+                print("import:", importStatus, answer["laterCount"] ?? "-", "later:", try clew.laterItems().map(\.title))
+                let (bad, _) = try await post("/import", ["source": "extension.youtube", "entries": []], token: "wrong")
+                print("wrong token:", bad)
+                listener.stop()
+                exit(pairStatus == 200 && importStatus == 200 && bad == 401 ? 0 : 1)
+            } catch {
+                print("FAIL:", error)
+                exit(1)
+            }
+        }
+        RunLoop.main.run()
+        exit(1)
+    }
+
     static func restoreTestAndExit() -> Never {
         Task { @MainActor in
             let dir = FileManager.default.temporaryDirectory.appendingPathComponent("clew-restore-test-\(UUID().uuidString)")
