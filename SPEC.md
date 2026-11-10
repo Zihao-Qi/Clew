@@ -205,7 +205,8 @@ stopped daily use, not adding features.
   sessions, each removable (a void).
 - **Day timeline (v1.2, 2026-11-10):** today's hours, **above the list in the menu**,
   so a plan and the list are one glance. Settings › General › Day timeline › "Show the
-  day timeline" (default on) turns it off and the menu is as before. About **4 hours show** (about
+  day timeline" (default on) turns it off and the menu is as before. About **6 hours show** (*changed*
+  2026-11-10 after use, from 4; about
   60 points an hour), it scrolls up and down through Clew's day (4 a.m. to 4 a.m.), and
   it opens scrolled to now, with a quiet line at the current time; the menu grows taller
   by that much, but never past the screen (the list scrolls when it must). **Today

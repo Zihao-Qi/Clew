@@ -14,8 +14,8 @@ struct TimelineGeometry: Equatable {
 enum TimelineMetrics {
     /// 60 points an hour.
     static let pointsPerMinute: CGFloat = 1
-    /// About 4 hours show (SPEC 2026-11-10).
-    static let height: CGFloat = 240
+    /// About 6 hours show (user, 2026-11-10; was 4).
+    static let height: CGFloat = 360
     static let labelWidth: CGFloat = 40
     static let quarter = Clew.blockStepMinutes
 

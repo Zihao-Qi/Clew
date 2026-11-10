@@ -250,6 +250,7 @@ struct TodayListView: View {
                         onPlace: showsTimeline ? { screen = .place(row.id, block: nil) } : nil,
                         canMoveUp: index > 0, canMoveDown: index < rows.count - 1,
                         isDragged: dragging == row.id,
+                        dragActive: dragging != nil || lifted != nil,
                         onHoverChange: { inside in
                             if inside { hoveredItem = row.id } else if hoveredItem == row.id { hoveredItem = nil }
                         })
@@ -502,6 +503,9 @@ struct RowView: View {
     /// This row is being dragged: it gets a solid background so rows sliding under it
     /// don't show through.
     var isDragged = false
+    /// Something is being dragged: rows under the pointer do not light up (user,
+    /// 2026-11-10: it looked as if they were selected).
+    var dragActive = false
     /// Tells the list which task is under the pointer (the Delete key's target).
     var onHoverChange: ((Bool) -> Void)? = nil
 
@@ -588,7 +592,7 @@ struct RowView: View {
                         .overlay(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.12)))
                 } else {
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.primary.opacity(hovering ? 0.06 : 0))
+                        .fill(Color.primary.opacity(hovering && !dragActive ? 0.06 : 0))
                 }
             }
             .padding(.horizontal, 6)
