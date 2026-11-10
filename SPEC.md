@@ -229,8 +229,8 @@ stopped daily use, not adding features.
   - **On a block** (right-click, also accessibility actions): **Done** / **+1** and
     **Undo** (the row's tick, by hand; *user choice*: right-click only, no circle on the
     block), **Focus** (the timer, with its controls there while it runs), **Move to…**
-    (a start-time and length picker), **Length** (15, 30, 45, 60, 90 minutes; lengths
-    that would pass 4 a.m. are not offered), **Add another block** (right after it, the
+    (a start-time and length picker), **Length** (15, 30, 45, 60, 90, 120 minutes;
+    lengths that would pass 4 a.m. are not offered), **Add another block** (right after it, the
     same length; not offered when that would pass 4 a.m.), **Not finished**, **Remove
     block**, **Delete**. Clicking a block opens the task's details. The row's right-click ›
     **Put on timeline…** places it without dragging.
@@ -290,24 +290,38 @@ stopped daily use, not adding features.
     says so.
   - **A repeating task's time slot** (*user*, 2026-11-10). A habit or a counted goal
     can have a slot, set in Add and Edit: "On the timeline: at 8:00 for 60 min" (a
-    start on a quarter hour, a length of 15, 30, 45, 60, 90 or 120 minutes; off by
-    default). **Each day the task is on Today**, Clew places that block by itself,
-    once: on a day it is not due (a weekday not chosen, a weekly target met) there is
-    none. It then behaves like any block: the task lives on the timeline, the block's
-    end ticks it.
-    - **Direct changes are for today only:** moving, resizing, removing it or dragging
-      it back to the list changes today's block; tomorrow it is at the slot again. A
-      block removed today does not come back today.
-    - **The repeating slot changes only in Edit.** A change (or turning it off) also
-      applies to today's block if that block is untouched (not moved, resized or
-      removed by hand) and has not started; otherwise it starts tomorrow.
-    - **Never a tick for time that was not planned:** the block is placed only if its
-      end is still ahead when Clew places it (the day's start, or when Clew next runs:
-      a Mac that was off until 10:00 gets no 8–9 block that day; the task stays in the
-      list). It is not placed either when the task already has a block today (placed by
-      hand), or while the timeline is turned off.
-    - A slot near the day's end is cut at 4 a.m., like a dropped block. Once-tasks and
-      links have no slot.
+    start on a quarter hour of the wall clock, a length of 15, 30, 45, 60, 90 or 120
+    minutes; off by default). Clew then places that block by itself.
+    - **When:** a slot block is placed when the task has a slot, is on Today and still
+      needs something (not done today; a goal not reached), the timeline is on, the
+      slot's **start is still ahead**, and the task has had **no block today** (live or
+      removed). Clew checks at the day's start, whenever it runs, and right after the
+      slot is saved, so a slot set at 7:00 for 8:00 appears today. A Mac opened at 8:30
+      for an 8–9 slot gets no block that day; the task stays in the list (*user*).
+      Blocks of earlier days decide first. On a day the task is not due (a weekday not
+      chosen, a weekly target met) there is none.
+    - **It never ticks by itself** (*user*: a slot that ticked daily would fill the
+      heatmap and active days with no action). At its end the block asks: it shows
+      "Done?", a notification "Done with Write intro?" offers **Done** (or **+1**), and
+      right-click › Done / +1 works as on any block. Unanswered, it stays an asking
+      block and the task stays undone, rolling forward as usual; nothing is counted.
+      Blocks placed by hand keep ticking at their end.
+    - **Direct changes are for today only** (*user*): moving, resizing, removing it or
+      dragging it back to the list changes today's block; tomorrow it is at the slot
+      again. A block removed today does not come back today.
+    - **The repeating slot changes only in Edit** (*user*). A change applies to today's
+      block too if that block is untouched (not moved, resized or removed by hand) and
+      has not started: it moves to the new slot, or is removed if the new slot has
+      already started (nothing ticks). Turning the slot off removes an untouched block
+      that has not started. Otherwise the change starts tomorrow.
+    - **Time:** the slot is wall-clock time in the current zone. On a DST day a time
+      that does not exist moves to the next quarter hour, a time that occurs twice is
+      the first one, and the length is real minutes. A slot is cut at 4 a.m., like a
+      dropped block. Once-tasks and links have no slot. Notification permission is asked
+      when a slot is saved.
+  - **A goal that reaches its total on the timeline goes back to the list** (*user*,
+    2026-11-10, for every block): its row there shows the congratulation and Next round /
+    Raise target; its block stays on the timeline, done.
   - **Calendar events (step 2)** show on the timeline as **read-only** blocks in their
     calendar's colour: title and time, nothing to click, never ticked, never counted,
     never alerted by Clew (Calendar has its own alerts). All-day events sit as a thin
