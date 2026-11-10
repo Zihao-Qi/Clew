@@ -65,6 +65,13 @@ private let a = "1850000000000000001", b = "1850000000000000002", c = "185000000
         #expect(tick.localDay == LocalDay(string: "2026-11-10")! && tick.source == .extensionX)
     }
 
+    @Test func theNewestBookmarkRemovedOnThePhoneIsCaught() throws {
+        try scan([a, b, c])
+        clock.set(local(10))
+        #expect(try scan([b, c]).letGo == 1)
+        #expect(try read() == [a])
+    }
+
     @Test func newPostsOnTopDoNotHideAGap() throws {
         try scan([a, b, c])
         try scan([n, a, c])
@@ -208,6 +215,10 @@ private let a = "1850000000000000001", b = "1850000000000000002", c = "185000000
         #expect(rule("ABC", "").order == ["A", "B", "C"])
         #expect(rule("ABC", "AAC") == (["A", "C"], ["B"]))         // a repeated row counts once
         #expect(rule("ABCD", "ACBD").removed.isEmpty)               // what is on the page is never removed
+        #expect(rule("ABC", "BC").removed == ["A"])                 // the newest one, gone from the top
+        #expect(rule("ABC", "XBC").removed == ["A"])                // ...with a new one above
+        #expect(rule("ABC", "XY").removed.isEmpty)                  // nothing known: nothing decided
+        #expect(rule("ABCDE", "EBC").removed.isEmpty)               // out of order: the top proves nothing
         // Gemini review: E then C bookmarked again on the phone, so the list is C E A B D.
         // Once the run reaches the posts that never moved, D is safe and real gaps count.
         #expect(rule("ABCDE", "CEAB").removed.isEmpty)

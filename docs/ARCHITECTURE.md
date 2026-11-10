@@ -323,7 +323,9 @@ Removals come from:
   rest in its old order. Only the part of the run *after its last step backwards* in
   the old order is trusted (Gemini review 2026-11-10: pairs inside the moved block
   prove nothing). For each pair of consecutive known posts there, every post between
-  them in the old order that is not in the run was removed. Once the run reaches the
+  them in the old order that is not in the run was removed. With nothing out of order,
+  the top of the list is a bound too, so the newest bookmark removed on the phone is
+  caught. Once the run reaches the
   posts that never moved, every gap is real; a run lying wholly inside a moved block
   of two or more posts is the remaining blind spot ("Not read" undoes it). The new
   order is the run, then the rest as before. It is kept in the setting

@@ -248,14 +248,18 @@ extension Clew {
     /// would wrongly take D as gone). Only the part of the run after its last step
     /// backwards in the old order is trusted: once the run reaches the posts that never
     /// moved, every gap there is real. A run that lies wholly inside a moved block of
-    /// two or more posts is the remaining blind spot ("Not read" undoes it).
+    /// two or more posts is the remaining blind spot ("Not read" undoes it). The top of
+    /// the list counts as a bound when nothing in the run is out of order.
     /// Returns the new order (the run, then the rest as before) and the removed refs.
     public static func gapRule(previous: [String], top: [String]) -> (order: [String], removed: [String]) {
         let position = Dictionary(previous.enumerated().map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
         let inRun = Set(top)
         let known = top.compactMap { position[$0] }
         let lastStepBack = known.indices.dropLast().last { known[$0] > known[$0 + 1] }
-        let trusted = lastStepBack.map { Array(known[($0 + 1)...]) } ?? known
+        // The run starts at the top of the list, so with nothing out of order the top
+        // itself is a bound too (-1): the newest bookmark, removed on the phone, is
+        // caught even though it has nothing above it.
+        let trusted = lastStepBack.map { Array(known[($0 + 1)...]) } ?? ([-1] + known)
         // `trusted` never steps back, so the ranges below do not overlap: each post is
         // removed at most once.
         var removed: [String] = []
