@@ -196,6 +196,18 @@ private func video(_ ref: String, watched: Double? = nil) -> ExternalEntry {
         #expect(voided.count == 1 && voided.allSatisfy { $0.source == .extensionYouTube })
     }
 
+    @Test func aVideoRemovedAMomentAgoIsNotBroughtBackByAStaleScan() throws {
+        // Gemini review: the 10-minute wait was only tested for X.
+        try load([video("aaaaaaaaaaa"), video("bbbbbbbbbbb")])
+        try load([video("aaaaaaaaaaa")])                            // b removed: finished
+        clock.set(local(2).addingTimeInterval(Clew.restoreAfter - 1))
+        try load([video("aaaaaaaaaaa"), video("bbbbbbbbbbb")])      // another tab, still showing b
+        #expect(try clew.collection(.extensionYouTube)?.done.map(\.item.externalRef) == ["bbbbbbbbbbb"])
+        clock.set(local(2).addingTimeInterval(Clew.restoreAfter + 1))
+        try load([video("aaaaaaaaaaa"), video("bbbbbbbbbbb")])      // really back on Watch Later
+        #expect(try clew.collection(.extensionYouTube)?.notStarted.contains { $0.item.externalRef == "bbbbbbbbbbb" } == true)
+    }
+
     // MARK: On and off
 
     @Test func aListTurnedOffIsHiddenAndImportsNothing() throws {

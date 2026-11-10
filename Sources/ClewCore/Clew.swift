@@ -243,6 +243,9 @@ public final class Clew: Sendable {
         let now = clock.now()
         let day = currentDay()
         return try store.write { w in
+            // Only a live item's tick: one that left a collection (or was deleted) is
+            // undone with "Not finished", never here (Gemini review 2026-11-10).
+            guard let item = try w.item(id: itemId), item.deletedAt == nil else { return nil }
             let roundStart = try w.roundStarts(itemIds: [itemId])[itemId]
             let todays = try w.checkIns(itemIds: [itemId], from: day)
                 .filter { c in c.localDay == day && (roundStart.map { c.at >= $0 } ?? true) }

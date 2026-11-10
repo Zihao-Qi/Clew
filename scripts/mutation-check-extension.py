@@ -49,6 +49,8 @@ M = [
  ("E38 forget does nothing", E+"x.ts", "    this.entries.splice(i, 1);\n", "    if (i < -1) this.entries.splice(i, 1);\n"),
  ("E39 run not shortened", E+"x.ts", "    if (i < this.run) this.run -= 1;\n", ""),
  ("E40 unbookmarked rows kept", E+"x.ts", "if (post && !isUnbookmarked(post)) posts.push", "if (post) posts.push"),
+ ("E41 forgotten stays forgotten", E+"x.ts", "    this.refs.delete(ref);\n", ""),
+ ("E42 click forgets nothing", E+"x.ts", "  if (!click.bookmarked) scan?.forget(click.entry.externalRef);", "  void scan; void click;"),
  ("E16 checks lax", E+"contract.ts", "[\"added\", \"renamed\", \"restored\", \"letGo\", \"skipped\", \"progressed\"].every((k) => isInt(r[k]))", "true"),
 ]
 results = []

@@ -4,7 +4,7 @@
 // - Anywhere on x.com, a click on a post's bookmark button is sent at once: one click
 //   listener, idle until you click.
 
-import { BookmarkScan, bookmarkClick, isBookmarks, readWindow } from "./x";
+import { BookmarkScan, applyClick, bookmarkClick, isBookmarks, readWindow } from "./x";
 
 const SETTLE_MS = 1500;
 const LOOK_MS = 250;
@@ -60,7 +60,7 @@ function onClick(event: MouseEvent): void {
   if (!(event.target instanceof Element)) return;
   const click = bookmarkClick(event.target, postBy);
   if (!click) return;
-  if (!click.bookmarked) scan?.forget(click.entry.externalRef);
+  applyClick(scan, click);
   send({ type: "bookmark", click });
 }
 

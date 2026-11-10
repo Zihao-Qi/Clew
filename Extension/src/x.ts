@@ -190,6 +190,12 @@ export class BookmarkScan {
   }
 }
 
+/** What a bookmark click means for the visit's scan: a post unbookmarked here leaves
+ * it, so the next send does not bring it back. */
+export function applyClick(scan: BookmarkScan | undefined, click: BookmarkRequest): void {
+  if (!click.bookmarked) scan?.forget(click.entry.externalRef);
+}
+
 /** A click on a post's bookmark button: what changed. The button is read before X
  * flips it, so "bookmark" means it is being bookmarked. */
 export function bookmarkClick(target: Element, postBy: (handle: string) => string): BookmarkRequest | undefined {

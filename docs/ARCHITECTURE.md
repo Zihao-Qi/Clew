@@ -305,7 +305,8 @@ means finished** (SPEC 2026-11-10): in the same transaction, each one without a 
 check-in gets one (`amount` 1, the import's `source`, today's `localDay`); one already
 ticked is not ticked again. An item let go that way comes back if it reappears: its
 let-go is voided, and so are the ticks the import gave it (source = the import's), so
-it is to watch again; a tick the user made stays. Anything the user deleted stays gone. A source
+it is to watch again; a tick the user made stays. Anything the user deleted stays gone
+for scans; only an X bookmark click brings a deleted post back (see the state table). A source
 turned off (`collectionsOff`, setting `collectionsOff`: a JSON array of source raw
 values; unknown ones are dropped) refuses the import with `ClewError.listTurnedOff`
 before anything is read or written; the Gateway answers 409 and the extension shows
@@ -332,8 +333,9 @@ Removals come from:
   `listOrder.extension.x` (a JSON array of refs; derived state, rewritten only when it
   changes).
 - **The bookmark button**, `bookmarkChanged(source:entry:bookmarked:)` (Gateway
-  `POST /v1/bookmark`): bookmarked adds the post at the top of the order, or restores
-  it if it had left (to read again), and drops posts no longer live from the order;
+  `POST /v1/bookmark`): bookmarked adds the post at the top of the order, restores it
+  if it had left (to read again), or brings it back if the user had deleted it (ticks
+  voided); posts no longer live are dropped from the order;
   unbookmarked makes a live post leave the list
   like any removal (`leaveList`: tick unless ticked, the import's let-go). Unknown
   posts are ignored when unbookmarked; a bookmark needs a title.

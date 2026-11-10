@@ -184,7 +184,9 @@ extension Clew {
                                                  top: top)
                 result.letGo += try leaveList(gone.compactMap { live[$0] }, source: batch.source,
                                                    now: now, day: day, zone: zone, w)
-                try Self.saveListOrder(order, batch.source, now: now, w)
+                // A post deleted in Clew may still be on the page (in the run): it keeps
+                // no place (Gemini review 2026-11-10).
+                try Self.saveListOrder(order.filter { live[$0] != nil }, batch.source, now: now, w)
             }
             return result
         }

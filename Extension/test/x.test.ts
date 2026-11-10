@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { parseHTML } from "linkedom";
-import { BookmarkScan, bookmarkClick, cellTop, isBookmarks, postId, readPost, readWindow, SELECTOR_VERSION } from "../src/x";
+import { applyClick, BookmarkScan, bookmarkClick, cellTop, isBookmarks, postId, readPost, readWindow, SELECTOR_VERSION } from "../src/x";
 
 const page = () =>
   parseHTML(readFileSync(new URL("fixtures/x-bookmarks.synthetic.html", import.meta.url), "utf8")).document;
@@ -101,6 +101,18 @@ describe("a scan built while scrolling", () => {
     expect(s.request().fromTop).toBe(2);
     s.add({ atTop: false, posts: [e(3), e(5)] });              // still unbroken
     expect(s.request().fromTop).toBe(3);
+  });
+
+  test("an unbookmark click forgets the post; a bookmark click does not; bookmarked again, it is back", () => {
+    const s = new BookmarkScan();
+    s.add({ atTop: true, posts: [e(1), e(2), e(3)] });
+    applyClick(s, { source: "extension.x", entry: { externalRef: e(1).externalRef, title: "" }, bookmarked: true });
+    expect(s.request().entries.length).toBe(3);
+    applyClick(s, { source: "extension.x", entry: { externalRef: e(2).externalRef, title: "" }, bookmarked: false });
+    expect(s.request().entries.map((x) => x.title)).toEqual(["p1", "p3"]);
+    applyClick(undefined, { source: "extension.x", entry: e(3), bookmarked: false });   // not on Bookmarks: fine
+    s.add({ atTop: false, posts: [e(1), e(2), e(3)] });        // bookmarked again in the same visit
+    expect(s.request().entries.map((x) => x.title)).toContain("p2");
   });
 
   test("forgetting a post seen after a break leaves the run as it was", () => {

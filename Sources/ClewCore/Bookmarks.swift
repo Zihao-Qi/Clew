@@ -26,8 +26,8 @@ extension Clew {
         return try storeForQueries.write { w in
             let all = try w.items(source: source)
             let existing = all.first { $0.externalRef == ref }
-            // Only live items keep a place (as in the import), so a post deleted in Clew
-            // never lingers in the order.
+            // Only live items keep a place (the import filters the same way), so a post
+            // deleted in Clew never lingers in the order.
             let live = Set(all.filter { $0.deletedAt == nil }.compactMap(\.externalRef))
             var order = try Self.listOrder(source, w).filter { $0 != ref && live.contains($0) }
             if bookmarked, let title {

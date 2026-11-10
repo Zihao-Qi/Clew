@@ -209,6 +209,18 @@ private let a = "1850000000000000001", b = "1850000000000000002", c = "185000000
         try clew.deleteItem(itemId: try #require(item(b)).id)
         #expect(try scan([a, b]).restored == 0)
         #expect(item(b)?.deletedAt != nil)
+        // ...and it keeps no place in the order even while still on the page (Gemini).
+        let order = try store.read { try $0.setting("listOrder.extension.x") }
+        #expect(order == #"["\#(a)"]"#)
+    }
+
+    @Test func aTickOfAPostThatLeftCannotBeUndoneHere() throws {
+        // Gemini review: undoToday turned "left" into "not read" behind the table's back.
+        try scan([a, b])
+        try clew.bookmarkChanged(source: .extensionX, entry: post(a), bookmarked: false)
+        #expect(try clew.undoToday(itemId: try #require(item(a)).id) == nil)
+        #expect(try read() == [a])
+        #expect(throws: ClewError.itemNotFound) { try clew.checkIn(itemId: try #require(item(a)).id) }
     }
 
     @Test func aBookmarkNeedsATitleAndAValidId() throws {

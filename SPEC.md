@@ -126,7 +126,8 @@ stopped daily use, not adding features.
   stays in the collection's Done group. "Not finished" (right-click) takes it out of
   Done and the heatmap. This happens only when the page showed the whole list (never
   from an empty list); a video re-added comes back, to watch again (its automatic tick
-  is undone; one the user made stays). What the user deleted stays gone.
+  is undone; one the user made stays). What the user deleted stays gone (for X, a
+  bookmark click is the one exception; see "X bookmarks").
 - **X bookmarks (v1.1, 2026-11-10):** the second collection ("X bookmarks  5 to
   read ›"). A post's title is the title of the X Article it shares, else its own text
   (not a quoted post's), else "Post by @name". **Adding:** opening Bookmarks in Chrome
