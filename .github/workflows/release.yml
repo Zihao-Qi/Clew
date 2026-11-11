@@ -1,0 +1,74 @@
+# Builds Clew for Homebrew (Casks/clew.rb). A tag v<version> publishes a GitHub release
+# with Clew-<version>.zip; a pull request that touches the release files does a dry run
+# (build, sign, verify, no release). Signing uses the "Clew Local Development" identity from
+# the repo secrets, so installs keep the same sandbox data as local builds (ARCHITECTURE §15).
+# Secrets are never given to workflows from forks.
+name: Release
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - scripts/release-build.sh
+      - Casks/**
+      - project.yml
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Signing identity in a temporary keychain
+        env:
+          P12: ${{ secrets.CLEW_SIGNING_P12 }}
+          P12_PASSWORD: ${{ secrets.CLEW_SIGNING_P12_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/clew-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          printf '%s' "$P12" | base64 --decode > "$RUNNER_TEMP/identity.p12"
+          security import "$RUNNER_TEMP/identity.p12" -k "$KEYCHAIN" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/identity.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          # A self-signed certificate signs only once it is trusted for code signing.
+          security find-certificate -c "Clew Local Development" -p "$KEYCHAIN" > "$RUNNER_TEMP/identity.pem"
+          sudo security add-trusted-cert -d -r trustRoot -p codeSign -k /Library/Keychains/System.keychain "$RUNNER_TEMP/identity.pem"
+          security find-identity -v -p codesigning "$KEYCHAIN"
+          echo "CLEW_KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+
+      - name: Build, sign and zip
+        run: |
+          set -euo pipefail
+          brew install xcodegen
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then VERSION="${GITHUB_REF_NAME#v}"
+          else VERSION="$(sed -n 's/^ *MARKETING_VERSION: //p' project.yml)"; fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          scripts/release-build.sh "$VERSION" dist
+
+      - name: Publish the release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "dist/Clew-$VERSION.zip" --title "Clew $VERSION" \
+            --notes "Install or update: \`brew tap zihao-qi/clew https://github.com/Zihao-Qi/Clew\`, then \`brew install --cask clew\` (or \`brew upgrade --cask clew\`). Not notarized: after each install or update, open System Settings › Privacy & Security and click Open Anyway for Clew."
+
+      - name: Dry run artifact
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Clew-dry-run
+          path: dist/*.zip
+          retention-days: 3
+
+      - name: Remove the signing keychain
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/clew-signing.keychain-db" || true
