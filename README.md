@@ -6,9 +6,26 @@ videos") so that what's left, and what's done, is always one glance away.
 
 Built for an ADHD brain: minimal text, visible progress, no streaks, no shame.
 
-Status: v1c done (list, reminders and summaries, ratings, backups); v1.1 in progress
-(Chrome extension: YouTube Watch Later into the Later pile).
+Status: v1.2 (list, reminders and summaries, ratings, backups; YouTube Watch Later and
+X bookmarks through a Chrome extension; focus timer; day timeline with time slots).
 See [SPEC.md](SPEC.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [AGENTS.md](AGENTS.md).
+
+## Install with Homebrew
+
+```sh
+brew tap zihao-qi/clew https://github.com/Zihao-Qi/Clew
+brew install --cask clew          # later: brew upgrade --cask clew
+```
+
+Clew is signed with its own certificate but not notarized by Apple, so macOS blocks it
+after each install or update: open **System Settings › Privacy & Security** and click
+**Open Anyway** for Clew. Your data stays on that Mac (`brew uninstall --zap` is the only
+thing that deletes it). macOS 14 or later.
+
+**Releasing** (maintainer): bump `MARKETING_VERSION` in `project.yml` and `version` in
+`Casks/clew.rb` in one pull request; after it is merged, push the tag `v<version>`. The
+Release workflow builds, signs and publishes `Clew-<version>.zip`
+(`scripts/release-build.sh` builds, signs and zips the same app locally, without publishing).
 
 ## Build and run
 
