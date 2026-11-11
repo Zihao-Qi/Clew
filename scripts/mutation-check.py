@@ -535,6 +535,14 @@ M = [
  ("SL25 slot not stored", S+"SQLiteStore.swift", "            i.titleOrigin.rawValue, try i.slot.map(json),", "            i.titleOrigin.rawValue, nil as String?,", "SQLiteStoreTests"),
  ("SL26 old blocks refused", D+"Facts.swift", "origin: try c.decodeIfPresent(Origin.self, forKey: .origin) ?? .hand,", "origin: try c.decode(Origin.self, forKey: .origin),", "SQLiteStoreTests"),
  ("SL27 any origin", S+"Schema.swift", "ALTER TABLE timeBlock ADD COLUMN origin TEXT NOT NULL DEFAULT 'hand' CHECK (origin IN ('hand', 'slot'));", "ALTER TABLE timeBlock ADD COLUMN origin TEXT NOT NULL DEFAULT 'hand';", "SQLiteStoreTests"),
+ # Calendar events (SPEC "Calendar events", step 2)
+ ("CE1 hidden shown", C+"CalendarEvents.swift", "!hidden.contains($0.calendarId) && ", "", "CalendarEventTests"),
+ ("CE2 not cut to day", C+"CalendarEvents.swift", "start: max(e.start, day.start),", "start: e.start,", "CalendarEventTests"),
+ ("CE3 all-day timed", C+"CalendarEvents.swift", ".filter { !$0.isAllDay && $0.end > $0.start }", ".filter { $0.end > $0.start }", "CalendarEventTests"),
+ ("CE4 separate lanes", C+"CalendarEvents.swift", "            day.blocks.map { (.block($0.id), $0.block.start, $0.block.end, 0) }\n            + timed.map", "            [] + timed.map", "CalendarEventTests"),
+ ("CE5 on by default", C+"CalendarEvents.swift", "try storeForQueries.read { try $0.setting(Self.calendarShownKey) == \"true\" }", "try storeForQueries.read { try $0.setting(Self.calendarShownKey) != \"false\" }", "CalendarEventTests"),
+ ("CE6 never re-shown", C+"CalendarEvents.swift", "if hidden { ids.insert(id) } else { ids.remove(id) }", "if hidden { ids.insert(id) }", "CalendarEventTests"),
+ ("CE7 other days", C+"CalendarEvents.swift", "$0.end > day.start && $0.start < day.end", "true", "CalendarEventTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

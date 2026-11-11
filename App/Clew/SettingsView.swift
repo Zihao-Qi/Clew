@@ -57,13 +57,14 @@ struct SettingsView: View {
 
     /// The sidebar's sections.
     enum Pane: String, CaseIterable, Identifiable {
-        case general, summaries, progress, browser, data
+        case general, summaries, progress, calendar, browser, data
         var id: String { rawValue }
         var title: Text {
             switch self {
             case .general: Text("General")
             case .summaries: Text("Summaries")
             case .progress: Text("Progress")
+            case .calendar: Text("Calendar")
             case .browser: Text("Browser")
             case .data: Text("Data")
             }
@@ -73,6 +74,7 @@ struct SettingsView: View {
             case .general: "gearshape"
             case .summaries: "bell"
             case .progress: "chart.bar"
+            case .calendar: "calendar"
             case .browser: "puzzlepiece.extension"
             case .data: "externaldrive"
             }
@@ -223,6 +225,9 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+
+                case .calendar:
+                CalendarSettings(model: model)
 
                 case .browser:
                 if let browser = model.browser {
@@ -421,3 +426,54 @@ private struct NonRestorableWindow: NSViewRepresentable {
         }
     }
 }
+
+/// Settings › Calendar (SPEC "Calendar events"): turn calendar events on the timeline on
+/// or off, and untick calendars. Clew only reads them; only the unticked ids are saved.
+struct CalendarSettings: View {
+    let model: AppModel
+    @State private var hidden: Set<String> = []
+
+    var body: some View {
+        Section {
+            Toggle("Show calendar events on the timeline", isOn: Binding(get: { model.calendarShown },
+                                                                        set: { model.setCalendarShown($0) }))
+            if model.calendarShown, model.calendarAccess == .denied {
+                HStack {
+                    Text("Clew isn't allowed to read your calendar.").font(.callout).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Open Privacy Settings…") { EventKitCalendar.openPrivacySettings() }
+                        .accessibilityLabel(Text("Open calendar privacy settings"))
+                }
+            }
+        } footer: {
+            Text("Today's events appear on the timeline next to your tasks. Clew only reads them: it never changes a calendar, and never saves or sends your events anywhere. Google, iCloud and other accounts show once added in System Settings › Internet Accounts.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        if model.calendarShown, model.calendarAccess == .granted {
+            let calendars = model.calendars()
+            ForEach(Array(Dictionary(grouping: calendars, by: \.source).keys.sorted()), id: \.self) { source in
+                Section {
+                    ForEach(calendars.filter { $0.source == source }) { calendar in
+                        Toggle(isOn: Binding(get: { !hidden.contains(calendar.id) }, set: { on in
+                            if on { hidden.remove(calendar.id) } else { hidden.insert(calendar.id) }
+                            model.setCalendar(calendar.id, hidden: !on)
+                        })) {
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(Color(.sRGB, red: calendar.color[0], green: calendar.color[1], blue: calendar.color[2]))
+                                    .frame(width: 8, height: 8)
+                                Text(calendar.title)
+                            }
+                        }
+                        .accessibilityLabel(Text("Show \(calendar.title)"))
+                    }
+                } header: {
+                    Text(source)
+                }
+            }
+            .onAppear { hidden = model.hiddenCalendars() }
+        }
+    }
+}
+

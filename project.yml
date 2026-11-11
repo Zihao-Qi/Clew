@@ -36,6 +36,8 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_LSUIElement: YES   # menu bar only, no Dock icon
         INFOPLIST_KEY_CFBundleDisplayName: Clew
+        # macOS 14 offers full or write-only calendar access, no read-only; Clew only reads.
+        INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription: "Clew shows today's events on its timeline. It only reads your calendars and never changes them."
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
         CODE_SIGN_ENTITLEMENTS: App/Clew/Clew.entitlements
         ENABLE_APP_SANDBOX: YES   # on from day one (ARCHITECTURE §1); no Accessibility

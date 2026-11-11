@@ -483,6 +483,18 @@ went back to the list); exports from before read `origin` as `hand`.
 - `placedItems` leaves out released blocks; placing a reached goal is refused; a hand
   move un-releases.
 
+**Calendar events (v1.2, step 2).** Read live through EventKit in the app
+(`EventKitCalendar`, behind `CalendarReading` so the snapshot uses made-up events), never
+stored: no table, no export. Full access is requested only from "Show your calendar"
+(macOS 14 has no read-only access; `NSCalendarsFullAccessUsageDescription` says Clew only
+reads); the sandbox entitlement is `com.apple.security.personal-information.calendars`.
+Declined invitations are skipped by the adapter; `EKEventStoreChanged` refreshes. Core's
+`Clew.timelineEvents(_:day:hidden:)` (pure, tested) drops hidden calendars and events
+outside Clew's day, keeps all-day ones apart, cuts timed ones to the day, and lays out
+blocks and events together (`blockPlaces`, `eventPlaces`). Settings: `calendarShown`
+(default off), `calendarPromptClosed`, `calendarsHidden` (only unticked ids, so new
+calendars show).
+
 **Site order (2026-11-10).** Every collection keeps the order its site shows in the
 setting `listOrder.<source>`, and its page lists what is left in that order (items
 not placed yet last, newest first). X's comes from the gap rule and the button.
