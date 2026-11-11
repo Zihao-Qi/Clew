@@ -17,6 +17,12 @@ enum TimelineMetrics {
     /// About 6 hours show (user, 2026-11-10; was 4).
     static let height: CGFloat = 360
     static let labelWidth: CGFloat = 40
+    /// Room between the blocks and hour lines and the card's right edge, so the timeline
+    /// reads as its own area, apart from the list (user, 2026-11-11).
+    static let trailing: CGFloat = 8
+    /// The current time sits this far down when the menu opens: 2 of the 6 hours behind
+    /// it, 4 ahead (user, 2026-11-11).
+    static let quartersBeforeNow = 8
     static let quarter = Clew.blockStepMinutes
 
     static func y(_ date: Date, in day: TimelineDay) -> CGFloat {
@@ -63,7 +69,7 @@ struct DayTimelineView: View {
             ZStack(alignment: .topLeading) {
                 grid
                 GeometryReader { g in
-                    let width = g.size.width - TimelineMetrics.labelWidth - 6
+                    let width = g.size.width - TimelineMetrics.labelWidth - TimelineMetrics.trailing
                     ForEach(day.blocks) { block in
                         TimelineBlockView(model: model, block: block, day: day, space: space,
                                           isLifted: liftedBlock == block.id, hovered: $hovered,
@@ -80,7 +86,7 @@ struct DayTimelineView: View {
                         if context.date >= day.start, context.date < day.end {
                             Rectangle()
                                 .fill(Color.accentColor.opacity(0.7))
-                                .frame(width: g.size.width - TimelineMetrics.labelWidth + 4, height: 1)
+                                .frame(width: g.size.width - TimelineMetrics.labelWidth + 4 - TimelineMetrics.trailing, height: 1)
                                 .offset(x: TimelineMetrics.labelWidth - 4, y: TimelineMetrics.y(context.date, in: day))
                                 .allowsHitTesting(false)
                                 .accessibilityHidden(true)
@@ -92,15 +98,25 @@ struct DayTimelineView: View {
         }
         .scrollPosition(id: $topQuarter, anchor: .top)
         .frame(height: TimelineMetrics.height)
+        // Its own card: a faint tint and rounded corners, inset like the list's rows.
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(space)) } action: { geometry.viewport = $0 }
-        .onAppear {
-            // Opens at now, with a little of the hour before it in view.
-            let minutes = Int(Date().timeIntervalSince(day.start) / 60)
-            topQuarter = max(0, min(minutes / TimelineMetrics.quarter - 2,
-                                    TimelineMetrics.quarters(day) - Int(TimelineMetrics.height) / TimelineMetrics.quarter))
-        }
+        .padding(.horizontal, 8)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
+        // Every time the menu opens, now is a third of the way down.
+        .onAppear(perform: centreOnNow)
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in centreOnNow() }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text("Today's timeline"))
+    }
+
+    private func centreOnNow() {
+        let minutes = Int(Date().timeIntervalSince(day.start) / 60)
+        let visible = Int(TimelineMetrics.height) / TimelineMetrics.quarter
+        topQuarter = max(0, min(minutes / TimelineMetrics.quarter - TimelineMetrics.quartersBeforeNow,
+                                TimelineMetrics.quarters(day) - visible))
     }
 
     /// One 15-point row per quarter hour (the scroll anchors), with the hour labels.
@@ -122,6 +138,7 @@ struct DayTimelineView: View {
                     Rectangle()
                         .fill(Color.primary.opacity(q % 4 == 0 ? 0.12 : 0))
                         .frame(height: 1)
+                        .padding(.trailing, TimelineMetrics.trailing)
                 }
                 .frame(height: CGFloat(TimelineMetrics.quarter) * TimelineMetrics.pointsPerMinute, alignment: .top)
                 .id(q)
@@ -159,6 +176,8 @@ struct TimelineBlockView: View {
     /// or is cancelled, which clears what the drag showed (Gemini review).
     @GestureState private var dragging = false
     @State private var resizeBy = 0
+    /// The pointer is on the bottom edge: a grab bar shows that it resizes.
+    @State private var onEdge = false
 
     private var b: TimeBlock { block.block }
     private var row: TodayRow? { model.today?.rows.first { $0.id == b.itemId } }
@@ -167,13 +186,23 @@ struct TimelineBlockView: View {
         block.state == .ticked || block.state == .covered || (block.state == .skipped && row?.isDone == true)
     }
     private var minutes: Int { b.minutes + resizeBy }
+    /// Running now: it stands out a little (user, 2026-11-11). Redrawn at each block's start
+    /// and end, when the app refreshes.
+    private var isNow: Bool { block.state == .pending && b.start <= Date() && Date() < b.end }
     private var height: CGFloat { CGFloat(minutes) * TimelineMetrics.pointsPerMinute }
 
     var body: some View {
         RoundedRectangle(cornerRadius: 4)
             .fill(looksDone ? Color.secondary.opacity(0.14)
+                  : isNow ? Color.accentColor.opacity(0.32)
                   : block.state == .pending || block.state == .asking ? Color.accentColor.opacity(0.22)
                   : Color.secondary.opacity(0.08))
+            .overlay(alignment: .leading) {
+                if isNow {
+                    Rectangle().fill(Color.accentColor).frame(width: 3)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 4))
             .overlay(alignment: .topLeading) { label }
             .overlay(alignment: .bottom) { if block.canChange { resizeHandle } }
             .frame(height: max(height - 1, 6))
@@ -261,10 +290,19 @@ struct TimelineBlockView: View {
         .padding(.top, minutes <= 15 ? 0 : 2)
     }
 
+    /// The bottom edge's grip: 12 points tall, reaching 4 below the block, so it is easy
+    /// to catch (user, 2026-11-11: 6 points was hard to hit).
     private var resizeHandle: some View {
         Color.clear
-            .frame(height: 6)
+            .frame(height: 12)
+            .overlay {
+                if onEdge || resizeBy != 0 {
+                    Capsule().fill(Color.accentColor.opacity(0.8)).frame(width: 24, height: 3)
+                }
+            }
             .contentShape(Rectangle())
+            .offset(y: 4)
+            .onHover { onEdge = $0 }
             .modifier(ResizePointer())
             .gesture(
                 DragGesture(minimumDistance: 2, coordinateSpace: .named(space))

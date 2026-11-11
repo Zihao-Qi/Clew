@@ -208,7 +208,11 @@ stopped daily use, not adding features.
   day timeline" (default on) turns it off and the menu is as before. About **6 hours show** (*changed*
   2026-11-10 after use, from 4; about
   60 points an hour), it scrolls up and down through Clew's day (4 a.m. to 4 a.m.), and
-  it opens scrolled to now, with a quiet line at the current time; the menu grows taller
+  it opens with now a third of the way down (2 hours behind, 4 ahead; re-centred every
+  time the menu opens; *user*, 2026-11-11), with a quiet line at the current time. It sits
+  in its own inset card with a faint tint, its hour lines and blocks stopping short of the
+  right edge, so it reads apart from the list; the block running now stands out a little
+  (a stronger tint and an accent edge); the menu grows taller
   by that much, but never past the screen (the list scrolls when it must). **Today
   only:** no tomorrow, nothing planned ahead. Nothing of Clew's own on it is red or says "missed".
   - **Placing moves the task** (*changed* 2026-11-10 after first use: the row stayed in

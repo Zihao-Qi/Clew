@@ -54,7 +54,7 @@ struct TodayListView: View {
         let view = timelineGeo.viewport
         return CGRect(x: view.minX + TimelineMetrics.labelWidth,
                       y: timelineGeo.contentTop + TimelineMetrics.y(start, in: day),
-                      width: max(20, view.width - TimelineMetrics.labelWidth - 6),
+                      width: max(20, view.width - TimelineMetrics.labelWidth - TimelineMetrics.trailing),
                       height: CGFloat(minutes) * TimelineMetrics.pointsPerMinute)
     }
 
@@ -288,7 +288,6 @@ struct TodayListView: View {
                                 onMove: { block in screen = .place(block.block.itemId, block: block.id) },
                                 onOpen: { screen = .detail($0) },
                                 onEdit: { item in screen = .edit(item, back: .list) })
-                Divider()
             }
             ForEach(model.lateTicks) { late in
                 LateTickLine(late: late, today: model.today?.day, model: model)
