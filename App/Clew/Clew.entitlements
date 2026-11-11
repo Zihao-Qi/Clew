@@ -12,6 +12,10 @@
 	     Watch Later import (ARCHITECTURE §6 Gateway). -->
 	<key>com.apple.security.network.server</key>
 	<true/>
+	<!-- Reads today's events from macOS Calendar for the day timeline, only after the user
+	     turns it on; Clew never writes to a calendar (SPEC "Calendar events"). -->
+	<key>com.apple.security.personal-information.calendars</key>
+	<true/>
 	<!-- Export writes only where the user picks in the save panel. -->
 	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>

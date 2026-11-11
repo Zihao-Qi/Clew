@@ -64,20 +64,101 @@ struct DayTimelineView: View {
     let onOpen: (UUID) -> Void
     let onEdit: (Item) -> Void
 
+    /// Blocks and events together: a block's column comes from the shared layout when
+    /// calendar events show.
+    private func place(_ block: TimelineBlock) -> TimelinePlace {
+        model.calendarEvents?.blockPlaces[block.id] ?? TimelinePlace(lane: block.lane, lanes: block.lanes)
+    }
+
     var body: some View {
+        VStack(spacing: 0) {
+            header
+            hours
+        }
+        // Its own card: a faint tint and rounded corners, inset like the list's rows.
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .padding(.horizontal, 8)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
+        // Every time the menu opens, now is a third of the way down.
+        .onAppear(perform: centreOnNow)
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in centreOnNow() }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text("Today's timeline"))
+    }
+
+    /// Above the hours: "Show your calendar" until it is on (or closed), a note when macOS
+    /// does not allow it, and today's all-day events as one thin line.
+    @ViewBuilder
+    private var header: some View {
+        if !model.calendarShown, !model.calendarPromptClosed {
+            HStack(spacing: 6) {
+                Button { model.showCalendar() } label: { Label("Show your calendar", systemImage: "calendar") }
+                    .accessibilityLabel(Text("Show your calendar events on the timeline"))
+                Spacer()
+                Button { model.closeCalendarPrompt() } label: { Image(systemName: "xmark").imageScale(.small) }
+                    .accessibilityLabel(Text("Not now"))
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .buttonStyle(.borderless)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+        } else if model.calendarShown, model.calendarAccess == .denied {
+            HStack(spacing: 6) {
+                Text("Clew can't read your calendar.")
+                Spacer()
+                Button("Allow…") { EventKitCalendar.openPrivacySettings() }
+                    .accessibilityLabel(Text("Open calendar privacy settings"))
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .buttonStyle(.borderless)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+        } else if let allDay = model.calendarEvents?.allDay, !allDay.isEmpty {
+            HStack(spacing: 8) {
+                ForEach(allDay) { event in
+                    HStack(spacing: 4) {
+                        Circle().fill(EventColor.of(event)).frame(width: 6, height: 6)
+                        Text(event.title).lineLimit(1)
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(Text("All day: \(event.title)"))
+                }
+                Spacer(minLength: 0)
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+        }
+    }
+
+    private var hours: some View {
         ScrollView(.vertical) {
             ZStack(alignment: .topLeading) {
                 grid
                 GeometryReader { g in
                     let width = g.size.width - TimelineMetrics.labelWidth - TimelineMetrics.trailing
+                    // Calendar events first, so task blocks draw over them.
+                    ForEach(model.calendarEvents?.timed ?? []) { event in
+                        let place = model.calendarEvents?.eventPlaces[event.id] ?? TimelinePlace(lane: 0, lanes: 1)
+                        TimelineEventView(event: event)
+                            .frame(width: max(20, width / CGFloat(place.lanes) - 2),
+                                   height: max(CGFloat(event.end.timeIntervalSince(event.start) / 60) * TimelineMetrics.pointsPerMinute - 1, 6))
+                            .offset(x: TimelineMetrics.labelWidth + CGFloat(place.lane) * width / CGFloat(place.lanes),
+                                    y: TimelineMetrics.y(event.start, in: day))
+                    }
                     ForEach(day.blocks) { block in
                         TimelineBlockView(model: model, block: block, day: day, space: space,
                                           isLifted: liftedBlock == block.id, hovered: $hovered,
                                           onDrag: { onDrag(block, $0) }, onDrop: { onDrop(block) },
                                           onMove: { onMove(block) }, onOpen: { onOpen(block.block.itemId) },
                                           onEdit: onEdit)
-                            .frame(width: max(20, width / CGFloat(block.lanes) - 2))
-                            .offset(x: TimelineMetrics.labelWidth + CGFloat(block.lane) * width / CGFloat(block.lanes),
+                            .frame(width: max(20, width / CGFloat(place(block).lanes) - 2))
+                            .offset(x: TimelineMetrics.labelWidth + CGFloat(place(block).lane) * width / CGFloat(place(block).lanes),
                                     y: TimelineMetrics.y(block.block.start, in: day))
                     }
                     // The current time, redrawn each minute (popover content: a TimelineView
@@ -98,18 +179,7 @@ struct DayTimelineView: View {
         }
         .scrollPosition(id: $topQuarter, anchor: .top)
         .frame(height: TimelineMetrics.height)
-        // Its own card: a faint tint and rounded corners, inset like the list's rows.
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(space)) } action: { geometry.viewport = $0 }
-        .padding(.horizontal, 8)
-        .padding(.top, 8)
-        .padding(.bottom, 4)
-        // Every time the menu opens, now is a third of the way down.
-        .onAppear(perform: centreOnNow)
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in centreOnNow() }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(Text("Today's timeline"))
     }
 
     private func centreOnNow() {
@@ -402,6 +472,44 @@ struct TimelineBlockView: View {
         if row != nil {
             Button("Delete", role: .destructive) { model.delete(b.itemId) }
         }
+    }
+}
+
+/// A calendar event: a stripe in its calendar's colour, a light fill, the title in
+/// secondary text. Read only: nothing to drag or tick (SPEC "Calendar events").
+struct TimelineEventView: View {
+    let event: CalendarEvent
+
+    private var range: String { "\(TimelineMetrics.time(event.start))–\(TimelineMetrics.time(event.end))" }
+    private var minutes: Double { event.end.timeIntervalSince(event.start) / 60 }
+
+    var body: some View {
+        let color = EventColor.of(event)
+        RoundedRectangle(cornerRadius: 4)
+            .fill(color.opacity(0.12))
+            .overlay(alignment: .leading) { Rectangle().fill(color).frame(width: 3) }
+            .overlay(alignment: .topLeading) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(event.title).font(.caption).lineLimit(1)
+                    if minutes >= 30 {
+                        Text(verbatim: range).font(.caption2.monospacedDigit()).lineLimit(1)
+                    }
+                }
+                .foregroundStyle(.secondary)
+                .padding(.leading, 7)
+                .padding(.top, minutes <= 15 ? 0 : 2)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .help(Text(verbatim: "\(event.title) · \(range)"))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text("Calendar: \(event.title), \(range)"))
+    }
+}
+
+enum EventColor {
+    static func of(_ event: CalendarEvent) -> Color {
+        let c = event.color + [0.5, 0.5, 0.5]
+        return Color(.sRGB, red: c[0], green: c[1], blue: c[2])
     }
 }
 

@@ -341,8 +341,10 @@ stopped daily use, not adding features.
     Raise target / Done; its block stays on the timeline, done. The row stays in the list
     (after Next round or Raise target too, so nothing moves under the pointer) until it
     is placed again, and cannot be placed while the goal is reached.
-  - **Calendar events (step 2)** show on the timeline as **read-only** blocks in their
-    calendar's colour: title and time, nothing to click, never ticked, never counted,
+  - **Calendar events (step 2)** show on the timeline as **read-only** blocks (*user*,
+    2026-11-11: a thin stripe in the calendar's colour, a very light fill, the title in
+    secondary text; they sit side by side with overlapping task blocks): title and time,
+    nothing to click, never ticked, never counted,
     never alerted by Clew (Calendar has its own alerts). All-day events sit as a thin
     line at the top. Declined events are hidden. Clew reads **every calendar in macOS
     Calendar** (Google, iCloud, Exchange too, once added in System Settings › Internet
@@ -350,7 +352,10 @@ stopped daily use, not adding features.
     the ones unticked, so a new calendar shows by default. Clew **never writes to a
     calendar**, and events are read live: never saved, exported or sent anywhere.
     Access is asked only when "Show your calendar" on the timeline (or in Settings) is
-    clicked; without it the timeline works with tasks alone.
+    clicked; without it the timeline works with tasks alone. "Show your calendar" sits at
+    the top of the timeline card until used or closed with ×; Settings › Calendar turns
+    events on or off and lists the calendars by account. If macOS does not allow access,
+    the timeline and Settings say so, with a way to the privacy settings.
   - **Steps:** (1) the timeline with task blocks, ticks and start alerts; (2) calendar
     events.
 - Weeks start on **Monday**; "N× per week" items reset then.

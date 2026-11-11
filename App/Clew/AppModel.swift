@@ -73,6 +73,14 @@ final class AppModel {
     }
     /// Today's row for a task, wherever it is shown.
     func row(_ itemId: UUID) -> TodayRow? { today?.rows.first { $0.id == itemId } }
+    /// Today's calendar events laid out with the blocks (SPEC "Calendar events"), while
+    /// calendar events are on and Clew may read Calendar.
+    private(set) var calendarEvents: TimelineEvents?
+    private(set) var calendarShown = false
+    private(set) var calendarPromptClosed = false
+    private(set) var calendarAccess: CalendarAccess = .notAsked
+    /// macOS Calendar, read only. Replaced by made-up events in the debug snapshot.
+    @ObservationIgnored var calendarSource: CalendarReading? = nil
     /// Tasks ticked by a block for an earlier day while the Mac slept.
     private(set) var lateTicks: [LateTick] = []
     @ObservationIgnored private var blockEdgeTimer: Timer?
@@ -83,6 +91,8 @@ final class AppModel {
         do {
             self.init(databaseAt: try Self.databaseURL())
             if let clew { browser = BrowserConnection(clew: clew) }
+            calendarSource = EventKitCalendar()
+            refresh()
         } catch {
             self.init(clew: nil)
             fatalMessage = String(localized: "Clew couldn't open its data. Quit and reopen Clew.")
@@ -144,6 +154,7 @@ final class AppModel {
             blockAlerts = (try? clew.blockAlerts()) ?? true
             timeline = try clew.timeline()
             lateTicks = try clew.lateTicks()
+            readCalendar(clew)
             focus = try clew.focusTimer()
             if let running = focus {
                 // A break that is over simply ends; a timer whose task left Today (done
@@ -344,6 +355,39 @@ final class AppModel {
         if tick != nil { offerRating(itemId: row.id) }
     }
     func setFocusOffersBreak(_ on: Bool) { run { try $0.setFocusOffersBreak(on) } }
+
+    // MARK: - Calendar events (SPEC 2026-11-10, day timeline step 2)
+
+    private func readCalendar(_ clew: Clew) {
+        calendarShown = (try? clew.calendarShown()) ?? false
+        calendarPromptClosed = (try? clew.calendarPromptClosed()) ?? false
+        guard let source = calendarSource else { calendarEvents = nil; return }
+        calendarAccess = source.access
+        guard calendarShown, calendarAccess == .granted, let day = timeline else { calendarEvents = nil; return }
+        source.observe { [weak self] in self?.refresh() }
+        let hidden = (try? clew.hiddenCalendars()) ?? []
+        calendarEvents = Clew.timelineEvents(source.events(from: day.start, to: day.end), day: day, hidden: hidden)
+    }
+
+    /// "Show your calendar": turns calendar events on and asks macOS for access (only
+    /// now, never at launch).
+    func showCalendar() {
+        run { try $0.setCalendarShown(true) }
+        guard let source = calendarSource, source.access == .notAsked else { return }
+        Task {
+            _ = await source.requestAccess()
+            refresh()
+        }
+    }
+
+    func setCalendarShown(_ on: Bool) {
+        if on { showCalendar() } else { run { try $0.setCalendarShown(false) } }
+    }
+
+    func closeCalendarPrompt() { run { try $0.closeCalendarPrompt() } }
+    func calendars() -> [CalendarInfo] { calendarSource?.calendars() ?? [] }
+    func hiddenCalendars() -> Set<String> { (try? clew?.hiddenCalendars()) ?? [] }
+    func setCalendar(_ id: String, hidden: Bool) { run { try $0.setCalendar(id, hidden: hidden) } }
 
     // MARK: - Day timeline (SPEC 2026-11-10)
 

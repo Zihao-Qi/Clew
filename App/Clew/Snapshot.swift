@@ -318,6 +318,10 @@ enum Snapshot {
                 clock.date = Date()
                 _ = try? clew.settleBlocks()
             }
+            // Calendar events (SPEC "Calendar events"), made up: never the user's calendar.
+            let fake = FakeCalendar(now: quarterNow)
+            model.calendarSource = fake
+            try clew.setCalendarShown(true)
             // Rating dots on, and "Stretch" just ticked, so the list shows them.
             model.setRatingsEnabled(true)
             model.refresh()
@@ -393,6 +397,27 @@ enum Snapshot {
             FileHandle.standardError.write(Data("snapshot failed: \(error)\n".utf8))
             exit(1)
         }
+    }
+
+    /// Made-up calendar events around now, for the snapshot only.
+    @MainActor final class FakeCalendar: CalendarReading {
+        let now: Date
+        init(now: Date) { self.now = now }
+        var access: CalendarAccess { .granted }
+        func requestAccess() async -> Bool { true }
+        func calendars() -> [CalendarInfo] {
+            [CalendarInfo(id: "work", title: "Work", source: "iCloud", color: [0.2, 0.6, 0.3]),
+             CalendarInfo(id: "home", title: "Home", source: "iCloud", color: [0.9, 0.5, 0.1])]
+        }
+        func events(from start: Date, to end: Date) -> [CalendarEvent] {
+            [CalendarEvent(id: "standup", calendarId: "work", title: "Standup", start: now.addingTimeInterval(-3600),
+                           end: now.addingTimeInterval(-2700), isAllDay: false, color: [0.2, 0.6, 0.3]),
+             CalendarEvent(id: "call", calendarId: "home", title: "Call with Sam", start: now.addingTimeInterval(1800),
+                           end: now.addingTimeInterval(4500), isAllDay: false, color: [0.9, 0.5, 0.1]),
+             CalendarEvent(id: "trip", calendarId: "home", title: "Mum's birthday", start: start, end: end,
+                           isAllDay: true, color: [0.9, 0.5, 0.1])]
+        }
+        func observe(_ onChange: @escaping @MainActor () -> Void) {}
     }
 
     /// A clock the snapshot can move into the past to seed history.
