@@ -23,9 +23,17 @@ after each install or update: open **System Settings › Privacy & Security** an
 **Open Anyway** for Clew. Your data stays on that Mac (`brew uninstall --zap` is the only
 thing that deletes it). macOS 14 or later.
 
+**Chrome extension from a release** (no Bun or clone needed; install it on the same Mac as
+the Clew it pairs with, since it talks only to `127.0.0.1`): each release also has
+`Clew-Extension-<version>.zip`.
+Unzip it somewhere it can stay, then `chrome://extensions` › **Developer mode** › **Load
+unpacked** › the `Clew Extension` folder, and pair it in Clew › Settings › Browser. To
+update, replace the folder with the new one and click the reload arrow.
+
 **Releasing** (maintainer): bump `MARKETING_VERSION` in `project.yml` and `version` in
 `Casks/clew.rb` in one pull request; after it is merged, push the tag `v<version>`. The
-Release workflow builds, signs and publishes `Clew-<version>.zip`
+Release workflow builds, signs and publishes `Clew-<version>.zip` and
+`Clew-Extension-<version>.zip`
 (`scripts/release-build.sh` builds, signs and zips the same app locally, without publishing).
 
 ## Build and run
