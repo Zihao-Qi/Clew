@@ -13,7 +13,7 @@ cask "clew" do
   desc "Today's list in the menu bar: what's left, what's done"
   homepage "https://github.com/Zihao-Qi/Clew"
 
-  depends_on macos: ">= :sonoma"
+  depends_on macos: :sonoma
 
   app "Clew.app"
 

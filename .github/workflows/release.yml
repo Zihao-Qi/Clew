@@ -69,6 +69,8 @@ jobs:
           path: dist/*.zip
           retention-days: 3
 
-      - name: Remove the signing keychain
+      - name: Remove the signing keychain and key files
         if: always()
-        run: security delete-keychain "$RUNNER_TEMP/clew-signing.keychain-db" || true
+        run: |
+          security delete-keychain "$RUNNER_TEMP/clew-signing.keychain-db" || true
+          rm -f "$RUNNER_TEMP/identity.p12" "$RUNNER_TEMP/identity.pem"

@@ -25,7 +25,7 @@ thing that deletes it). macOS 14 or later.
 **Releasing** (maintainer): bump `MARKETING_VERSION` in `project.yml` and `version` in
 `Casks/clew.rb` in one pull request; after it is merged, push the tag `v<version>`. The
 Release workflow builds, signs and publishes `Clew-<version>.zip`
-(`scripts/release-build.sh` does the same locally).
+(`scripts/release-build.sh` builds, signs and zips the same app locally, without publishing).
 
 ## Build and run
 
