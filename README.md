@@ -14,6 +14,7 @@ See [SPEC.md](SPEC.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [AGENTS
 
 ```sh
 brew tap zihao-qi/clew https://github.com/Zihao-Qi/Clew
+brew trust zihao-qi/clew          # once: Homebrew asks before using a third-party tap
 brew install --cask clew          # later: brew upgrade --cask clew
 ```
 

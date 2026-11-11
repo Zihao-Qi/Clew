@@ -1,5 +1,6 @@
 # Homebrew cask for Clew, from this repo as its own tap:
 #   brew tap zihao-qi/clew https://github.com/Zihao-Qi/Clew
+#   brew trust zihao-qi/clew        (once)
 #   brew install --cask clew        (later: brew upgrade --cask clew)
 # Bump `version` together with MARKETING_VERSION in project.yml, then push the tag
 # v<version>; .github/workflows/release.yml builds and publishes the zip.
