@@ -39,6 +39,7 @@ targets:
         # macOS 14 offers full or write-only calendar access, no read-only; Clew only reads.
         INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription: "Clew shows today's events on its timeline. It only reads your calendars and never changes them."
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon   # the bunny (design/app-icon)
         CODE_SIGN_ENTITLEMENTS: App/Clew/Clew.entitlements
         ENABLE_APP_SANDBOX: YES   # on from day one (ARCHITECTURE §1); no Accessibility
         ENABLE_HARDENED_RUNTIME: YES
