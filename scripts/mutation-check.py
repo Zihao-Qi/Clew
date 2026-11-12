@@ -551,8 +551,12 @@ M = [
  ("OS4 unknown is nil", C+"OpenShortcut.swift", "return OpenShortcut.decode(json) ?? .default", "return OpenShortcut.decode(json)", "OpenShortcutTests"),
  ("OS5 no modifier allowed", C+"OpenShortcut.swift", "public var hasStrongModifier: Bool { command || option || control }",
   "public var hasStrongModifier: Bool { true }", "OpenShortcutTests"),
- ("OS6 quit allowed", C+"OpenShortcut.swift", "case 12, 13, 4, 46, 49, 48, 53: return true // Q W H M Space Tab Escape",
-  "case 13, 4, 46, 49, 48, 53: return true // W H M Space Tab Escape", "OpenShortcutTests"),
+ ("OS6 quit allowed", C+"OpenShortcut.swift", 'case "Q", "W", "H", "M": return true',
+  'case "W", "H", "M": return true', "OpenShortcutTests"),
+ ("OS7 layout quit allowed", C+"OpenShortcut.swift",
+  "switch glyph.uppercased() {\n        case \"Q\", \"W\", \"H\", \"M\": return true\n        default: return false\n        }",
+  "switch keyCode {\n        case 12, 13, 4, 46: return true\n        default: return false\n        }",
+  "OpenShortcutTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

@@ -52,6 +52,15 @@ import Testing
         #expect(optionL.isAllowed)
     }
 
+    @Test func reservedLettersFollowTheGlyphNotTheQWERTYKeyCode() {
+        // On Dvorak, Q is hardware key code 7, not ANSI 12.
+        let dvorakQuit = OpenShortcut(keyCode: 7, command: true, shift: false, option: false, control: false, glyph: "Q")
+        // The ANSI Q key types an apostrophe on Dvorak and must not be treated as Quit.
+        let dvorakApostrophe = OpenShortcut(keyCode: 12, command: true, shift: false, option: false, control: false, glyph: "'")
+        #expect(!dvorakQuit.isAllowed)
+        #expect(dvorakApostrophe.isAllowed)
+    }
+
     @Test func setOpenListShortcutIgnoresADisallowedShortcut() throws {
         try clew.setOpenListShortcut(.default)
         let quit = OpenShortcut(keyCode: 12, command: true, shift: false, option: false, control: false, glyph: "Q")

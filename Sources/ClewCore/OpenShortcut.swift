@@ -32,11 +32,18 @@ public struct OpenShortcut: Equatable, Sendable, Hashable, Codable {
 
     /// Shortcuts that must stay with the system or the front app: Quit, Close, Hide,
     /// Minimise, Space (Spotlight when Control is also used, and a reserved Command
-    /// space on some layouts), Tab, and Escape.
+    /// space on some layouts), Tab, and Escape. Reserved letters are matched by
+    /// `glyph` (from the active keyboard layout) so Command-Q stays blocked on
+    /// Dvorak and other non-QWERTY sources. Space, Tab and Escape use hardware
+    /// key codes, which do not change with layout.
     public var isReserved: Bool {
         guard command || control else { return false }
         switch keyCode {
-        case 12, 13, 4, 46, 49, 48, 53: return true // Q W H M Space Tab Escape
+        case 49, 48, 53: return true // Space Tab Escape
+        default: break
+        }
+        switch glyph.uppercased() {
+        case "Q", "W", "H", "M": return true
         default: return false
         }
     }

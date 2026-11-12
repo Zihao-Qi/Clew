@@ -14,16 +14,22 @@ struct OpenShortcutRecorder: View {
             Text("Shortcut")
             Spacer()
             Button(action: startRecording) {
-                Text(recording ? "Type a shortcut" : (shortcut?.display ?? "None"))
+                Group {
+                    if recording {
+                        Text("Type a shortcut")
+                    } else if let shortcut {
+                        Text(shortcut.display)
+                    } else {
+                        Text("None")
+                    }
+                }
                     .monospaced()
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .background(RoundedRectangle(cornerRadius: 5).fill(Color.primary.opacity(0.08)))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(recording
-                ? Text("Type a shortcut")
-                : Text("Open the list shortcut, \(shortcut?.display ?? "None")"))
+            .accessibilityLabel(recorderAccessibilityLabel)
             if shortcut != nil, !recording {
                 Button(action: clear) {
                     Image(systemName: "xmark.circle.fill")
@@ -43,6 +49,16 @@ struct OpenShortcutRecorder: View {
             if on { OpenShortcutHotkey.shared.suspend() } else { OpenShortcutHotkey.shared.resume() }
         }
         .onDisappear { if recording { stopRecording() } }
+    }
+
+    private var recorderAccessibilityLabel: Text {
+        if recording {
+            Text("Type a shortcut")
+        } else if let shortcut {
+            Text("Open the list shortcut, \(shortcut.display)")
+        } else {
+            Text("Open the list shortcut, \(Text("None"))")
+        }
     }
 
     private func startRecording() {
