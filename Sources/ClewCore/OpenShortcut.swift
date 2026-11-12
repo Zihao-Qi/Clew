@@ -66,12 +66,14 @@ extension Clew {
     static let openListShortcutKey = "openListShortcut"
 
     /// The shortcut that opens the list: the default when never set, `nil` when the
-    /// user has cleared it, and the default again if the stored value cannot be read.
+    /// user has cleared it, and the default again if the stored value cannot be read
+    /// or is not an allowed shortcut.
     public func openListShortcut() throws -> OpenShortcut? {
         try storeForQueries.read { r in
             guard let json = try r.setting(Self.openListShortcutKey) else { return .default }
             if json == "null" { return nil }
-            return OpenShortcut.decode(json) ?? .default
+            guard let shortcut = OpenShortcut.decode(json), shortcut.isAllowed else { return .default }
+            return shortcut
         }
     }
 

@@ -548,7 +548,10 @@ M = [
  ("OS2 missing is nil", C+"OpenShortcut.swift", "guard let json = try r.setting(Self.openListShortcutKey) else { return .default }",
   "guard let json = try r.setting(Self.openListShortcutKey) else { return nil }", "OpenShortcutTests"),
  ("OS3 null is default", C+"OpenShortcut.swift", "if json == \"null\" { return nil }", "if json == \"null\" { return .default }", "OpenShortcutTests"),
- ("OS4 unknown is nil", C+"OpenShortcut.swift", "return OpenShortcut.decode(json) ?? .default", "return OpenShortcut.decode(json)", "OpenShortcutTests"),
+ ("OS4 unknown is nil", C+"OpenShortcut.swift",
+  "guard let shortcut = OpenShortcut.decode(json), shortcut.isAllowed else { return .default }",
+  "guard let shortcut = OpenShortcut.decode(json), shortcut.isAllowed else { return nil }",
+  "OpenShortcutTests"),
  ("OS5 no modifier allowed", C+"OpenShortcut.swift", "public var hasStrongModifier: Bool { command || option || control }",
   "public var hasStrongModifier: Bool { true }", "OpenShortcutTests"),
  ("OS6 quit allowed", C+"OpenShortcut.swift", 'case "Q", "W", "H", "M": return true',
@@ -556,6 +559,10 @@ M = [
  ("OS7 layout quit allowed", C+"OpenShortcut.swift",
   "switch glyph.uppercased() {\n        case \"Q\", \"W\", \"H\", \"M\": return true\n        default: return false\n        }",
   "switch keyCode {\n        case 12, 13, 4, 46: return true\n        default: return false\n        }",
+  "OpenShortcutTests"),
+ ("OS8 imported quit is default", C+"OpenShortcut.swift",
+  "guard let shortcut = OpenShortcut.decode(json), shortcut.isAllowed else { return .default }",
+  "guard let shortcut = OpenShortcut.decode(json) else { return .default }",
   "OpenShortcutTests"),
 ]
 

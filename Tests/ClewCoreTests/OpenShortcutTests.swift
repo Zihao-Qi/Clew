@@ -61,6 +61,13 @@ import Testing
         #expect(dvorakApostrophe.isAllowed)
     }
 
+    @Test func aDisallowedImportedShortcutFallsBackToTheDefault() throws {
+        let quit = OpenShortcut(keyCode: 12, command: true, shift: false, option: false, control: false, glyph: "Q")
+        let json = String(decoding: try JSONEncoder().encode(quit), as: UTF8.self)
+        try store.write { try $0.saveSetting("openListShortcut", json: json, updatedAt: Date()) }
+        #expect(try clew.openListShortcut() == .default)
+    }
+
     @Test func setOpenListShortcutIgnoresADisallowedShortcut() throws {
         try clew.setOpenListShortcut(.default)
         let quit = OpenShortcut(keyCode: 12, command: true, shift: false, option: false, control: false, glyph: "Q")
