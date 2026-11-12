@@ -17,6 +17,7 @@ struct SettingsView: View {
     @State private var letGoCount = 0
     @State private var ratingDots = false
     @State private var barStyle = Clew.defaultBarStyle
+    @State private var openListShortcut: OpenShortcut? = .default
     @State private var listsOff: Set<Source> = []
     @State private var offersBreak = true
     @State private var timelineShown = true
@@ -104,6 +105,24 @@ struct SettingsView: View {
                             Button("Open Login Items") { LoginItem.openLoginItemsSettings() }
                         }
                     }
+                }
+
+                Section {
+                    OpenShortcutRecorder(shortcut: $openListShortcut) { shortcut in
+                        openListShortcut = shortcut
+                        model.setOpenListShortcut(shortcut)
+                    }
+                } header: {
+                    Text("Open the list")
+                } footer: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Opens or closes today's list from the keyboard, even when the menu is closed. The default is ⌘.")
+                        if let openListShortcutError = model.openListShortcutError {
+                            Text(openListShortcutError)
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
 
                 Section {
@@ -325,6 +344,7 @@ struct SettingsView: View {
         letGoCount = model.lettingGoCount()
         ratingDots = model.ratingsOn
         barStyle = model.barStyle
+        openListShortcut = model.openListShortcut
         listsOff = model.collectionsOff()
         offersBreak = model.focusOffersBreak
         timelineShown = model.timelineShown

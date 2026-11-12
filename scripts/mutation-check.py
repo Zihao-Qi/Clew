@@ -543,6 +543,16 @@ M = [
  ("CE5 on by default", C+"CalendarEvents.swift", "try storeForQueries.read { try $0.setting(Self.calendarShownKey) == \"true\" }", "try storeForQueries.read { try $0.setting(Self.calendarShownKey) != \"false\" }", "CalendarEventTests"),
  ("CE6 never re-shown", C+"CalendarEvents.swift", "if hidden { ids.insert(id) } else { ids.remove(id) }", "if hidden { ids.insert(id) }", "CalendarEventTests"),
  ("CE7 other days", C+"CalendarEvents.swift", "$0.end > day.start && $0.start < day.end", "true", "CalendarEventTests"),
+ ("OS1 default not period", C+"OpenShortcut.swift", "keyCode: 47, command: true, shift: false, option: false, control: false, glyph: \".\"",
+  "keyCode: 40, command: true, shift: false, option: false, control: false, glyph: \"K\"", "OpenShortcutTests"),
+ ("OS2 missing is nil", C+"OpenShortcut.swift", "guard let json = try r.setting(Self.openListShortcutKey) else { return .default }",
+  "guard let json = try r.setting(Self.openListShortcutKey) else { return nil }", "OpenShortcutTests"),
+ ("OS3 null is default", C+"OpenShortcut.swift", "if json == \"null\" { return nil }", "if json == \"null\" { return .default }", "OpenShortcutTests"),
+ ("OS4 unknown is nil", C+"OpenShortcut.swift", "return OpenShortcut.decode(json) ?? .default", "return OpenShortcut.decode(json)", "OpenShortcutTests"),
+ ("OS5 no modifier allowed", C+"OpenShortcut.swift", "public var hasStrongModifier: Bool { command || option || control }",
+  "public var hasStrongModifier: Bool { true }", "OpenShortcutTests"),
+ ("OS6 quit allowed", C+"OpenShortcut.swift", "case 12, 13, 4, 46, 49, 48, 53: return true // Q W H M Space Tab Escape",
+  "case 13, 4, 46, 49, 48, 53: return true // W H M Space Tab Escape", "OpenShortcutTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

@@ -26,6 +26,10 @@ final class AppModel {
     private(set) var collections: [CollectionSummary] = []
     /// How rows draw progress (Settings › General).
     private(set) var barStyle = Clew.defaultBarStyle
+    /// The global shortcut that opens the list (Settings › General). `nil` if cleared.
+    private(set) var openListShortcut: OpenShortcut? = .default
+    /// Nil unless Carbon refused to register the current shortcut.
+    private(set) var openListShortcutError: String?
     /// Set when the database cannot be opened; the list is replaced by this message.
     private(set) var fatalMessage: String?
     /// A short, transient message for a rejected action.
@@ -92,6 +96,7 @@ final class AppModel {
             self.init(databaseAt: try Self.databaseURL())
             if let clew { browser = BrowserConnection(clew: clew) }
             calendarSource = EventKitCalendar()
+            OpenShortcutHotkey.shared.start()
             refresh()
         } catch {
             self.init(clew: nil)
@@ -148,6 +153,9 @@ final class AppModel {
             laterCount = try clew.laterCount()
             watched = try clew.watchProgress(itemIds: list.rows.map(\.id))
             barStyle = (try? clew.barStyle()) ?? Clew.defaultBarStyle
+            do { openListShortcut = try clew.openListShortcut() } catch { }
+            OpenShortcutHotkey.shared.apply(openListShortcut)
+            openListShortcutError = OpenShortcutHotkey.shared.registrationError
             collections = try clew.collections()
             focusOffersBreak = (try? clew.focusOffersBreak()) ?? true
             timelineShown = (try? clew.timelineShown()) ?? true
@@ -501,6 +509,10 @@ final class AppModel {
 
     func setBarStyle(_ style: ProgressBarStyle) {
         run { try $0.setBarStyle(style) }
+    }
+
+    func setOpenListShortcut(_ shortcut: OpenShortcut?) {
+        run { try $0.setOpenListShortcut(shortcut) }
     }
 
     func undo(_ row: TodayRow) {

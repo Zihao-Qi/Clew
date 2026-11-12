@@ -223,7 +223,10 @@ Queries are read models: `Today`, `Later(filter)`, `History(range)`,
 
 **Menu bar UI.** `MenuBarExtra` (window style). It observes the `Today` read model through
 GRDB `ValueObservation`, so the list updates live when the extension or agent
-writes. Every action is a command; the UI has no business logic.
+writes. Every action is a command; the UI has no business logic. A global shortcut
+(default ⌘., stored in Settings as `openListShortcut`) opens the list by clicking
+Clew's own status item; Carbon registers the hotkey, so no Accessibility permission
+is required (2026-11-11).
 
 **Title fetcher.** The app's only network use (entitlement
 `com.apple.security.network.client`): when a link is pasted into `+ add`, one load of
