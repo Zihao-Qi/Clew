@@ -75,8 +75,8 @@ struct DayTimelineView: View {
             header
             hours
         }
-        // Its own card: a faint tint and rounded corners, inset like the list's rows.
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
+        // Its own card: a shallower fill than the list, slightly translucent, with rounded corners, inset like the list's rows.
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .textBackgroundColor).opacity(0.7)))
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .padding(.horizontal, 8)
         .padding(.top, 8)
