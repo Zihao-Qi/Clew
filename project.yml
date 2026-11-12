@@ -16,6 +16,7 @@ targets:
     productName: Clew
     sources:
       - App/Clew
+      - Tests/ClewAppChecks/ShortcutSmokeTest.swift # DEBUG-only, isolated UI smoke check
     dependencies:
       - package: ClewPackage
         product: ClewDomain

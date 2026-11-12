@@ -109,7 +109,6 @@ struct SettingsView: View {
 
                 Section {
                     OpenShortcutRecorder(shortcut: $openListShortcut) { shortcut in
-                        openListShortcut = shortcut
                         model.setOpenListShortcut(shortcut)
                     }
                 } header: {
@@ -117,7 +116,7 @@ struct SettingsView: View {
                 } footer: {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Opens or closes today's list from the keyboard, even when the menu is closed. The default is ⌘.")
-                        if let openListShortcutError = model.openListShortcutError {
+                        if let openListShortcutError = OpenShortcutHotkey.shared.registrationError {
                             Text(openListShortcutError)
                         }
                     }

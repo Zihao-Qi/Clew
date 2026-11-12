@@ -41,7 +41,7 @@ struct OpenShortcutRecorder: View {
         }
         .background {
             if recording {
-                ShortcutCapture { handle($0) }
+                ShortcutCapture(onKey: { handle($0) }, onCancel: { stopRecording() })
                     .frame(width: 0, height: 0)
             }
         }
@@ -97,39 +97,57 @@ struct OpenShortcutRecorder: View {
 /// A tiny view that swallows key downs while a shortcut is being recorded.
 private struct ShortcutCapture: NSViewRepresentable {
     var onKey: (NSEvent) -> Void
+    var onCancel: () -> Void
 
     func makeNSView(context: Context) -> CaptureView {
         let view = CaptureView()
-        view.onKey = onKey
+        updateNSView(view, context: context)
         return view
     }
 
     func updateNSView(_ view: CaptureView, context: Context) {
         view.onKey = onKey
+        view.onCancel = onCancel
+    }
+
+    static func dismantleNSView(_ view: CaptureView, coordinator: ()) {
+        view.stop()
     }
 
     final class CaptureView: NSView {
         var onKey: ((NSEvent) -> Void)?
+        var onCancel: (() -> Void)?
         private var monitor: Any?
+        private var closeObserver: NSObjectProtocol?
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            if window != nil {
-                window?.makeFirstResponder(self)
-                if monitor == nil {
-                    monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                        self?.onKey?(event)
-                        return nil
-                    }
+            stop()
+            guard let window else { return }
+            window.makeFirstResponder(self)
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                self?.onKey?(event)
+                return nil
+            }
+            // A closed SwiftUI/AppKit window can retain its hosting view; neither
+            // onDisappear nor viewDidMoveToWindow is guaranteed to run on close.
+            closeObserver = NotificationCenter.default.addObserver(
+                forName: NSWindow.willCloseNotification, object: window, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.stop()
+                    self?.onCancel?()
                 }
-            } else if let monitor {
-                NSEvent.removeMonitor(monitor)
-                self.monitor = nil
             }
         }
 
-        // Cleanup is in viewDidMoveToWindow; a deinit must not touch the
-        // non-Sendable monitor token (Swift 6).
+        func stop() {
+            if let monitor { NSEvent.removeMonitor(monitor) }
+            if let closeObserver { NotificationCenter.default.removeObserver(closeObserver) }
+            monitor = nil
+            closeObserver = nil
+        }
+
         override var acceptsFirstResponder: Bool { true }
     }
 }

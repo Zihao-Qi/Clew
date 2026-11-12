@@ -48,6 +48,18 @@ rebuilds keep the same signature and the sandbox container. Needs XcodeGen
 (`brew install xcodegen`). After changing UI text, run a build and then
 `scripts/sync-strings.py <derived-data>` to update the String Catalog.
 
+Shortcut checks need a logged-in macOS GUI session:
+
+```sh
+bash scripts/check-open-shortcut.sh     # real Carbon conflict + injected handler failure
+# After a Debug app build (optional argument: path to its executable):
+bash scripts/check-open-shortcut-ui.sh  # isolated, in-memory UI fixture; exits within 30 s
+```
+
+The UI check uses local AppKit events, not Accessibility or global keystroke injection.
+It never opens the live database. When building alongside an installed Clew, use a
+separate `PRODUCT_BUNDLE_IDENTIFIER` for the smoke build to isolate its app container too.
+
 ## Chrome extension (v1.1)
 
 ```sh

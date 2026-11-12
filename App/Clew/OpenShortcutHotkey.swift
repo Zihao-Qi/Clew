@@ -2,24 +2,23 @@ import AppKit
 import Carbon.HIToolbox
 import ClewCore
 import Foundation
-import os
+import Observation
 
 /// Registers the global shortcut that opens today's list. Carbon hotkeys work in the
 /// sandbox and need no Accessibility permission (SPEC Tech; decided 2026-11-11).
-@MainActor
+@Observable @MainActor
 final class OpenShortcutHotkey {
     static let shared = OpenShortcutHotkey()
 
-    private var started = false
-    private var suspended = false
-    private var current: OpenShortcut?
-    private var hotKeyRef: EventHotKeyRef?
-    private var handlerRef: EventHandlerRef?
+    @ObservationIgnored private var started = false
+    @ObservationIgnored private var suspended = false
+    @ObservationIgnored private var current: OpenShortcut?
+    @ObservationIgnored private var hotKeyRef: EventHotKeyRef?
+    @ObservationIgnored private var handlerRef: EventHandlerRef?
     /// Set when Carbon refuses the shortcut (often because another app owns it).
     private(set) var registrationError: String?
     private static let signature: OSType = 0x434C4557 // 'CLEW'
     private static let hotKeyID = EventHotKeyID(signature: signature, id: 1)
-    private static let log = Logger(subsystem: "io.github.zihao-qi.clew", category: "OpenShortcut")
 
     /// Stored as a static C function pointer so InstallEventHandler keeps a valid
     /// thunk for the process lifetime (an inline closure is not guaranteed to last).
@@ -32,7 +31,6 @@ final class OpenShortcutHotkey {
 
     func start() {
         started = true
-        installHandlerIfNeeded()
         if !suspended { register(current) }
     }
 
@@ -76,9 +74,6 @@ final class OpenShortcutHotkey {
         if status != noErr {
             handlerRef = nil
             registrationError = Self.couldNotRegister
-            Self.trace("InstallEventHandler failed: \(status)")
-        } else {
-            Self.trace("InstallEventHandler ok")
         }
     }
 
@@ -86,9 +81,10 @@ final class OpenShortcutHotkey {
         unregister()
         guard let shortcut, shortcut.isAllowed else {
             registrationError = nil
-            Self.trace("register skipped shortcut=\(shortcut?.display ?? "nil") allowed=\(shortcut?.isAllowed == true)")
             return
         }
+        installHandlerIfNeeded()
+        guard handlerRef != nil else { return }
         var ref: EventHotKeyRef?
         let modifiers = carbonModifiers(shortcut)
         let ident = Self.hotKeyID
@@ -96,10 +92,8 @@ final class OpenShortcutHotkey {
         if status == noErr {
             hotKeyRef = ref
             registrationError = nil
-            Self.trace("RegisterEventHotKey ok \(shortcut.display) keyCode=\(shortcut.keyCode) modifiers=\(modifiers)")
         } else {
             registrationError = Self.couldNotRegister
-            Self.trace("RegisterEventHotKey failed: \(status) \(shortcut.display) keyCode=\(shortcut.keyCode) modifiers=\(modifiers)")
         }
     }
 
@@ -120,11 +114,6 @@ final class OpenShortcutHotkey {
     }
 
     static let couldNotRegister = String(localized: "Clew couldn't register this shortcut. Another app may already be using it.")
-
-    static func trace(_ message: String) {
-        log.notice("\(message, privacy: .public)")
-    }
-
 }
 
 /// Opens or closes the menu bar list by clicking Clew's own status item. That is
@@ -133,12 +122,7 @@ final class OpenShortcutHotkey {
 enum MenuBarExtraToggle {
     @MainActor
     static func toggle() {
-        OpenShortcutHotkey.trace("hotkey pressed")
-        if #available(macOS 14.0, *) {
-            NSApp.activate()
-        } else {
-            NSApp.activate(ignoringOtherApps: true)
-        }
+        NSApp.activate()
         // Activation is not always finished in this turn; click on the next one.
         DispatchQueue.main.async {
             clickStatusItem()
@@ -147,32 +131,15 @@ enum MenuBarExtraToggle {
 
     @MainActor
     private static func clickStatusItem() {
-        guard let button = statusItemButton() else {
-            let names = NSApp.windows.map(\.className).joined(separator: ",")
-            OpenShortcutHotkey.trace("toggle: no status item button; windows=[\(names)]")
-            return
-        }
-        OpenShortcutHotkey.trace("toggle: performClick title=\(button.title)")
+        guard let button = statusItemButton() else { return }
         button.performClick(nil)
     }
 
     @MainActor
     private static func statusItemButton() -> NSStatusBarButton? {
-        let bar = NSStatusBar.system
-        // `items` is not public; it is an NSPointerArray, so a Swift
-        // [NSStatusItem] or NSArray cast is nil and looks like "no item".
-        if let pointers = bar.value(forKey: "items") as? NSPointerArray {
-            for index in 0..<pointers.count {
-                guard let pointer = pointers.pointer(at: index) else { continue }
-                let item = Unmanaged<NSStatusItem>.fromOpaque(pointer).takeUnretainedValue()
-                if let button = item.button { return button }
-            }
-        }
-        // Fallback: MenuBarExtra's status item window is already in this process.
-        for window in NSApp.windows where window.className.contains("NSStatusBarWindow") {
-            if let item = window.value(forKey: "statusItem") as? NSStatusItem, let button = item.button {
-                return button
-            }
+        // Search only this process's public views. Missing/changed SwiftUI view
+        // structure returns nil rather than risking an Objective-C KVC exception.
+        for window in NSApp.windows {
             if let button = statusBarButton(in: window.contentView) {
                 return button
             }

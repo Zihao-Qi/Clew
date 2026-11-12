@@ -28,8 +28,6 @@ final class AppModel {
     private(set) var barStyle = Clew.defaultBarStyle
     /// The global shortcut that opens the list (Settings › General). `nil` if cleared.
     private(set) var openListShortcut: OpenShortcut? = .default
-    /// Nil unless Carbon refused to register the current shortcut.
-    private(set) var openListShortcutError: String?
     /// Set when the database cannot be opened; the list is replaced by this message.
     private(set) var fatalMessage: String?
     /// A short, transient message for a rejected action.
@@ -155,7 +153,6 @@ final class AppModel {
             barStyle = (try? clew.barStyle()) ?? Clew.defaultBarStyle
             do { openListShortcut = try clew.openListShortcut() } catch { }
             OpenShortcutHotkey.shared.apply(openListShortcut)
-            openListShortcutError = OpenShortcutHotkey.shared.registrationError
             collections = try clew.collections()
             focusOffersBreak = (try? clew.focusOffersBreak()) ?? true
             timelineShown = (try? clew.timelineShown()) ?? true
