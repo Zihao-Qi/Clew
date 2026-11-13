@@ -9,6 +9,7 @@
     "%@ this week" : {},
     "%@ was not finished" : {},
     "%@, %@" : {},
+    "%@, %lld of %lld, %@" : {},
     "%@, goal reached" : {},
     "%lld" : {},
     "%lld back" : {},

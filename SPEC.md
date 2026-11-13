@@ -222,7 +222,8 @@ stopped daily use, not adding features.
     times and hour labels 11. A block or event shows its time under the title only when
     it lasts **more than 30 minutes**; one of 30 minutes or less shows just the title (a
     slot block's "Done?" or a running focus timer follows it on the same line), centred
-    in a 15-minute one. A range names a
+    in a 15-minute one. A counted goal's block shows its count ("10/30", as its row) at the
+    right end of the title line, where the list has it; the title truncates first. A range names a
     shared AM or PM once: "9:00 – 10:00 AM" (24-hour clocks show none); a range past
     midnight shows both in full.
   - **Placing moves the task** (*changed* 2026-11-10 after first use: the row stayed in

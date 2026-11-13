@@ -391,7 +391,8 @@ struct TimelineBlockView: View {
             }
             .help(Text(verbatim: "\(block.title) · \(range)"))
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(Text("\(block.title), \(range)"))
+            .accessibilityLabel(count.map { Text("\(block.title), \($0.done) of \($0.target), \(range)") }
+                                ?? Text("\(block.title), \(range)"))
             .accessibilityValue(stateText)
             .accessibilityAction(named: Text("Details"), onOpen)
             .accessibilityAction(named: Text("Move to…"), onMove)
@@ -431,7 +432,10 @@ struct TimelineBlockView: View {
             }
             if twoLines {
                 VStack(alignment: .leading, spacing: 0) {
-                    title
+                    HStack(alignment: .firstTextBaseline, spacing: 3) {
+                        title
+                        countView
+                    }
                     status ?? Text(verbatim: range).font(TimelineMetrics.detailFont.monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
@@ -440,6 +444,7 @@ struct TimelineBlockView: View {
                 // and keeps its width; the title truncates instead.
                 title
                 if let status { status.fixedSize() }
+                countView
             }
         }
         .lineLimit(1)
@@ -451,6 +456,25 @@ struct TimelineBlockView: View {
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity,
                alignment: TimelineMetrics.textAlignment(minutes))
         .clipped()
+    }
+
+    /// A counted goal's "10/30" at the right end of the title line, where the list shows
+    /// it (user, 2026-11-13); kept whole, the title truncates instead.
+    @ViewBuilder
+    private var countView: some View {
+        if let count {
+            Spacer(minLength: 4)
+            Text(verbatim: "\(count.done)/\(count.target)")
+                .font(TimelineMetrics.detailFont.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .fixedSize()
+        }
+    }
+
+    /// The goal's progress in its current round, as its row counts it.
+    private var count: (done: Int, target: Int)? {
+        guard let row, let target = row.item.progress.target else { return nil }
+        return (row.progressAmount, target)
     }
 
     private var title: Text {
