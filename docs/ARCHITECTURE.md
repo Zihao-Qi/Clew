@@ -329,10 +329,14 @@ leading zero, within `Int64`); the URL is `https://x.com/i/status/<id>`. X is an
   skipped, the entries are not empty and `fromTop == entries.count` (one unbroken run
   from the top). Then every live item not in it leaves (`leaveList`), except items
   whose `updatedAt` is within `restoreAfter` (10 minutes: bookmarked, brought back or
-  renamed, so the page may predate it); the order becomes the entries. The extension
-  sets it only when the scan's run is unbroken, the last row (by `translateY`) holds no
-  post, is inside the viewport, no `[role="progressbar"]` is on the page, and the row
-  count and entries stayed the same for 3 seconds. Checked on the signed-in page
+  renamed, so the page may predate it); the order becomes those kept items, then the
+  entries. **Cap:** if more than 20 would leave and that is more than half the live
+  items, nothing leaves by this rule (the gap rule runs as before). The extension sets
+  `reachedEnd` only when the scan's run is unbroken, every row above the last held a
+  readable post, the last row (by `translateY`) holds no post, no text and no button,
+  is inside the viewport, no `[role="progressbar"]` is on the page, the row count and
+  entries stayed the same for 3 seconds (re-checked on scroll and when sending), and
+  the visit began less than 10 minutes ago. Checked on the signed-in page
   2026-11-13 (4 bookmarks): the last row is an empty `cellInnerDiv` 200 points tall,
   and nothing loads after scrolling to it; a long list's last row before more load is
   not verified, which is why it must stay still on screen.
@@ -521,7 +525,7 @@ calendars show).
 
 **Site order (2026-11-10).** Every collection keeps the order its site shows in the
 setting `listOrder.<source>`, and its page lists what is left in that order (items
-not placed yet last, newest first). X's comes from the gap rule and the button.
+not placed yet last, newest first). X's comes from the gap rule, the list's end and the button.
 Watch Later's is rewritten by each scan: the live items it saw, in page order, then
 the live items it did not see, as before (so a partial scan moves nothing it did not
 see). The extension drops a post from the visit's scan when it is unbookmarked there,

@@ -147,12 +147,15 @@ stopped daily use, not adding features.
   seen is decided, unless the end was seen. **The end of the list** (*changed*
   2026-11-13, user: posts removed below the last remaining bookmark stayed in Clew for
   good): when the posts read without a break from the top reach X's last row, that row
-  is on screen, nothing is loading, and nothing changes for 3 seconds, the scan is the
-  whole list, and every post in Clew it did not see was removed (read), as with Watch
-  Later. Never from an empty page or a scan with an unreadable row, and never a post
-  Clew changed in the last 10 minutes (bookmarked, brought back or renamed: the page
-  may be stale). A short list ends after one scroll to the bottom; a long one when
-  scrolled all the way down. A post its author
+  is on screen and empty (no text, no button: not a loading or "Retry" row), nothing is
+  loading, every row above it held a readable post, and nothing changes for 3 seconds
+  (checked again on each scroll and when sending), within 10 minutes of the page
+  loading: then the scan is the whole list, and every post in Clew it did not see was
+  removed (read), as with Watch Later. Never from an empty page, never a post Clew
+  changed in the last 10 minutes (bookmarked, brought back or renamed: the page may be
+  stale), and never more than 20 posts that are also more than half the list at once
+  (then the gap rule alone, as before; a guard against a broken page). A short list
+  ends after one scroll to the bottom; a long one when scrolled all the way down. A post its author
   deleted also disappears, so it counts as read (accepted). A post deleted in Clew
   comes back when bookmarked again with a click (*changed* 2026-11-10: it stayed
   gone); a scan never brings it back, since it cannot tell "still bookmarked" from
@@ -161,8 +164,8 @@ stopped daily use, not adding features.
   the phone jump to the top and are never taken as a gap; in the rare case where only
   such posts were seen, a post can wrongly count as read ("Not read" undoes it). Bookmarked again: back to
   read. "Not read" (right-click) undoes an automatic "read".
-  These automatic removals are not counted as the user's "let go". The same rule will
-  apply to X: unbookmarking a post means it was read. Pairing: Settings › Browser
+  These automatic removals are not counted as the user's "let go". Unbookmarking a post
+  means it was read. Pairing: Settings › Browser
   shows a 6-digit code.
 - **Collections (v1.1, 2026-11-09):** an imported list is **one collection**, not one
   task per video: a row below the tasks, after a thin divider and with no heading
