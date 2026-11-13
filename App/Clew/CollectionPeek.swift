@@ -81,8 +81,12 @@ final class PeekController {
 
     /// The pointer moved in the list. Its position is read on screen from AppKit, so no
     /// coordinate conversion can differ from where the panel is placed.
+    /// The row under it is found here too, from the rows' frames on screen: SwiftUI's
+    /// `onHover` for the row can arrive after this event, which made the rest start
+    /// only on a second movement (it felt slow).
     func pointerMoved() {
         let screen = NSEvent.mouseLocation
+        currentRow = row(at: screen)
         apply { $0.pointer(on: currentRow, at: PeekPoint(x: screen.x, y: screen.y), now: Date()) }
     }
 
@@ -92,8 +96,13 @@ final class PeekController {
         apply { $0.pointerLeftRows(now: Date()) }
     }
 
-    func rowHover(_ source: Source, inside: Bool) {
-        if inside { currentRow = source } else if currentRow == source { currentRow = nil }
+    private func row(at point: NSPoint) -> Source? {
+        for (source, anchor) in rowViews {
+            guard let view = anchor.view, let window = view.window, window === menuWindow,
+                  !view.isHiddenOrHasHiddenAncestor else { continue }
+            if window.convertToScreen(view.convert(view.visibleRect, to: nil)).contains(point) { return source }
+        }
+        return nil
     }
 
     fileprivate func rowView(_ source: Source, _ view: NSView) { rowViews[source] = WeakView(view: view) }
@@ -148,7 +157,7 @@ final class PeekController {
         let entries = page.inProgress + page.notStarted
         guard !entries.isEmpty else { return false }
         let lines = min(entries.count, Self.maxLines)
-        let height = PeekList.headerHeight + CGFloat(lines) * Self.lineHeight + 12
+        let height = CGFloat(lines) * Self.lineHeight + 2 * PeekList.inset
         let place = peekFrame(menu: Self.rect(menu.frame), row: Self.rect(row), visible: Self.rect(screen.visibleFrame),
                               width: Self.width, height: height)
         state.placed(on: place.side)
@@ -199,8 +208,8 @@ final class PeekPanel: NSPanel {
 
     func show(_ list: PeekList) {
         host.rootView = AnyView(list)
-        title = list.header
-        setAccessibilityLabel(list.header)
+        title = list.name
+        setAccessibilityLabel(list.name)
     }
 
     func clear() {
@@ -231,19 +240,21 @@ final class PeekHostingView: NSHostingView<AnyView> {
     }
 }
 
-/// What the panel shows: "To read (4)" and the titles. A title opens on the press.
+/// What the panel shows: the titles, nothing above them ("To read (4)" is only its name
+/// for VoiceOver). A title opens on the press. Same glass as the menu on macOS 26.
 struct PeekList: View {
     let model: AppModel
     let source: Source
 
-    static let headerHeight: CGFloat = 26
+    static let inset: CGFloat = 6
+    static let cornerRadius: CGFloat = 12
 
     var entries: [CollectionEntry] {
         guard let page = model.collection(source) else { return [] }
         return page.inProgress + page.notStarted
     }
 
-    var header: String {
+    var name: String {
         source == .extensionX ? String(localized: "To read (\(entries.count))")
                               : String(localized: "To watch (\(entries.count))")
     }
@@ -252,24 +263,22 @@ struct PeekList: View {
         // Reading `collections` re-renders the panel after every change, like the page.
         let _ = model.collections
         let list = entries
-        VStack(alignment: .leading, spacing: 0) {
-            Text(verbatim: header)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .frame(height: Self.headerHeight, alignment: .center)
-                .padding(.horizontal, 10)
-                .accessibilityAddTraits(.isHeader)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(list) { entry in PeekRow(entry: entry, model: model) }
-                }
+        let content = ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(list) { entry in PeekRow(entry: entry, model: model) }
             }
-            .frame(height: CGFloat(min(list.count, PeekController.maxLines)) * PeekController.lineHeight)
         }
-        .padding(.bottom, 6)
+        .frame(height: CGFloat(min(list.count, PeekController.maxLines)) * PeekController.lineHeight)
+        .padding(.vertical, Self.inset)
         .frame(width: PeekController.width, alignment: .topLeading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        let shape = RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
+        if #available(macOS 26, *) {
+            // The menu (MenuBarExtra's window) is drawn with this glass; the old
+            // material looked darker beside it.
+            content.glassEffect(.regular, in: shape)
+        } else {
+            content.background(.regularMaterial, in: shape).clipShape(shape)
+        }
     }
 }
 

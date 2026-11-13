@@ -29,8 +29,9 @@ public struct PeekRect: Equatable, Sendable {
 public struct PeekState: Equatable, Sendable {
     public enum Side: Equatable, Sendable { case left, right }
 
-    /// Rest on a row this long opens its panel.
-    public static let openDelay: TimeInterval = 0.3
+    /// Rest on a row this long opens its panel (*changed* 2026-11-13 from 0.3 s, user:
+    /// it felt slow).
+    public static let openDelay: TimeInterval = 0.1
     /// Away from row and panel this long (and not heading for the panel) closes it.
     public static let closeDelay: TimeInterval = 0.2
 
@@ -66,11 +67,12 @@ public struct PeekState: Equatable, Sendable {
         last = point
         let heading = isHeadingToPanel(from: previous, to: point)
         if on != row {
-            // A new row: nothing counts until the pointer moves on it.
+            // A new row. Arriving on it by moving is movement, and the rest begins at
+            // once; a row that came under a still pointer counts only once it moves.
             if row == blocked { blocked = nil }
             row = on
-            moved = false
-            restSince = nil
+            moved = on != nil && previous != nil && previous != point
+            restSince = moved ? now : nil
         } else if on != nil, let previous, previous != point {
             moved = true
             // Moving on a row with no panel of its own (yet, or again after one closed)

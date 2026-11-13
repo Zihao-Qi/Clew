@@ -21,17 +21,33 @@ import Testing
     /// Open on the YouTube row, the panel placed to the left.
     func opened() -> PeekState {
         var state = resting()
-        state.tick(now: at(0.3))
+        state.tick(now: at(0.1))
         state.placed(on: .left)
         return state
     }
 
     @Test func opensAfterAShortRestThatBeganWithMovement() {
         var state = resting()
-        state.tick(now: at(0.29))
-        #expect(state.open == nil && state.deadline == at(0.3))
-        state.tick(now: at(0.3))
+        state.tick(now: at(0.09))
+        #expect(state.open == nil && state.deadline == at(0.1))
+        state.tick(now: at(0.1))
         #expect(state.open == .extensionYouTube)
+    }
+
+    /// One movement onto the row and then still: the rest began on arrival (it used to
+    /// wait for a second movement, which felt slow).
+    @Test func arrivingOnARowByMovingStartsTheRestAtOnce() {
+        var state = PeekState()
+        state.pointer(on: nil, at: p(1000, 540), now: at(0))
+        state.pointer(on: .extensionYouTube, at: p(1000, 500), now: at(0))
+        state.tick(now: at(0.1))
+        #expect(state.open == .extensionYouTube)
+        // Another row coming under the same, still point is not arriving by moving.
+        var still = PeekState()
+        still.pointer(on: .extensionYouTube, at: p(1000), now: at(0))
+        still.pointer(on: .extensionX, at: p(1000), now: at(1))
+        still.tick(now: at(5))
+        #expect(still.open == nil && still.deadline == nil)
     }
 
     @Test func aRowSlidingUnderAStillPointerNeverOpens() {
@@ -81,9 +97,9 @@ import Testing
         var state = opened()
         state.pointer(on: .extensionX, at: p(1000, 470), now: at(1))
         state.pointer(on: .extensionX, at: p(1001, 470), now: at(1))   // away from the panel's side
-        state.tick(now: at(1.2))
-        #expect(state.open == nil)                                  // left the YouTube row: closed
-        state.tick(now: at(1.3))
+        state.tick(now: at(1.09))
+        #expect(state.open == .extensionYouTube)                    // not rested yet
+        state.tick(now: at(1.1))
         #expect(state.open == .extensionX)
     }
 
