@@ -128,7 +128,8 @@ struct RootView: View {
                                onEdit: { screen = .edit($0, back: .detail) },
                                onBack: { screen = .list })
                 case .collection(let source):
-                    CollectionView(model: model, source: source) { screen = .list }
+                    // One page per list: its folded groups never carry over to the other.
+                    CollectionView(model: model, source: source) { screen = .list }.id(source)
                 case .edit(let item, let back):
                     EditView(model: model, item: item) { screen = back == .detail ? .detail(item.id) : .list }
                 case .place(let itemId, let block):
