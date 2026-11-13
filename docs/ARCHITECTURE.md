@@ -235,14 +235,19 @@ so it re-renders on changes). **Core** holds the pure parts, tested with injecte
 is not movement: "moved" needs two different positions), entered/left the panel, tick,
 row clicked, drag began, list left (the list view's `onDisappear`: ⌘N, ⌘L, details;
 it also clears the click block), menu closed, list emptied → open/closed for which
-source; open after 0.3 s of rest that began with movement; while closing, the 0.2 s
+source; open after 0.1 s of rest that began with movement (arriving on a row at a new
+position is movement; the row under the pointer is found by the controller from the
+rows' screen frames on each hover event, since SwiftUI's `onHover` for a row can come
+after the list's hover event); while closing, the 0.2 s
 restarts as long as the pointer moves toward the panel's side; another row takes over
 only after its own rest, and time heading for the open panel is not rest; no reopen
 after a click until the row is left) and
 `peekFrame` (280 pt wide, flush with the menu window, left if the screen's visible
 frame has room else right, top at the row, moved up to fit). **App:** a borderless
 `NSPanel` (`.nonactivatingPanel`, `canBecomeKey`/`canBecomeMain` false, clear
-background, rounded material, `hasShadow`), attached with `addChildWindow(_:ordered:
+background, `hasShadow`; on macOS 26 SwiftUI's `.glassEffect(.regular)` in a 12 pt
+rounded rectangle, the glass the `MenuBarExtra` window draws (`CABackdropLayer` with
+`glassBackground`), else `.regularMaterial`), attached with `addChildWindow(_:ordered:
 .above)` to the menu's window; every close does `removeChildWindow` and `orderOut` (a
 child ordered out with its parent would come back with it). Its `NSHostingView`
 subclass accepts the first mouse, and a title opens on **mouse-down** (whether the

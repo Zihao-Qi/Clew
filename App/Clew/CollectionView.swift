@@ -87,10 +87,7 @@ struct CollectionRowView: View {
             PeekController.shared.rowClicked()
             onOpen()
         }
-        .onHover { inside in
-            hovering = inside
-            PeekController.shared.rowHover(summary.source, inside: inside)
-        }
+        .onHover { hovering = $0 }
         .accessibilityElement(children: .ignore)
         .accessibilityAddTraits(.isButton)
         .accessibilityLabel(Text(verbatim: "\(CollectionStyle.name(summary.source)), \(CollectionStyle.left(summary.toWatch, summary.source)), \(String(localized: "\(summary.done) done"))"))

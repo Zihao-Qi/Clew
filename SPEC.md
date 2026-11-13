@@ -183,16 +183,20 @@ stopped daily use, not adding features.
   anywhere on its header row unfolds it (*changed* 2026-11-13, user: only Done was folded,
   and only its small arrow opened it).
   **A peek on hover** (*user*, 2026-11-13): resting the pointer on a collection's row
-  for about 0.3 s opens a small panel beside Clew's menu, like a macOS submenu, with
-  only what is left: "To watch (3)" (In progress, then Not started, as on the page) or
-  "To read (4)", one title per line (one line each, truncated). Pressing a title opens
+  for about 0.1 s opens a small panel beside Clew's menu, like a macOS submenu, with
+  only what is left (In progress, then Not started, as on the page), one title per line
+  (one line each, truncated), and no heading above them; VoiceOver names the panel
+  "To watch (3)" or "To read (4)" (*changed* 2026-11-13, user: no "To watch" title, and
+  0.1 s, not 0.3 s, which felt slow). On macOS 26 it is drawn with the same glass as the
+  menu (the older material looked darker beside it). Pressing a title opens
   it in the browser, as on the page (the browser comes forward and the menu closes, so
   one link per opening); nothing else is done there (no ticking, no Done group). The
   panel is 280 points wide, flush against the menu (no gap) on the side with room on
   the menu's own screen (left first, since Clew lives at the right of the menu bar),
   its top level with the row (moved up when it would pass the screen's bottom), at most
   about 12 lines tall (it scrolls beyond).
-  - **Opens** only after the pointer *moved* onto the row and rested there; never under
+  - **Opens** only after the pointer *moved* onto the row (arriving on it by moving
+    counts) and rested there; never under
     a pointer that did not move (the menu opening with ⌘., the list moving under it, or
     coming back from the page with Esc), never during a drag of a row or block, and not
     again after a click on the row until the pointer has left the row.
