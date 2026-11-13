@@ -494,7 +494,7 @@ struct TimelineBlockView: View {
                 switch phase {
                 case .active:
                     onEdge = true
-                    NSCursor.resizeUpDown.set()
+                    Self.resizeCursor.set()
                 case .ended:
                     onEdge = false
                     if !resizing { NSCursor.arrow.set() }
@@ -517,7 +517,7 @@ struct TimelineBlockView: View {
                 DragGesture(minimumDistance: 2, coordinateSpace: .named(space))
                     .updating($resizing) { _, live, _ in live = true }
                     .onChanged { value in
-                        NSCursor.resizeUpDown.set()
+                        Self.resizeCursor.set()
                         let room = TimelineMetrics.room(after: b.start, in: day)
                         let wanted = b.minutes + Self.snap(value.translation.height)
                         resizeBy = min(max(wanted, Clew.blockStepMinutes), room) - b.minutes
@@ -529,6 +529,12 @@ struct TimelineBlockView: View {
                         if change != 0 { model.resizeBlock(b.id, minutes: b.minutes + change) }
                     }
             )
+    }
+
+    /// The bottom-edge resize cursor, as a window's bottom edge shows it (the one SwiftUI's
+    /// pointer style gave before; `resizeUpDown` has a bar between the arrows).
+    private static var resizeCursor: NSCursor {
+        if #available(macOS 15.0, *) { NSCursor.frameResize(position: .bottom, directions: .all) } else { .resizeUpDown }
     }
 
     /// Back to the arrow if this grip set the resize cursor.
