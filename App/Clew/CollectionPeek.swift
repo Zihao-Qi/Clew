@@ -119,6 +119,8 @@ final class PeekController {
     func collectionsChanged(_ summaries: [CollectionSummary]) {
         for summary in summaries where summary.toWatch == 0 { apply { $0.emptied(summary.source) } }
         if let shown, !summaries.contains(where: { $0.source == shown }) { apply { $0.emptied(shown) } }
+        // Still open with a different count: fit the panel to it (Gemini review).
+        if let shown, state.open == shown, !show(shown) { apply { $0.emptied(shown) } }
     }
 
     fileprivate func panelHover(_ inside: Bool) { apply { $0.panelHover(inside, now: Date()) } }
@@ -268,7 +270,8 @@ struct PeekList: View {
                 ForEach(list) { entry in PeekRow(entry: entry, model: model) }
             }
         }
-        .frame(height: CGFloat(min(list.count, PeekController.maxLines)) * PeekController.lineHeight)
+        // At most this tall; less when the screen is shorter (`peekFrame` cuts the panel).
+        .frame(maxHeight: CGFloat(min(list.count, PeekController.maxLines)) * PeekController.lineHeight)
         .padding(.vertical, Self.inset)
         .frame(width: PeekController.width, alignment: .topLeading)
         let shape = RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
