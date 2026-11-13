@@ -158,7 +158,7 @@ struct DayTimelineView: View {
                 Button { model.closeCalendarPrompt() } label: { Image(systemName: "xmark").imageScale(.small) }
                     .accessibilityLabel(Text("Not now"))
             }
-            .font(.caption)
+            .font(TimelineMetrics.detailFont)
             .foregroundStyle(.secondary)
             .buttonStyle(.borderless)
             .padding(.horizontal, 10)
@@ -170,7 +170,7 @@ struct DayTimelineView: View {
                 Button("Allow…") { EventKitCalendar.openPrivacySettings() }
                     .accessibilityLabel(Text("Open calendar privacy settings"))
             }
-            .font(.caption)
+            .font(TimelineMetrics.detailFont)
             .foregroundStyle(.secondary)
             .buttonStyle(.borderless)
             .padding(.horizontal, 10)
@@ -278,7 +278,7 @@ struct DayTimelineView: View {
                             Text(verbatim: hourLabel(q))
                                 .font(TimelineMetrics.detailFont.monospacedDigit())
                                 .foregroundStyle(.secondary)
-                                .offset(y: -6)
+                                .offset(y: -7)
                         } else {
                             Color.clear
                         }
@@ -436,7 +436,7 @@ struct TimelineBlockView: View {
             }
         }
         .padding(.horizontal, 4)
-        .padding(.top, minutes <= 15 ? 0 : 2)
+        .padding(.top, minutes <= 30 ? 0 : 2)
     }
 
     /// The bottom edge's grip: 12 points tall, reaching 4 below the block, so it is easy
@@ -576,7 +576,7 @@ struct TimelineEventView: View {
                 }
                 .foregroundStyle(.secondary)
                 .padding(.leading, 7)
-                .padding(.top, minutes <= 15 ? 0 : 2)
+                .padding(.top, minutes <= 30 ? 0 : 2)
             }
             .clipShape(RoundedRectangle(cornerRadius: 4))
             .help(Text(verbatim: "\(event.title) · \(range)"))

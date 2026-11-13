@@ -447,7 +447,7 @@ struct LiftedBlockCard: View {
                     }
                 }
                 .padding(.horizontal, 4)
-                .padding(.top, minutes <= 15 ? 0 : 2)
+                .padding(.top, minutes <= 30 ? 0 : 2)
             }
     }
 }
