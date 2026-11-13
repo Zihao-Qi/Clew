@@ -44,6 +44,19 @@ enum TimelineMetrics {
     }
 
     static func time(_ date: Date) -> String { date.formatted(date: .omitted, time: .shortened) }
+
+    /// "9:00 – 10:00 AM": the shared AM/PM only once (user, 2026-11-13), in the user's
+    /// locale (24-hour clocks have none). A range past midnight keeps both in full, since
+    /// the interval format would add the dates.
+    static func range(_ start: Date, _ end: Date) -> String {
+        guard Calendar.current.isDate(start, inSameDayAs: end) else { return "\(time(start)) – \(time(end))" }
+        return (start..<end).formatted(Date.IntervalFormatStyle(date: .omitted, time: .shortened))
+    }
+
+    /// Timeline text, a size up from the first build (user, 2026-11-13): titles, then
+    /// times and hour labels.
+    static let titleFont = Font.callout
+    static let detailFont = Font.subheadline
 }
 
 /// Today's hours above the list: scrolls, opens at now, holds the task blocks.
@@ -174,7 +187,7 @@ struct DayTimelineView: View {
                 }
                 Spacer(minLength: 0)
             }
-            .font(.caption2)
+            .font(TimelineMetrics.detailFont)
             .foregroundStyle(.secondary)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
@@ -263,7 +276,7 @@ struct DayTimelineView: View {
                     Group {
                         if q % 4 == 0 {
                             Text(verbatim: hourLabel(q))
-                                .font(.caption2.monospacedDigit())
+                                .font(TimelineMetrics.detailFont.monospacedDigit())
                                 .foregroundStyle(.secondary)
                                 .offset(y: -6)
                         } else {
@@ -381,7 +394,7 @@ struct TimelineBlockView: View {
     }
 
     private var range: String {
-        "\(TimelineMetrics.time(b.start))–\(TimelineMetrics.time(b.start.addingTimeInterval(TimeInterval(minutes * 60))))"
+        TimelineMetrics.range(b.start, b.start.addingTimeInterval(TimeInterval(minutes * 60)))
     }
 
     private var stateText: Text {
@@ -397,26 +410,26 @@ struct TimelineBlockView: View {
     private var label: some View {
         HStack(alignment: .top, spacing: 3) {
             if looksDone {
-                Image(systemName: "checkmark").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                Image(systemName: "checkmark").font(TimelineMetrics.detailFont.weight(.semibold)).foregroundStyle(.secondary)
             }
             VStack(alignment: .leading, spacing: 0) {
                 Text(block.title)
-                    .font(.caption)
+                    .font(TimelineMetrics.titleFont)
                     .lineLimit(1)
                     .foregroundStyle(looksDone ? .secondary : .primary)
                 if block.state == .asking {
                     // A slot block never ticks by itself: it asks (SPEC 2026-11-10).
                     Text("Done?")
-                        .font(.caption2.weight(.semibold))
+                        .font(TimelineMetrics.detailFont.weight(.semibold))
                         .foregroundStyle(Color.accentColor)
                 } else if let timer {
                     // Its focus timer counts down here, since the task is not in the list.
                     Text(verbatim: (timer.phase == .rest ? "☕ " : "⏱ ") + RowView.clock(timer.remaining(at: model.clockTick)))
-                        .font(.caption2.monospacedDigit())
+                        .font(TimelineMetrics.detailFont.monospacedDigit())
                         .foregroundStyle(.secondary)
                 } else if height >= 30 {
                     Text(verbatim: range)
-                        .font(.caption2.monospacedDigit())
+                        .font(TimelineMetrics.detailFont.monospacedDigit())
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -546,7 +559,7 @@ struct TimelineBlockView: View {
 struct TimelineEventView: View {
     let event: CalendarEvent
 
-    private var range: String { "\(TimelineMetrics.time(event.start))–\(TimelineMetrics.time(event.end))" }
+    private var range: String { TimelineMetrics.range(event.start, event.end) }
     private var minutes: Double { event.end.timeIntervalSince(event.start) / 60 }
 
     var body: some View {
@@ -556,9 +569,9 @@ struct TimelineEventView: View {
             .overlay(alignment: .leading) { Rectangle().fill(color).frame(width: 3) }
             .overlay(alignment: .topLeading) {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(event.title).font(.caption).lineLimit(1)
+                    Text(event.title).font(TimelineMetrics.titleFont).lineLimit(1)
                     if minutes >= 30 {
-                        Text(verbatim: range).font(.caption2.monospacedDigit()).lineLimit(1)
+                        Text(verbatim: range).font(TimelineMetrics.detailFont.monospacedDigit()).lineLimit(1)
                     }
                 }
                 .foregroundStyle(.secondary)

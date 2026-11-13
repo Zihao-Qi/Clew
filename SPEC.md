@@ -218,6 +218,11 @@ stopped daily use, not adding features.
   (a stronger tint and an accent edge); the menu grows taller
   by that much, but never past the screen (the list scrolls when it must). **Today
   only:** no tomorrow, nothing planned ahead. Nothing of Clew's own on it is red or says "missed".
+  - **Text** (*user*, 2026-11-13): a size larger than first built (titles 12 points,
+    times and hour labels 11). A block or event shows its time under the title only when
+    it lasts 30 minutes or more; a shorter one shows just the title. A range names a
+    shared AM or PM once: "9:00 – 10:00 AM" (24-hour clocks show none); a range past
+    midnight shows both in full.
   - **Placing moves the task** (*changed* 2026-11-10 after first use: the row stayed in
     the list too, so it looked copied, not moved). Drag a task's row from Today's list
     onto an hour (the timeline scrolls when the drag nears its top or bottom edge): the
