@@ -440,7 +440,7 @@ struct LiftedBlockCard: View {
             .overlay {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(title).font(TimelineMetrics.titleFont).lineLimit(1)
-                    if let start, TimelineMetrics.hasSecondLine(minutes) {
+                    if let start, TimelineMetrics.hasSecondLine(Double(minutes)) {
                         Text(verbatim: TimelineMetrics.range(start, start.addingTimeInterval(TimeInterval(minutes * 60))))
                             .font(TimelineMetrics.detailFont.monospacedDigit())
                             .foregroundStyle(.secondary)
@@ -448,7 +448,8 @@ struct LiftedBlockCard: View {
                 }
                 .padding(.horizontal, 4)
                 .padding(.top, TimelineMetrics.textTop(minutes))
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: TimelineMetrics.textAlignment(minutes))
+                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity,
+                       alignment: TimelineMetrics.textAlignment(minutes))
             }
     }
 }

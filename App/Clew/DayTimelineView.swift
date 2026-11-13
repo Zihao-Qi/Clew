@@ -60,7 +60,7 @@ enum TimelineMetrics {
 
     /// Only blocks and events longer than 30 minutes have room for a second line (the
     /// time); shorter ones show just the title (user, 2026-11-13).
-    static func hasSecondLine(_ minutes: Int) -> Bool { minutes > 30 }
+    static func hasSecondLine(_ minutes: Double) -> Bool { minutes > 30 }
 
     /// Where a block's text sits: one line centred in a 15-minute block (14 points, less
     /// than a body line), else at the top.
@@ -417,7 +417,7 @@ struct TimelineBlockView: View {
     }
 
     private var label: some View {
-        let twoLines = TimelineMetrics.hasSecondLine(minutes)
+        let twoLines = TimelineMetrics.hasSecondLine(Double(minutes))
         return HStack(alignment: .firstTextBaseline, spacing: 3) {
             if looksDone {
                 Image(systemName: "checkmark").font(TimelineMetrics.detailFont.weight(.semibold)).foregroundStyle(.secondary)
@@ -438,7 +438,12 @@ struct TimelineBlockView: View {
         .lineLimit(1)
         .padding(.horizontal, 4)
         .padding(.top, TimelineMetrics.textTop(minutes))
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: TimelineMetrics.textAlignment(minutes))
+        // minHeight 0: in a 15-minute block the frame is the block, not the taller line,
+        // so the line really centres (Gemini review). Clipped, so a very narrow column
+        // never spills "Done?" or a timer onto its neighbour.
+        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity,
+               alignment: TimelineMetrics.textAlignment(minutes))
+        .clipped()
     }
 
     private var title: Text {
@@ -595,14 +600,15 @@ struct TimelineEventView: View {
             .overlay {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(event.title).font(TimelineMetrics.titleFont).lineLimit(1)
-                    if TimelineMetrics.hasSecondLine(Int(minutes)) {
+                    if TimelineMetrics.hasSecondLine(minutes) {
                         Text(verbatim: range).font(TimelineMetrics.detailFont.monospacedDigit()).lineLimit(1)
                     }
                 }
                 .foregroundStyle(.secondary)
                 .padding(.leading, 7)
                 .padding(.top, TimelineMetrics.textTop(Int(minutes)))
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: TimelineMetrics.textAlignment(Int(minutes)))
+                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity,
+                       alignment: TimelineMetrics.textAlignment(Int(minutes)))
             }
             .clipShape(RoundedRectangle(cornerRadius: 4))
             .help(Text(verbatim: "\(event.title) · \(range)"))
