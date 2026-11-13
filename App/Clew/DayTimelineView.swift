@@ -334,6 +334,9 @@ struct TimelineBlockView: View {
     /// or is cancelled, which clears what the drag showed (Gemini review).
     @GestureState private var dragging = false
     @State private var resizeBy = 0
+    /// True while the grip is dragged; it resets by itself when the drag ends or is
+    /// cancelled, so a cancelled resize never leaves its cursor or size behind.
+    @GestureState private var resizing = false
     /// The pointer is on the bottom edge: a grab bar shows that it resizes.
     @State private var onEdge = false
 
@@ -494,11 +497,25 @@ struct TimelineBlockView: View {
                     NSCursor.resizeUpDown.set()
                 case .ended:
                     onEdge = false
-                    if resizeBy == 0 { NSCursor.arrow.set() }
+                    if !resizing { NSCursor.arrow.set() }
                 }
+            }
+            .onChange(of: resizing) { _, live in
+                // Ended or cancelled: nothing of the resize stays, and the arrow comes
+                // back unless the pointer is still on the grip.
+                guard !live else { return }
+                resizeBy = 0
+                if !onEdge { NSCursor.arrow.set() }
+            }
+            // The grip going away under the pointer (the block deleted or no longer
+            // changeable) or the menu closing never sends "hover ended".
+            .onDisappear { resetCursor() }
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in
+                resetCursor()
             }
             .gesture(
                 DragGesture(minimumDistance: 2, coordinateSpace: .named(space))
+                    .updating($resizing) { _, live, _ in live = true }
                     .onChanged { value in
                         NSCursor.resizeUpDown.set()
                         let room = TimelineMetrics.room(after: b.start, in: day)
@@ -509,10 +526,16 @@ struct TimelineBlockView: View {
                         let room = TimelineMetrics.room(after: b.start, in: day)
                         let change = min(max(b.minutes + Self.snap(value.translation.height), Clew.blockStepMinutes), room) - b.minutes
                         resizeBy = 0
-                        if !onEdge { NSCursor.arrow.set() }
                         if change != 0 { model.resizeBlock(b.id, minutes: b.minutes + change) }
                     }
             )
+    }
+
+    /// Back to the arrow if this grip set the resize cursor.
+    private func resetCursor() {
+        guard onEdge || resizing || resizeBy != 0 else { return }
+        onEdge = false
+        NSCursor.arrow.set()
     }
 
     private var moveGesture: some Gesture {
