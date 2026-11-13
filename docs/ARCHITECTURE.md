@@ -321,8 +321,21 @@ before anything is read or written; the Gateway answers 409 and the extension sh
 
 **X bookmarks (SPEC 2026-11-10).** `extension.x` refs are post ids (1–19 digits, no
 leading zero, within `Int64`); the URL is `https://x.com/i/status/<id>`. X is an
-*ordered source*: its scans are never `complete` (even with a stray `listTotal`).
-Removals come from:
+*ordered source*: its scans are `complete` only when the extension saw the list's end
+(never from a stray `listTotal`). Removals come from:
+- **The end of the list** (2026-11-13), `ImportBatch.reachedEnd` (API
+  `ImportRequest.reachedEnd`, optional: older extensions omit it, older Clews ignore it).
+  The batch is the whole list when `reachedEnd`, the scan report agrees, nothing was
+  skipped, the entries are not empty and `fromTop == entries.count` (one unbroken run
+  from the top). Then every live item not in it leaves (`leaveList`), except items
+  whose `updatedAt` is within `restoreAfter` (10 minutes: bookmarked, brought back or
+  renamed, so the page may predate it); the order becomes the entries. The extension
+  sets it only when the scan's run is unbroken, the last row (by `translateY`) holds no
+  post, is inside the viewport, no `[role="progressbar"]` is on the page, and the row
+  count and entries stayed the same for 3 seconds. Checked on the signed-in page
+  2026-11-13 (4 bookmarks): the last row is an empty `cellInnerDiv` 200 points tall,
+  and nothing loads after scrolling to it; a long list's last row before more load is
+  not verified, which is why it must stay still on screen.
 - **The gap rule**, on `ImportBatch.fromTop`, the leading entries the extension saw as
   one unbroken run from the top. Only when the scan report agrees and nothing was
   skipped (else the run is 0); a negative run is 0. `gapRule(previous:top:)` takes the

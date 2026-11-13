@@ -139,11 +139,20 @@ stopped daily use, not adding features.
   as you scroll (newest first, so new ones are seen at once), and bookmarking a post
   anywhere on x.com in Chrome adds it right away. **Removing = read** (same rule as
   Watch Later): unbookmarking in Chrome marks it read at once. The page shows no count
-  and loads as you scroll, so it is never compared as a whole list; instead the **gap
-  rule**: Clew remembers the order it last saw, and a post missing from *between* two
-  posts still on the page (seen without a break from the top) was removed, so a
-  removal on the phone is caught the next time Bookmarks is opened in Chrome and
-  scrolled past where it was. Nothing below what was seen is decided. A post its author
+  and loads as you scroll, so it is compared as a whole list only once its **end** has
+  been seen (below); until then the **gap rule**: Clew remembers the order it last saw,
+  and a post missing from *between* two posts still on the page (seen without a break
+  from the top) was removed, so a removal on the phone is caught the next time
+  Bookmarks is opened in Chrome and scrolled past where it was. Nothing below what was
+  seen is decided, unless the end was seen. **The end of the list** (*changed*
+  2026-11-13, user: posts removed below the last remaining bookmark stayed in Clew for
+  good): when the posts read without a break from the top reach X's last row, that row
+  is on screen, nothing is loading, and nothing changes for 3 seconds, the scan is the
+  whole list, and every post in Clew it did not see was removed (read), as with Watch
+  Later. Never from an empty page or a scan with an unreadable row, and never a post
+  Clew changed in the last 10 minutes (bookmarked, brought back or renamed: the page
+  may be stale). A short list ends after one scroll to the bottom; a long one when
+  scrolled all the way down. A post its author
   deleted also disappears, so it counts as read (accepted). A post deleted in Clew
   comes back when bookmarked again with a click (*changed* 2026-11-10: it stayed
   gone); a scan never brings it back, since it cannot tell "still bookmarked" from
