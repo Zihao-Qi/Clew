@@ -53,10 +53,19 @@ enum TimelineMetrics {
         return (start..<end).formatted(Date.IntervalFormatStyle(date: .omitted, time: .shortened))
     }
 
-    /// Timeline text, a size up from the first build (user, 2026-11-13): titles, then
-    /// times and hour labels.
-    static let titleFont = Font.callout
+    /// Timeline text (user, 2026-11-13): titles the size of the list's (body), times and
+    /// hour labels a little smaller.
+    static let titleFont = Font.body
     static let detailFont = Font.subheadline
+
+    /// Only blocks and events longer than 30 minutes have room for a second line (the
+    /// time); shorter ones show just the title (user, 2026-11-13).
+    static func hasSecondLine(_ minutes: Int) -> Bool { minutes > 30 }
+
+    /// Where a block's text sits: one line centred in a 15-minute block (14 points, less
+    /// than a body line), else at the top.
+    static func textAlignment(_ minutes: Int) -> Alignment { minutes <= 15 ? .leading : .topLeading }
+    static func textTop(_ minutes: Int) -> CGFloat { minutes <= 15 ? 0 : 2 }
 }
 
 /// Today's hours above the list: scrolls, opens at now, holds the task blocks.
@@ -408,35 +417,51 @@ struct TimelineBlockView: View {
     }
 
     private var label: some View {
-        HStack(alignment: .top, spacing: 3) {
+        let twoLines = TimelineMetrics.hasSecondLine(minutes)
+        return HStack(alignment: .firstTextBaseline, spacing: 3) {
             if looksDone {
                 Image(systemName: "checkmark").font(TimelineMetrics.detailFont.weight(.semibold)).foregroundStyle(.secondary)
             }
-            VStack(alignment: .leading, spacing: 0) {
-                Text(block.title)
-                    .font(TimelineMetrics.titleFont)
-                    .lineLimit(1)
-                    .foregroundStyle(looksDone ? .secondary : .primary)
-                if block.state == .asking {
-                    // A slot block never ticks by itself: it asks (SPEC 2026-11-10).
-                    Text("Done?")
-                        .font(TimelineMetrics.detailFont.weight(.semibold))
-                        .foregroundStyle(Color.accentColor)
-                } else if let timer {
-                    // Its focus timer counts down here, since the task is not in the list.
-                    Text(verbatim: (timer.phase == .rest ? "☕ " : "⏱ ") + RowView.clock(timer.remaining(at: model.clockTick)))
-                        .font(TimelineMetrics.detailFont.monospacedDigit())
+            if twoLines {
+                VStack(alignment: .leading, spacing: 0) {
+                    title
+                    status ?? Text(verbatim: range).font(TimelineMetrics.detailFont.monospacedDigit())
                         .foregroundStyle(.secondary)
-                } else if height >= 30 {
-                    Text(verbatim: range)
-                        .font(TimelineMetrics.detailFont.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
                 }
+            } else {
+                // 30 minutes or less: one line. "Done?" or a running timer follows the title
+                // and keeps its width; the title truncates instead.
+                title
+                if let status { status.fixedSize() }
             }
         }
+        .lineLimit(1)
         .padding(.horizontal, 4)
-        .padding(.top, minutes <= 30 ? 0 : 2)
+        .padding(.top, TimelineMetrics.textTop(minutes))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: TimelineMetrics.textAlignment(minutes))
+    }
+
+    private var title: Text {
+        Text(block.title)
+            .font(TimelineMetrics.titleFont)
+            .foregroundStyle(looksDone ? .secondary : .primary)
+    }
+
+    /// What a block says besides its title: a slot block's question, or its focus timer.
+    private var status: Text? {
+        if block.state == .asking {
+            // A slot block never ticks by itself: it asks (SPEC 2026-11-10).
+            return Text("Done?")
+                .font(TimelineMetrics.detailFont.weight(.semibold))
+                .foregroundStyle(Color.accentColor)
+        }
+        if let timer {
+            // Its focus timer counts down here, since the task is not in the list.
+            return Text(verbatim: (timer.phase == .rest ? "☕ " : "⏱ ") + RowView.clock(timer.remaining(at: model.clockTick)))
+                .font(TimelineMetrics.detailFont.monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
+        return nil
     }
 
     /// The bottom edge's grip: 12 points tall, reaching 4 below the block, so it is easy
@@ -567,16 +592,17 @@ struct TimelineEventView: View {
         RoundedRectangle(cornerRadius: 4)
             .fill(color.opacity(0.12))
             .overlay(alignment: .leading) { Rectangle().fill(color).frame(width: 3) }
-            .overlay(alignment: .topLeading) {
+            .overlay {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(event.title).font(TimelineMetrics.titleFont).lineLimit(1)
-                    if minutes >= 30 {
+                    if TimelineMetrics.hasSecondLine(Int(minutes)) {
                         Text(verbatim: range).font(TimelineMetrics.detailFont.monospacedDigit()).lineLimit(1)
                     }
                 }
                 .foregroundStyle(.secondary)
                 .padding(.leading, 7)
-                .padding(.top, minutes <= 30 ? 0 : 2)
+                .padding(.top, TimelineMetrics.textTop(Int(minutes)))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: TimelineMetrics.textAlignment(Int(minutes)))
             }
             .clipShape(RoundedRectangle(cornerRadius: 4))
             .help(Text(verbatim: "\(event.title) · \(range)"))
