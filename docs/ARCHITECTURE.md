@@ -501,7 +501,8 @@ reads); the sandbox entitlement is `com.apple.security.personal-information.cale
 Declined invitations are skipped by the adapter; `EKEventStoreChanged` refreshes. Core's
 `Clew.timelineEvents(_:day:hidden:)` (pure, tested) drops hidden calendars and events
 outside Clew's day, keeps all-day ones apart, cuts timed ones to the day, and lays out
-blocks and events together (`blockPlaces`, `eventPlaces`). Settings: `calendarShown`
+blocks and events together (`blockPlaces`, `eventPlaces`; `timelineLayout`, which also places
+the double-click's open name box as a draft block, 2026-11-13). Settings: `calendarShown`
 (default off), `calendarPromptClosed`, `calendarsHidden` (only unticked ids, so new
 calendars show).
 

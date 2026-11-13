@@ -369,6 +369,29 @@ extension Clew {
         }
     }
 
+    /// A double-click on the timeline (SPEC 2026-11-13): a today task and its 30-minute
+    /// block at `start` (cut at the day's end), in one write, so nothing is half made. A
+    /// block that has already ended decides at once, as a dropped row's does.
+    @discardableResult
+    public func addOnTimeline(title: String, titleOrigin: TitleOrigin = .typed, url: URL? = nil,
+                              start: Date) throws -> (item: Item, block: TimeBlock) {
+        // One clock read: the task's day and the block's day are the same day.
+        let now = clockForQueries.now()
+        let today = LocalDay(of: now, in: zonesForQueries.current(), rolloverHour: rolloverHour)
+        let bounds = dayBounds(today)
+        try Self.checkStart(start, bounds)
+        // 15 or 30: a start on a quarter hour inside the day always leaves room for that.
+        let length = min(Self.blockDefaultMinutes, Int(bounds.end.timeIntervalSince(start) / 60))
+        return try storeForQueries.write { w in
+            let item = try insertNewItem(NewItem(title: title, titleOrigin: titleOrigin, url: url, shape: .today),
+                                         source: .user, now: now, day: today, w)
+            let block = TimeBlock(id: newID(), itemId: item.id, localDay: today, start: start, minutes: length,
+                                  placedAt: now, updatedAt: now)
+            try w.save(block)
+            return (item, try decideIfEnded(block, now: now, w))
+        }
+    }
+
     /// Move to… or a drag of the block: a new start, and optionally a new length.
     @discardableResult
     public func moveBlock(id: UUID, start: Date, minutes: Int? = nil) throws -> TimeBlock {

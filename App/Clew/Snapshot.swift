@@ -171,6 +171,155 @@ enum Snapshot {
         }
     }
 
+    /// `CLEW_NEWTASK_TEST=1`: the timeline's double-click (SPEC 2026-11-13) with real
+    /// mouse and key events in an off-screen window: what a double-click, typing, Return,
+    /// Esc, a click away and the window losing the keyboard do. In-memory data. Input
+    /// methods, the Delete key over a hovered task and the real menu are checked by hand.
+    static func startNewTaskTest() {
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1))
+            do {
+                let clew = Clew(store: try SQLiteStore.inMemory(), clock: SystemClock(), zones: SystemTimeZone())
+                try clew.closeCalendarPrompt()
+                let model = AppModel(clew: clew, notify: false)
+                model.refresh()
+                let probe = NewTaskProbe()
+                let host = NSHostingView(rootView: NewTaskHarness(model: model, probe: probe).frame(width: 360))
+                let size = host.fittingSize
+                let window = NSWindow(contentRect: NSRect(x: -10_000, y: -10_000, width: size.width, height: size.height),
+                                      styleMask: [.titled], backing: .buffered, defer: false)
+                window.contentView = host
+                window.makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
+                try await Task.sleep(for: .milliseconds(600))
+                var number = 0
+                /// Points from the window content's top-left.
+                @MainActor func mouse(_ x: CGFloat, _ yFromTop: CGFloat, clicks: Int) async throws {
+                    let p = NSPoint(x: x, y: size.height - yFromTop)
+                    for n in 1...clicks {
+                        for (i, type) in [NSEvent.EventType.leftMouseDown, .leftMouseUp].enumerated() {
+                            number += 1
+                            let e = NSEvent.mouseEvent(with: type, location: p, modifierFlags: [],
+                                                       timestamp: ProcessInfo.processInfo.systemUptime + Double(i) * 0.03,
+                                                       windowNumber: window.windowNumber, context: nil, eventNumber: number,
+                                                       clickCount: n, pressure: type == .leftMouseDown ? 1 : 0)!
+                            NSApp.postEvent(e, atStart: false)
+                        }
+                        try await Task.sleep(for: .milliseconds(60))
+                    }
+                    try await Task.sleep(for: .milliseconds(400))
+                }
+                @MainActor func key(_ chars: String, code: UInt16 = 0) async throws {
+                    for type in [NSEvent.EventType.keyDown, .keyUp] {
+                        let e = NSEvent.keyEvent(with: type, location: .zero, modifierFlags: [],
+                                                 timestamp: ProcessInfo.processInfo.systemUptime,
+                                                 windowNumber: window.windowNumber, context: nil, characters: chars,
+                                                 charactersIgnoringModifiers: chars, isARepeat: false, keyCode: code)!
+                        NSApp.postEvent(e, atStart: false)
+                    }
+                    try await Task.sleep(for: .milliseconds(40))
+                }
+                @MainActor func type(_ text: String) async throws {
+                    for c in text { try await key(String(c)) }
+                    try await Task.sleep(for: .milliseconds(200))
+                }
+                @MainActor func titles() -> [String] { (model.today?.rows ?? []).map(\.item.title) }
+                @MainActor func report(_ name: String, _ ok: Bool) { print(ok ? "PASS" : "FAIL", name); fflush(stdout) }
+                // The hours start below the card's 8-point inset.
+                let x: CGFloat = 200, y1: CGFloat = 100, y2: CGFloat = 250
+
+                print("window up", size, "key:", window.isKeyWindow); fflush(stdout)
+                try await mouse(x, y1, clicks: 1)
+                report("a single click opens nothing", probe.draft == nil)
+                try await mouse(x, y1, clicks: 2)
+                let first = probe.draft
+                report("a double-click opens the box", first != nil)
+                try await type("Write intro")
+                try await key("\r", code: 36)
+                let made = model.today?.rows.first { $0.item.title == "Write intro" }
+                let block = model.timeline?.blocks.first { $0.block.itemId == made?.id }
+                report("Return makes the task and its block there, and closes the box",
+                       made != nil && block?.block.start == first?.start && block?.block.minutes == first?.minutes
+                       && probe.draft == nil)
+
+                try await mouse(x, y2, clicks: 2)
+                report("a second box opens", probe.draft != nil)
+                try await type("dropped")
+                try await key("\u{1b}", code: 53)
+                report("Esc drops it", probe.draft == nil && !titles().contains("dropped"))
+
+                try await mouse(x, y2, clicks: 2)
+                try await type("clicked away")
+                try await mouse(x, y1 + 120, clicks: 1)
+                report("a click elsewhere drops it", probe.draft == nil && !titles().contains("clicked away"))
+
+                try await mouse(x, y2, clicks: 2)
+                let before = probe.draft
+                try await type("moved")
+                try await mouse(x, y2 + 60, clicks: 2)
+                report("a double-click elsewhere opens a new box there",
+                       probe.draft != nil && probe.draft?.id != before?.id && probe.draft?.start != before?.start)
+                try await key("\r", code: 36)
+                report("the new box starts empty: Return makes nothing", probe.draft == nil
+                       && titles() == ["Write intro"])
+                print("  draft:", probe.draft as Any, "titles:", titles(), "first responder:",
+                      window.firstResponder.map { String(describing: Swift.type(of: $0)) } ?? "none")
+
+                if let block {
+                    let opened = probe.opened
+                    let blockY = 8 + TimelineMetrics.y(block.block.start, in: model.timeline!)
+                        - CGFloat(probe.topQuarter ?? 0) * CGFloat(TimelineMetrics.quarter) * TimelineMetrics.pointsPerMinute + 10
+                    try await mouse(x, blockY, clicks: 1)
+                    print("  (a single click on the block opened details:", probe.opened - opened, "times)")
+                    try await mouse(x, blockY, clicks: 2)
+                    report("a double-click on a block opens no box", probe.draft == nil)
+                    probe.draft = nil
+                }
+
+                window.makeKeyAndOrderFront(nil)
+                try await Task.sleep(for: .milliseconds(300))
+                try await mouse(x, y2, clicks: 2)
+                try await type("lost focus")
+                print("  main window key before:", window.isKeyWindow)
+                let other = NSWindow(contentRect: NSRect(x: -10_000, y: -8_000, width: 50, height: 50),
+                                     styleMask: [.titled], backing: .buffered, defer: false)
+                other.makeKeyAndOrderFront(nil)
+                try await Task.sleep(for: .milliseconds(400))
+                report("the window losing the keyboard drops it", probe.draft == nil && !titles().contains("lost focus"))
+                print("  other key:", other.isKeyWindow, "main key:", window.isKeyWindow, "draft:", probe.draft as Any)
+                exit(0)
+            } catch {
+                print("new task test failed:", error)
+                exit(1)
+            }
+        }
+    }
+
+    @MainActor final class NewTaskProbe {
+        var draft: NewTaskDraft?
+        var opened = 0
+        var topQuarter: Int?
+    }
+
+    private struct NewTaskHarness: View {
+        let model: AppModel
+        let probe: NewTaskProbe
+        @State private var newTask: NewTaskDraft?
+        @State private var top: Int?
+        @State private var geometry = TimelineGeometry()
+        var body: some View {
+            if let day = model.timeline {
+                DayTimelineView(model: model, day: day, space: "harness", geometry: $geometry, topQuarter: $top,
+                                liftedBlock: nil, hovered: .constant(nil), newTask: $newTask,
+                                onDrag: { _, _ in }, onDrop: { _ in }, onMove: { _ in },
+                                onOpen: { _ in probe.opened += 1 }, onEdit: { _ in })
+                    .coordinateSpace(name: "harness")
+                    .onChange(of: newTask) { _, now in probe.draft = now }
+                    .onChange(of: top, initial: true) { _, now in probe.topQuarter = now }
+            }
+        }
+    }
+
     /// `CLEW_DROP_TEST=1`: three rows; calls the drop logic the drag gesture uses.
     static func startDropTest() {
         Task { @MainActor in
@@ -372,6 +521,21 @@ enum Snapshot {
                             .padding(.leading, 40)
                     }.frame(width: 340).padding(.vertical, 8), appearance: appearance,
                            to: dir.appendingPathComponent("lifted-\(appearance == .aqua ? "light" : "dark").png"))
+                }
+            }
+            // The double-click's name box (SPEC 2026-11-13), at the same start as a block and
+            // an event: it takes the column its block will get.
+            if let day = model.timeline {
+                let at = quarterNow.addingTimeInterval(1800)
+                let draft = NewTaskDraft(minutesIn: at.timeIntervalSince(day.start) / 60, day: day)
+                let top = max(0, Int(quarterNow.timeIntervalSince(day.start) / 900) - TimelineMetrics.quartersBeforeNow)
+                for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+                    render(DayTimelineView(model: model, day: day, space: "snapshot", geometry: .constant(TimelineGeometry()),
+                                           topQuarter: .constant(top), liftedBlock: nil, hovered: .constant(nil),
+                                           newTask: .constant(draft), onDrag: { _, _ in }, onDrop: { _ in },
+                                           onMove: { _ in }, onOpen: { _ in }, onEdit: { _ in })
+                               .frame(width: 360), appearance: appearance,
+                           to: dir.appendingPathComponent("newtask-\(appearance == .aqua ? "light" : "dark").png"))
                 }
             }
             // The other progress bar style.

@@ -32,6 +32,9 @@ struct TodayListView: View {
     @State private var blockGrab: CGFloat = 0
     /// The task under the pointer (a row or a block): the Delete key deletes it.
     @State private var hoveredItem: UUID?
+    /// The timeline's name box (SPEC 2026-11-13). It lives with the list: leaving the list
+    /// (Add, Later, Settings, details) drops it.
+    @State private var newTask: NewTaskDraft?
     /// Cleared by itself when a row drag ends or is cancelled.
     @GestureState private var rowDragLive = false
 
@@ -283,7 +286,7 @@ struct TodayListView: View {
             if showsTimeline, let day = model.timeline {
                 DayTimelineView(model: model, day: day, space: Self.listSpace,
                                 geometry: $timelineGeo, topQuarter: $topQuarter,
-                                liftedBlock: lifted?.blockId, hovered: $hoveredItem,
+                                liftedBlock: lifted?.blockId, hovered: $hoveredItem, newTask: $newTask,
                                 onDrag: blockDrag, onDrop: blockDropped,
                                 onMove: { block in screen = .place(block.block.itemId, block: block.id) },
                                 onOpen: { screen = .detail($0) },
@@ -398,7 +401,8 @@ struct TodayListView: View {
                 .keyboardShortcut(.delete, modifiers: [])
                 .opacity(0)
                 .frame(width: 0, height: 0)
-                .disabled(hoveredItem == nil || dragging != nil || lifted != nil)
+                // While the name box is open, the keyboard edits the name.
+                .disabled(hoveredItem == nil || dragging != nil || lifted != nil || newTask != nil)
                 .accessibilityHidden(true)
         }
         // One space for the timeline and the rows, so a row can be dragged onto an hour.

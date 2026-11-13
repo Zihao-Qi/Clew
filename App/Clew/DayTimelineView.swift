@@ -57,6 +57,8 @@ struct DayTimelineView: View {
     let liftedBlock: UUID?
     /// The task under the pointer (the Delete key's target).
     @Binding var hovered: UUID?
+    /// The double-click's name box, while it is open (SPEC 2026-11-13).
+    @Binding var newTask: NewTaskDraft?
     /// A block's drag, reported to the list (nil: cancelled), and its drop.
     let onDrag: (TimelineBlock, DragGesture.Value?) -> Void
     let onDrop: (TimelineBlock) -> Void
@@ -64,10 +66,47 @@ struct DayTimelineView: View {
     let onOpen: (UUID) -> Void
     let onEdit: (Item) -> Void
 
+    /// While the name box is open, one layout for blocks, events and the box, so the box
+    /// sits in the column its block will get (SPEC 2026-11-13).
+    private var draftLayout: (blocks: [UUID: TimelinePlace], events: [String: TimelinePlace], draft: TimelinePlace?)? {
+        newTask.map { Clew.timelineLayout(blocks: day.blocks, timed: model.calendarEvents?.timed ?? [],
+                                          draft: ($0.start, $0.end)) }
+    }
+
     /// Blocks and events together: a block's column comes from the shared layout when
     /// calendar events show.
-    private func place(_ block: TimelineBlock) -> TimelinePlace {
-        model.calendarEvents?.blockPlaces[block.id] ?? TimelinePlace(lane: block.lane, lanes: block.lanes)
+    private func place(_ block: TimelineBlock, _ layout: (blocks: [UUID: TimelinePlace], events: [String: TimelinePlace], draft: TimelinePlace?)?) -> TimelinePlace {
+        layout?.blocks[block.id] ?? model.calendarEvents?.blockPlaces[block.id]
+            ?? TimelinePlace(lane: block.lane, lanes: block.lanes)
+    }
+
+    /// Where a column starts and how wide it is, in the hours' coordinates.
+    private func columns(_ place: TimelinePlace, width: CGFloat) -> (x: CGFloat, width: CGFloat) {
+        (TimelineMetrics.labelWidth + CGFloat(place.lane) * width / CGFloat(place.lanes),
+         max(20, width / CGFloat(place.lanes) - 2))
+    }
+
+    /// Opens the name box at the quarter hour `y` points into the day, unless the double-
+    /// click was on a block (its own click opens details) or inside the open box.
+    private func openNewTask(at point: CGPoint, width: CGFloat) {
+        let layout = draftLayout
+        func hits(_ start: Date, _ end: Date, _ place: TimelinePlace) -> Bool {
+            let col = columns(place, width: width)
+            return point.y >= TimelineMetrics.y(start, in: day) && point.y < TimelineMetrics.y(end, in: day)
+                && point.x >= col.x && point.x < col.x + col.width
+        }
+        if day.blocks.contains(where: { hits($0.block.start, $0.block.end, place($0, layout)) }) { return }
+        if let box = newTask, let at = layout?.draft, hits(box.start, box.end, at) { return }
+        newTask = NewTaskDraft(minutesIn: Double(point.y / TimelineMetrics.pointsPerMinute), day: day)
+    }
+
+    /// VoiceOver's "New task on the timeline": the box at the next quarter hour (the
+    /// day's last one if none is left), with now in view.
+    private func openNewTaskAtNextQuarter() {
+        centreOnNow()
+        let minutes = Date().timeIntervalSince(day.start) / 60
+        let next = (minutes / Double(TimelineMetrics.quarter)).rounded(.down) + 1
+        newTask = NewTaskDraft(minutesIn: next * Double(TimelineMetrics.quarter), day: day)
     }
 
     var body: some View {
@@ -82,10 +121,16 @@ struct DayTimelineView: View {
         .padding(.top, 8)
         .padding(.bottom, 4)
         // Every time the menu opens, now is a third of the way down.
-        .onAppear(perform: centreOnNow)
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in centreOnNow() }
+        // While the name box is open, the timeline stays where it is.
+        .onAppear { if newTask == nil { centreOnNow() } }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+            if newTask == nil { centreOnNow() }
+        }
+        // The rollover closes the box; nothing is made.
+        .onChange(of: day.day) { newTask = nil }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text("Today's timeline"))
+        .accessibilityAction(named: Text("New task on the timeline"), openNewTaskAtNextQuarter)
     }
 
     /// Above the hours: "Show your calendar" until it is on (or closed), a note when macOS
@@ -142,24 +187,36 @@ struct DayTimelineView: View {
                 grid
                 GeometryReader { g in
                     let width = g.size.width - TimelineMetrics.labelWidth - TimelineMetrics.trailing
+                    let layout = draftLayout
+                    ZStack(alignment: .topLeading) {
                     // Calendar events first, so task blocks draw over them.
                     ForEach(model.calendarEvents?.timed ?? []) { event in
-                        let place = model.calendarEvents?.eventPlaces[event.id] ?? TimelinePlace(lane: 0, lanes: 1)
+                        let col = columns(layout?.events[event.id] ?? model.calendarEvents?.eventPlaces[event.id]
+                                          ?? TimelinePlace(lane: 0, lanes: 1), width: width)
                         TimelineEventView(event: event)
-                            .frame(width: max(20, width / CGFloat(place.lanes) - 2),
+                            .frame(width: col.width,
                                    height: max(CGFloat(event.end.timeIntervalSince(event.start) / 60) * TimelineMetrics.pointsPerMinute - 1, 6))
-                            .offset(x: TimelineMetrics.labelWidth + CGFloat(place.lane) * width / CGFloat(place.lanes),
-                                    y: TimelineMetrics.y(event.start, in: day))
+                            .offset(x: col.x, y: TimelineMetrics.y(event.start, in: day))
                     }
                     ForEach(day.blocks) { block in
+                        let col = columns(place(block, layout), width: width)
                         TimelineBlockView(model: model, block: block, day: day, space: space,
                                           isLifted: liftedBlock == block.id, hovered: $hovered,
                                           onDrag: { onDrag(block, $0) }, onDrop: { onDrop(block) },
                                           onMove: { onMove(block) }, onOpen: { onOpen(block.block.itemId) },
                                           onEdit: onEdit)
-                            .frame(width: max(20, width / CGFloat(place(block).lanes) - 2))
-                            .offset(x: TimelineMetrics.labelWidth + CGFloat(place(block).lane) * width / CGFloat(place(block).lanes),
-                                    y: TimelineMetrics.y(block.block.start, in: day))
+                            .frame(width: col.width)
+                            .offset(x: col.x, y: TimelineMetrics.y(block.block.start, in: day))
+                    }
+                    if let draft = newTask, let at = layout?.draft {
+                        let col = columns(at, width: width)
+                        NewTaskBox(model: model, draft: draft) {
+                            // Only this box: a late close never takes a newer one.
+                            if newTask?.id == draft.id { newTask = nil }
+                        }
+                        .id(draft.id)
+                        .frame(width: col.width)
+                        .offset(x: col.x, y: TimelineMetrics.y(draft.start, in: day))
                     }
                     // The current time, redrawn each minute (popover content: a TimelineView
                     // is fine here, unlike in the menu bar label).
@@ -173,6 +230,15 @@ struct DayTimelineView: View {
                                 .accessibilityHidden(true)
                         }
                     }
+                    }
+                    .frame(width: g.size.width, height: g.size.height, alignment: .topLeading)
+                    // Double-click an empty spot, or an event: a new task there (SPEC
+                    // 2026-11-13). A block's own click comes first, and a click inside the
+                    // open box is the box's.
+                    .contentShape(Rectangle())
+                    .gesture(SpatialTapGesture(count: 2).onEnded { value in
+                        openNewTask(at: value.location, width: width)
+                    })
                 }
             }
             .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(space)).minY } action: { geometry.contentTop = $0 }
