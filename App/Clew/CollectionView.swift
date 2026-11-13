@@ -96,7 +96,14 @@ struct CollectionView: View {
     let source: Source
     let onBack: () -> Void
 
-    @State private var showDone = false
+    /// The groups unfolded now; every page opens with all of them folded (user,
+    /// 2026-11-13).
+    @State private var open: Set<Group> = []
+    /// The list's own height, so its scroll area is never taller than what it holds.
+    @State private var listHeight: CGFloat = 0
+    private static let maxListHeight: CGFloat = 300
+
+    enum Group: Hashable { case inProgress, notStarted, done }
 
     var body: some View {
         // Reading `collections` re-renders the page after every change.
@@ -123,13 +130,13 @@ struct CollectionView: View {
                     StatTile(value: "\(page.finishedLast30)", label: Text("Last 30 days"))
                     StatTile(value: "\(page.finishedAllTime)", label: Text("All time"))
                 }
-                // A menu bar window sizes to its content, so a long list scrolls in a
-                // fixed height instead of growing past the screen.
-                if page.total > 8 {
-                    ScrollView { list(page) }.frame(height: 300)
-                } else {
-                    list(page)
+                // A menu bar window sizes to its content: the list scrolls once it is taller
+                // than 300 points, and is never given more room than it fills (a fixed
+                // height left a blank area under folded groups; user, 2026-11-13).
+                ScrollView {
+                    list(page).onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
                 }
+                .frame(height: min(max(listHeight, 1), Self.maxListHeight))
             } else {
                 Text("Nothing here yet.").foregroundStyle(.secondary)
             }
@@ -139,30 +146,47 @@ struct CollectionView: View {
     }
 
     private func list(_ page: CollectionDetails) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
             if !page.inProgress.isEmpty {
-                group(Text("In progress"), page.inProgress)
+                group(.inProgress, Text("In progress (\(page.inProgress.count))"), page.inProgress)
             }
             if !page.notStarted.isEmpty {
                 // Posts have no progress: everything left is simply to read.
-                group(source == .extensionX ? Text("To read") : Text("Not started"), page.notStarted)
+                group(.notStarted, source == .extensionX ? Text("To read (\(page.notStarted.count))")
+                                                         : Text("Not started (\(page.notStarted.count))"),
+                      page.notStarted)
             }
             if !page.done.isEmpty {
-                DisclosureGroup(isExpanded: $showDone) {
-                    entries(page.done)
-                } label: {
-                    Text("Done (\(page.done.count))").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                }
+                group(.done, Text("Done (\(page.done.count))"), page.done)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func group(_ title: Text, _ list: [CollectionEntry]) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            title.font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                .accessibilityAddTraits(.isHeader)
-            entries(list)
+    /// A folded group: the whole header row, not only its arrow, folds and unfolds it.
+    private func group(_ key: Group, _ title: Text, _ list: [CollectionEntry]) -> some View {
+        let isOpen = open.contains(key)
+        return VStack(alignment: .leading, spacing: 4) {
+            Button {
+                if isOpen { open.remove(key) } else { open.insert(key) }
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "chevron.right")
+                        .imageScale(.small)
+                        .rotationEffect(.degrees(isOpen ? 90 : 0))
+                    title
+                    Spacer(minLength: 0)
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.vertical, 3)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(title)
+            .accessibilityValue(isOpen ? Text("Unfolded") : Text("Folded"))
+            .accessibilityAddTraits(.isHeader)
+            if isOpen { entries(list) }
         }
     }
 

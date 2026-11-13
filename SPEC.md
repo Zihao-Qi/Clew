@@ -178,7 +178,10 @@ stopped daily use, not adding features.
   week / last 30 days / all time, and the whole list (In progress, most watched first;
   Not started (posts: To read) in the site's own order, Watch Later's or X's newest
   bookmark first (*changed* 2026-11-10 from "newest first", which gave no order to
-  videos imported together); Done, folded, including videos that left the list).
+  videos imported together); Done, including videos that left the list). **Every group
+  starts folded**, with its count ("To read (4)"), each time the page opens, and a click
+  anywhere on its header row unfolds it (*changed* 2026-11-13, user: only Done was folded,
+  and only its small arrow opened it).
   Each video has a circle (undo is for today's tick, and only while it is on the list)
   and a title that opens it. Deleting an item in Clew takes it out of the heatmap and
   the counts too (*changed* 2026-11-10). Each list can be turned **off** in Settings › General ›
