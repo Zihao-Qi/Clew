@@ -583,6 +583,22 @@ M = [
  ("XE7 cap off by one", C+"Imports.swift", "if gone.count > wholeListCap, gone.count * 2 > live.count { return nil }", "if gone.count >= wholeListCap, gone.count * 2 > live.count { return nil }", "XBookmarkTests"),
  ("XE8 kept lose their place", C+"Imports.swift", "return (gone, kept + seen.filter { live[$0] != nil })", "return (gone, seen.filter { live[$0] != nil })", "XBookmarkTests"),
  ("XE9 gateway drops the end", W+"Gateway.swift", "fromTop: body.fromTop, reachedEnd: body.reachedEnd))", "fromTop: body.fromTop))", "ContractTests"),
+ # The collection peek (SPEC 2026-11-13)
+ ("PK1 opens at once", C+"Peek.swift", "public static let openDelay: TimeInterval = 0.3", "public static let openDelay: TimeInterval = 0", "PeekTests"),
+ ("PK2 no movement gate", C+"Peek.swift", "            row = on\n            moved = false\n            restSince = nil", "            row = on\n            moved = true\n            restSince = now", "PeekTests"),
+ ("PK15 closed panel still held", C+"Peek.swift", "        // A panel ordered out sends no \"pointer left\": it is not under the pointer now.\n        inPanel = false\n", "", "PeekTests"),
+ ("PK14 no reopen on the row", C+"Peek.swift", "            if restSince == nil, row != open { restSince = now }\n", "", "PeekTests"),
+ ("PK3 heading ignored", C+"Peek.swift", "return side == .left ? to.x < from.x : to.x > from.x", "return false", "PeekTests"),
+ ("PK4 heading is rest", C+"Peek.swift", "        if heading, let row, row != open, moved { restSince = now }\n", "", "PeekTests"),
+ ("PK5 click no block", C+"Peek.swift", "        blocked = row\n        close()", "        close()", "PeekTests"),
+ ("PK6 opens in a drag", C+"Peek.swift", "moved, !dragging, let restSince,", "moved, let restSince,", "PeekTests"),
+ ("PK7 panel keeps the row", C+"Peek.swift", "            row = nil\n            moved = false\n            restSince = nil\n        }\n        updateClosing", "        }\n        updateClosing", "PeekTests"),
+ ("PK8 any list empties it", C+"Peek.swift", "if open == source { close() }", "close()", "PeekTests"),
+ ("PK9 always left", C+"Peek.swift", "let side: PeekState.Side = menu.minX - width >= visible.minX ? .left : .right", "let side: PeekState.Side = .left", "PeekTests"),
+ ("PK10 not moved up", C+"Peek.swift", "    if y < visible.minY { y = visible.minY }\n", "", "PeekTests"),
+ ("PK11 panel does not hold it", C+"Peek.swift", "if row == open || inPanel {", "if row == open {", "PeekTests"),
+ ("PK12 list left keeps the block", C+"Peek.swift", "    public mutating func listLeft() {\n        self = PeekState()", "    public mutating func listLeft() {\n        close()", "PeekTests"),
+ ("PK13 closes at once", C+"Peek.swift", "public static let closeDelay: TimeInterval = 0.2", "public static let closeDelay: TimeInterval = 0", "PeekTests"),
  ("DC9 task dated by clock again", C+"Timeline.swift", "                                         source: .user, now: now, day: today, w)", "                                         source: .user, now: now, day: currentDay().adding(days: 1), w)", "TimelineTests"),
 ]
 

@@ -407,6 +407,18 @@ struct TodayListView: View {
         }
         // One space for the timeline and the rows, so a row can be dragged onto an hour.
         .coordinateSpace(name: Self.listSpace)
+        // The peek beside a collection row (SPEC 2026-11-13): the list reports the
+        // pointer, drags and leaving; the rows report hover and clicks.
+        .background(PeekWindowReader(model: model))
+        .onContinuousHover { phase in
+            switch phase {
+            case .active: PeekController.shared.pointerMoved()
+            case .ended: PeekController.shared.pointerLeftList()
+            }
+        }
+        .onChange(of: dragging != nil || lifted != nil) { _, active in PeekController.shared.dragChanged(active) }
+        .onChange(of: model.collections) { _, lists in PeekController.shared.collectionsChanged(lists) }
+        .onDisappear { PeekController.shared.listLeft() }
     }
 }
 

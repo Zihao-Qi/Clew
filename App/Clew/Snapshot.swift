@@ -538,6 +538,13 @@ enum Snapshot {
                            to: dir.appendingPathComponent("newtask-\(appearance == .aqua ? "light" : "dark").png"))
                 }
             }
+            // The peek beside a collection row (SPEC 2026-11-13).
+            for (name, source) in [("peek-youtube", Source.extensionYouTube), ("peek-x", .extensionX)] {
+                for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+                    render(PeekList(model: model, source: source).padding(8), appearance: appearance,
+                           to: dir.appendingPathComponent("\(name)-\(appearance == .aqua ? "light" : "dark").png"))
+                }
+            }
             // The other progress bar style.
             model.setBarStyle(.underTitle)
             model.refresh()
