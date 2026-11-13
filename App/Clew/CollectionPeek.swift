@@ -29,6 +29,8 @@ final class PeekController {
     private var timer: Timer?
     /// Counts the menu becoming key: a deferred "menu closed" from before is stale.
     private var epoch = 0
+    /// Between the menu losing the keyboard and the deferred close: nothing new is timed.
+    private var menuLeaving = false
 
     // MARK: Events from the list
 
@@ -49,7 +51,13 @@ final class PeekController {
         }
         observers.append(NotificationCenter.default.addObserver(
             forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main) { _ in
-            MainActor.assumeIsolated { PeekController.shared.epoch += 1 }
+            MainActor.assumeIsolated {
+                let peek = PeekController.shared
+                peek.epoch += 1
+                // Key again before the deferred close: carry on where it was.
+                peek.menuLeaving = false
+                peek.sync()
+            }
         })
     }
 
@@ -59,12 +67,14 @@ final class PeekController {
     private func menuGoing(_ window: NSWindow) {
         timer?.invalidate()
         timer = nil
+        menuLeaving = true
         let token = epoch
         DispatchQueue.main.async {
             MainActor.assumeIsolated {
                 let peek = PeekController.shared
                 guard peek.menuWindow === window, peek.epoch == token, !window.isKeyWindow else { return }
                 peek.apply { $0.menuClosed() }
+                peek.menuLeaving = false
             }
         }
     }
@@ -123,7 +133,7 @@ final class PeekController {
         }
         timer?.invalidate()
         timer = nil
-        if let deadline = state.deadline {
+        if !menuLeaving, let deadline = state.deadline {
             timer = Timer.scheduledTimer(withTimeInterval: max(0.01, deadline.timeIntervalSinceNow), repeats: false) { _ in
                 MainActor.assumeIsolated { PeekController.shared.apply { $0.tick(now: Date()) } }
             }
