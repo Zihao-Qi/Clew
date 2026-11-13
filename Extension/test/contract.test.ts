@@ -46,6 +46,10 @@ describe("contract", () => {
     const xScan = new BookmarkScan();
     xScan.add(readWindow(x, (h) => h));
     expect(keys(xScan.request())).toEqual(keys(example("import-x.request.json")));
+    // SPEC 2026-11-13: a whole scan (every row readable) whose end was seen says so.
+    const whole = new BookmarkScan();
+    whole.add({ atTop: true, posts: readWindow(x, (h) => h).posts.filter((p) => p !== undefined) });
+    expect(keys(whole.request(true))).toEqual(keys(example("import-x-end.request.json")));
     const click = bookmarkClick(x.getElementById("icon")!, (h) => h);
     expect(keys(click)).toEqual(keys(example("bookmark.request.json")));
   });

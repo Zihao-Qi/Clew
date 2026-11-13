@@ -46,6 +46,8 @@ export interface ImportRequest {
   scan: ScanReport;
   /** X: how many leading entries were seen as one unbroken run from the top. */
   fromTop?: number;
+  /** X: the list's end was seen, still and on screen, so the run is the whole list. */
+  reachedEnd?: boolean;
 }
 
 /** `POST /v1/bookmark`: the bookmark button was clicked on a post. */

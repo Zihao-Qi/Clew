@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { parseHTML } from "linkedom";
-import { applyClick, BookmarkScan, bookmarkClick, cellTop, isBookmarks, postId, readPost, readWindow, SELECTOR_VERSION } from "../src/x";
+import { applyClick, BookmarkScan, bookmarkClick, cellTop, endRow, isBookmarks, postId, readPost, readWindow, SELECTOR_VERSION } from "../src/x";
 
 const page = () =>
   parseHTML(readFileSync(new URL("fixtures/x-bookmarks.synthetic.html", import.meta.url), "utf8")).document;
@@ -164,5 +164,69 @@ describe("the bookmark button", () => {
     expect(bookmarkClick(doc.querySelector('[data-testid="tweetText"]')!, postBy)).toBeUndefined();
     const { document } = parseHTML(`<button data-testid="bookmark">Bookmark</button>`);
     expect(bookmarkClick(document.querySelector("button")!, postBy)).toBeUndefined();
+  });
+});
+
+// SPEC 2026-11-13: the end of the list, as X showed it on the signed-in page (4 posts,
+// then an empty 200 px row holding two empty divs).
+describe("the end of the list", () => {
+  const row = (top: number, inner: string) =>
+    `<div data-testid="cellInnerDiv" style="transform: translateY(${top}px); position: absolute; width: 100%;">${inner}</div>`;
+  const post = (n: number, extra = "") =>
+    `<article data-testid="tweet"><a href="/u${n}/status/18500000000000000${n}"><time></time></a>` +
+    `<div data-testid="tweetText">p${n}</div>${extra}<button data-testid="removeBookmark"></button></article>`;
+  const empty = "<div><div></div></div>";
+  const doc = (...rows: string[]) => parseHTML(`<main>${rows.join("")}</main>`).document;
+
+  test("is an empty last row below readable posts, with nothing loading", () => {
+    const d = doc(row(0, post(1)), row(583.5, post(2)), row(1055, post(3)), row(1870, empty));
+    expect(endRow(d, postBy)).toBe(d.querySelectorAll('[data-testid="cellInnerDiv"]')[3]);
+    // Rows come in any DOM order: the last by translateY counts.
+    const shuffled = doc(row(1870, empty), row(583.5, post(2)), row(0, post(1)));
+    expect(endRow(shuffled, postBy)?.getAttribute("style")).toContain("1870px");
+  });
+
+  test("is not a loading, Retry or text row, nor a post", () => {
+    expect(endRow(doc(row(0, post(1)), row(500, `<div role="progressbar"></div>`)), postBy)).toBeUndefined();
+    expect(endRow(doc(row(0, post(1)), row(500, empty), `<div role="progressbar"></div>`), postBy)).toBeUndefined();
+    expect(endRow(doc(row(0, post(1)), row(500, `<div><button>Retry</button></div>`)), postBy)).toBeUndefined();
+    expect(endRow(doc(row(0, post(1)), row(500, `<div><button aria-label="Retry"></button></div>`)), postBy)).toBeUndefined();
+    expect(endRow(doc(row(0, post(1)), row(500, `<div><div role="button" aria-label="Retry"></div></div>`)), postBy)).toBeUndefined();
+    expect(endRow(doc(row(0, post(1)), row(500, `<div><span>Something went wrong</span></div>`)), postBy)).toBeUndefined();
+    expect(endRow(doc(row(0, post(1)), row(500, post(2))), postBy)).toBeUndefined();
+    expect(endRow(doc(row(0, empty)), postBy)).toBeUndefined();          // no posts at all
+  });
+
+  test("needs every row above it to be a readable post", () => {
+    const unreadable = `<article data-testid="tweet"><div data-testid="tweetText">no link</div></article>`;
+    expect(endRow(doc(row(0, post(1)), row(400, unreadable), row(800, empty)), postBy)).toBeUndefined();
+    expect(endRow(doc(row(0, post(1)), row(400, `<div>Who to follow</div>`), row(800, empty)), postBy)).toBeUndefined();
+    // A post unbookmarked during the visit is off the list, not unreadable.
+    const off = `<article data-testid="tweet"><a href="/u2/status/1850000000000000002"><time></time></a>` +
+      `<button data-testid="bookmark"></button></article>`;
+    expect(endRow(doc(row(0, post(1)), row(400, off), row(800, empty)), postBy)).toBeDefined();
+  });
+
+  test("a scan says reachedEnd only when it is whole", () => {
+    const top = { atTop: true, posts: [e(1), e(2)] };
+    const whole = new BookmarkScan();
+    whole.add(top);
+    expect(whole.whole).toBe(true);
+    expect(whole.request(true).reachedEnd).toBe(true);
+    expect(whole.request().reachedEnd).toBeUndefined();
+    expect(whole.request(false).reachedEnd).toBeUndefined();
+    const unreadable = new BookmarkScan();
+    unreadable.add({ atTop: true, posts: [e(1), undefined] });
+    expect(unreadable.whole).toBe(false);
+    expect(unreadable.request(true).reachedEnd).toBeUndefined();
+    const broken = new BookmarkScan();
+    broken.add(top);
+    broken.add({ atTop: false, posts: [e(7)] });                       // jumped past rows
+    expect(broken.whole).toBe(false);
+    expect(broken.request(true).reachedEnd).toBeUndefined();
+    const midway = new BookmarkScan();
+    midway.add({ atTop: false, posts: [e(3)] });                       // opened scrolled down
+    expect(midway.request(true).reachedEnd).toBeUndefined();
+    expect(new BookmarkScan().request(true).reachedEnd).toBeUndefined();
   });
 });
