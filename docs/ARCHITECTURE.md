@@ -230,11 +230,15 @@ is required (2026-11-11).
 **Collection peek (2026-11-13; Fable review).** The panel lists
 `CollectionDetails.inProgress + notStarted` (it reads `model.collections` like the page,
 so it re-renders on changes). **Core** holds the pure parts, tested with injected time:
-`PeekState` (events: pointer moved on/off a row with its position, entered/left the
-panel, tick, row clicked, drag began, menu closed, list emptied → open/closed for
-which source; open after 0.3 s of rest that began with movement; while closing, the
-0.2 s restarts as long as the pointer moves toward the panel's side; another row takes
-over only after its own rest; no reopen after a click until the row is left) and
+`PeekState` (events: pointer moved on/off a row with its **screen** position
+(`onContinuousHover(coordinateSpace: .global)`, so a row sliding under a still pointer
+is not movement: "moved" needs two different positions), entered/left the panel, tick,
+row clicked, drag began, list left (the list view's `onDisappear`: ⌘N, ⌘L, details;
+it also clears the click block), menu closed, list emptied → open/closed for which
+source; open after 0.3 s of rest that began with movement; while closing, the 0.2 s
+restarts as long as the pointer moves toward the panel's side; another row takes over
+only after its own rest, and time heading for the open panel is not rest; no reopen
+after a click until the row is left) and
 `peekFrame` (280 pt wide, flush with the menu window, left if the screen's visible
 frame has room else right, top at the row, moved up to fit). **App:** a borderless
 `NSPanel` (`.nonactivatingPanel`, `canBecomeKey`/`canBecomeMain` false, clear
@@ -247,7 +251,10 @@ the press works either way). Hover in the panel comes from an `NSTrackingArea`
 (`.activeAlways`, `.mouseEnteredAndExited`, `.mouseMoved`), not SwiftUI's `onHover`
 (unverified in a never-key window). The list reports row hover with positions
 (`onContinuousHover`), clicks and drags; the menu window's `didResignKey`/`willClose`
-close it and cancel any pending open.
+close it and cancel any pending open, one main-queue turn later (as the name box's
+watcher does), so the panel's own mouse-down is handled first. A title is pressed, not
+a SwiftUI `Button`, so it carries `.isButton`, the label "Open <title>" and a default
+accessibility action that opens it.
 
 **Title fetcher.** The app's only network use (entitlement
 `com.apple.security.network.client`): when a link is pasted into `+ add`, one load of

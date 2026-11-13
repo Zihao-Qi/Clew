@@ -200,8 +200,9 @@ stopped daily use, not adding features.
     toward the panel's side (crossing other rows on the way, like a macOS submenu).
   - **Closes** 0.2 s after the pointer leaves both and stops heading for the panel; at
     once on the row's click (its page opens), when a drag starts, when the menu closes
-    or leaves the list, and when nothing is left. The other collection's panel replaces
-    it only after resting on that row. Esc does what it does without the panel.
+    or leaves the list (also by ⌘N or ⌘L), and when nothing is left. The other
+    collection's panel replaces it only after resting on that row; time spent heading
+    for the open panel does not count as rest. Esc does what it does without the panel.
   - It never takes the keyboard, so the menu stays open and its keys keep working.
     Titles read "Open <title>" to VoiceOver; the page stays the way in for the keyboard.
   Each video has a circle (undo is for today's tick, and only while it is on the list)
