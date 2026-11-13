@@ -380,8 +380,8 @@ extension Clew {
         let today = LocalDay(of: now, in: zonesForQueries.current(), rolloverHour: rolloverHour)
         let bounds = dayBounds(today)
         try Self.checkStart(start, bounds)
+        // 15 or 30: a start on a quarter hour inside the day always leaves room for that.
         let length = min(Self.blockDefaultMinutes, Int(bounds.end.timeIntervalSince(start) / 60))
-        try Self.checkLength(length, start: start, bounds)
         return try storeForQueries.write { w in
             let item = try insertNewItem(NewItem(title: title, titleOrigin: titleOrigin, url: url, shape: .today),
                                          source: .user, now: now, day: today, w)
