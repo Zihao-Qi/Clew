@@ -439,15 +439,15 @@ struct LiftedBlockCard: View {
             .overlay(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.12)))
             .overlay(alignment: .topLeading) {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(title).font(.caption).lineLimit(1)
+                    Text(title).font(TimelineMetrics.titleFont).lineLimit(1)
                     if let start, minutes >= 30 {
-                        Text(verbatim: "\(TimelineMetrics.time(start))–\(TimelineMetrics.time(start.addingTimeInterval(TimeInterval(minutes * 60))))")
-                            .font(.caption2.monospacedDigit())
+                        Text(verbatim: TimelineMetrics.range(start, start.addingTimeInterval(TimeInterval(minutes * 60))))
+                            .font(TimelineMetrics.detailFont.monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
                 }
                 .padding(.horizontal, 4)
-                .padding(.top, minutes <= 15 ? 0 : 2)
+                .padding(.top, minutes <= 30 ? 0 : 2)
             }
     }
 }

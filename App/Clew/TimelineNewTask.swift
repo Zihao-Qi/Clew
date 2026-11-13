@@ -40,7 +40,7 @@ struct NewTaskBox: View {
                 HStack(spacing: 4) {
                     TextField(text: $text) { Text("Name or link") }
                         .textFieldStyle(.plain)
-                        .font(.caption)
+                        .font(TimelineMetrics.titleFont)
                         .focused($focused)
                         // Return and Esc while an input method is composing belong to it:
                         // onSubmit and onExitCommand only see them once it has finished.
