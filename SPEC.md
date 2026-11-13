@@ -249,6 +249,34 @@ stopped daily use, not adding features.
     without its blocks.
   - **Several blocks** are allowed (Add another block); the first comes from dragging the
     row or Put on timeline….
+  - **A new task from the timeline** (*user*, 2026-11-13). **Double-click** an empty
+    spot (or a calendar event, which takes no clicks) and a small name box opens right
+    there, like Calendar's: a **30-minute block** at the quarter hour under the pointer
+    (cut at 4 a.m.), in the column the block will take (beside an event it overlaps), so
+    nothing jumps on Return. It scrolls with the hours. Type a name and press **Return**:
+    a **today task** is made and placed there in one step (its row's place, once it is
+    back in the list, is at the end, as with `+ add`). A name Clew refuses (too long)
+    keeps the box open with its text and the usual notice.
+    - **Cancel:** Esc, a name that is empty or only spaces, clicking anywhere else, the
+      menu closing, leaving the list (Add, Later, Settings, details) and the rollover all
+      close the box and drop what was typed; nothing is made. A click that closes it
+      still does what it does (a circle ticks, a block opens its details). A
+      double-click elsewhere on the timeline opens a new, empty box there. While an
+      input method is composing (Pinyin, Kana), Return and Esc belong to it.
+    - **Links:** a link pasted into the box works as in `+ add`: its page title is filled
+      in, editable, and Return saves what the box shows. Copy the link first: switching
+      to the browser closes the menu, and the box with it.
+    - **No choices in the box:** the kind is a today task (changing a task's kind is a
+      later feature), and the length changes by dragging the block's bottom edge.
+    - **Past hours are allowed:** a block that has already ended ticks at once, as when a
+      row is dropped there, so the task is made done (Not finished undoes it).
+    - **While the box is open** the keyboard edits the name: the Delete key does not
+      delete the task under the pointer, and the timeline does not re-centre on now.
+    - Double-clicking a block opens its details, as a click does; the details ignore the
+      second click, so it cannot land on their buttons.
+    - VoiceOver gets a "New task on the timeline" action on the timeline, which opens
+      the box at the next quarter hour (the day's last one if none is left). Without
+      VoiceOver, `+ add` and then Put on timeline… does the same.
   - **A block's end ticks the task** (*new rule*: until now only the user and a
     finished external list ticked; the focus timer still never ticks by itself). It is a
     real tick, dated the block's day: the row is done, it counts on the heatmap and in

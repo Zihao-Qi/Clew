@@ -430,7 +430,12 @@ are every source but `timeline`.
   timeline…": moves the task's earliest block not ended, else adds one; 30 minutes by
   default, and a moved block's length, cut at the day's end; only rows on today's list), `moveBlock(id:start:)`,
   `resizeBlock(id:minutes:)`, `addBlock(after:)` (same length, right after; refused if it
-  would pass the day's end), `removeBlock(id:)`, `blockNotFinished(id:)`. Moving or
+  would pass the day's end), `removeBlock(id:)`, `blockNotFinished(id:)`,
+  `addOnTimeline(title:titleOrigin:url:start:)` (2026-11-13, the timeline's double-click:
+  in **one write**, the today task `addItem(.today)` would make and a 30-minute block at
+  `start`, cut at the day's end, deciding at once if it has ended; a `start` outside
+  today, e.g. after a rollover, refuses the whole command and makes nothing; the clock is
+  read once, for the task's `plannedDay` and the block's day). Moving or
   resizing changes the end, so it voids a live `tickId`, clears `decidedAt`/`tickId`
   (keeps `coverId`) and decides at once if the new end has passed. Removing voids a live
   `tickId`. **Rounds:** a `tickId` made before the goal's current round started is
@@ -450,10 +455,12 @@ are every source but `timeline`.
 - **Alerts:** the plan adds `clew.block.<id>` at each of today's pending blocks' start
   (after now), for a task that still needs something, when the setting `blockAlerts`
   is on (default). `wantsNotifications` counts it; the app asks permission when the
-  first block is placed.
+  first block is placed (by a drop, Put on timeline… or `addOnTimeline`).
 - **Display** (`timeline()`): the day's start and end, and today's live blocks of
   tasks on the list with title, state, `canChange` (the rounds rule) and a lane, so
-  overlapping blocks sit side by side. `placedItems` = tasks with a live block today:
+  overlapping blocks sit side by side (the double-click's open name box joins that layout
+  as a draft block while it is open, so neighbours make room at once and nothing moves on
+  Return). `placedItems` = tasks with a live block today:
   while the timeline shows, the app leaves them out of the list's rows (they still
   count in `done/total`, which Core computes from the whole list). The setting
   `timelineShown` (default on) hides the timeline and puts every task back in the list. The table `timeBlock` (v8) has no-delete; exports carry it (older read as none).
