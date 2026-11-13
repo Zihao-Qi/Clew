@@ -9,6 +9,10 @@ struct ClewApp: App {
 
     init() {
         #if DEBUG
+        if ProcessInfo.processInfo.environment["CLEW_SHORTCUT_SMOKE"] != nil {
+            _model = State(initialValue: ShortcutSmokeTest.model())
+            return
+        }
         if let link = ProcessInfo.processInfo.environment["CLEW_FETCH_TITLE"] {
             Snapshot.fetchTitleAndExit(link)
         }

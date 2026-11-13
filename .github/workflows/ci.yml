@@ -48,6 +48,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: All package tests
         run: swift test
+      - name: Shortcut registration failure checks
+        run: bash scripts/check-open-shortcut.sh
       - name: Build the app
         run: |
           brew install xcodegen
@@ -55,5 +57,7 @@ jobs:
           xcodebuild -project Clew.xcodeproj -scheme Clew -configuration Debug \
             -destination 'platform=macOS' -derivedDataPath DerivedData \
             CODE_SIGN_IDENTITY=- build
+      - name: Isolated shortcut UI smoke check
+        run: bash scripts/check-open-shortcut-ui.sh
       - name: Every UI string is in the String Catalog
         run: python3 -I scripts/sync-strings.py DerivedData --check

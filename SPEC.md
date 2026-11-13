@@ -32,7 +32,10 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
 ## In scope
 
 1. **Menu bar list.** A SwiftUI `MenuBarExtra`. The title shows `done/total` for today.
-   Click it to open today's list. No main window is required.
+   Click it to open today's list. No main window is required. A global shortcut also
+   opens the list (default **⌘.**, changeable in Settings › General). It uses a
+   Carbon hotkey, so the sandbox stays on and Clew needs no Accessibility permission
+   (2026-11-11).
 2. **Item kinds.**
    - *Once*: done on a chosen day; if not done, it quietly moves to tomorrow.
      Saved links in the Later pile behave the same once picked for a day.
@@ -385,7 +388,10 @@ stopped daily use, not adding features.
 
 ## Open question
 
-1. Which global hotkey, if any, opens the list? (v1 can ship without one.)
+None currently open.
+
+Decided 2026-11-11: a global shortcut opens the list; the default is ⌘. (Command-Period),
+changeable in Settings › General.
 
 ## Tech
 

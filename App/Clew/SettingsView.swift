@@ -107,6 +107,24 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    OpenShortcutRecorder(shortcut: Binding(
+                        get: { model.openListShortcut },
+                        set: { model.setOpenListShortcut($0) }
+                    ))
+                } header: {
+                    Text("Open the list")
+                } footer: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Opens or closes today's list from the keyboard, even when the menu is closed. The default is ⌘.")
+                        if let openListShortcutError = OpenShortcutHotkey.shared.registrationError {
+                            Text(openListShortcutError)
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Section {
                     Toggle("Rating dots after a tick", isOn: Binding(get: { ratingDots }, set: { on in
                         ratingDots = on
                         model.setRatingsEnabled(on)
