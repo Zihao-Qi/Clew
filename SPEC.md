@@ -182,6 +182,29 @@ stopped daily use, not adding features.
   starts folded**, with its count ("To read (4)"), each time the page opens, and a click
   anywhere on its header row unfolds it (*changed* 2026-11-13, user: only Done was folded,
   and only its small arrow opened it).
+  **A peek on hover** (*user*, 2026-11-13): resting the pointer on a collection's row
+  for about 0.3 s opens a small panel beside Clew's menu, like a macOS submenu, with
+  only what is left: "To watch (3)" (In progress, then Not started, as on the page) or
+  "To read (4)", one title per line (one line each, truncated). Pressing a title opens
+  it in the browser, as on the page (the browser comes forward and the menu closes, so
+  one link per opening); nothing else is done there (no ticking, no Done group). The
+  panel is 280 points wide, flush against the menu (no gap) on the side with room on
+  the menu's own screen (left first, since Clew lives at the right of the menu bar),
+  its top level with the row (moved up when it would pass the screen's bottom), at most
+  about 12 lines tall (it scrolls beyond).
+  - **Opens** only after the pointer *moved* onto the row and rested there; never under
+    a pointer that did not move (the menu opening with ⌘., the list moving under it, or
+    coming back from the page with Esc), never during a drag of a row or block, and not
+    again after a click on the row until the pointer has left the row.
+  - **Stays** while the pointer is on the row, inside the panel, or moving from the row
+    toward the panel's side (crossing other rows on the way, like a macOS submenu).
+  - **Closes** 0.2 s after the pointer leaves both and stops heading for the panel; at
+    once on the row's click (its page opens), when a drag starts, when the menu closes
+    or leaves the list (also by ⌘N or ⌘L), and when nothing is left. The other
+    collection's panel replaces it only after resting on that row; time spent heading
+    for the open panel does not count as rest. Esc does what it does without the panel.
+  - It never takes the keyboard, so the menu stays open and its keys keep working.
+    Titles read "Open <title>" to VoiceOver; the page stays the way in for the keyboard.
   Each video has a circle (undo is for today's tick, and only while it is on the list)
   and a title that opens it. Deleting an item in Clew takes it out of the heatmap and
   the counts too (*changed* 2026-11-10). Each list can be turned **off** in Settings › General ›
