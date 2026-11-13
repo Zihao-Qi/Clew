@@ -8,11 +8,10 @@ washi-cream background with both eyes filled. (`bunny-source.png` was the initia
 The sizes in `App/Clew/Assets.xcassets/AppIcon.appiconset` are made from that 1024 image:
 
 ```sh
-swift design/app-icon/make-app-icon.swift design/app-icon/daruma-source.png App/Clew/Assets.xcassets/AppIcon.appiconset/icon_1024.png
+swift design/app-icon/make-app-icon.swift design/app-icon/daruma-source.png App/Clew/Assets.xcassets/AppIcon.appiconset/icon_1024.png --crop 102,102,820,820
 for s in 16 32 64 128 256 512; do
   sips -z $s $s App/Clew/Assets.xcassets/AppIcon.appiconset/icon_1024.png --out App/Clew/Assets.xcassets/AppIcon.appiconset/icon_$s.png
 done
 ```
 
-For pre-framed source images with baked corners/margins (like `bunny-source.png`), pass
-`--crop x,y,w,h` (e.g. `--crop 52,53,1148,1148`).
+`--crop 102,102,820,820` zooms the Daruma figure to ~83% of the 824 pt tile (matching standard macOS icon proportions like Chrome/ChatGPT). For pre-framed source images with baked corners/margins (like `bunny-source.png`), pass `--crop 52,53,1148,1148`.
