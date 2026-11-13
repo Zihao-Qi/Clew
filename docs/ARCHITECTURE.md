@@ -458,7 +458,9 @@ are every source but `timeline`.
   first block is placed (by a drop, Put on timeline… or `addOnTimeline`).
 - **Display** (`timeline()`): the day's start and end, and today's live blocks of
   tasks on the list with title, state, `canChange` (the rounds rule) and a lane, so
-  overlapping blocks sit side by side. `placedItems` = tasks with a live block today:
+  overlapping blocks sit side by side (the double-click's open name box joins that layout
+  as a draft block while it is open, so neighbours make room at once and nothing moves on
+  Return). `placedItems` = tasks with a live block today:
   while the timeline shows, the app leaves them out of the list's rows (they still
   count in `done/total`, which Core computes from the whole list). The setting
   `timelineShown` (default on) hides the timeline and puts every task back in the list. The table `timeBlock` (v8) has no-delete; exports carry it (older read as none).
