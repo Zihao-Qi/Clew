@@ -227,6 +227,19 @@ writes. Every action is a command; the UI has no business logic. A global shortc
 (default ⌘., stored in Settings as `openListShortcut`) opens the list by clicking
 Clew's own status item; Carbon registers the hotkey, so no Accessibility permission
 is required (2026-11-11).
+**Collection peek (2026-11-13).** App-only, no Core change: the hover panel shows
+`CollectionDetails.inProgress + notStarted` from the model already observed. It is a
+borderless `NSPanel` (`.nonactivatingPanel`, `canBecomeKey`/`canBecomeMain` false,
+`hidesOnDeactivate`, level just above the menu's window, no shadow-casting focus ring),
+made a child window of the menu's window so it moves and closes with it, hosting a
+SwiftUI list whose buttons accept the first mouse (a non-key panel's click must still
+open a link). One controller owns it (at most one panel): the row reports hover in and
+out and its frame in screen coordinates; the panel reports hover; the controller opens
+after 0.3 s of rest, closes 0.2 s after both are left (so the pointer can cross the
+gap), and closes at once on the row's click, on the list screen going away, on the
+menu window's `didResignKey`/`willClose`, and when the list empties. Placement: left of
+the menu window if the screen's visible frame has room, else right; top aligned with
+the row, clamped inside the visible frame.
 
 **Title fetcher.** The app's only network use (entitlement
 `com.apple.security.network.client`): when a link is pasted into `+ add`, one load of
