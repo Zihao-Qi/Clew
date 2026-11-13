@@ -430,7 +430,11 @@ are every source but `timeline`.
   timeline…": moves the task's earliest block not ended, else adds one; 30 minutes by
   default, and a moved block's length, cut at the day's end; only rows on today's list), `moveBlock(id:start:)`,
   `resizeBlock(id:minutes:)`, `addBlock(after:)` (same length, right after; refused if it
-  would pass the day's end), `removeBlock(id:)`, `blockNotFinished(id:)`. Moving or
+  would pass the day's end), `removeBlock(id:)`, `blockNotFinished(id:)`,
+  `addOnTimeline(title:titleOrigin:url:start:)` (2026-11-13, the timeline's double-click:
+  in **one write**, the today task `addItem(.today)` would make and a 30-minute block at
+  `start`, cut at the day's end, deciding at once if it has ended; a `start` outside
+  today, e.g. after a rollover, refuses the whole command and makes nothing). Moving or
   resizing changes the end, so it voids a live `tickId`, clears `decidedAt`/`tickId`
   (keeps `coverId`) and decides at once if the new end has passed. Removing voids a live
   `tickId`. **Rounds:** a `tickId` made before the goal's current round started is
