@@ -22,6 +22,7 @@ describe("contract", () => {
     expect(isPairResponse(example("pair.response.json"))).toBe(true);
     expect(isImportResponse(example("import.response.json"))).toBe(true);
     expect(isImportResponse(example("import-x.response.json"))).toBe(true);
+    expect(isImportResponse(example("import-x-end.response.json"))).toBe(true);
     expect(isBookmarkResponse(example("bookmark.response.json"))).toBe(true);
     expect(isFailure(example("failure.response.json"))).toBe(true);
   });
