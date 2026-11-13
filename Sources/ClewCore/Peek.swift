@@ -151,6 +151,8 @@ public struct PeekState: Equatable, Sendable {
         open = nil
         side = nil
         closingSince = nil
+        // A panel ordered out sends no "pointer left": it is not under the pointer now.
+        inPanel = false
     }
 
     /// Off the open row and out of the panel: the close wait runs, restarting while the

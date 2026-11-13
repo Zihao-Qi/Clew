@@ -586,6 +586,7 @@ M = [
  # The collection peek (SPEC 2026-11-13)
  ("PK1 opens at once", C+"Peek.swift", "public static let openDelay: TimeInterval = 0.3", "public static let openDelay: TimeInterval = 0", "PeekTests"),
  ("PK2 no movement gate", C+"Peek.swift", "            row = on\n            moved = false\n            restSince = nil", "            row = on\n            moved = true\n            restSince = now", "PeekTests"),
+ ("PK15 closed panel still held", C+"Peek.swift", "        // A panel ordered out sends no \"pointer left\": it is not under the pointer now.\n        inPanel = false\n", "", "PeekTests"),
  ("PK14 no reopen on the row", C+"Peek.swift", "            if restSince == nil, row != open { restSince = now }\n", "", "PeekTests"),
  ("PK3 heading ignored", C+"Peek.swift", "return side == .left ? to.x < from.x : to.x > from.x", "return false", "PeekTests"),
  ("PK4 heading is rest", C+"Peek.swift", "        if heading, let row, row != open, moved { restSince = now }\n", "", "PeekTests"),

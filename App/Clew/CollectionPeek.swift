@@ -27,6 +27,8 @@ final class PeekController {
     private var panel: PeekPanel?
     private var shown: Source?
     private var timer: Timer?
+    /// Counts the menu becoming key: a deferred "menu closed" from before is stale.
+    private var epoch = 0
 
     // MARK: Events from the list
 
@@ -38,12 +40,31 @@ final class PeekController {
         observers.forEach(NotificationCenter.default.removeObserver)
         observers = []
         menuWindow = window
+        epoch += 1
         guard let window else { return }
         observers = [NSWindow.didResignKeyNotification, NSWindow.willCloseNotification].map { name in
             NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { _ in
-                DispatchQueue.main.async {
-                    MainActor.assumeIsolated { PeekController.shared.apply { $0.menuClosed() } }
-                }
+                MainActor.assumeIsolated { PeekController.shared.menuGoing(window) }
+            }
+        }
+        observers.append(NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main) { _ in
+            MainActor.assumeIsolated { PeekController.shared.epoch += 1 }
+        })
+    }
+
+    /// The menu is closing or lost the keyboard: nothing may open from now on (a timer
+    /// due on this turn is stopped at once), and the panel closes one turn later, so a
+    /// press in it is handled first. A later "became key" makes that close stale.
+    private func menuGoing(_ window: NSWindow) {
+        timer?.invalidate()
+        timer = nil
+        let token = epoch
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                let peek = PeekController.shared
+                guard peek.menuWindow === window, peek.epoch == token, !window.isKeyWindow else { return }
+                peek.apply { $0.menuClosed() }
             }
         }
     }
@@ -140,6 +161,8 @@ final class PeekController {
         // A child ordered out with its parent would come back with it: detach first.
         panel.parent?.removeChildWindow(panel)
         panel.orderOut(nil)
+        // Drop the rows, so a press cut short (the browser came forward) leaves nothing.
+        panel.clear()
     }
 
     private static func rect(_ r: CGRect) -> PeekRect {
@@ -168,6 +191,10 @@ final class PeekPanel: NSPanel {
         host.rootView = AnyView(list)
         title = list.header
         setAccessibilityLabel(list.header)
+    }
+
+    func clear() {
+        host.rootView = AnyView(EmptyView())
     }
 }
 

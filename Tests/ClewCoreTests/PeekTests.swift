@@ -142,6 +142,19 @@ import Testing
         #expect(state.open == .extensionYouTube)
     }
 
+    @Test func aPanelClosedUnderThePointerDoesNotHoldTheNextOne() {
+        var state = opened()
+        state.panelHover(true, now: at(1))
+        state.emptied(.extensionYouTube)            // closed while the pointer was in it
+        state.pointer(on: .extensionX, at: p(900), now: at(2))
+        state.pointer(on: .extensionX, at: p(901), now: at(2))
+        state.tick(now: at(2.3))
+        #expect(state.open == .extensionX)
+        state.pointerLeftRows(now: at(3))
+        state.tick(now: at(3.2))
+        #expect(state.open == nil)
+    }
+
     @Test func nothingLeftClosesIt() {
         var state = opened()
         state.emptied(.extensionX)
