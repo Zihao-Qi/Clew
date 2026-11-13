@@ -334,6 +334,9 @@ struct TimelineBlockView: View {
     /// or is cancelled, which clears what the drag showed (Gemini review).
     @GestureState private var dragging = false
     @State private var resizeBy = 0
+    /// True while the grip is dragged; it resets by itself when the drag ends or is
+    /// cancelled, so a cancelled resize never leaves its cursor or size behind.
+    @GestureState private var resizing = false
     /// The pointer is on the bottom edge: a grab bar shows that it resizes.
     @State private var onEdge = false
 
@@ -362,7 +365,11 @@ struct TimelineBlockView: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: 4))
             .overlay(alignment: .topLeading) { label }
-            .overlay(alignment: .bottom) { if block.canChange { resizeHandle } }
+            // The grip reaches 4 points below the block, placed by layout (not a visual
+            // offset), so the hover, the cursor and the drag all use the same strip.
+            .overlay(alignment: .bottom) {
+                if block.canChange { resizeHandle.alignmentGuide(.bottom) { $0[.bottom] - 4 } }
+            }
             .frame(height: max(height - 1, 6))
             // While dragged, the lifted card draws it, over the hours or over the list.
             .opacity(isLifted ? 0 : 1)
@@ -480,12 +487,37 @@ struct TimelineBlockView: View {
                 }
             }
             .contentShape(Rectangle())
-            .offset(y: 4)
-            .onHover { onEdge = $0 }
-            .modifier(ResizePointer())
+            // The cursor is set on every move over the grip and through the resize, so a
+            // tooltip or a redraw cannot put the arrow back (user, 2026-11-13: SwiftUI's
+            // pointer style showed the resize cursor only in a narrow part of the grip).
+            .onContinuousHover { phase in
+                switch phase {
+                case .active:
+                    onEdge = true
+                    NSCursor.resizeUpDown.set()
+                case .ended:
+                    onEdge = false
+                    if !resizing { NSCursor.arrow.set() }
+                }
+            }
+            .onChange(of: resizing) { _, live in
+                // Ended or cancelled: nothing of the resize stays, and the arrow comes
+                // back unless the pointer is still on the grip.
+                guard !live else { return }
+                resizeBy = 0
+                if !onEdge { NSCursor.arrow.set() }
+            }
+            // The grip going away under the pointer (the block deleted or no longer
+            // changeable) or the menu closing never sends "hover ended".
+            .onDisappear { resetCursor() }
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in
+                resetCursor()
+            }
             .gesture(
                 DragGesture(minimumDistance: 2, coordinateSpace: .named(space))
+                    .updating($resizing) { _, live, _ in live = true }
                     .onChanged { value in
+                        NSCursor.resizeUpDown.set()
                         let room = TimelineMetrics.room(after: b.start, in: day)
                         let wanted = b.minutes + Self.snap(value.translation.height)
                         resizeBy = min(max(wanted, Clew.blockStepMinutes), room) - b.minutes
@@ -497,6 +529,13 @@ struct TimelineBlockView: View {
                         if change != 0 { model.resizeBlock(b.id, minutes: b.minutes + change) }
                     }
             )
+    }
+
+    /// Back to the arrow if this grip set the resize cursor.
+    private func resetCursor() {
+        guard onEdge || resizing || resizeBy != 0 else { return }
+        onEdge = false
+        NSCursor.arrow.set()
     }
 
     private var moveGesture: some Gesture {
@@ -621,17 +660,6 @@ enum EventColor {
     static func of(_ event: CalendarEvent) -> Color {
         let c = event.color + [0.5, 0.5, 0.5]
         return Color(.sRGB, red: c[0], green: c[1], blue: c[2])
-    }
-}
-
-/// The up-down resize cursor over a block's bottom edge (macOS 15+).
-struct ResizePointer: ViewModifier {
-    func body(content: Content) -> some View {
-        if #available(macOS 15.0, *) {
-            content.pointerStyle(.frameResize(position: .bottom))
-        } else {
-            content
-        }
     }
 }
 
