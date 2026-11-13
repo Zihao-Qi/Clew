@@ -362,7 +362,11 @@ struct TimelineBlockView: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: 4))
             .overlay(alignment: .topLeading) { label }
-            .overlay(alignment: .bottom) { if block.canChange { resizeHandle } }
+            // The grip reaches 4 points below the block, placed by layout (not a visual
+            // offset), so the hover, the cursor and the drag all use the same strip.
+            .overlay(alignment: .bottom) {
+                if block.canChange { resizeHandle.alignmentGuide(.bottom) { $0[.bottom] - 4 } }
+            }
             .frame(height: max(height - 1, 6))
             // While dragged, the lifted card draws it, over the hours or over the list.
             .opacity(isLifted ? 0 : 1)
@@ -480,12 +484,23 @@ struct TimelineBlockView: View {
                 }
             }
             .contentShape(Rectangle())
-            .offset(y: 4)
-            .onHover { onEdge = $0 }
-            .modifier(ResizePointer())
+            // The cursor is set on every move over the grip and through the resize, so a
+            // tooltip or a redraw cannot put the arrow back (user, 2026-11-13: SwiftUI's
+            // pointer style showed the resize cursor only in a narrow part of the grip).
+            .onContinuousHover { phase in
+                switch phase {
+                case .active:
+                    onEdge = true
+                    NSCursor.resizeUpDown.set()
+                case .ended:
+                    onEdge = false
+                    if resizeBy == 0 { NSCursor.arrow.set() }
+                }
+            }
             .gesture(
                 DragGesture(minimumDistance: 2, coordinateSpace: .named(space))
                     .onChanged { value in
+                        NSCursor.resizeUpDown.set()
                         let room = TimelineMetrics.room(after: b.start, in: day)
                         let wanted = b.minutes + Self.snap(value.translation.height)
                         resizeBy = min(max(wanted, Clew.blockStepMinutes), room) - b.minutes
@@ -494,6 +509,7 @@ struct TimelineBlockView: View {
                         let room = TimelineMetrics.room(after: b.start, in: day)
                         let change = min(max(b.minutes + Self.snap(value.translation.height), Clew.blockStepMinutes), room) - b.minutes
                         resizeBy = 0
+                        if !onEdge { NSCursor.arrow.set() }
                         if change != 0 { model.resizeBlock(b.id, minutes: b.minutes + change) }
                     }
             )
@@ -621,17 +637,6 @@ enum EventColor {
     static func of(_ event: CalendarEvent) -> Color {
         let c = event.color + [0.5, 0.5, 0.5]
         return Color(.sRGB, red: c[0], green: c[1], blue: c[2])
-    }
-}
-
-/// The up-down resize cursor over a block's bottom edge (macOS 15+).
-struct ResizePointer: ViewModifier {
-    func body(content: Content) -> some View {
-        if #available(macOS 15.0, *) {
-            content.pointerStyle(.frameResize(position: .bottom))
-        } else {
-            content
-        }
     }
 }
 
