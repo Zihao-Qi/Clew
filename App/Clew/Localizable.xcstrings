@@ -311,6 +311,7 @@
     "Time's up: %@" : {},
     "Times a week" : {},
     "To read (%lld)" : {},
+    "To watch (%lld)" : {},
     "Today" : {},
     "Today's events appear on the timeline next to your tasks. Clew only reads them: it never changes a calendar, and never saves or sends your events anywhere. Google, iCloud and other accounts show once added in System Settings › Internet Accounts." : {},
     "Today's hours above the list. Drag a task onto an hour; when its block ends, the task is ticked. A habit or goal can have its own time in Edit: it appears there each day and asks \"Done?\" at its end. Block alerts: when a block starts, and that question." : {},

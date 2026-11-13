@@ -80,8 +80,17 @@ struct CollectionRowView: View {
         }
         .padding(.vertical, 2)
         .contentShape(Rectangle())
-        .onTapGesture(perform: onOpen)
-        .onHover { hovering = $0 }
+        // Resting here opens the peek beside the menu (SPEC 2026-11-13); a click opens
+        // the page and closes the peek.
+        .background(PeekRowAnchor(source: summary.source))
+        .onTapGesture {
+            PeekController.shared.rowClicked()
+            onOpen()
+        }
+        .onHover { inside in
+            hovering = inside
+            PeekController.shared.rowHover(summary.source, inside: inside)
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityAddTraits(.isButton)
         .accessibilityLabel(Text(verbatim: "\(CollectionStyle.name(summary.source)), \(CollectionStyle.left(summary.toWatch, summary.source)), \(String(localized: "\(summary.done) done"))"))
