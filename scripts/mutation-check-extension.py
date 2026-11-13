@@ -51,6 +51,17 @@ M = [
  ("E40 unbookmarked rows kept", E+"x.ts", "if (post && !isUnbookmarked(post)) posts.push", "if (post) posts.push"),
  ("E41 forgotten stays forgotten", E+"x.ts", "    this.refs.delete(ref);\n", ""),
  ("E42 click forgets nothing", E+"x.ts", "  if (!click.bookmarked) scan?.forget(click.entry.externalRef);", "  void scan; void click;"),
+ # The end of the list (SPEC 2026-11-13)
+ ("E43 loading ignored", E+"x.ts", "  if (root.querySelector(SELECTORS.loading)) return undefined;\n", ""),
+ ("E44 Retry row is the end", E+"x.ts", "if (last.querySelector(SELECTORS.post) || last.querySelector(SELECTORS.control)) return undefined;", "if (last.querySelector(SELECTORS.post)) return undefined;"),
+ ("E45 text row is the end", E+"x.ts", "  if ((last.textContent ?? \"\").trim() !== \"\") return undefined;\n", ""),
+ ("E46 rows above unchecked", E+"x.ts", "    if (!post) return undefined;\n    if (!isUnbookmarked(post) && readPost(post, postBy) === undefined) return undefined;\n", ""),
+ ("E47 last in DOM order", E+"x.ts", "  const last = cells[cells.length - 1];", "  const last = Array.from(root.querySelectorAll(SELECTORS.cell)).pop();"),
+ ("E48 end with no posts", E+"x.ts", "if (cells.length < 2 || !last) return undefined;", "if (!last) return undefined;"),
+ ("E49 whole despite unreadable", E+"x.ts", "return this.unreadable === 0 && this.entries.length > 0 &&", "return this.entries.length > 0 &&"),
+ ("E50 whole despite a break", E+"x.ts", "this.entries.length > 0 && this.run === this.entries.length;", "this.entries.length > 0;"),
+ ("E51 end sent when not whole", E+"x.ts", "...(reachedEnd && this.whole ? { reachedEnd: true } : {}),", "...(reachedEnd ? { reachedEnd: true } : {}),"),
+ ("E52 end always sent", E+"x.ts", "...(reachedEnd && this.whole ? { reachedEnd: true } : {}),", "reachedEnd: true,"),
  ("E16 checks lax", E+"contract.ts", "[\"added\", \"renamed\", \"restored\", \"letGo\", \"skipped\", \"progressed\"].every((k) => isInt(r[k]))", "true"),
 ]
 results = []

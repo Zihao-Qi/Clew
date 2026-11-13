@@ -25,10 +25,14 @@ private let a = "1850000000000000001", b = "1850000000000000002", c = "185000000
 
     /// A scan of `refs`, top first, the first `run` of them unbroken from the top.
     @discardableResult
-    private func scan(_ refs: [String], run: Int? = nil, found: Int? = nil) throws -> ImportResult {
+    private func scan(_ refs: [String], run: Int? = nil, found: Int? = nil, end: Bool? = nil) throws -> ImportResult {
         try clew.importExternal(ImportBatch(source: .extensionX, entries: refs.map { post($0) }, listTotal: nil,
             scan: ScanReport(found: found ?? refs.count, parsed: refs.count, selectorVersion: "t"),
-            fromTop: run ?? refs.count))
+            fromTop: run ?? refs.count, reachedEnd: end))
+    }
+    /// `count` post ids, distinct from a…n.
+    private func many(_ count: Int, from start: Int = 100) -> [String] {
+        (start..<(start + count)).map { "18600000000000\(String(format: "%05d", $0))" }
     }
     private func item(_ ref: String) -> Item? { store.state.items.values.first { $0.externalRef == ref } }
     private func page() throws -> CollectionDetails { try #require(try clew.collection(.extensionX)) }
@@ -240,6 +244,74 @@ private let a = "1850000000000000001", b = "1850000000000000002", c = "185000000
     }
 
     // MARK: The rule on its own
+
+    // MARK: The end of the list (SPEC 2026-11-13)
+
+    @Test func seeingTheEndClearsPostsRemovedBelowTheLastOne() throws {
+        try scan([a, b, c, d, e])
+        clock.set(local(10))
+        // The user's case: removed on the phone, below and between what is left.
+        let gap = try scan([a, c])
+        #expect(try !gap.complete && toRead() == [a, c, d, e])     // the gap rule: b only
+        let whole = try scan([a, c], end: true)
+        #expect(whole.complete && whole.letGo == 2)
+        #expect(try toRead() == [a, c] && read() == [b, d, e])
+        #expect(try page().notStarted.compactMap(\.item.externalRef) == [a, c])
+        // "Not read" undoes it, as any automatic read.
+        let dItem = try #require(item(d))
+        try clew.markNotFinished(itemId: dItem.id)
+        #expect(try !read().contains(d))
+    }
+
+    @Test func theEndIsTrustedOnlyForAWholeUnbrokenReadablePage() throws {
+        try scan([a, b, c, d])
+        clock.set(local(10))
+        try scan([a, b], run: 1, end: true)                            // a break after a
+        try scan([a, b], found: 3, end: true)                          // a row it could not read
+        try scan([], end: true)                                        // an empty page
+        try scan([a, b], end: false)
+        try scan([a, b])                                               // an older extension
+        #expect(try toRead() == [a, b, c, d])
+        // A malformed entry is skipped, so the page was not read whole either.
+        try clew.importExternal(ImportBatch(source: .extensionX, entries: [post(a), post(b), post("0x")], listTotal: nil,
+            scan: ScanReport(found: 3, parsed: 3, selectorVersion: "t"), fromTop: 3, reachedEnd: true))
+        #expect(try toRead() == [a, b, c, d])
+    }
+
+    @Test func aPostClewChangedInTheLastTenMinutesStaysAndLeadsTheOrder() throws {
+        try scan([a, b, c])
+        clock.set(local(10))
+        try clew.bookmarkChanged(source: .extensionX, entry: post(n), bookmarked: true)   // clicked in another tab
+        clock.set(local(10).addingTimeInterval(9 * 60))
+        let r = try scan([a, b], end: true)                           // this page loaded before the click
+        #expect(try r.complete && r.letGo == 1 && read() == [c])
+        #expect(try page().notStarted.compactMap(\.item.externalRef) == [n, a, b])
+        // Once it is older than ten minutes, a page without it means it was removed.
+        clock.set(local(10).addingTimeInterval(11 * 60))
+        try scan([a, b], end: true)
+        #expect(try read() == [c, n])
+    }
+
+    @Test func moreThanTwentyAndMoreThanHalfIsNotTrusted() throws {
+        let old = many(30)
+        try scan(old)
+        clock.set(local(10))
+        // 21 of 30 gone at once: a broken page, not a cleanup. The gap rule runs instead.
+        let kept = Array(old.prefix(9))
+        let r = try scan(kept, end: true)
+        #expect(try !r.complete && r.letGo == 0 && toRead().count == 30)
+        // 21 gone of 50 is less than half: trusted.
+        let more = many(20, from: 200)
+        try scan(more + old, run: 0)
+        #expect(try toRead().count == 50)
+        let r2 = try scan(more + kept, end: true)
+        #expect(try r2.complete && r2.letGo == 21 && toRead().count == 29)
+        // 20 gone, more than half but not more than 20, is within the cap (the newer
+        // posts are past their ten minutes by then).
+        clock.set(local(10).addingTimeInterval(11 * 60))
+        let r3 = try scan(Array(more.prefix(9)), end: true)
+        #expect(r3.complete && r3.letGo == 20)
+    }
 
     @Test func gapRuleCases() {
         typealias G = (order: [String], removed: [String])

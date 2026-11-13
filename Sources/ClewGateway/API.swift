@@ -40,6 +40,8 @@ public enum API {
         /// For a list without a count (X bookmarks): how many leading entries were seen
         /// as one unbroken run from the top of the list (the gap rule).
         public var fromTop: Int?
+        /// For a list without a count: the scraper saw the list's end (SPEC 2026-11-13).
+        public var reachedEnd: Bool?
     }
 
     public struct ImportResponse: Codable, Hashable, Sendable {

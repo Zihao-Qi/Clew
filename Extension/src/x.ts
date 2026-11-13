@@ -15,7 +15,9 @@ import type { BookmarkRequest, ExternalEntry, ImportRequest } from "./contract";
 // time link, quotes sit in div[role="link"], and the button is a <button> with
 // data-testid "bookmark" or "removeBookmark". X Articles have no tweetText: their
 // title is the first text in the card around "article-cover-image".
-export const SELECTOR_VERSION = "x-2026-11-10b";
+// 2026-11-13 (4 bookmarks): the list ends with an empty cellInnerDiv (200 px, two empty
+// divs) and no progressbar; nothing loads after scrolling to it.
+export const SELECTOR_VERSION = "x-2026-11-13";
 
 export const SELECTORS = {
   /** One per row of the timeline, `style="transform: translateY(<n>px); …"`. */
@@ -35,6 +37,10 @@ export const SELECTORS = {
   articleCover: '[data-testid="article-cover-image"]',
   /** Text blocks (the article title is the first one in the card). */
   textBlock: '[dir="auto"]',
+  /** X's spinner while more rows load. */
+  loading: '[role="progressbar"]',
+  /** Anything to press in a row (a "Retry" row is not the end). */
+  control: 'button, [role="button"], a',
 } as const;
 
 const STATUS = /^\/[A-Za-z0-9_]{1,15}\/status\/(\d{1,19})(?:[/?#]|$)/;
@@ -141,6 +147,28 @@ export function readWindow(root: ParentNode, postBy: (handle: string) => string)
   return { atTop: cells.length > 0 && cells[0]?.top === 0, posts };
 }
 
+/** The list's last row, when this page shows its end (SPEC 2026-11-13): nothing is
+ * loading, the last row (by translateY) holds no post, no text and nothing to press, and
+ * every row above it holds a readable post (or one unbookmarked during the visit). The
+ * caller checks that the row is on screen and stays so. */
+export function endRow(root: ParentNode, postBy: (handle: string) => string): Element | undefined {
+  if (root.querySelector(SELECTORS.loading)) return undefined;
+  const cells = Array.from(root.querySelectorAll(SELECTORS.cell))
+    .map((cell) => ({ cell, top: cellTop(cell) }))
+    .sort((a, b) => (a.top ?? Infinity) - (b.top ?? Infinity))
+    .map(({ cell }) => cell);
+  const last = cells[cells.length - 1];
+  if (cells.length < 2 || !last) return undefined;
+  if (last.querySelector(SELECTORS.post) || last.querySelector(SELECTORS.control)) return undefined;
+  if ((last.textContent ?? "").trim() !== "") return undefined;
+  for (const cell of cells.slice(0, -1)) {
+    const post = cell.querySelector(SELECTORS.post);
+    if (!post) return undefined;
+    if (!isUnbookmarked(post) && readPost(post, postBy) === undefined) return undefined;
+  }
+  return last;
+}
+
 /** Builds one scan out of the windows seen while the page scrolls. */
 export class BookmarkScan {
   private readonly entries: ExternalEntry[] = [];
@@ -178,7 +206,19 @@ export class BookmarkScan {
     if (i < this.run) this.run -= 1;
   }
 
-  request(): ImportRequest {
+  /** Every post seen so far was read, in one run from the top (a break leaves later
+   * entries outside the run): if the end of the list is seen now, this is the whole list. */
+  get whole(): boolean {
+    return this.unreadable === 0 && this.entries.length > 0 && this.run === this.entries.length;
+  }
+
+  get size(): number {
+    return this.entries.length;
+  }
+
+  /** `reachedEnd`: the caller saw the list's end, still and on screen, during a recent
+   * visit; it is sent only for a whole scan. */
+  request(reachedEnd = false): ImportRequest {
     const parsed = this.entries.length;
     return {
       source: "extension.x",
@@ -186,6 +226,7 @@ export class BookmarkScan {
       // A row that could not be read may be a post Clew knows: then nothing is compared.
       scan: { found: parsed + this.unreadable, parsed, selectorVersion: SELECTOR_VERSION },
       fromTop: this.run,
+      ...(reachedEnd && this.whole ? { reachedEnd: true } : {}),
     };
   }
 }
