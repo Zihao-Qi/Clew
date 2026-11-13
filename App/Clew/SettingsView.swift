@@ -17,7 +17,6 @@ struct SettingsView: View {
     @State private var letGoCount = 0
     @State private var ratingDots = false
     @State private var barStyle = Clew.defaultBarStyle
-    @State private var openListShortcut: OpenShortcut? = .default
     @State private var listsOff: Set<Source> = []
     @State private var offersBreak = true
     @State private var timelineShown = true
@@ -108,9 +107,10 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    OpenShortcutRecorder(shortcut: $openListShortcut) { shortcut in
-                        model.setOpenListShortcut(shortcut)
-                    }
+                    OpenShortcutRecorder(shortcut: Binding(
+                        get: { model.openListShortcut },
+                        set: { model.setOpenListShortcut($0) }
+                    ))
                 } header: {
                     Text("Open the list")
                 } footer: {
@@ -343,7 +343,6 @@ struct SettingsView: View {
         letGoCount = model.lettingGoCount()
         ratingDots = model.ratingsOn
         barStyle = model.barStyle
-        openListShortcut = model.openListShortcut
         listsOff = model.collectionsOff()
         offersBreak = model.focusOffersBreak
         timelineShown = model.timelineShown

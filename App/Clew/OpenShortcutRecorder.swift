@@ -5,7 +5,6 @@ import SwiftUI
 /// Settings › General: shows the current shortcut, records a new one, or clears it.
 struct OpenShortcutRecorder: View {
     @Binding var shortcut: OpenShortcut?
-    var onChange: (OpenShortcut?) -> Void
 
     @State private var recording = false
 
@@ -45,9 +44,6 @@ struct OpenShortcutRecorder: View {
                     .frame(width: 0, height: 0)
             }
         }
-        .onChange(of: recording) { _, on in
-            if on { OpenShortcutHotkey.shared.suspend() } else { OpenShortcutHotkey.shared.resume() }
-        }
         .onDisappear { if recording { stopRecording() } }
     }
 
@@ -62,17 +58,19 @@ struct OpenShortcutRecorder: View {
     }
 
     private func startRecording() {
+        guard !recording else { return }
         recording = true
+        OpenShortcutHotkey.shared.suspend()
     }
 
     private func stopRecording() {
+        guard recording else { return }
         recording = false
         OpenShortcutHotkey.shared.resume()
     }
 
     private func clear() {
         shortcut = nil
-        onChange(nil)
     }
 
     private func handle(_ event: NSEvent) {
@@ -82,14 +80,12 @@ struct OpenShortcutRecorder: View {
         }
         if event.keyCode == 51 || event.keyCode == 117 { // Delete: clear.
             shortcut = nil
-            onChange(nil)
             stopRecording()
             return
         }
         guard let next = OpenShortcut(event: event) else { return }
         guard next.isAllowed else { return } // keep recording
         shortcut = next
-        onChange(next)
         stopRecording()
     }
 }

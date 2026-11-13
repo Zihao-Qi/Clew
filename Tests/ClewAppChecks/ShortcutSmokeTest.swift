@@ -4,7 +4,6 @@ import Carbon.HIToolbox
 import ClewCore
 import ClewDomain
 import ClewStore
-import Observation
 import SwiftUI
 
 /// Debug-only, in-process UI exercise. Launch the built app with
@@ -66,8 +65,7 @@ enum ShortcutSmokeTest {
         await settle()
         print("PASS: installed Carbon callback reaches the list")
 
-        let state = RecorderState(shortcut: initial)
-        let host = NSHostingView(rootView: RecorderFixture(state: state, model: model).frame(width: 400, height: 80))
+        let host = NSHostingView(rootView: RecorderFixture(model: model).frame(width: 400, height: 80))
         let window = NSWindow(contentRect: NSRect(x: 40, y: 100, width: 400, height: 80),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -78,25 +76,24 @@ enum ShortcutSmokeTest {
         await click(window, x: 340)
         require(available(initial), "Recording suspends the global shortcut")
         await key(window, code: 53, text: "\u{1b}")
-        require(state.shortcut == initial && !available(initial), "Escape restores the existing shortcut")
+        require(model.openListShortcut == initial && !available(initial), "Escape restores the existing shortcut")
         print("PASS: recorder captures Escape and restores the shortcut")
 
         await click(window, x: 340)
         await key(window, code: 40, text: "k", flags: [.command, .control, .option, .shift])
         let changed = OpenShortcut(keyCode: 40, command: true, shift: true,
                                    option: true, control: true, glyph: "K")
-        require(state.shortcut == changed, "Actual recorder captures the changed shortcut")
+        require(model.openListShortcut == changed, "Actual recorder captures the changed shortcut")
         require(savedShortcut(core) == changed, "Recorder persists through the real model")
         require(hotkey.registrationError == nil && !available(changed), "Changed shortcut is registered")
         print("PASS: recorder changes, persists and registers the shortcut")
 
         await click(window, x: 340)
         await key(window, code: 51, text: "\u{7f}")
-        require(state.shortcut == nil && savedShortcut(core) == nil, "Delete clears and saves the shortcut")
+        require(model.openListShortcut == nil && savedShortcut(core) == nil, "Delete clears and saves the shortcut")
         require(available(changed), "Clearing releases the shortcut")
         print("PASS: Delete clears the shortcut and releases registration")
 
-        state.shortcut = initial
         model.setOpenListShortcut(initial)
         await settle()
         await click(window, x: 340)
@@ -179,17 +176,14 @@ enum ShortcutSmokeTest {
         override func keyDown(with event: NSEvent) { keyCount += 1 }
     }
 
-    @Observable final class RecorderState {
-        var shortcut: OpenShortcut?
-        init(shortcut: OpenShortcut?) { self.shortcut = shortcut }
-    }
-
     private struct RecorderFixture: View {
-        @Bindable var state: RecorderState
         let model: AppModel
         var body: some View {
-            OpenShortcutRecorder(shortcut: $state.shortcut) { model.setOpenListShortcut($0) }
-                .padding(12)
+            OpenShortcutRecorder(shortcut: Binding(
+                get: { model.openListShortcut },
+                set: { model.setOpenListShortcut($0) }
+            ))
+            .padding(12)
         }
     }
 }
