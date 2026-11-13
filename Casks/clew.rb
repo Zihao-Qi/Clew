@@ -5,7 +5,7 @@
 # Bump `version` together with MARKETING_VERSION in project.yml, then push the tag
 # v<version>; .github/workflows/release.yml builds and publishes the zip.
 cask "clew" do
-  version "1.4.0"
+  version "1.4.1"
   # Releases are built by CI from the tag; the download is checked by HTTPS from GitHub.
   sha256 :no_check
 
