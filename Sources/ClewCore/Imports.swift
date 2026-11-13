@@ -30,13 +30,18 @@ public struct ImportBatch: Hashable, Sendable {
     /// saw as one unbroken run from the top of the list. Only that run is compared with
     /// the order Clew last saw (the gap rule, SPEC 2026-11-10).
     public var fromTop: Int?
+    /// For a list without a count: the scraper saw the list's end, still and on screen,
+    /// so an unbroken run from the top is the whole list (SPEC 2026-11-13).
+    public var reachedEnd: Bool?
 
-    public init(source: Source, entries: [ExternalEntry], listTotal: Int?, scan: ScanReport? = nil, fromTop: Int? = nil) {
+    public init(source: Source, entries: [ExternalEntry], listTotal: Int?, scan: ScanReport? = nil, fromTop: Int? = nil,
+                reachedEnd: Bool? = nil) {
         self.source = source
         self.entries = entries
         self.listTotal = listTotal
         self.scan = scan
         self.fromTop = fromTop
+        self.reachedEnd = reachedEnd
     }
 }
 
@@ -174,11 +179,20 @@ extension Clew {
                 let rest = try Self.listOrder(batch.source, w).filter { live.contains($0) && !inScan.contains($0) }
                 try Self.saveListOrder(seen + rest, batch.source, now: now, w)
             }
-            // A list without a count (X bookmarks): the gap rule on the unbroken run.
+            // A list without a count (X bookmarks): the whole list once its end was seen,
+            // else the gap rule on the unbroken run.
             if Self.orderedSources.contains(batch.source) {
                 let run = scanAgrees && result.skipped == 0 ? max(0, batch.fromTop ?? 0) : 0   // never trust the client's number
                 let live = Dictionary(uniqueKeysWithValues: try w.items(source: batch.source)
                     .filter { $0.deletedAt == nil }.compactMap { i in i.externalRef.map { ($0, i) } })
+                if batch.reachedEnd == true, !entries.isEmpty, run == entries.count,
+                   let whole = Self.wholeList(seen: entries.map(\.ref), live: live,
+                                              changedSince: now.addingTimeInterval(-Self.restoreAfter)) {
+                    result.complete = true
+                    result.letGo += try leaveList(whole.gone, source: batch.source, now: now, day: day, zone: zone, w)
+                    try Self.saveListOrder(whole.order, batch.source, now: now, w)
+                    return result
+                }
                 let top = entries.prefix(run).map(\.ref)
                 let (order, gone) = Self.gapRule(previous: try Self.listOrder(batch.source, w).filter { live[$0] != nil },
                                                  top: top)
@@ -251,6 +265,26 @@ extension Clew {
     /// removals come from the gap rule and from the bookmark button, never from a
     /// whole-list compare.
     static let orderedSources: Set<Source> = [.extensionX]
+
+    /// Above this many removals that are also more than half the list, a whole-list scan
+    /// of X is not trusted (a broken page; SPEC 2026-11-13).
+    static let wholeListCap = 20
+
+    /// X's whole list, seen to its end (SPEC 2026-11-13): every live post not seen left,
+    /// except one Clew changed since `changedSince` (the page may predate it). The order
+    /// is those kept, then what was seen. Nil when more than `wholeListCap` posts would
+    /// leave and they are more than half the list.
+    static func wholeList(seen: [String], live: [String: Item], changedSince: Date)
+        -> (gone: [Item], order: [String])? {
+        let onPage = Set(seen)
+        let missing = live.values.filter { !onPage.contains($0.externalRef ?? "") }
+        let gone = missing.filter { $0.updatedAt < changedSince }
+        if gone.count > wholeListCap, gone.count * 2 > live.count { return nil }
+        let kept = missing.filter { $0.updatedAt >= changedSince }
+            .sorted { ($0.updatedAt, $0.id.uuidString) > ($1.updatedAt, $1.id.uuidString) }
+            .compactMap(\.externalRef)
+        return (gone, kept + seen.filter { live[$0] != nil })
+    }
 
     /// The gap rule (SPEC 2026-11-10). `previous` is the list as Clew last saw it, top
     /// first; `top` an unbroken run from the top of the list now. An item that was

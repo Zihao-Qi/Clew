@@ -566,13 +566,23 @@ M = [
   "OpenShortcutTests"),
  # A new task from the timeline (SPEC 2026-11-13)
  ("DC1 new block never decides", C+"Timeline.swift", "            return (item, try decideIfEnded(block, now: now, w))", "            return (item, block)", "TimelineTests"),
- ("DC2 any start", C+"Timeline.swift", "        let bounds = dayBounds(today)\n        try Self.checkStart(start, bounds)\n        let length = min(", "        let bounds = dayBounds(today)\n        let length = min(", "TimelineTests"),
+ ("DC2 any start", C+"Timeline.swift", "        try Self.checkStart(start, bounds)\n        // 15 or 30:", "        // 15 or 30:", "TimelineTests"),
  ("DC3 not cut at 4", C+"Timeline.swift", "let length = min(Self.blockDefaultMinutes, Int(bounds.end.timeIntervalSince(start) / 60))", "let length = Self.blockDefaultMinutes", "TimelineTests"),
- ("DC4 half made", C+"Timeline.swift", "        try Self.checkStart(start, bounds)\n        let length = min(", "        _ = try? addItem(NewItem(title: title, shape: .today))\n        try Self.checkStart(start, bounds)\n        let length = min(", "TimelineTests"),
+ ("DC4 half made", C+"Timeline.swift", "        try Self.checkStart(start, bounds)\n        // 15 or 30:", "        _ = try? addItem(NewItem(title: title, shape: .today))\n        try Self.checkStart(start, bounds)\n        // 15 or 30:", "TimelineTests"),
  ("DC5 untrimmed", C+"Clew.swift", "        let title = try Self.validTitle(new.title)\n        let url = try new.url.map(Self.validURL)\n", "        _ = try Self.validTitle(new.title)\n        let title = new.title\n        let url = try new.url.map(Self.validURL)\n", "TimelineTests"),
  ("DC6 draft first on a tie", C+"CalendarEvents.swift", "if let draft { spans.append((.draft, draft.start, draft.end, 0, blocks.count)) }", "if let draft { spans.append((.draft, draft.start, draft.end, 0, -1)) }", "CalendarEventTests"),
  ("DC7 draft after events", C+"CalendarEvents.swift", "if let draft { spans.append((.draft, draft.start, draft.end, 0, blocks.count)) }", "if let draft { spans.append((.draft, draft.start, draft.end, 2, 0)) }", "CalendarEventTests"),
  ("DC8 draft left out", C+"CalendarEvents.swift", "if let draft { spans.append((.draft, draft.start, draft.end, 0, blocks.count)) }", "", "CalendarEventTests"),
+ # X: the end of the list (SPEC 2026-11-13)
+ ("XE1 end ignored", C+"Imports.swift", "if batch.reachedEnd == true, !entries.isEmpty, run == entries.count,", "if false, !entries.isEmpty, run == entries.count,", "XBookmarkTests"),
+ ("XE2 broken run trusted", C+"Imports.swift", "if batch.reachedEnd == true, !entries.isEmpty, run == entries.count,", "if batch.reachedEnd == true, !entries.isEmpty,", "XBookmarkTests"),
+ ("XE3 empty page trusted", C+"Imports.swift", "if batch.reachedEnd == true, !entries.isEmpty, run == entries.count,", "if batch.reachedEnd == true, run == entries.count,", "XBookmarkTests"),
+ ("XE4 no ten minutes", C+"Imports.swift", "let gone = missing.filter { $0.updatedAt < changedSince }", "let gone = missing", "XBookmarkTests"),
+ ("XE5 no cap", C+"Imports.swift", "        if gone.count > wholeListCap, gone.count * 2 > live.count { return nil }\n", "", "XBookmarkTests"),
+ ("XE6 cap or", C+"Imports.swift", "if gone.count > wholeListCap, gone.count * 2 > live.count { return nil }", "if gone.count > wholeListCap || gone.count * 2 > live.count { return nil }", "XBookmarkTests"),
+ ("XE7 cap off by one", C+"Imports.swift", "if gone.count > wholeListCap, gone.count * 2 > live.count { return nil }", "if gone.count >= wholeListCap, gone.count * 2 > live.count { return nil }", "XBookmarkTests"),
+ ("XE8 kept lose their place", C+"Imports.swift", "return (gone, kept + seen.filter { live[$0] != nil })", "return (gone, seen.filter { live[$0] != nil })", "XBookmarkTests"),
+ ("XE9 gateway drops the end", W+"Gateway.swift", "fromTop: body.fromTop, reachedEnd: body.reachedEnd))", "fromTop: body.fromTop))", "ContractTests"),
  ("DC9 task dated by clock again", C+"Timeline.swift", "                                         source: .user, now: now, day: today, w)", "                                         source: .user, now: now, day: currentDay().adding(days: 1), w)", "TimelineTests"),
 ]
 

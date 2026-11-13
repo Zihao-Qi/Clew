@@ -1,0 +1,10 @@
+{
+  "source": "extension.x",
+  "entries": [
+    {"externalRef": "1850000000000000001", "title": "First post"},
+    {"externalRef": "1850000000000000002", "title": "Post by @someone"}
+  ],
+  "scan": {"found": 2, "parsed": 2, "selectorVersion": "x-2026-11-13"},
+  "fromTop": 2,
+  "reachedEnd": true
+}

@@ -25,10 +25,14 @@ private let a = "1850000000000000001", b = "1850000000000000002", c = "185000000
 
     /// A scan of `refs`, top first, the first `run` of them unbroken from the top.
     @discardableResult
-    private func scan(_ refs: [String], run: Int? = nil, found: Int? = nil) throws -> ImportResult {
+    private func scan(_ refs: [String], run: Int? = nil, found: Int? = nil, end: Bool? = nil) throws -> ImportResult {
         try clew.importExternal(ImportBatch(source: .extensionX, entries: refs.map { post($0) }, listTotal: nil,
             scan: ScanReport(found: found ?? refs.count, parsed: refs.count, selectorVersion: "t"),
-            fromTop: run ?? refs.count))
+            fromTop: run ?? refs.count, reachedEnd: end))
+    }
+    /// `count` post ids, distinct from a…n.
+    private func many(_ count: Int, from start: Int = 100) -> [String] {
+        (start..<(start + count)).map { "18600000000000\(String(format: "%05d", $0))" }
     }
     private func item(_ ref: String) -> Item? { store.state.items.values.first { $0.externalRef == ref } }
     private func page() throws -> CollectionDetails { try #require(try clew.collection(.extensionX)) }
@@ -45,14 +49,14 @@ private let a = "1850000000000000001", b = "1850000000000000002", c = "185000000
         #expect(i.titleOrigin == .fetched && i.source == .extensionX)
         let row = try #require(try clew.collections().first { $0.source == .extensionX })
         #expect(row.toWatch == 1 && row.onList == 1)
-        #expect(try clew.today().total == 0 && clew.laterPile().isEmpty)
+        #expect(try try clew.today().total == 0 && clew.laterPile().isEmpty)
     }
 
     @Test func toReadFollowsXsOrderNewestBookmarkFirst() throws {
         try scan([c, a, b])
-        #expect(try page().notStarted.compactMap(\.item.externalRef) == [c, a, b])
+        #expect(try try page().notStarted.compactMap(\.item.externalRef) == [c, a, b])
         try clew.bookmarkChanged(source: .extensionX, entry: post(n), bookmarked: true)
-        #expect(try page().notStarted.compactMap(\.item.externalRef) == [n, c, a, b])
+        #expect(try try page().notStarted.compactMap(\.item.externalRef) == [n, c, a, b])
     }
 
     @Test func aPostMissingBetweenTwoStillThereWasRead() throws {
@@ -60,7 +64,7 @@ private let a = "1850000000000000001", b = "1850000000000000002", c = "185000000
         clock.set(local(10))
         let r = try scan([a, c, d])                                 // b unbookmarked on the phone
         #expect(r.letGo == 1)
-        #expect(try read() == [b] && toRead() == [a, c, d, e])      // e is below what was seen: kept
+        #expect(try try read() == [b] && toRead() == [a, c, d, e])      // e is below what was seen: kept
         let tick = try #require(store.state.checkIns.values.first)
         #expect(tick.localDay == LocalDay(string: "2026-11-10")! && tick.source == .extensionX)
     }
@@ -68,45 +72,45 @@ private let a = "1850000000000000001", b = "1850000000000000002", c = "185000000
     @Test func theNewestBookmarkRemovedOnThePhoneIsCaught() throws {
         try scan([a, b, c])
         clock.set(local(10))
-        #expect(try scan([b, c]).letGo == 1)
-        #expect(try read() == [a])
+        #expect(try try scan([b, c]).letGo == 1)
+        #expect(try try read() == [a])
     }
 
     @Test func newPostsOnTopDoNotHideAGap() throws {
         try scan([a, b, c])
         try scan([n, a, c])
-        #expect(try read() == [b])
+        #expect(try try read() == [b])
         try scan([a, n, c])                                         // unknown posts between are skipped over
-        #expect(try read() == [b] && toRead() == [n, a, c])
+        #expect(try try read() == [b] && toRead() == [n, a, c])
     }
 
     @Test func aPostBookmarkedAgainMovesToTheTopWithoutMakingGaps() throws {
         try scan([a, b, c, d, e])
         try scan([e, a, b])                                         // e bookmarked again; c and d not loaded
-        #expect(try read().isEmpty && toRead() == [a, b, c, d, e])
+        #expect(try try read().isEmpty && toRead() == [a, b, c, d, e])
         try scan([e, a, c])                                         // now b is really gone
-        #expect(try read() == [b])
+        #expect(try try read() == [b])
     }
 
     @Test func onlyTheUnbrokenRunFromTheTopIsCompared() throws {
         try scan([a, b, c, d])
         // The scraper saw a, then lost the thread; c and d were seen after a break.
         let r = try scan([a, c, d], run: 1)
-        #expect(try r.letGo == 0 && read().isEmpty)
-        #expect(try scan([a, c, d], run: 0).letGo == 0)
-        #expect(try scan([a, c, d], run: -1).letGo == 0)           // a nonsense run is no run
-        #expect(try scan([a, c, d], run: 99).letGo == 1)           // clamped to the entries
+        #expect(try try r.letGo == 0 && read().isEmpty)
+        #expect(try try scan([a, c, d], run: 0).letGo == 0)
+        #expect(try try scan([a, c, d], run: -1).letGo == 0)           // a nonsense run is no run
+        #expect(try try scan([a, c, d], run: 99).letGo == 1)           // clamped to the entries
     }
 
     @Test func aScanThatMissedRowsComparesNothing() throws {
         try scan([a, b, c])
-        #expect(try scan([a, c], found: 3).letGo == 0)              // a row it could not read
+        #expect(try try scan([a, c], found: 3).letGo == 0)              // a row it could not read
         let bad = try clew.importExternal(ImportBatch(source: .extensionX, entries: [post(a), post("x"), post(c)],
             listTotal: nil, scan: ScanReport(found: 3, parsed: 3, selectorVersion: "t"), fromTop: 3))
         #expect(bad.skipped == 1 && bad.letGo == 0)                 // a malformed entry
         let noReport = try clew.importExternal(ImportBatch(source: .extensionX, entries: [post(a), post(c)],
             listTotal: nil, fromTop: 2))
-        #expect(try noReport.letGo == 0 && read().isEmpty)
+        #expect(try try noReport.letGo == 0 && read().isEmpty)
     }
 
     @Test func aListCountIsNeverTrustedForX() throws {
@@ -136,7 +140,7 @@ private let a = "1850000000000000001", b = "1850000000000000002", c = "185000000
         // c is now on top: a run [c, b] says a was removed; with c still in its old
         // place, that run would have been a step back and proven nothing.
         try scan([c, b])
-        #expect(try read() == [a])
+        #expect(try try read() == [a])
     }
 
     @Test func aPostDeletedInClewLeavesTheOrderOnTheNextClick() throws {
@@ -153,18 +157,18 @@ private let a = "1850000000000000001", b = "1850000000000000002", c = "185000000
         #expect(r.added == 1 && item(n)?.title == "just saved")
         // n is now the newest: a run [n, b] shows a was removed.
         try scan([n, b])
-        #expect(try read() == [a])
+        #expect(try try read() == [a])
     }
 
     @Test func unbookmarkingMarksItRead() throws {
         try scan([a, b])
         clock.set(local(11))
         let r = try clew.bookmarkChanged(source: .extensionX, entry: post(a, ""), bookmarked: false)
-        #expect(try r.letGo == 1 && read() == [a])
+        #expect(try try r.letGo == 1 && read() == [a])
         #expect(store.state.checkIns.values.map(\.localDay) == [LocalDay(string: "2026-11-11")!])
         // Again, or for a post Clew never saw: nothing more.
-        #expect(try clew.bookmarkChanged(source: .extensionX, entry: post(a), bookmarked: false).letGo == 0)
-        #expect(try clew.bookmarkChanged(source: .extensionX, entry: post(n), bookmarked: false).letGo == 0)
+        #expect(try try clew.bookmarkChanged(source: .extensionX, entry: post(a), bookmarked: false).letGo == 0)
+        #expect(try try clew.bookmarkChanged(source: .extensionX, entry: post(n), bookmarked: false).letGo == 0)
         #expect(store.state.checkIns.count == 1 && item(n) == nil)
         // Ticked by the user first: no second tick.
         try clew.checkIn(itemId: try #require(item(b)).id)
@@ -176,13 +180,13 @@ private let a = "1850000000000000001", b = "1850000000000000002", c = "185000000
         try scan([a, b])
         try clew.bookmarkChanged(source: .extensionX, entry: post(a), bookmarked: false)
         let r = try clew.bookmarkChanged(source: .extensionX, entry: post(a), bookmarked: true)
-        #expect(try r.restored == 1 && toRead() == [a, b] && read().isEmpty)
+        #expect(try try r.restored == 1 && toRead() == [a, b] && read().isEmpty)
         // Deleted in Clew, then bookmarked again: the click brings it back, to read
         // (user, 2026-11-10), even if it had been ticked before.
         try clew.checkIn(itemId: try #require(item(b)).id)
         try clew.deleteItem(itemId: try #require(item(b)).id)
-        #expect(try clew.bookmarkChanged(source: .extensionX, entry: post(b), bookmarked: true).restored == 1)
-        #expect(try toRead() == [a, b] && read().isEmpty && store.state.items.count == 2)
+        #expect(try try clew.bookmarkChanged(source: .extensionX, entry: post(b), bookmarked: true).restored == 1)
+        #expect(try try toRead() == [a, b] && read().isEmpty && store.state.items.count == 2)
         #expect(store.state.checkIns.values.filter { $0.voidedAt == nil }.isEmpty)
     }
 
@@ -192,22 +196,22 @@ private let a = "1850000000000000001", b = "1850000000000000002", c = "185000000
         clock.set(local(9, 12))
         try clew.bookmarkChanged(source: .extensionX, entry: post(a), bookmarked: false)
         clock.set(local(9, 12).addingTimeInterval(Clew.restoreAfter - 1))
-        #expect(try scan([a, b]).restored == 0 && read() == [a])
+        #expect(try try scan([a, b]).restored == 0 && read() == [a])
         // Long enough after, it is really back on the list (bookmarked again on the phone).
         clock.set(local(9, 12).addingTimeInterval(Clew.restoreAfter + 1))
-        #expect(try scan([a, b]).restored == 1 && toRead() == [a, b])
+        #expect(try try scan([a, b]).restored == 1 && toRead() == [a, b])
         // A click never waits, and it is a restore: a tick the user made stays.
         try clew.checkIn(itemId: try #require(item(b)).id)
         try clew.bookmarkChanged(source: .extensionX, entry: post(b), bookmarked: false)
-        #expect(try clew.bookmarkChanged(source: .extensionX, entry: post(b), bookmarked: true).restored == 1)
-        #expect(try read() == [b] && store.state.checkIns.values.contains { $0.itemId == item(b)?.id && $0.voidedAt == nil })
+        #expect(try try clew.bookmarkChanged(source: .extensionX, entry: post(b), bookmarked: true).restored == 1)
+        #expect(try try read() == [b] && store.state.checkIns.values.contains { $0.itemId == item(b)?.id && $0.voidedAt == nil })
     }
 
     @Test func aScanNeverBringsBackWhatTheUserDeleted() throws {
         // A scan cannot tell "still bookmarked" from "bookmarked again": only a click can.
         try scan([a, b])
         try clew.deleteItem(itemId: try #require(item(b)).id)
-        #expect(try scan([a, b]).restored == 0)
+        #expect(try try scan([a, b]).restored == 0)
         #expect(item(b)?.deletedAt != nil)
         // ...and it keeps no place in the order even while still on the page (Gemini).
         let order = try store.read { try $0.setting("listOrder.extension.x") }
@@ -218,14 +222,14 @@ private let a = "1850000000000000001", b = "1850000000000000002", c = "185000000
         // Gemini review: undoToday turned "left" into "not read" behind the table's back.
         try scan([a, b])
         try clew.bookmarkChanged(source: .extensionX, entry: post(a), bookmarked: false)
-        #expect(try clew.undoToday(itemId: try #require(item(a)).id) == nil)
-        #expect(try read() == [a])
+        #expect(try try clew.undoToday(itemId: try #require(item(a)).id) == nil)
+        #expect(try try read() == [a])
         #expect(throws: ClewError.itemNotFound) { try clew.checkIn(itemId: try #require(item(a)).id) }
     }
 
     @Test func aBookmarkNeedsATitleAndAValidId() throws {
-        #expect(try clew.bookmarkChanged(source: .extensionX, entry: post(a, "  "), bookmarked: true).skipped == 1)
-        #expect(try clew.bookmarkChanged(source: .extensionX, entry: post("abc"), bookmarked: true).skipped == 1)
+        #expect(try try clew.bookmarkChanged(source: .extensionX, entry: post(a, "  "), bookmarked: true).skipped == 1)
+        #expect(try try clew.bookmarkChanged(source: .extensionX, entry: post("abc"), bookmarked: true).skipped == 1)
         #expect(store.state.items.isEmpty)
     }
 
@@ -240,6 +244,74 @@ private let a = "1850000000000000001", b = "1850000000000000002", c = "185000000
     }
 
     // MARK: The rule on its own
+
+    // MARK: The end of the list (SPEC 2026-11-13)
+
+    @Test func seeingTheEndClearsPostsRemovedBelowTheLastOne() throws {
+        try scan([a, b, c, d, e])
+        clock.set(local(10))
+        // The user's case: removed on the phone, below and between what is left.
+        let gap = try scan([a, c])
+        #expect(try !gap.complete && toRead() == [a, c, d, e])     // the gap rule: b only
+        let whole = try scan([a, c], end: true)
+        #expect(whole.complete && whole.letGo == 2)
+        #expect(try try toRead() == [a, c] && read() == [b, d, e])
+        #expect(try try page().notStarted.compactMap(\.item.externalRef) == [a, c])
+        // "Not read" undoes it, as any automatic read.
+        let dItem = try #require(item(d))
+        try clew.markNotFinished(itemId: dItem.id)
+        #expect(try try !read().contains(d))
+    }
+
+    @Test func theEndIsTrustedOnlyForAWholeUnbrokenReadablePage() throws {
+        try scan([a, b, c, d])
+        clock.set(local(10))
+        try scan([a, b], run: 1, end: true)                            // a break after a
+        try scan([a, b], found: 3, end: true)                          // a row it could not read
+        try scan([], end: true)                                        // an empty page
+        try scan([a, b], end: false)
+        try scan([a, b])                                               // an older extension
+        #expect(try try toRead() == [a, b, c, d])
+        // A malformed entry is skipped, so the page was not read whole either.
+        try clew.importExternal(ImportBatch(source: .extensionX, entries: [post(a), post(b), post("0x")], listTotal: nil,
+            scan: ScanReport(found: 3, parsed: 3, selectorVersion: "t"), fromTop: 3, reachedEnd: true))
+        #expect(try try toRead() == [a, b, c, d])
+    }
+
+    @Test func aPostClewChangedInTheLastTenMinutesStaysAndLeadsTheOrder() throws {
+        try scan([a, b, c])
+        clock.set(local(10))
+        try clew.bookmarkChanged(source: .extensionX, entry: post(n), bookmarked: true)   // clicked in another tab
+        clock.set(local(10).addingTimeInterval(9 * 60))
+        let r = try scan([a, b], end: true)                           // this page loaded before the click
+        #expect(try r.complete && r.letGo == 1 && read() == [c])
+        #expect(try try page().notStarted.compactMap(\.item.externalRef) == [n, a, b])
+        // Once it is older than ten minutes, a page without it means it was removed.
+        clock.set(local(10).addingTimeInterval(11 * 60))
+        try scan([a, b], end: true)
+        #expect(try try read() == [c, n])
+    }
+
+    @Test func moreThanTwentyAndMoreThanHalfIsNotTrusted() throws {
+        let old = many(30)
+        try scan(old)
+        clock.set(local(10))
+        // 21 of 30 gone at once: a broken page, not a cleanup. The gap rule runs instead.
+        let kept = Array(old.prefix(9))
+        let r = try scan(kept, end: true)
+        #expect(try !r.complete && r.letGo == 0 && toRead().count == 30)
+        // 21 gone of 50 is less than half: trusted.
+        let more = many(20, from: 200)
+        try scan(more + old, run: 0)
+        #expect(try try toRead().count == 50)
+        let r2 = try scan(more + kept, end: true)
+        #expect(try r2.complete && r2.letGo == 21 && toRead().count == 29)
+        // 20 gone, more than half but not more than 20, is within the cap (the newer
+        // posts are past their ten minutes by then).
+        clock.set(local(10).addingTimeInterval(11 * 60))
+        let r3 = try scan(Array(more.prefix(9)), end: true)
+        #expect(r3.complete && r3.letGo == 20)
+    }
 
     @Test func gapRuleCases() {
         typealias G = (order: [String], removed: [String])

@@ -186,7 +186,7 @@ public final class Gateway: @unchecked Sendable {
             do {
                 let result = try clew.importExternal(ImportBatch(source: body.source, entries: body.entries,
                                                                  listTotal: body.listTotal, scan: body.scan,
-                                                                 fromTop: body.fromTop))
+                                                                 fromTop: body.fromTop, reachedEnd: body.reachedEnd))
                 let needsUpdate = body.scan.needsUpdate(listTotal: body.listTotal, result: result)
                 let report = ImportReport(at: now(), source: body.source, listTotal: body.listTotal, scan: body.scan,
                                           result: result, needsUpdate: needsUpdate)
