@@ -13,6 +13,11 @@ struct DetailView: View {
     let onEdit: (Item) -> Void
     let onBack: () -> Void
 
+    /// False for a double-click's length after opening: the second click of a
+    /// double-click on a block or row lands here and must not hit Delete or Back (SPEC
+    /// 2026-11-13).
+    @State private var takesClicks = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Button(action: onBack) {
@@ -48,6 +53,15 @@ struct DetailView: View {
             }
         }
         .padding(12)
+        .overlay {
+            if !takesClicks {
+                Color.clear.contentShape(Rectangle()).accessibilityHidden(true)
+            }
+        }
+        .task {
+            try? await Task.sleep(for: .seconds(NSEvent.doubleClickInterval))
+            takesClicks = true
+        }
     }
 
     private func header(_ d: ItemDetails) -> some View {

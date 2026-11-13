@@ -81,23 +81,35 @@ extension Clew {
                               end: min(e.end, day.end), isAllDay: false, color: e.color)
             }
             .sorted { ($0.start, $0.end, $0.id) < ($1.start, $1.end, $1.id) }
-        // Blocks and events in one start order; for a tie, blocks first.
-        enum Key: Hashable { case block(UUID), event(String) }
-        let spans: [(key: Key, start: Date, end: Date, order: Int)] =
-            day.blocks.map { (.block($0.id), $0.block.start, $0.block.end, 0) }
-            + timed.map { (.event($0.id), $0.start, $0.end, 1) }
-        let sorted = spans.sorted { ($0.start, $0.order) < ($1.start, $1.order) }
-        let lanes = lanes(sorted.map { ($0.start, $0.end) })
-        var blockPlaces: [UUID: TimelinePlace] = [:]
-        var eventPlaces: [String: TimelinePlace] = [:]
-        for (span, lane) in zip(sorted, lanes) {
+        let layout = timelineLayout(blocks: day.blocks, timed: timed)
+        return TimelineEvents(timed: timed, allDay: allDay, blockPlaces: layout.blocks, eventPlaces: layout.events)
+    }
+
+    /// One layout for blocks, timed events and, while the double-click's name box is open,
+    /// the block it will make (`draft`), so the box sits in the column that block will get
+    /// and nothing moves on Return (SPEC 2026-11-13). Blocks and events in one start order;
+    /// for a tie, blocks first, in the timeline's order, then the draft (it is placed
+    /// last), then events.
+    public static func timelineLayout(blocks: [TimelineBlock], timed: [CalendarEvent],
+                                      draft: (start: Date, end: Date)? = nil)
+        -> (blocks: [UUID: TimelinePlace], events: [String: TimelinePlace], draft: TimelinePlace?) {
+        enum Key: Hashable { case block(UUID), draft, event(String) }
+        var spans: [(key: Key, start: Date, end: Date, order: Int, index: Int)] =
+            blocks.enumerated().map { (.block($1.id), $1.block.start, $1.block.end, 0, $0) }
+        if let draft { spans.append((.draft, draft.start, draft.end, 0, blocks.count)) }
+        spans += timed.enumerated().map { (.event($1.id), $1.start, $1.end, 1, $0) }
+        let sorted = spans.sorted { ($0.start, $0.order, $0.index) < ($1.start, $1.order, $1.index) }
+        var result: (blocks: [UUID: TimelinePlace], events: [String: TimelinePlace], draft: TimelinePlace?) =
+            ([:], [:], nil)
+        for (span, lane) in zip(sorted, lanes(sorted.map { ($0.start, $0.end) })) {
             let place = TimelinePlace(lane: lane.lane, lanes: lane.lanes)
             switch span.key {
-            case .block(let id): blockPlaces[id] = place
-            case .event(let id): eventPlaces[id] = place
+            case .block(let id): result.blocks[id] = place
+            case .draft: result.draft = place
+            case .event(let id): result.events[id] = place
             }
         }
-        return TimelineEvents(timed: timed, allDay: allDay, blockPlaces: blockPlaces, eventPlaces: eventPlaces)
+        return result
     }
 
     // MARK: Settings › Calendar

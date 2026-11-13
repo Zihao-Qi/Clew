@@ -91,6 +91,60 @@ private let tuesday = LocalDay(string: "2026-11-10")!
         #expect(throws: ClewError.invalidMinutes(max: 0)) { try clew.addBlock(after: late.id) }
     }
 
+    // MARK: A new task from the timeline (SPEC 2026-11-13)
+
+    @Test func doubleClickMakesATodayTaskAndItsBlockThere() throws {
+        let earlier = try task("earlier")
+        let made = try clew.addOnTimeline(title: "  Write intro ", start: at(10, 10, 15))
+        let item = made.item
+        #expect(item.kind == .once && item.title == "Write intro" && item.plannedDay == tuesday && item.source == .user)
+        #expect(made.block.itemId == item.id && made.block.start == at(10, 10, 15) && made.block.minutes == 30
+                && made.block.localDay == tuesday && made.block.decidedAt == nil)
+        // On Today, after what was there (its row's place, once back in the list, is at the end).
+        #expect(try clew.today().rows.map(\.id) == [earlier, item.id])
+        // It lives on the timeline, not in the list.
+        #expect(try clew.timeline().placedItems == [item.id])
+        // A link keeps its fetched title's origin.
+        let link = try clew.addOnTimeline(title: "Swift Testing", titleOrigin: .fetched,
+                                          url: URL(string: "https://example.com/a"), start: at(10, 11))
+        #expect(link.item.kind == .once && link.item.titleOrigin == .fetched && link.item.url?.host == "example.com")
+    }
+
+    @Test func aRefusedNameOrStartMakesNothing() throws {
+        // The box opened before 4 a.m. and Return came after the rollover: 3:30 is yesterday's now.
+        for (now, start) in [(at(10, 9), at(10, 10, 5)),      // not on a quarter hour
+                             (at(10, 9), at(11, 4)),          // tomorrow
+                             (at(11, 4, 1), at(11, 3, 30))] { // after the rollover
+            clock.set(now)
+            #expect(throws: ClewError.notAllowed) { try clew.addOnTimeline(title: "write", start: start) }
+        }
+        clock.set(at(10, 9))
+        #expect(throws: ClewError.emptyTitle) { try clew.addOnTimeline(title: "   ", start: at(10, 10)) }
+        #expect(throws: ClewError.self) {
+            try clew.addOnTimeline(title: String(repeating: "x", count: 1000), start: at(10, 10))
+        }
+        #expect(store.state.items.isEmpty && store.state.timeBlocks.isEmpty)
+    }
+
+    @Test func nearFourAMTheNewBlockIsCutToFit() throws {
+        let made = try clew.addOnTimeline(title: "late", start: at(11, 3, 45))
+        #expect(made.block.minutes == 15 && made.block.end == at(11, 4))
+    }
+
+    @Test func aPastHourMakesTheTaskDoneAndNotFinishedUndoesIt() throws {
+        let made = try clew.addOnTimeline(title: "ran", start: at(10, 8))   // 8:00-8:30, now 9:00
+        let tick = try #require(ticks(made.item.id).first)
+        #expect(ticks(made.item.id).count == 1 && tick.source == .timeline && tick.localDay == tuesday)
+        #expect(block(made.block.id).tickId == tick.id && made.block.tickId == tick.id)
+        #expect(try row(made.item.id)?.isDone == true)
+        try clew.blockNotFinished(id: made.block.id)
+        let undone = try row(made.item.id)
+        #expect(ticks(made.item.id).isEmpty && undone?.isDone == false)
+        // A block that has not ended yet leaves the task to do.
+        let open = try clew.addOnTimeline(title: "now", start: at(10, 8, 45))   // until 9:15
+        #expect(ticks(open.item.id).isEmpty && open.block.decidedAt == nil)
+    }
+
     // MARK: Deciding
 
     @Test func aBlocksEndTicksTheTaskOnce() throws {

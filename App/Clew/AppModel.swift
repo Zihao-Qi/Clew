@@ -402,6 +402,17 @@ final class AppModel {
         if blockAlerts { askForNotifications() }
         return run { try $0.placeOnTimeline(itemId: itemId, start: start, minutes: minutes) }
     }
+    /// The timeline's name box, on Return (SPEC 2026-11-13): a today task and its block, in
+    /// one step. A link's page title is kept as fetched unless it was edited.
+    @discardableResult
+    func addOnTimeline(_ text: String, fetchedTitle: String?, at start: Date) -> Bool {
+        let parsed = QuickEntry.parse(text)
+        if blockAlerts { askForNotifications() }
+        return run {
+            try $0.addOnTimeline(title: parsed.title, titleOrigin: parsed.title == fetchedTitle ? .fetched : .typed,
+                                 url: parsed.url, start: start)
+        }
+    }
     @discardableResult
     func moveBlock(_ id: UUID, to start: Date, minutes: Int? = nil) -> Bool {
         run { try $0.moveBlock(id: id, start: start, minutes: minutes) }

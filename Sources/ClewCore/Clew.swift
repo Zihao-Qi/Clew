@@ -166,10 +166,16 @@ public final class Clew: Sendable {
 
     @discardableResult
     public func addItem(_ new: NewItem, source: Source = .user) throws -> Item {
+        let now = clock.now()
+        let day = LocalDay(of: now, in: zones.current(), rolloverHour: rolloverHour)
+        return try store.write { w in try insertNewItem(new, source: source, now: now, day: day, w) }
+    }
+
+    /// The item `addItem` makes, inside a write that may do more (the timeline's
+    /// double-click places it in the same write).
+    func insertNewItem(_ new: NewItem, source: Source, now: Date, day: LocalDay, _ w: any StoreWriter) throws -> Item {
         let title = try Self.validTitle(new.title)
         let url = try new.url.map(Self.validURL)
-        let now = clock.now()
-        let day = currentDay()
 
         let kind: ItemKind, schedule: Schedule, progress: ProgressSpec, state: ItemState, planned: LocalDay?
         switch new.shape {
@@ -186,16 +192,14 @@ public final class Clew: Sendable {
 
         // Only repeating tasks have a slot.
         guard new.slot == nil || kind == .habit || kind == .goal else { throw ClewError.notAllowed }
-        return try store.write { w in
-            let item = Item(
-                id: makeID(), kind: kind, title: title, titleOrigin: new.titleOrigin, url: url,
-                schedule: schedule, progress: progress,
-                state: state, plannedDay: planned, sortKey: (try w.maxSortKey() ?? 0) + 1, source: source,
-                slot: new.slot, createdAt: now, updatedAt: now
-            )
-            try w.insert(item)
-            return item
-        }
+        let item = Item(
+            id: makeID(), kind: kind, title: title, titleOrigin: new.titleOrigin, url: url,
+            schedule: schedule, progress: progress,
+            state: state, plannedDay: planned, sortKey: (try w.maxSortKey() ?? 0) + 1, source: source,
+            slot: new.slot, createdAt: now, updatedAt: now
+        )
+        try w.insert(item)
+        return item
     }
 
     @discardableResult

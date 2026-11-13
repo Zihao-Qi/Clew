@@ -37,6 +37,11 @@ struct ClewApp: App {
             Snapshot.startClickTest()
             return
         }
+        if ProcessInfo.processInfo.environment["CLEW_NEWTASK_TEST"] != nil {
+            _model = State(initialValue: AppModel(clew: nil, notify: false))
+            Snapshot.startNewTaskTest()
+            return
+        }
         if ProcessInfo.processInfo.environment["CLEW_RENDER_PNG"] != nil {
             Snapshot.renderAndExit()
         }

@@ -539,7 +539,7 @@ M = [
  ("CE1 hidden shown", C+"CalendarEvents.swift", "!hidden.contains($0.calendarId) && ", "", "CalendarEventTests"),
  ("CE2 not cut to day", C+"CalendarEvents.swift", "start: max(e.start, day.start),", "start: e.start,", "CalendarEventTests"),
  ("CE3 all-day timed", C+"CalendarEvents.swift", ".filter { !$0.isAllDay && $0.end > $0.start }", ".filter { $0.end > $0.start }", "CalendarEventTests"),
- ("CE4 separate lanes", C+"CalendarEvents.swift", "            day.blocks.map { (.block($0.id), $0.block.start, $0.block.end, 0) }\n            + timed.map", "            [] + timed.map", "CalendarEventTests"),
+ ("CE4 separate lanes", C+"CalendarEvents.swift", "            blocks.enumerated().map { (.block($1.id), $1.block.start, $1.block.end, 0, $0) }", "            []", "CalendarEventTests"),
  ("CE5 on by default", C+"CalendarEvents.swift", "try storeForQueries.read { try $0.setting(Self.calendarShownKey) == \"true\" }", "try storeForQueries.read { try $0.setting(Self.calendarShownKey) != \"false\" }", "CalendarEventTests"),
  ("CE6 never re-shown", C+"CalendarEvents.swift", "if hidden { ids.insert(id) } else { ids.remove(id) }", "if hidden { ids.insert(id) }", "CalendarEventTests"),
  ("CE7 other days", C+"CalendarEvents.swift", "$0.end > day.start && $0.start < day.end", "true", "CalendarEventTests"),
@@ -564,6 +564,16 @@ M = [
   "guard let shortcut = OpenShortcut.decode(json), shortcut.isAllowed else { return .default }",
   "guard let shortcut = OpenShortcut.decode(json) else { return .default }",
   "OpenShortcutTests"),
+ # A new task from the timeline (SPEC 2026-11-13)
+ ("DC1 new block never decides", C+"Timeline.swift", "            return (item, try decideIfEnded(block, now: now, w))", "            return (item, block)", "TimelineTests"),
+ ("DC2 any start", C+"Timeline.swift", "        let bounds = dayBounds(today)\n        try Self.checkStart(start, bounds)\n        let length = min(", "        let bounds = dayBounds(today)\n        let length = min(", "TimelineTests"),
+ ("DC3 not cut at 4", C+"Timeline.swift", "let length = min(Self.blockDefaultMinutes, Int(bounds.end.timeIntervalSince(start) / 60))", "let length = Self.blockDefaultMinutes", "TimelineTests"),
+ ("DC4 half made", C+"Timeline.swift", "        try Self.checkStart(start, bounds)\n        let length = min(", "        _ = try? addItem(NewItem(title: title, shape: .today))\n        try Self.checkStart(start, bounds)\n        let length = min(", "TimelineTests"),
+ ("DC5 untrimmed", C+"Clew.swift", "        let title = try Self.validTitle(new.title)\n        let url = try new.url.map(Self.validURL)\n", "        _ = try Self.validTitle(new.title)\n        let title = new.title\n        let url = try new.url.map(Self.validURL)\n", "TimelineTests"),
+ ("DC6 draft first on a tie", C+"CalendarEvents.swift", "if let draft { spans.append((.draft, draft.start, draft.end, 0, blocks.count)) }", "if let draft { spans.append((.draft, draft.start, draft.end, 0, -1)) }", "CalendarEventTests"),
+ ("DC7 draft after events", C+"CalendarEvents.swift", "if let draft { spans.append((.draft, draft.start, draft.end, 0, blocks.count)) }", "if let draft { spans.append((.draft, draft.start, draft.end, 2, 0)) }", "CalendarEventTests"),
+ ("DC8 draft left out", C+"CalendarEvents.swift", "if let draft { spans.append((.draft, draft.start, draft.end, 0, blocks.count)) }", "", "CalendarEventTests"),
+ ("DC9 task dated by clock again", C+"Timeline.swift", "                                         source: .user, now: now, day: today, w)", "                                         source: .user, now: now, day: currentDay().adding(days: 1), w)", "TimelineTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0
