@@ -239,7 +239,8 @@ one request (ephemeral `URLSession` with no cookie storage and no URL cache, 15 
 timeout, `User-Agent: Clew`, `Accept: application/vnd.github+json`), reads only
 `tag_name`, and builds the release link from the tag; any other status, a missing or
 bad tag, or a network error is a failed check. It runs on its own only while the
-switch is on: `AppModel` asks Core whether one is due at launch, on wake and every hour.
+switch is on: `AppModel` asks Core whether one is due at launch, on wake, every hour
+and when the switch is turned on.
 **Opening Settings from the menu** first clicks Clew's status item **synchronously**
 (`performClick` while the menu is still open: it closes the menu), then opens Settings
 and activates. Measured with a probe of the real app: the menu closed and opened again
