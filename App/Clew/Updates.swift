@@ -81,7 +81,8 @@ final class Updates {
     private func check(manual: Bool) async {
         guard !checking else { return }
         checking = true
-        if manual { message = nil }
+        // Any check replaces what the last Check Now said.
+        message = nil
         update { $0.began(now: now()) }
         let tag = await fetch()
         var outcome = UpdateState.Outcome.failed

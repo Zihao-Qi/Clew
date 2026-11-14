@@ -638,8 +638,11 @@ private struct AboutVisibility: NSViewRepresentable {
             super.viewDidMoveToWindow()
             stop()
             guard let window else { return }
+            // A closed Settings window can come back with this view still in it (the
+            // scene keeps it), so becoming key or main counts as showing again.
             for name in [NSWindow.didMiniaturizeNotification, NSWindow.didDeminiaturizeNotification,
-                         NSWindow.willCloseNotification] {
+                         NSWindow.willCloseNotification, NSWindow.didBecomeKeyNotification,
+                         NSWindow.didBecomeMainNotification] {
                 let closing = name == NSWindow.willCloseNotification
                 observers.append(NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
                     MainActor.assumeIsolated { self?.report(closing: closing) }
@@ -650,7 +653,7 @@ private struct AboutVisibility: NSViewRepresentable {
 
         func report(closing: Bool) {
             guard let updates else { return }
-            let showing = !closing && window != nil && window?.isMiniaturized == false
+            let showing = !closing && window?.isVisible == true && window?.isMiniaturized == false
             if updates.aboutShowing != showing { updates.aboutShowing = showing }
         }
 
