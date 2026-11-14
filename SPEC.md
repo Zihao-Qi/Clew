@@ -220,7 +220,8 @@ stopped daily use, not adding features.
   the chosen bar style. It never ticks anything (a video ticks when it leaves Watch
   Later, whatever its progress; see Watch Later import).
 - **Progress bars (2026-11-09):** Settings › General › Progress bars picks one of two
-  styles for counted goals, collections and started videos: *behind the title* (the row's rounded
+  styles for counted goals and started videos (*changed* 2026-11-13: collection rows
+  have no bar): *behind the title* (the row's rounded
   background fills from the left, default) or *under the title* (a long bar under the
   name, almost to the row's end) or *no bar*. The short bar beside the count is gone;
   `10/30` stays. Pick shows a link's site ("medium.com", no "www.") but not for

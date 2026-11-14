@@ -31,46 +31,27 @@ enum CollectionStyle {
 /// opens its page.
 struct CollectionRowView: View {
     let summary: CollectionSummary
-    let model: AppModel
     let onOpen: () -> Void
 
     @State private var hovering = false
-    @State private var titleInset: CGFloat = 26
-    private static let rowSpace = "collectionRow"
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                // In the circle's place, so names line up with the tasks above.
-                Image(systemName: CollectionStyle.icon(summary.source))
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-                    .frame(width: TaskColumns.circleWidth)
-                Text(verbatim: CollectionStyle.name(summary.source))
-                    .lineLimit(1)
-                    .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(Self.rowSpace)).minX } action: { titleInset = $0 }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Text(verbatim: CollectionStyle.left(summary.toWatch, summary.source))
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                Image(systemName: "chevron.right")
-                    .imageScale(.small)
-                    .foregroundStyle(.tertiary)
-            }
-            .background {
-                if model.barStyle == .behindTitle {
-                    ProgressFill(fraction: summary.fraction)
-                        .padding(.horizontal, -6)
-                        .padding(.vertical, -5)
-                }
-            }
-            if model.barStyle == .underTitle {
-                ProgressLine(fraction: summary.fraction)
-                    .padding(.leading, titleInset)
-                    .padding(.top, -2)
-            }
+        HStack(spacing: 8) {
+            // In the circle's place, so names line up with the tasks above.
+            Image(systemName: CollectionStyle.icon(summary.source))
+                .font(.title3)
+                .foregroundStyle(.secondary)
+                .frame(width: TaskColumns.circleWidth)
+            Text(verbatim: CollectionStyle.name(summary.source))
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(verbatim: CollectionStyle.left(summary.toWatch, summary.source))
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+            Image(systemName: "chevron.right")
+                .imageScale(.small)
+                .foregroundStyle(.tertiary)
         }
-        .coordinateSpace(.named(Self.rowSpace))
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
         .background {
