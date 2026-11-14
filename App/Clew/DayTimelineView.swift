@@ -17,8 +17,9 @@ enum TimelineMetrics {
     static let pointsPerMinute: CGFloat = 1
     /// About 6 hours show (user, 2026-11-10; was 4).
     static let height: CGFloat = 360
-    /// Room before the widest hour label and between the labels and hour lines.
-    static let labelLeading: CGFloat = 4
+    /// Room before the widest hour label (matching `trailing` on the card's right edge)
+    /// and between the labels and hour lines.
+    static let labelLeading: CGFloat = trailing
     static let labelGap: CGFloat = 4
     /// Room between the blocks and hour lines and the card's right edge, so the timeline
     /// reads as its own area, apart from the list (user, 2026-11-11).
