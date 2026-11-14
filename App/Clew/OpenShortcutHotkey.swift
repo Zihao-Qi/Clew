@@ -129,6 +129,16 @@ enum MenuBarExtraToggle {
         }
     }
 
+    /// Closes the open menu now, from inside it (SPEC 2026-11-13: opening Settings closes
+    /// the menu). A synchronous click on the status item, while the menu is surely open:
+    /// `NSWindow.close()` hides it but SwiftUI still counts it open (the next click on
+    /// the menu bar then does nothing), and a deferred click could reopen a menu that
+    /// closed by itself in between.
+    @MainActor
+    static func closeMenu() {
+        clickStatusItem()
+    }
+
     @MainActor
     private static func clickStatusItem() {
         guard let button = statusItemButton() else { return }

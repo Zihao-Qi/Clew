@@ -41,6 +41,8 @@ final class AppModel {
 
     /// The Chrome extension's connection (live app only).
     private(set) var browser: BrowserConnection?
+    /// The About pane and the opt-in update check (SPEC 2026-11-13); per Mac.
+    let updates: Updates
 
     /// True when the user turned Clew's notifications off in System Settings.
     private(set) var notificationsDenied = false
@@ -95,6 +97,7 @@ final class AppModel {
             if let clew { browser = BrowserConnection(clew: clew) }
             calendarSource = EventKitCalendar()
             OpenShortcutHotkey.shared.start()
+            updates.start()
             refresh()
         } catch {
             self.init(clew: nil)
@@ -118,8 +121,9 @@ final class AppModel {
     }
 
     /// `notify: false` keeps a model (e.g. the debug snapshot's) away from real notifications.
-    init(clew: Clew?, notify: Bool = true) {
+    init(clew: Clew?, notify: Bool = true, updates: Updates? = nil) {
         self.clew = clew
+        self.updates = updates ?? Updates()
         if notify, clew != nil {
             notifications = NotificationsAdapter { [weak self] action in self?.handle(action) }
         }

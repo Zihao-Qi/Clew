@@ -57,7 +57,7 @@ struct SettingsView: View {
 
     /// The sidebar's sections.
     enum Pane: String, CaseIterable, Identifiable {
-        case general, summaries, progress, calendar, browser, data
+        case general, summaries, progress, calendar, browser, data, about
         var id: String { rawValue }
         var title: Text {
             switch self {
@@ -67,6 +67,7 @@ struct SettingsView: View {
             case .calendar: Text("Calendar")
             case .browser: Text("Browser")
             case .data: Text("Data")
+            case .about: Text("About")
             }
         }
         var icon: String {
@@ -77,6 +78,7 @@ struct SettingsView: View {
             case .calendar: "calendar"
             case .browser: "puzzlepiece.extension"
             case .data: "externaldrive"
+            case .about: "info.circle"
             }
         }
     }
@@ -290,6 +292,8 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                case .about:
+                AboutPane(updates: model.updates)
                 }
             }
             .formStyle(.grouped)
@@ -306,7 +310,10 @@ struct SettingsView: View {
                 showingRestore = false
             }
         }
-        .frame(width: 620, height: 440)
+        .frame(width: 720, height: 520)
+        // The gear asks for About while a newer version is known (SPEC 2026-11-13).
+        .onAppear(perform: takePaneRequest)
+        .onChange(of: model.updates.paneRequest) { _, _ in takePaneRequest() }
         // A menu bar app shows no window at launch, so macOS must not restore this one
         // if it was open when Clew quit.
         .background(NonRestorableWindow())
@@ -329,6 +336,12 @@ struct SettingsView: View {
                 .fixedSize()
                 .accessibilityLabel(Text("Time"))
         }
+    }
+
+    private func takePaneRequest() {
+        guard let request = model.updates.paneRequest else { return }
+        pane = request
+        model.updates.paneRequest = nil
     }
 
     private func reload() {
@@ -495,3 +508,159 @@ struct CalendarSettings: View {
     }
 }
 
+
+/// Settings › About (SPEC 2026-11-13): who made Clew, its version, how to upgrade, and
+/// the opt-in update check.
+struct AboutPane: View {
+    let updates: Updates
+    @State private var copied = false
+    @State private var copyReset: Task<Void, Never>?
+
+    var body: some View {
+        Section {
+            HStack(alignment: .center, spacing: 16) {
+                Image(nsImage: NSApplication.shared.applicationIconImage)
+                    .resizable()
+                    .frame(width: 64, height: 64)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(verbatim: "Clew").font(.title2.weight(.semibold))
+                    Text("Version \(updates.versionText) (\(updates.buildText))")
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                    HStack(spacing: 4) {
+                        Text("Made by Zihao Qi")
+                        Text(verbatim: "·").foregroundStyle(.tertiary)
+                        Link(destination: Updates.author) { Text(verbatim: "github.com/Zihao-Qi") }
+                    }
+                    Link(destination: Updates.repository) { Text("Clew on GitHub") }
+                }
+            }
+            .padding(.vertical, 4)
+        }
+        // Showing About clears the dot (SPEC: open on About and not minimized).
+        .background(AboutVisibility(updates: updates))
+
+        Section {
+            Toggle("Check for updates automatically", isOn: Binding(
+                get: { updates.state.isOn },
+                set: { updates.setOn($0) }))
+            if let newer = updates.available {
+                HStack {
+                    Text("Clew \(newer.description) is available.")
+                    Link(destination: Updates.releasePage(newer)) { Text("Release notes") }
+                }
+            }
+            LabeledContent {
+                Text(verbatim: updates.state.lastSuccess.map {
+                    $0.formatted(date: .abbreviated, time: .shortened)
+                } ?? String(localized: "Never"))
+            } label: {
+                Text("Last checked")
+            }
+            HStack {
+                Button { updates.checkNow() } label: {
+                    updates.checking ? Text("Checking…") : Text("Check Now")
+                }
+                .disabled(updates.checking)
+                if let message = updates.message {
+                    Text(message).font(.callout).foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("Updates")
+        } footer: {
+            Text("Clew asks GitHub for its latest release, at most once a day. Nothing about you or your data is sent.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+
+        Section {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("With Homebrew")
+                HStack {
+                    Text(verbatim: Updates.brewCommand)
+                        .font(.system(.body, design: .monospaced))
+                        .textSelection(.enabled)
+                    Spacer()
+                    Button(action: copy) { copied ? Text("Copied") : Text("Copy") }
+                        .accessibilityLabel(copied ? Text("Copied") : Text("Copy the Homebrew command"))
+                }
+            }
+            HStack(spacing: 4) {
+                Text("Otherwise")
+                Link(destination: Updates.latestPage) { Text("Download the latest release") }
+            }
+        } header: {
+            Text("How to upgrade")
+        } footer: {
+            Text("The browser extension is on the same page (Clew-Extension zip); load the new one in your browser.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func copy() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(Updates.brewCommand, forType: .string)
+        copied = true
+        copyReset?.cancel()
+        copyReset = Task {
+            try? await Task.sleep(for: .seconds(2))
+            if !Task.isCancelled { copied = false }
+        }
+    }
+}
+
+/// Tells `Updates` while About is on screen in a window that is not minimized.
+private struct AboutVisibility: NSViewRepresentable {
+    let updates: Updates
+
+    func makeNSView(context: Context) -> Probe {
+        let probe = Probe()
+        probe.updates = updates
+        return probe
+    }
+
+    func updateNSView(_ probe: Probe, context: Context) { probe.updates = updates }
+
+    static func dismantleNSView(_ probe: Probe, coordinator: ()) {
+        // Another section was picked (or the window closed): About is not on screen.
+        probe.stop()
+        probe.updates?.aboutShowing = false
+    }
+
+    final class Probe: NSView {
+        weak var updates: Updates?
+        private var observers: [NSObjectProtocol] = []
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            stop()
+            guard let window else { return }
+            // A closed Settings window can come back with this view still in it (the
+            // scene keeps it), so becoming key or main counts as showing again.
+            for name in [NSWindow.didMiniaturizeNotification, NSWindow.didDeminiaturizeNotification,
+                         NSWindow.willCloseNotification, NSWindow.didBecomeKeyNotification,
+                         NSWindow.didBecomeMainNotification] {
+                let closing = name == NSWindow.willCloseNotification
+                observers.append(NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.report(closing: closing) }
+                })
+            }
+            report(closing: false)
+        }
+
+        func report(closing: Bool) {
+            guard let updates else { return }
+            let showing = !closing && window?.isVisible == true && window?.isMiniaturized == false
+            if updates.aboutShowing != showing { updates.aboutShowing = showing }
+        }
+
+        func stop() {
+            observers.forEach(NotificationCenter.default.removeObserver)
+            observers = []
+            if window == nil, updates?.aboutShowing == true { updates?.aboutShowing = false }
+        }
+    }
+}

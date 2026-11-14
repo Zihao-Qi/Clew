@@ -372,16 +372,25 @@ struct TodayListView: View {
                 Button { screen = .pick } label: { Text("Later (\(model.laterCount))") }
                     .keyboardShortcut("l")
                     .accessibilityLabel(Text("Later pile, \(model.laterCount) items. Pick some for today."))
-                // One click straight to Settings; Quit lives there.
+                // One click straight to Settings; Quit lives there. The menu closes first,
+                // like any menu item that opens a window; with a newer version known, the
+                // dot shows and Settings opens at About (SPEC 2026-11-13).
                 Button {
+                    if model.updates.showsDot { model.updates.paneRequest = .about }
+                    MenuBarExtraToggle.closeMenu()
                     openWindow(id: SettingsView.windowID)
                     NSApp.activate(ignoringOtherApps: true)
                 } label: {
                     Image(systemName: "gearshape")
+                        .overlay(alignment: .topTrailing) {
+                            if model.updates.showsDot {
+                                Circle().fill(Color.accentColor).frame(width: 6, height: 6).offset(x: 3, y: -2)
+                            }
+                        }
                 }
                 .keyboardShortcut(",")
                 .help(Text("Settings"))
-                .accessibilityLabel(Text("Settings"))
+                .accessibilityLabel(model.updates.showsDot ? Text("Settings, update available") : Text("Settings"))
             }
             .buttonStyle(.borderless)
             .padding(.horizontal, 12)

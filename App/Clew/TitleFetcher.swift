@@ -1,7 +1,7 @@
 import ClewCore
 import Foundation
 
-/// The app's only network use (SPEC §8): one page load of a link the user just pasted
+/// The app's network use (SPEC §8), with the opt-in update check (`Updates`): one page load of a link the user just pasted
 /// (following its http(s) redirects, e.g. youtu.be), to read its title. No cookies, no
 /// cache, text/html only, at most 3 MB (YouTube's og:title sits ~800 KB in), stopping
 /// early once `og:title` has been read.
