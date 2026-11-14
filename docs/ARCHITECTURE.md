@@ -227,6 +227,20 @@ writes. Every action is a command; the UI has no business logic. A global shortc
 (default ⌘., stored in Settings as `openListShortcut`) opens the list by clicking
 Clew's own status item; Carbon registers the hotkey, so no Accessibility permission
 is required (2026-11-11).
+**About and updates (2026-11-13).** **Core** `UpdateCheck` (pure, injected time):
+parses a tag (`v` + dot-separated numbers, else nil), compares versions part by part
+(missing parts 0), `isDue(lastAttempt:now:)` (none yet, or ≥ 24 h ago; a clock set
+back counts as due), and `showsDot(running:latest:seen:)` (latest newer than running
+and not equal to seen). `Clew` keeps the switch, the last attempt, the last success,
+the latest known release (tag + page URL) and the version seen in About in the
+settings table, stamped by its clock. **App:** `UpdateChecker` does the one request
+(ephemeral `URLSession`, no cookies, 15 s timeout, `User-Agent: Clew`, `Accept:
+application/vnd.github+json`), reads only `tag_name` and `html_url` (an `https`
+link on `github.com`, else no link), and never runs on its own unless the switch is on;
+`AppModel` asks Core whether a check is due at launch and every hour. Opening Settings
+from the menu clicks Clew's status item (`MenuBarExtraToggle`), which closes the menu
+the same way a click on the menu bar does, then opens the window.
+
 **Collection peek (2026-11-13; Fable review).** The panel lists
 `CollectionDetails.inProgress + notStarted` (it reads `model.collections` like the page,
 so it re-renders on changes). **Core** holds the pure parts, tested with injected time:
@@ -813,7 +827,8 @@ remains an option for an App Store build.
   has real users; after that, a change needs a data migration, because the sandbox
   container, Keychain items and notification permission are keyed by it.
 - **No tracking.** No analytics, no phoning home. Any future crash reporting is
-  opt-in.
+  opt-in. The one exception is the update check (2026-11-13): off until the user turns
+  it on, and it sends nothing but a plain request for the latest release.
 - **Localisation and accessibility from the first commit.** All UI text goes in a
   String Catalog (English first); every control has a VoiceOver label; the menu bar
   list is fully keyboard-navigable.

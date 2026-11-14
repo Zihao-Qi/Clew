@@ -80,7 +80,9 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
    load of that page (and its redirects), no cookies, nothing else sent. While a
    browser is paired (v1.1), Clew also listens on this Mac only (`127.0.0.1`) for
    its extension. With calendar access (v1.2), Clew reads today's events from macOS
-   Calendar on this Mac; it never stores or writes them.
+   Calendar on this Mac; it never stores or writes them. Only if turned on in
+   Settings › About (off by default, 2026-11-13), Clew also asks GitHub once a day
+   whether a newer release exists (see "About and updates").
 9. **Launch at login** (`SMAppService`), toggled in a small Settings window.
 10. **Task details.** Clicking a row opens its details. Habits and goals: a 16-week heatmap (done days
     filled, other days a quiet gray, never red), days done this week / in the last
@@ -121,6 +123,36 @@ shows them only in Settings. Until that bar is met, the next work is fixing what
 stopped daily use, not adding features.
 
 ## Decisions (2026-11-08)
+
+- **About and updates (user, 2026-11-13).**
+  - **Opening Settings closes the menu** (the gear button and ⌘,), like any menu
+    item that opens a window. The Settings window is **720 × 520** (was 620 × 440).
+  - **About** is the last section of the sidebar: Clew's icon, "Clew", "Version 1.5.0
+    (6)" (from the app itself), "Made by Zihao Qi" with a link to
+    github.com/Zihao-Qi, and a link to the project (github.com/Zihao-Qi/Clew).
+  - **How to upgrade**, always shown (a sandboxed app cannot tell how it was
+    installed): "With Homebrew" and `brew update && brew upgrade --cask clew` with a
+    Copy button; "Otherwise" a link to the latest release on GitHub. One line says
+    the browser extension comes from the same release page (its zip), loaded again in
+    the browser. Clew never installs anything itself.
+  - **Check for updates automatically**: a switch, **off** by default. When on, Clew
+    asks GitHub at most once a day (on launch and while running, 24 hours after the
+    last attempt, whether that attempt worked or not) for the latest release: one
+    request to `api.github.com/repos/Zihao-Qi/Clew/releases/latest`, no cookies, a
+    plain "Clew" user agent, nothing about the user or their data. Only the release's
+    tag (`v1.5.1`) and its page link are read; drafts and pre-releases are never
+    offered (GitHub's "latest" leaves them out). **Check Now** asks at once, whether
+    the switch is on or off, and says what it found: "Clew is up to date.", "Clew
+    1.5.1 is available." with a link to its release page, or "Couldn't reach GitHub."
+    An automatic check that fails says nothing. "Last checked" shows the time of the
+    last check that worked.
+  - Versions compare by number, part by part (`1.10.0` is newer than `1.9.2`; a
+    missing part is 0); a tag that is not `v` plus numbers is ignored.
+  - **The dot:** while a newer version than the running one is known and About has
+    not been opened since it was found, the menu's gear button has a small dot (and
+    VoiceOver says "Settings, update available"). Opening About clears it; a still
+    newer version brings it back. After upgrading, the known version is no longer
+    newer, so there is no dot. No notification.
 
 - **Watch Later import (v1.1, 2026-11-09):** a paired Chrome extension copies
   YouTube's Watch Later into Clew when the Watch Later page is opened. A video removed
@@ -458,7 +490,8 @@ stopped daily use, not adding features.
 - A pasted link goes to Today by default, not Later; `↗` is replaced by a clickable
   title with a link mark (2026-11-08, after first use).
 - Pasted links get their page title fetched (2026-11-08, after first use); this is
-  the app's only internet use (the v1.1 extension connection stays on this Mac).
+  the app's only internet use (the v1.1 extension connection stays on this Mac;
+  the update check, off by default, was added 2026-11-13).
 - The menu bar title is an icon plus `done/total`, not the word "Clew" (2026-11-08, v1a).
 - A counted goal's undo is a small `−` beside its count, shown only after a `+1` today;
   it removes the last `+1`. It sits apart from the circle so rapid ticks can't hit it
