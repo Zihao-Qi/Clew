@@ -227,19 +227,24 @@ writes. Every action is a command; the UI has no business logic. A global shortc
 (default ⌘., stored in Settings as `openListShortcut`) opens the list by clicking
 Clew's own status item; Carbon registers the hotkey, so no Accessibility permission
 is required (2026-11-11).
-**About and updates (2026-11-13).** **Core** `UpdateCheck` (pure, injected time):
-parses a tag (`v` + dot-separated numbers, else nil), compares versions part by part
-(missing parts 0), `isDue(lastAttempt:now:)` (none yet, or ≥ 24 h ago; a clock set
-back counts as due), and `showsDot(running:latest:seen:)` (latest newer than running
-and not equal to seen). `Clew` keeps the switch, the last attempt, the last success,
-the latest known release (tag + page URL) and the version seen in About in the
-settings table, stamped by its clock. **App:** `UpdateChecker` does the one request
-(ephemeral `URLSession`, no cookies, 15 s timeout, `User-Agent: Clew`, `Accept:
-application/vnd.github+json`), reads only `tag_name` and `html_url` (an `https`
-link on `github.com`, else no link), and never runs on its own unless the switch is on;
-`AppModel` asks Core whether a check is due at launch and every hour. Opening Settings
-from the menu clicks Clew's status item (`MenuBarExtraToggle`), which closes the menu
-the same way a click on the menu bar does, then opens the window.
+**About and updates (2026-11-13; Gemini review).** **Core** `UpdateCheck` (pure,
+injected time): parses a version (`v`-prefixed for a tag, bare for the running app;
+dot-separated numbers, else nil), compares part by part (missing parts 0),
+`isDue(lastAttempt:now:)` (none, ≥ 24 h ago, or in the future), and
+`showsDot(running:latest:seen:)` (latest newer than running and not equal to seen).
+The state (switch, last attempt, last success, latest known tag, tag seen in About) is
+per Mac, so the **app** keeps it in `UserDefaults`, not in Clew's settings table
+(which export, restore and a future sync carry). **App:** `UpdateChecker` does the
+one request (ephemeral `URLSession` with no cookie storage and no URL cache, 15 s
+timeout, `User-Agent: Clew`, `Accept: application/vnd.github+json`), reads only
+`tag_name`, and builds the release link from the tag; any other status, a missing or
+bad tag, or a network error is a failed check. It runs on its own only while the
+switch is on: `AppModel` asks Core whether one is due at launch, on wake and every hour.
+**Opening Settings from the menu** captures the menu's window (the key window when the
+gear is clicked), opens Settings, then closes that window with `close()` on the same
+turn (no deferred status-item click, which could toggle the menu open again); a
+request to show About travels through `AppModel` so an already open Settings window
+switches to it.
 
 **Collection peek (2026-11-13; Fable review).** The panel lists
 `CollectionDetails.inProgress + notStarted` (it reads `model.collections` like the page,
@@ -275,7 +280,7 @@ watcher does), so the panel's own mouse-down is handled first. A title is presse
 a SwiftUI `Button`, so it carries `.isButton`, the label "Open <title>" and a default
 accessibility action that opens it.
 
-**Title fetcher.** The app's only network use (entitlement
+**Title fetcher.** The app's network use, with the opt-in update check (entitlement
 `com.apple.security.network.client`): when a link is pasted into `+ add`, one load of
 that URL (following http(s) redirects) with an ephemeral session (no cookies, no cache), `text/html` only, at most
 3 MB, stopping once a complete `<meta property="og:title">` has been read (checked every

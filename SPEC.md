@@ -126,34 +126,47 @@ stopped daily use, not adding features.
 
 - **About and updates (user, 2026-11-13).**
   - **Opening Settings closes the menu** (the gear button and ⌘,), like any menu
-    item that opens a window. The Settings window is **720 × 520** (was 620 × 440).
+    item that opens a window: the menu's own window closes first, then Settings comes
+    forward. The Settings window is **720 × 520** (was 620 × 440).
   - **About** is the last section of the sidebar: Clew's icon, "Clew", "Version 1.5.0
     (6)" (from the app itself), "Made by Zihao Qi" with a link to
     github.com/Zihao-Qi, and a link to the project (github.com/Zihao-Qi/Clew).
   - **How to upgrade**, always shown (a sandboxed app cannot tell how it was
     installed): "With Homebrew" and `brew update && brew upgrade --cask clew` with a
-    Copy button; "Otherwise" a link to the latest release on GitHub. One line says
-    the browser extension comes from the same release page (its zip), loaded again in
-    the browser. Clew never installs anything itself.
+    Copy button (it reads "Copied" for 2 seconds); "Otherwise" a link to the latest
+    release on GitHub. One line says the browser extension comes from the same release
+    page (its zip), loaded again in the browser. Clew never installs anything itself.
   - **Check for updates automatically**: a switch, **off** by default. When on, Clew
-    asks GitHub at most once a day (on launch and while running, 24 hours after the
-    last attempt, whether that attempt worked or not) for the latest release: one
-    request to `api.github.com/repos/Zihao-Qi/Clew/releases/latest`, no cookies, a
+    asks GitHub for the latest release when a check is **due**: on launch, on wake
+    and every hour, it checks if the last attempt (automatic or Check Now, worked or
+    not) was 24 hours ago or more, or never happened, or is in the future (the clock
+    was set back). Turning the switch on checks at once if due. One `https` request to
+    `api.github.com/repos/Zihao-Qi/Clew/releases/latest`, no cookies, no cache, a
     plain "Clew" user agent, nothing about the user or their data. Only the release's
-    tag (`v1.5.1`) and its page link are read; drafts and pre-releases are never
-    offered (GitHub's "latest" leaves them out). **Check Now** asks at once, whether
-    the switch is on or off, and says what it found: "Clew is up to date.", "Clew
-    1.5.1 is available." with a link to its release page, or "Couldn't reach GitHub."
-    An automatic check that fails says nothing. "Last checked" shows the time of the
-    last check that worked.
+    tag (`v1.5.1`) is read; its link is built from the tag
+    (github.com/Zihao-Qi/Clew/releases/tag/v1.5.1), never taken from the reply. Drafts
+    and pre-releases are never offered (GitHub's "latest" leaves them out).
+  - **Check Now** asks at once, whether the switch is on or off; while asking it is
+    disabled and reads "Checking…". Then one line says what it found: "Clew is up to
+    date." or "Couldn't check for updates." (no network, an error reply, no release
+    yet, or a tag that is not `v` plus numbers). An automatic check that fails says
+    nothing.
+  - Whenever a release newer than the running Clew is known (from any check that
+    worked, kept across relaunches), About shows "Clew 1.5.1 is available." with a
+    "Release notes" link, also after a later check failed. "Last checked" shows the
+    date and time of the last check that worked, or "Never".
   - Versions compare by number, part by part (`1.10.0` is newer than `1.9.2`; a
-    missing part is 0); a tag that is not `v` plus numbers is ignored.
+    missing part is 0); a tag is `v` plus numbers, the running version is the same
+    numbers without the `v`.
   - **The dot:** while a newer version than the running one is known and About has
-    not been opened since it was found, the menu's gear button has a small dot (and
-    VoiceOver says "Settings, update available"). Opening About clears it; a still
-    newer version brings it back. After upgrading, the known version is no longer
-    newer, so there is no dot. No notification.
-
+    not been shown since it was found, the menu's gear button has a small dot
+    (VoiceOver: "Settings, update available"), and the gear opens Settings at About.
+    Showing About clears it (also when About is already on screen as it is found); a
+    still newer version brings it back. After upgrading, the known version is no
+    longer newer, so there is no dot. No notification.
+  - The switch and what the checks found belong to **this Mac**, not to Clew's data:
+    they are not in the export, a restore does not change them, and they will not
+    sync.
 - **Watch Later import (v1.1, 2026-11-09):** a paired Chrome extension copies
   YouTube's Watch Later into Clew when the Watch Later page is opened. A video removed
   from Watch Later **counts as finished** (*changed* 2026-11-10, user decision: before,
@@ -476,7 +489,8 @@ stopped daily use, not adding features.
 - A counted goal's step is always **+1** per click.
 - The rating row is offered **every time**, and is always skippable.
 - Ratings are 5 points (rough … great), shown after a tick and on hover; Settings has
-  a sidebar: General, Summaries, Progress, Data (2026-11-09).
+  a sidebar: General, Summaries, Progress, Data (2026-11-09; more sections since, the
+  last one About, 2026-11-13).
 - "Still want this?" lives only in the Later picker; untouched = not saved, edited,
   moved to Later or kept for 42 days. Rating dots are built off by default, as a
   Settings switch (2026-11-09).
