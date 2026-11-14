@@ -96,11 +96,15 @@ final class PeekController {
         apply { $0.pointerLeftRows(now: Date()) }
     }
 
-    private func row(at point: NSPoint) -> Source? {
+    /// The row's own bounds, not `visibleRect`: SwiftUI does not clip its hosted views,
+    /// so `visibleRect` is the whole window for every row (then the first row in the
+    /// dictionary won everywhere). The collection rows are outside the list's scroll
+    /// view, so nothing hides part of them.
+    func row(at point: NSPoint) -> Source? {
         for (source, anchor) in rowViews {
             guard let view = anchor.view, let window = view.window, window === menuWindow,
                   !view.isHiddenOrHasHiddenAncestor else { continue }
-            if window.convertToScreen(view.convert(view.visibleRect, to: nil)).contains(point) { return source }
+            if window.convertToScreen(view.convert(view.bounds, to: nil)).contains(point) { return source }
         }
         return nil
     }
