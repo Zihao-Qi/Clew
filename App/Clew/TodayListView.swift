@@ -325,7 +325,7 @@ struct TodayListView: View {
                 Divider().padding(.horizontal, 12)
                 VStack(spacing: 0) {
                     ForEach(model.collections) { summary in
-                        CollectionRowView(summary: summary, model: model) { screen = .collection(summary.source) }
+                        CollectionRowView(summary: summary) { screen = .collection(summary.source) }
                     }
                 }
                 .padding(.vertical, 6)

@@ -40,7 +40,6 @@ private func video(_ ref: String, watched: Double? = nil) -> ExternalEntry {
         try clew.checkIn(itemId: try id("bbbbbbbbbbb"))
         let row = try #require(try clew.collections().first)
         #expect(row.source == .extensionYouTube && row.toWatch == 3 && row.done == 1 && row.onList == 4)
-        #expect(row.fraction == 0.25)
         #expect(try clew.today().total == 0)                        // never counted toward today
     }
 
@@ -152,7 +151,6 @@ private func video(_ ref: String, watched: Double? = nil) -> ExternalEntry {
         #expect(ticks.allSatisfy { $0.source == .extensionYouTube && $0.amount == 1 })
         let row = try #require(try clew.collections().first)
         #expect(row.toWatch == 1 && row.done == 2 && row.onList == 1)
-        #expect(row.fraction == 2.0 / 3.0)                          // done out of everything it holds
         let page = try #require(try clew.collection(.extensionYouTube))
         #expect(Set(page.done.map(\.item.externalRef)) == ["bbbbbbbbbbb", "ccccccccccc"])
         #expect(page.finishedByDay == [LocalDay(string: "2026-11-09")!: 2])

@@ -15,8 +15,6 @@ public struct CollectionSummary: Hashable, Sendable, Identifiable {
     public let onList: Int
 
     public var id: Source { source }
-    /// Done out of everything the collection holds.
-    public var fraction: Double { toWatch + done == 0 ? 0 : Double(done) / Double(toWatch + done) }
 }
 
 /// One video or post on a collection's page.
