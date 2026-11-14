@@ -240,10 +240,15 @@ timeout, `User-Agent: Clew`, `Accept: application/vnd.github+json`), reads only
 `tag_name`, and builds the release link from the tag; any other status, a missing or
 bad tag, or a network error is a failed check. It runs on its own only while the
 switch is on: `AppModel` asks Core whether one is due at launch, on wake and every hour.
-**Opening Settings from the menu** captures the menu's window (the key window when the
-gear is clicked), opens Settings, then closes that window with `close()` on the same
-turn (no deferred status-item click, which could toggle the menu open again); a
-request to show About travels through `AppModel` so an already open Settings window
+**Opening Settings from the menu** first clicks Clew's status item **synchronously**
+(`performClick` while the menu is still open: it closes the menu), then opens Settings
+and activates. Measured with a probe of the real app: the menu closed and opened again
+normally three rounds in a row with another window brought forward right after.
+`NSWindow.close()` on the menu's window was rejected: it hides the menu, but SwiftUI
+still counts it as open, so the next click on the menu bar did nothing. The deferred
+click in `MenuBarExtraToggle` is not used here (it could land after the menu closed by
+itself and open it again). A
+request to show About travels through `AppModel`, so an already open Settings window
 switches to it.
 
 **Collection peek (2026-11-13; Fable review).** The panel lists

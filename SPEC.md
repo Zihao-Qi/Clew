@@ -126,8 +126,7 @@ stopped daily use, not adding features.
 
 - **About and updates (user, 2026-11-13).**
   - **Opening Settings closes the menu** (the gear button and ⌘,), like any menu
-    item that opens a window: the menu's own window closes first, then Settings comes
-    forward. The Settings window is **720 × 520** (was 620 × 440).
+    item that opens a window: the menu closes first, then Settings comes forward. The Settings window is **720 × 520** (was 620 × 440).
   - **About** is the last section of the sidebar: Clew's icon, "Clew", "Version 1.5.0
     (6)" (from the app itself), "Made by Zihao Qi" with a link to
     github.com/Zihao-Qi, and a link to the project (github.com/Zihao-Qi/Clew).
