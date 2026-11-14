@@ -380,9 +380,8 @@ struct TimelineBlockView: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: 4)
-            .fill(looksDone ? Color.secondary.opacity(0.14)
-                  : isNow ? Color.accentColor.opacity(0.32)
-                  : block.state == .pending || block.state == .asking ? Color.accentColor.opacity(0.22)
+            .fill(isNow ? Color.accentColor.opacity(0.32)
+                  : looksDone || block.state == .pending || block.state == .asking ? Color.accentColor.opacity(0.22)
                   : Color.secondary.opacity(0.08))
             .overlay(alignment: .leading) {
                 if isNow {
@@ -506,7 +505,7 @@ struct TimelineBlockView: View {
     private var title: Text {
         Text(block.title)
             .font(TimelineMetrics.titleFont)
-            .foregroundStyle(looksDone ? .secondary : .primary)
+            .foregroundStyle(.primary)
     }
 
     /// What a block says besides its title: a slot block's question, or its focus timer.
