@@ -6,6 +6,7 @@ struct TodayListView: View {
     let model: AppModel
     @Binding var screen: Screen
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.locale) private var locale
     /// Reordering with a plain drag gesture inside the list (SwiftUI's draggable /
     /// dropDestination never delivered the drop in the menu bar panel). The rows in
     /// between slide aside live; release lands it in the gap. The slot and shift math is
@@ -55,9 +56,10 @@ struct TodayListView: View {
     private func blockFrame(start: Date, minutes: Int) -> CGRect {
         guard let day = model.timeline else { return .zero }
         let view = timelineGeo.viewport
-        return CGRect(x: view.minX + TimelineMetrics.labelWidth,
+        let labelWidth = TimelineMetrics.labelWidth(for: day, locale: locale)
+        return CGRect(x: view.minX + labelWidth,
                       y: timelineGeo.contentTop + TimelineMetrics.y(start, in: day),
-                      width: max(20, view.width - TimelineMetrics.labelWidth - TimelineMetrics.trailing),
+                      width: max(20, view.width - labelWidth - TimelineMetrics.trailing),
                       height: CGFloat(minutes) * TimelineMetrics.pointsPerMinute)
     }
 

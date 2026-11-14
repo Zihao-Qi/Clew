@@ -1,3 +1,4 @@
+import AppKit
 import ClewCore
 import ClewDomain
 import SwiftUI
@@ -16,7 +17,9 @@ enum TimelineMetrics {
     static let pointsPerMinute: CGFloat = 1
     /// About 6 hours show (user, 2026-11-10; was 4).
     static let height: CGFloat = 360
-    static let labelWidth: CGFloat = 40
+    /// Room before the widest hour label and between the labels and hour lines.
+    static let labelLeading: CGFloat = 4
+    static let labelGap: CGFloat = 4
     /// Room between the blocks and hour lines and the card's right edge, so the timeline
     /// reads as its own area, apart from the list (user, 2026-11-11).
     static let trailing: CGFloat = 8
@@ -44,6 +47,26 @@ enum TimelineMetrics {
     }
 
     static func time(_ date: Date) -> String { date.formatted(date: .omitted, time: .shortened) }
+
+    static func hourLabel(_ date: Date, locale: Locale = .autoupdatingCurrent) -> String {
+        date.formatted(Date.FormatStyle.dateTime.hour().locale(locale))
+    }
+
+    /// Gutter width for `day`'s hour labels in `locale`, so 24-hour ("04"–"23") and
+    /// localized labels don't sit behind a blank 12-hour AM/PM margin.
+    static func labelWidth(for day: TimelineDay, locale: Locale = .autoupdatingCurrent) -> CGFloat {
+        let font = NSFont.monospacedDigitSystemFont(
+            ofSize: NSFont.preferredFont(forTextStyle: .subheadline).pointSize,
+            weight: .regular
+        )
+        let attrs: [NSAttributedString.Key: Any] = [.font: font]
+        let maxText = stride(from: 0, to: quarters(day), by: 4).reduce(CGFloat(0)) { widest, q in
+            let date = day.start.addingTimeInterval(TimeInterval(q * quarter * 60))
+            let w = ceil((hourLabel(date, locale: locale) as NSString).size(withAttributes: attrs).width)
+            return max(widest, w)
+        }
+        return maxText + labelLeading + labelGap
+    }
 
     /// "9:00 – 10:00 AM": the shared AM/PM only once (user, 2026-11-13), in the user's
     /// locale (24-hour clocks have none). A range past midnight keeps both in full, since
@@ -87,6 +110,7 @@ struct DayTimelineView: View {
     let onMove: (TimelineBlock) -> Void
     let onOpen: (UUID) -> Void
     let onEdit: (Item) -> Void
+    @Environment(\.locale) private var locale
 
     /// While the name box is open, one layout for blocks, events and the box, so the box
     /// sits in the column its block will get (SPEC 2026-11-13).
@@ -103,17 +127,17 @@ struct DayTimelineView: View {
     }
 
     /// Where a column starts and how wide it is, in the hours' coordinates.
-    private func columns(_ place: TimelinePlace, width: CGFloat) -> (x: CGFloat, width: CGFloat) {
-        (TimelineMetrics.labelWidth + CGFloat(place.lane) * width / CGFloat(place.lanes),
+    private func columns(_ place: TimelinePlace, width: CGFloat, labelWidth: CGFloat) -> (x: CGFloat, width: CGFloat) {
+        (labelWidth + CGFloat(place.lane) * width / CGFloat(place.lanes),
          max(20, width / CGFloat(place.lanes) - 2))
     }
 
     /// Opens the name box at the quarter hour `y` points into the day, unless the double-
     /// click was on a block (its own click opens details) or inside the open box.
-    private func openNewTask(at point: CGPoint, width: CGFloat) {
+    private func openNewTask(at point: CGPoint, width: CGFloat, labelWidth: CGFloat) {
         let layout = draftLayout
         func hits(_ start: Date, _ end: Date, _ place: TimelinePlace) -> Bool {
-            let col = columns(place, width: width)
+            let col = columns(place, width: width, labelWidth: labelWidth)
             return point.y >= TimelineMetrics.y(start, in: day) && point.y < TimelineMetrics.y(end, in: day)
                 && point.x >= col.x && point.x < col.x + col.width
         }
@@ -204,24 +228,25 @@ struct DayTimelineView: View {
     }
 
     private var hours: some View {
-        ScrollView(.vertical) {
+        let labelWidth = TimelineMetrics.labelWidth(for: day, locale: locale)
+        return ScrollView(.vertical) {
             ZStack(alignment: .topLeading) {
-                grid
+                grid(labelWidth: labelWidth)
                 GeometryReader { g in
-                    let width = g.size.width - TimelineMetrics.labelWidth - TimelineMetrics.trailing
+                    let width = g.size.width - labelWidth - TimelineMetrics.trailing
                     let layout = draftLayout
                     ZStack(alignment: .topLeading) {
                     // Calendar events first, so task blocks draw over them.
                     ForEach(model.calendarEvents?.timed ?? []) { event in
                         let col = columns(layout?.events[event.id] ?? model.calendarEvents?.eventPlaces[event.id]
-                                          ?? TimelinePlace(lane: 0, lanes: 1), width: width)
+                                          ?? TimelinePlace(lane: 0, lanes: 1), width: width, labelWidth: labelWidth)
                         TimelineEventView(event: event)
                             .frame(width: col.width,
                                    height: max(CGFloat(event.end.timeIntervalSince(event.start) / 60) * TimelineMetrics.pointsPerMinute - 1, 6))
                             .offset(x: col.x, y: TimelineMetrics.y(event.start, in: day))
                     }
                     ForEach(day.blocks) { block in
-                        let col = columns(place(block, layout), width: width)
+                        let col = columns(place(block, layout), width: width, labelWidth: labelWidth)
                         TimelineBlockView(model: model, block: block, day: day, space: space,
                                           isLifted: liftedBlock == block.id, hovered: $hovered,
                                           onDrag: { onDrag(block, $0) }, onDrop: { onDrop(block) },
@@ -231,7 +256,7 @@ struct DayTimelineView: View {
                             .offset(x: col.x, y: TimelineMetrics.y(block.block.start, in: day))
                     }
                     if let draft = newTask, let at = layout?.draft {
-                        let col = columns(at, width: width)
+                        let col = columns(at, width: width, labelWidth: labelWidth)
                         NewTaskBox(model: model, draft: draft) {
                             // Only this box: a late close never takes a newer one.
                             if newTask?.id == draft.id { newTask = nil }
@@ -246,8 +271,8 @@ struct DayTimelineView: View {
                         if context.date >= day.start, context.date < day.end {
                             Rectangle()
                                 .fill(Color.accentColor.opacity(0.7))
-                                .frame(width: g.size.width - TimelineMetrics.labelWidth + 4 - TimelineMetrics.trailing, height: 1)
-                                .offset(x: TimelineMetrics.labelWidth - 4, y: TimelineMetrics.y(context.date, in: day))
+                                .frame(width: g.size.width - labelWidth + TimelineMetrics.labelGap - TimelineMetrics.trailing, height: 1)
+                                .offset(x: labelWidth - TimelineMetrics.labelGap, y: TimelineMetrics.y(context.date, in: day))
                                 .allowsHitTesting(false)
                                 .accessibilityHidden(true)
                         }
@@ -259,7 +284,7 @@ struct DayTimelineView: View {
                     // open box is the box's.
                     .contentShape(Rectangle())
                     .gesture(SpatialTapGesture(count: 2).onEnded { value in
-                        openNewTask(at: value.location, width: width)
+                        openNewTask(at: value.location, width: width, labelWidth: labelWidth)
                     })
                 }
             }
@@ -278,10 +303,10 @@ struct DayTimelineView: View {
     }
 
     /// One 15-point row per quarter hour (the scroll anchors), with the hour labels.
-    private var grid: some View {
+    private func grid(labelWidth: CGFloat) -> some View {
         VStack(spacing: 0) {
             ForEach(0..<TimelineMetrics.quarters(day), id: \.self) { q in
-                HStack(alignment: .top, spacing: 4) {
+                HStack(alignment: .top, spacing: TimelineMetrics.labelGap) {
                     Group {
                         if q % 4 == 0 {
                             Text(verbatim: hourLabel(q))
@@ -292,7 +317,7 @@ struct DayTimelineView: View {
                             Color.clear
                         }
                     }
-                    .frame(width: TimelineMetrics.labelWidth - 4, alignment: .trailing)
+                    .frame(width: labelWidth - TimelineMetrics.labelGap, alignment: .trailing)
                     Rectangle()
                         .fill(Color.primary.opacity(q % 4 == 0 ? 0.12 : 0))
                         .frame(height: 1)
@@ -310,7 +335,7 @@ struct DayTimelineView: View {
 
     private func hourLabel(_ q: Int) -> String {
         let date = day.start.addingTimeInterval(TimeInterval(q * TimelineMetrics.quarter * 60))
-        return date.formatted(.dateTime.hour())
+        return TimelineMetrics.hourLabel(date, locale: locale)
     }
 }
 
