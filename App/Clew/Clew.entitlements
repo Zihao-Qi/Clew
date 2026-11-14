@@ -5,7 +5,7 @@
 	<!-- Sandbox on; no files outside the container. -->
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
-	<!-- Outgoing only, for one thing: fetching a pasted link's page title (SPEC §8). -->
+	<!-- Outgoing only: fetching a pasted link's page title, and the update check when the user turns it on (SPEC §8). -->
 	<key>com.apple.security.network.client</key>
 	<true/>
 	<!-- Incoming, on 127.0.0.1 only, while a browser is paired: the extension's
