@@ -227,6 +227,31 @@ writes. Every action is a command; the UI has no business logic. A global shortc
 (default ⌘., stored in Settings as `openListShortcut`) opens the list by clicking
 Clew's own status item; Carbon registers the hotkey, so no Accessibility permission
 is required (2026-11-11).
+**About and updates (2026-11-13; Gemini review).** **Core** `UpdateCheck` (pure,
+injected time): parses a version (`v`-prefixed for a tag, bare for the running app;
+dot-separated numbers, else nil), compares part by part (missing parts 0),
+`isDue(lastAttempt:now:)` (none, ≥ 24 h ago, or in the future), and
+`showsDot(running:latest:seen:)` (latest newer than running and not equal to seen).
+The state (switch, last attempt, last success, latest known tag, tag seen in About) is
+per Mac, so the **app** keeps it in `UserDefaults`, not in Clew's settings table
+(which export, restore and a future sync carry). **App:** `UpdateChecker` does the
+one request (ephemeral `URLSession` with no cookie storage and no URL cache, 15 s
+timeout, `User-Agent: Clew`, `Accept: application/vnd.github+json`), reads only
+`tag_name`, and builds the release link from the tag; any other status, a missing or
+bad tag, or a network error is a failed check. It runs on its own only while the
+switch is on: `AppModel` asks Core whether one is due at launch, on wake, every hour
+and when the switch is turned on.
+**Opening Settings from the menu** first clicks Clew's status item **synchronously**
+(`performClick` while the menu is still open: it closes the menu), then opens Settings
+and activates. Measured with a probe of the real app: the menu closed and opened again
+normally three rounds in a row with another window brought forward right after.
+`NSWindow.close()` on the menu's window was rejected: it hides the menu, but SwiftUI
+still counts it as open, so the next click on the menu bar did nothing. The deferred
+click in `MenuBarExtraToggle` is not used here (it could land after the menu closed by
+itself and open it again). A
+request to show About travels through `AppModel`, so an already open Settings window
+switches to it.
+
 **Collection peek (2026-11-13; Fable review).** The panel lists
 `CollectionDetails.inProgress + notStarted` (it reads `model.collections` like the page,
 so it re-renders on changes). **Core** holds the pure parts, tested with injected time:
@@ -261,7 +286,7 @@ watcher does), so the panel's own mouse-down is handled first. A title is presse
 a SwiftUI `Button`, so it carries `.isButton`, the label "Open <title>" and a default
 accessibility action that opens it.
 
-**Title fetcher.** The app's only network use (entitlement
+**Title fetcher.** The app's network use, with the opt-in update check (entitlement
 `com.apple.security.network.client`): when a link is pasted into `+ add`, one load of
 that URL (following http(s) redirects) with an ephemeral session (no cookies, no cache), `text/html` only, at most
 3 MB, stopping once a complete `<meta property="og:title">` has been read (checked every
@@ -813,7 +838,8 @@ remains an option for an App Store build.
   has real users; after that, a change needs a data migration, because the sandbox
   container, Keychain items and notification permission are keyed by it.
 - **No tracking.** No analytics, no phoning home. Any future crash reporting is
-  opt-in.
+  opt-in. The one exception is the update check (2026-11-13): off until the user turns
+  it on, and it sends nothing but a plain request for the latest release.
 - **Localisation and accessibility from the first commit.** All UI text goes in a
   String Catalog (English first); every control has a VoiceOver label; the menu bar
   list is fully keyboard-navigable.

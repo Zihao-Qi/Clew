@@ -76,11 +76,13 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
    at 21:00, both changeable. Short, friendly, never a list of failures. A day
    with no ticks gets an encouraging line instead of "0/6".
 8. **Local data.** A SQLite database (GRDB) in Application Support. One-click JSON
-   export. No account. The only internet use is fetching a pasted link's title: one
+   export. No account. The only internet use (besides the opt-in update check below) is fetching a pasted link's title: one
    load of that page (and its redirects), no cookies, nothing else sent. While a
    browser is paired (v1.1), Clew also listens on this Mac only (`127.0.0.1`) for
    its extension. With calendar access (v1.2), Clew reads today's events from macOS
-   Calendar on this Mac; it never stores or writes them.
+   Calendar on this Mac; it never stores or writes them. Only if turned on in
+   Settings › About (off by default, 2026-11-13), Clew also asks GitHub once a day
+   whether a newer release exists (see "About and updates").
 9. **Launch at login** (`SMAppService`), toggled in a small Settings window.
 10. **Task details.** Clicking a row opens its details. Habits and goals: a 16-week heatmap (done days
     filled, other days a quiet gray, never red), days done this week / in the last
@@ -122,6 +124,51 @@ stopped daily use, not adding features.
 
 ## Decisions (2026-11-08)
 
+- **About and updates (user, 2026-11-13).**
+  - **Opening Settings closes the menu** (the gear button and ⌘,), like any menu
+    item that opens a window: the menu closes first, then Settings comes forward. The Settings window is **720 × 520** (was 620 × 440).
+  - **About** (sidebar icon `info.circle`) is the last section of the sidebar: Clew's icon, "Clew", "Version 1.5.0
+    (6)" (from the app itself), "Made by Zihao Qi" with a link to
+    github.com/Zihao-Qi, and a link "Clew on GitHub" to github.com/Zihao-Qi/Clew.
+  - **How to upgrade**, always shown (a sandboxed app cannot tell how it was
+    installed): "With Homebrew" and `brew update && brew upgrade --cask clew` with a
+    Copy button (it reads "Copied" for 2 seconds); "Otherwise" a link "Download the
+    latest release" to github.com/Zihao-Qi/Clew/releases/latest. Then: "The browser
+    extension is on the same page (Clew-Extension zip); load the new one in your
+    browser." Clew never installs anything itself.
+  - **Check for updates automatically**: a switch, **off** by default. When on, Clew
+    asks GitHub for the latest release when a check is **due**: on launch, on wake
+    and every hour, it checks if the last attempt (automatic or Check Now, worked or
+    not) was 24 hours ago or more, or never happened, or is in the future (the clock
+    was set back). Turning the switch on checks at once if due. One `https` request to
+    `api.github.com/repos/Zihao-Qi/Clew/releases/latest`, no cookies, no cache, a
+    plain "Clew" user agent, nothing about the user or their data. Only the release's
+    tag (`v1.5.1`) is read; its link is built from the tag
+    (github.com/Zihao-Qi/Clew/releases/tag/v1.5.1), never taken from the reply. Drafts
+    and pre-releases are never offered (GitHub's "latest" leaves them out).
+  - **Check Now** asks at once, whether the switch is on or off; while asking it is
+    disabled and reads "Checking…". Then one line says what it found: "Clew is up to
+    date." or "Couldn't check for updates." (no network, an error reply, no release
+    yet, or a tag that is not `v` plus numbers). An automatic check that fails says
+    nothing.
+  - Whenever a release newer than the running Clew is known (from any check that
+    worked, kept across relaunches), About shows "Clew 1.5.1 is available." with a
+    "Release notes" link, also after a later check failed. "Last checked" shows the
+    date and time of the last check that worked (the system's abbreviated date and
+    short time, e.g. "Nov 13, 2026 at 8:30 PM"), or "Never".
+  - Versions compare by number, part by part (`1.10.0` is newer than `1.9.2`; a
+    missing part is 0); a tag is `v` plus numbers, the running version is the same
+    numbers without the `v`.
+  - **The dot:** while a newer version than the running one is known and About has
+    not been shown since it was found, the menu's gear button has a small dot
+    (VoiceOver: "Settings, update available"), and the gear (and ⌘,) opens Settings at
+    About. Showing About clears it: opening it, or a check finding the version while
+    the Settings window is open on About and not minimized (in front or not); a
+    still newer version brings it back. After upgrading, the known version is no
+    longer newer, so there is no dot. No notification.
+  - The switch and what the checks found belong to **this Mac**, not to Clew's data:
+    they are not in the export, a restore does not change them, and they will not
+    sync.
 - **Watch Later import (v1.1, 2026-11-09):** a paired Chrome extension copies
   YouTube's Watch Later into Clew when the Watch Later page is opened. A video removed
   from Watch Later **counts as finished** (*changed* 2026-11-10, user decision: before,
@@ -444,7 +491,8 @@ stopped daily use, not adding features.
 - A counted goal's step is always **+1** per click.
 - The rating row is offered **every time**, and is always skippable.
 - Ratings are 5 points (rough … great), shown after a tick and on hover; Settings has
-  a sidebar: General, Summaries, Progress, Data (2026-11-09).
+  a sidebar: General, Summaries, Progress, Data (2026-11-09; more sections since, the
+  last one About, 2026-11-13).
 - "Still want this?" lives only in the Later picker; untouched = not saved, edited,
   moved to Later or kept for 42 days. Rating dots are built off by default, as a
   Settings switch (2026-11-09).
@@ -458,7 +506,8 @@ stopped daily use, not adding features.
 - A pasted link goes to Today by default, not Later; `↗` is replaced by a clickable
   title with a link mark (2026-11-08, after first use).
 - Pasted links get their page title fetched (2026-11-08, after first use); this is
-  the app's only internet use (the v1.1 extension connection stays on this Mac).
+  then the app's only internet use (the v1.1 extension connection stays on this Mac;
+  the update check, off by default, was added 2026-11-13).
 - The menu bar title is an icon plus `done/total`, not the word "Clew" (2026-11-08, v1a).
 - A counted goal's undo is a small `−` beside its count, shown only after a `+1` today;
   it removes the last `+1`. It sits apart from the circle so rapid ticks can't hit it
