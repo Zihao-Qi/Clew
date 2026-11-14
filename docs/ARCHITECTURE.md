@@ -237,7 +237,7 @@ row clicked, drag began, list left (the list view's `onDisappear`: ⌘N, ⌘L, d
 it also clears the click block), menu closed, list emptied → open/closed for which
 source; open after 0.1 s of rest that began with movement (arriving on a row at a new
 position is movement; the row under the pointer is found by the controller from the
-rows' screen frames on each hover event, since SwiftUI's `onHover` for a row can come
+rows' screen frames (their bounds: SwiftUI does not clip hosted views, so `visibleRect` is the whole window) on each hover event, since SwiftUI's `onHover` for a row can come
 after the list's hover event); while closing, the 0.2 s
 restarts as long as the pointer moves toward the panel's side; another row takes over
 only after its own rest, and time heading for the open panel is not rest; no reopen
