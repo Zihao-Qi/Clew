@@ -182,7 +182,8 @@ stopped daily use, not adding features.
   - **A reached goal** shows its congratulation and choices (Next round, Raise
     target, Done) on its row, wherever it is, on the day it was reached; from the next
     day it is hidden, unless Next round or Raise target was chosen (as before). A goal
-    reached by a late tick shows them on its row in Goals & Later.
+    reached by a late tick shows them on its row in Goals & Later; that tick is the
+    earlier day's, so it does not count in today's `done/total`.
   - **All done:** when Today's count is complete (done equals total and the total is
     at least 1, including a Goals & Later item ticked today), one quiet line, "All done
     for today", shows above Today's rows (in place of "Nothing for today." or
@@ -232,7 +233,7 @@ stopped daily use, not adding features.
     when Clew was not opened for weeks. The card shows **once**: the first time the
     menu opens on the list screen in a new week (by click or ⌘.), for that opening
     only. The menu closing (its window losing the keyboard, also to a system alert;
-    a right-click menu or the hover peek do not), leaving the list (Add, Later,
+    a right-click menu or the hover peek do not), leaving the list (Add,
     Settings, details, a page) or × ends it, and it does not come back that week
     (*user*, 2026-11-15: it should not sit above the list). It never appears while
     the menu is open (a new week at the rollover, or a late tick, shows it the next
@@ -365,7 +366,8 @@ stopped daily use, not adding features.
   the phone jump to the top and are never taken as a gap; in the rare case where only
   such posts were seen, a post can wrongly count as read ("Not read" undoes it). Bookmarked again: back to
   read. "Not read" (right-click) undoes an automatic "read".
-  These automatic removals are not counted as the user's "let go". Unbookmarking a post
+  These automatic removals are not counted as the user's "let go" (*changed*
+  2026-11-15: the user's let go is gone; the count with it). Unbookmarking a post
   means it was read. Pairing: Settings › Browser
   shows a 6-digit code.
 - **Collections (v1.1, 2026-11-09):** an imported list is **one collection**, not one
@@ -477,13 +479,16 @@ stopped daily use, not adding features.
     block** snapped to 15 minutes. Drag a block to move it and its bottom edge to resize
     it (15 minutes at least, ending at 4 a.m. at the latest). **Dragging a block back
     onto the list** removes it; a task with no blocks left is back in the list, in the
-    gap it was dropped in. **One lifted card** carries what is dragged (*changed*
+    gap it was dropped in (*changed* 2026-11-15: dropped in Goals & Later, an item
+    moved to Today moves back, an unticked once task or link moves to Later, and
+    anything else lands at Today's end). **One lifted card** carries what is dragged (*changed*
     2026-11-10 after use: a dashed outline and a different chip looked like other
     things): over the list it looks exactly like a row being reordered, and the rows
     slide apart where it would land; over the hours it is the block it would become, at
     the quarter hour under the pointer; one tint for both, and its shape changes
     smoothly as it crosses the line. Only tasks
-    on Today can be placed; the collection rows cannot. Blocks may overlap each other and
+    on Today can be placed (*changed* 2026-11-15: and Goals & Later rows, which move
+    to Today); the collection rows cannot. Blocks may overlap each other and
     events; overlapping ones sit side by side. Tasks on the timeline still count in the
     menu bar's `done/total`. With the timeline turned off, every task is in the list.
   - **On a block** (right-click, also accessibility actions): **Done** / **+1** and
@@ -510,7 +515,7 @@ stopped daily use, not adding features.
     back in the list, is at the end, as with `+ add`). A name Clew refuses (too long)
     keeps the box open with its text and the usual notice.
     - **Cancel:** Esc, a name that is empty or only spaces, clicking anywhere else, the
-      menu closing, leaving the list (Add, Later, Settings, details) and the rollover all
+      menu closing, leaving the list (Add, Settings, details) and the rollover all
       close the box and drop what was typed; nothing is made. A click that closes it
       still does what it does (a circle ticks, a block opens its details). A
       double-click elsewhere on the timeline opens a new, empty box there. While an
@@ -654,7 +659,8 @@ stopped daily use, not adding features.
 - Clicking a row opens its details; the link mark, not the title, opens a link.
   Goal bars align in one column. Rows can be dragged to reorder (2026-11-08, after use).
 - Reminders fire on every day the item is on Today until done, once per day; "Later"
-  moves a once-item or link to the Later pile; "Open" appears only for links
+  moves a once-item or link to the Later pile (*changed* 2026-11-15: either list;
+  Goals & Later); "Open" appears only for links
   (2026-11-08, v1b).
 - Counted goals have rounds; reaching the total stops counting until the user picks
   next round, a higher target, or done (2026-11-08, after first use).
