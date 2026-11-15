@@ -227,18 +227,26 @@ writes. Every action is a command; the UI has no business logic. A global shortc
 (default ⌘., stored in Settings as `openListShortcut`) opens the list by clicking
 Clew's own status item; Carbon registers the hotkey, so no Accessibility permission
 is required (2026-11-11).
-**Last week's card (2026-11-15).** **Domain** `WeekRecap` (pure): from the week's
-check-ins (with their items) and focus sessions, it counts done (ticks, voided left
-out, items of kind task/habit/goal), active days (distinct `localDay` of any tick),
-focus minutes, watched and read (ticks on YouTube and X collection items) and picks
-the highlights (habits and goals with ≥ 2 ticks, most first, ties by list order, at
-most 2; deleted items left out). **Core** `Clew.weekCard()` reads the clock once:
-today's `LocalDay`; the week is the Monday-to-Sunday before the one containing today;
-it returns nil when the switch is off, the card was closed for this week, or the
-recap has no tick. Closing stores this week's Monday in the settings table
-(`weekCard.closed`); the switch is `weekCard.on` (Clew's data, like other settings).
-**App:** the list screen shows it above the timeline card and refreshes it with the
-model (a new week at the rollover brings it).
+**Last week's card (2026-11-15; Fable review).** **Domain** `WeekRecap` (pure):
+from the week's live check-ins (each with its item: kind, `source`, `deletedAt`, list
+order) and live focus sessions it computes done (sum of `amount` on items whose
+`source` is not a collection source), watched and read (distinct items with source
+`extension.youtube` / `extension.x` ticked that week, leaving out user-deleted ones by
+the collection page's rule; an item that left the site's list is soft-deleted with its
+tick in the same write and is kept), focus minutes, whether any tick exists, and the
+highlights (habits and goals not deleted, ≥ 2 ticks or +1s, most first, ties by list
+order, at most 2). **Core** `Clew.lastWeek()` (the recap, or nil without a tick; for
+Settings › Progress) and `Clew.weekCard()` (the same, or nil when the switch is off or
+`weekCard.shown` equals this week's Monday) read the clock once (after
+`settleBlocks`, as `refresh` does): today's `LocalDay` and its week's Monday; last
+week is the 7 days before that Monday. New store queries: the live check-ins (with
+items) and focus sessions with `localDay` in a range. It returns nil when the switch
+is off, `weekCard.shown` equals this week's Monday, or there was no tick. Settings
+keys `weekCard.on` and `weekCard.shown` (Clew's data, observed like
+`calendarPromptClosed`). **App:** the list screen takes the card when the menu opens
+(the window becoming key on the list), marks the week shown at once (`markWeekCardShown`),
+and keeps its own copy until the menu closes, the list is left, or ×; it never appears
+mid-session. `rowsLimit` subtracts its height like the timeline's.
 
 **About and updates (2026-11-13; Gemini review).** **Core** `UpdateCheck` (pure,
 injected time): parses a version (`v`-prefixed for a tag, bare for the running app;
