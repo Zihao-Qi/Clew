@@ -47,6 +47,10 @@ struct WeekHighlights: View {
                 Text(verbatim: "\(h.count)×").monospacedDigit().fixedSize()
             }
         }
+        // Read as words, not "·" and "4×" (the card replaces this with its own label).
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: highlights.map { String(localized: "\($0.title) \($0.count) times") }
+            .joined(separator: ", ")))
     }
 }
 

@@ -596,6 +596,7 @@ M = [
  ("WR10 ties by id only", D+"WeekRecap.swift", "if a.item.sortKey != b.item.sortKey { return a.item.sortKey < b.item.sortKey }\n", "", "WeekRecapTests"),
  ("WR11 once is highlight", D+"WeekRecap.swift", "where (tick.item.kind == .habit || tick.item.kind == .goal)", "where (tick.item.kind != .link)", "WeekRecapTests"),
  ("WR12 three highlights", D+"WeekRecap.swift", "public static let maxHighlights = 2", "public static let maxHighlights = 3", "WeekRecapTests"),
+ ("WR13 ties skip created", D+"WeekRecap.swift", "                if a.item.createdAt != b.item.createdAt { return a.item.createdAt < b.item.createdAt }\n", "", "WeekRecapTests"),
  ("WC1 this week", C+"WeekCard.swift", "let monday = today.weekStart.adding(days: -7)", "let monday = today.weekStart", "WeekCardTests"),
  ("WC2 shown ignored", C+"WeekCard.swift", "        if shown == \"\\\"\\(today.weekStart.description)\\\"\" { return nil }\n", "", "WeekCardTests"),
  ("WC3 shown hides later weeks", C+"WeekCard.swift", "if shown == \"\\\"\\(today.weekStart.description)\\\"\" { return nil }", "if let shown, shown >= \"\\\"\\(today.weekStart.description)\\\"\" { return nil }", "WeekCardTests"),

@@ -56,7 +56,9 @@ public struct WeekRecap: Equatable, Sendable {
         let highlights = counts.values.filter { $0.count >= 2 }
             .sorted { a, b in
                 if a.count != b.count { return a.count > b.count }
+                // The list's own order: sort key, then created, then id (as Today).
                 if a.item.sortKey != b.item.sortKey { return a.item.sortKey < b.item.sortKey }
+                if a.item.createdAt != b.item.createdAt { return a.item.createdAt < b.item.createdAt }
                 return a.item.id.uuidString < b.item.id.uuidString
             }
             .prefix(maxHighlights)

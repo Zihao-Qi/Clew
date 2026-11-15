@@ -112,5 +112,14 @@ import Testing
         #expect(r?.highlights.map(\.title) == ["First", "Second"])
         let alone = make([tick(first, "2026-11-09"), tick(first, "2026-11-10"), tick(once, "2026-11-11")])
         #expect(alone?.highlights.map(\.title) == ["First"])
+        // Same sort key: the older item first, as in the list (ids the other way round).
+        func made(_ title: String, at: Double, id: String) -> Item {
+            Item(id: UUID(uuidString: id)!, kind: .goal, title: title, schedule: .daily, progress: .counter(target: 9),
+                 state: .active, sortKey: 5, source: .user, createdAt: t0.addingTimeInterval(at), updatedAt: t0)
+        }
+        let older = made("Older", at: 0, id: "FFFFFFFF-0000-0000-0000-000000000001")
+        let newer = made("Newer", at: 60, id: "00000000-0000-0000-0000-000000000001")
+        #expect(make([tick(newer, "2026-11-09", 2), tick(older, "2026-11-09", 2)])?.highlights.map(\.title)
+                == ["Older", "Newer"])
     }
 }

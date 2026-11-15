@@ -167,6 +167,8 @@ struct MenuSessionWatcher: NSViewRepresentable {
         view.onList = onList
     }
 
+    static func dismantleNSView(_ view: Watcher, coordinator: ()) { view.stop() }
+
     final class Watcher: NSView {
         weak var model: AppModel?
         var onList = true
@@ -174,10 +176,14 @@ struct MenuSessionWatcher: NSViewRepresentable {
 
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
+        func stop() {
             observers.forEach(NotificationCenter.default.removeObserver)
             observers = []
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            stop()
             guard let window else { return }
             let center = NotificationCenter.default
             observers.append(center.addObserver(forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main) { [weak self] _ in
@@ -189,8 +195,16 @@ struct MenuSessionWatcher: NSViewRepresentable {
                 })
             }
             // The first opening after launch: the window may already be key when this
-            // view joins it, so no "became key" will come for this opening.
-            if window.isKeyWindow { opened() }
+            // view joins it, so no "became key" will come for this opening. Next turn,
+            // not while SwiftUI is attaching views.
+            if window.isKeyWindow {
+                DispatchQueue.main.async { [weak self] in
+                    MainActor.assumeIsolated {
+                        guard let self, self.window?.isKeyWindow == true else { return }
+                        self.opened()
+                    }
+                }
+            }
         }
 
         private func opened() { model?.menuOpened(onList: onList) }
