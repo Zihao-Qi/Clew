@@ -17,7 +17,7 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
 ## v1 in one picture
 
 ```
- ☑︎  3/4                        ← menu bar title (icon + done/total, Today only)
+ ☑︎  3/4                        ← menu bar title (icon + done/total: Today, plus anything ticked below)
  ─────────────────────────────────────
  (day timeline)
  ✓ Exercise
@@ -43,7 +43,8 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
    (2026-11-11).
 2. **Item kinds.**
    - *Once*: done on a chosen day; if not done, it quietly moves to tomorrow.
-     Saved links in the Later pile behave the same once picked for a day.
+     Saved links in the Later pile behave the same once picked for a day
+     (*changed* 2026-11-15: a Later item moved to Today is there for that day only).
    - *Repeating*: daily, chosen weekdays, or N times per week. Once a weekly
      target is met, the item leaves Today's list until next Monday, unless you
      ticked it today.
@@ -71,10 +72,9 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
 5. **Later.** Choosing "Later" in `+ add` puts an item (a link or not) in **Goals &
    Later**, the second list in the menu (*changed* 2026-11-15: it was a hidden pile
    with a count and a "Pick 1–3 for today" screen; see "Today and Goals & Later"). A
-   pasted link goes to Today like anything else unless Later is chosen. Items
-   untouched for 6 weeks get a "Still want this?" on their row, with **Keep** (its
-   6 weeks start again) or **Let go** (removed; Settings counts it). Saying no counts
-   as a win. Any item can be deleted (right-click › Delete, or the Delete key).
+   pasted link goes to Today like anything else unless Later is chosen. The old
+   "Still want this?" (Keep / Let go after 6 weeks untouched) is gone (*user*,
+   2026-11-15). Any item can be deleted (right-click › Delete, or the Delete key).
    Delete hides it for good; its history is kept.
 6. **Gentle reminders** (optional, per item, off by default). One notification at
    a chosen time on each day the item is on Today and not done yet, with **Done**,
@@ -134,61 +134,80 @@ stopped daily use, not adding features.
 
 ## Decisions (2026-11-08)
 
-- **Today and Goals & Later (user, 2026-11-15).** Long-term goals on Today made a
-  finished day read "3/5": they are worked on now and then, never all done in a day.
-  The menu now has **two visible lists**, one under the other, and only the first
-  counts. A folded row or submenu was rejected (it adds steps and hides the tasks).
+- **Today and Goals & Later (user, 2026-11-15; Fable review).** Long-term goals on
+  Today made a finished day read "3/5": they are worked on now and then, never all
+  done in a day. The menu now has **two visible lists**, one under the other, and only
+  the first counts. A folded row or submenu was rejected (it adds steps and hides the
+  tasks).
   - **Today** (under the day timeline): once tasks and links planned for today or
     earlier (unfinished ones still carry over, as before), habits on their days, and
     anything from Goals & Later **moved to Today** for today. The menu bar's
     `done/total`, the morning and evening summaries and the "all done" line count
     Today, plus any Goals & Later item ticked today (it counts without moving: a
     finished day with one goal +1 reads "4/4", never "3/3 +1").
-  - **Goals & Later** (a quiet section label, then its rows): every counted goal,
-    and every Later item (once tasks and links saved for no day). Its rows look and
-    work like Today's (circle, `+1`, bars, link mark, details, rating, right-click,
-    the Delete key) and have their own order, dragged as on Today. New items go to
-    its end. It is always shown in full; when the menu reaches the bottom of the
-    screen, Today and Goals & Later scroll together (the timeline above and the
-    collection rows and footer below stay put). With nothing in it, its label is
-    hidden too.
+  - **Goals & Later** (a quiet section label, then its rows): every counted goal
+    that is not reached (see below), and every Later item (once tasks and links saved
+    for no day) that is not done. Its rows look and work like Today's (circle, `+1`,
+    bars, link mark, a link's site as Pick showed it, details, rating, right-click,
+    the Delete key) and have their own order, dragged as on Today; Move Up / Move
+    Down stop at each list's ends. New items go to its end. It is always shown in
+    full; when the menu reaches the bottom of the screen, Today and Goals & Later
+    scroll together (the timeline above and the collection rows and footer below stay
+    put; it opens scrolled to the top, and scrolls by itself while a row is dragged
+    near its edge). With nothing in it, its label is hidden too.
+  - **Empty Today:** "Nothing for today." (or "Everything is on the timeline.") stays
+    above the Goals & Later label, as now.
   - **Add** keeps its four kinds: Today and Habit go to Today; **Goal** and
-    **Later** go to Goals & Later. A goal has a total and no "Repeats" (removed).
-    Adding returns to the list, where the new row can be seen ("Saved to Later
-    (13)" is gone).
-  - **Moving to Today** (for today only): drag a Goals & Later row into Today, or
-    onto an hour of the day timeline (it is placed there and is on Today), or
-    right-click › **Move to Today**. It then shows in Today, in Today's order (at its
-    end), until the rollover; the next day it is back in Goals & Later wherever it
-    was, finished or not (a once task or link that was ticked is done and leaves).
-    Dragging it back down, or right-click › **Move to Goals & Later**, undoes the
-    move for today (its blocks on today's timeline are removed; ticks stay).
-  - **Moving to Later**: a once task or link on Today that has no tick can be
-    dragged down into Goals & Later, or right-click › **Move to Later**, as the
-    reminder's Later button does. Habits stay on Today on their days (they cannot be
-    dragged down); a goal on Today (moved there for today) goes back as above.
+    **Later** go to Goals & Later. A goal has a total, no "Repeats" and no time slot
+    (both removed). Adding returns to the list, where the new row can be seen
+    ("Saved to Later (13)" is gone).
+  - **Moving to Today** (for today only): drag a Goals & Later row into Today (it
+    lands in the gap where it is dropped), or onto an hour of the day timeline (it is
+    placed there and goes to Today's end), or right-click › **Move to Today** (Today's
+    end). It then shows in Today until the rollover; the next day it is back in Goals
+    & Later at its old place, unless it was done (a ticked once task or link leaves
+    for good, as on Today; a goal stays). Dragging it back down, right-click › **Move
+    to Goals & Later**, or a reminder's **Later** button undoes the move for today:
+    its blocks are removed as when any task leaves Today (ended blocks keep their
+    ticks; ticks stay).
+  - **Moving to Later:** a once task or link on Today that has no tick can be
+    dragged down into Goals & Later (into the gap), or right-click › **Move to
+    Later** (its end), as the reminder's Later button does. Habits stay on Today on
+    their days (they cannot be dragged down).
   - **Ticking in Goals & Later** counts today and never moves the row; the row shows
-    ticked until the rollover, as on Today. A ticked once task or link is done.
-  - **All done:** when every Today item is done (and there is at least one), one
-    quiet line, "All done for today", shows above Today's rows; otherwise nothing
-    shows (never "2 left").
-  - **"Still want this?"** shows under the title of a Later item untouched for 6
-    weeks (same rule as before), with **Keep** and **Let go**; goals do not get it.
-  - **Gone:** the footer's "Later (N)" button, the "Pick 1–3 for today" screen and
+    ticked until the rollover, as on Today, and can be undone. A ticked once task or
+    link is done (it leaves the next day). A block of an item moved to Today ticks it
+    at its end, as any block; a late tick after the rollover goes to the block's day.
+  - **A reached goal** shows its congratulation and choices (Next round, Raise
+    target, Done) on its row, wherever it is, on the day it was reached; from the next
+    day it is hidden, unless Next round or Raise target was chosen (as before). A goal
+    reached by a late tick shows them on its row in Goals & Later.
+  - **All done:** when Today's count is complete (done equals total and the total is
+    at least 1, including a Goals & Later item ticked today), one quiet line, "All done
+    for today", shows above Today's rows (in place of "Nothing for today." or
+    "Everything is on the timeline."); otherwise nothing shows (never "2 left").
+  - **Focus** on a Goals & Later row moves it to Today first (*user*: focusing on it
+    makes it part of today); moving it back, deleting it or the rollover ends a
+    running timer as when any task leaves Today.
+  - **"Still want this?" is gone** (*user*, 2026-11-15: rather than asking on rows,
+    the user deletes what they no longer want). Keep and Let go go with it; Settings ›
+    Progress shows no "Let go from Later" any more, and earlier answers stay in the
+    history only.
+  - **Gone too:** the footer's "Later (N)" button, the "Pick 1–3 for today" screen and
     its ⌘L shortcut, and the "Saved to Later (N)" line.
   - **Goals lose their schedule and time slot.** A goal's "Repeats" and its
-    repeating time slot (SPEC "A repeating task's time slot") are removed: it is
-    placed on the timeline only by moving it, for today. Gentle reminders still fire
-    only on days the item is on Today.
+    repeating time slot are removed: it is placed on the timeline only by moving it,
+    for today. Gentle reminders still fire only on days the item is on Today.
   - **Existing data just moves**, nothing is asked: on the first launch of this
-    version every goal's schedule becomes none and its time slot is removed (its
-    past blocks and ticks stay), so goals show in Goals & Later; Later items show
-    there too; Today's once tasks and habits stay on Today.
-  - The Focus timer and the details page work on Goals & Later rows too (Focus moves
-    the row to Today for today first, as Focus works only on Today).
+    version every goal's schedule becomes none and its time slot is removed (past
+    blocks and ticks stay); a goal with a live block today is moved to Today for
+    today, so its block stays. Later items show in Goals & Later; Today's once tasks
+    and habits stay on Today; items picked from Later before the update are on Today
+    already and carry over as once tasks.
   - YouTube and X rows sit below both lists, above the footer, as before.
-  - VoiceOver: the label "Goals & Later" is a heading; every row has "Move to Today"
-    or "Move to Goals & Later" / "Move to Later" as actions, so nothing needs a drag.
+  - Details say where an item is: "On Today", "In Goals & Later", "Done Nov 9".
+  - VoiceOver: the label "Goals & Later" is a heading; every row has "Move to Today",
+    "Move to Goals & Later" or "Move to Later" as actions, so nothing needs a drag.
 
 - **Last week's card (user, 2026-11-15; Fable review).** A reminder of how the last
   week went, because looking back at what got done helps the next start (Design
@@ -377,7 +396,7 @@ stopped daily use, not adding features.
     toward the panel's side (crossing other rows on the way, like a macOS submenu).
   - **Closes** 0.2 s after the pointer leaves both and stops heading for the panel; at
     once on the row's click (its page opens), when a drag starts, when the menu closes
-    or leaves the list (also by ⌘N or ⌘L), and when nothing is left. The other
+    or leaves the list (also by ⌘N or ⌘L; ⌘L is gone since 2026-11-15), and when nothing is left. The other
     collection's panel replaces it only after resting on that row; time spent heading
     for the open panel does not count as rest. Esc does what it does without the panel.
   - It never takes the keyboard, so the menu stays open and its keys keep working.
@@ -398,10 +417,10 @@ stopped daily use, not adding features.
   background fills from the left, default) or *under the title* (a long bar under the
   name, almost to the row's end) or *no bar*. The short bar beside the count is gone;
   `10/30` stays. Pick shows a link's site ("medium.com", no "www.") but not for
-  YouTube videos.
+  YouTube videos (*changed* 2026-11-15: Pick is gone; Goals & Later rows show it).
   The same bar will show a focus timer's time later.
 - **One-off details (2026-11-09):** once-tasks and saved links have no
-  heatmap (videos had this page too until they moved to their collection's page). Their details show where the item is (In Later, On Today, Done Nov 9),
+  heatmap (videos had this page too until they moved to their collection's page). Their details show where the item is (In Later, On Today, Done Nov 9; *changed* 2026-11-15: In Goals & Later),
   watch progress for videos, a short history (saved, picked, kept, done · felt), and
   Open video / Open link.
 - **Focus timer (v1.2, 2026-11-10):** a tomato clock on a task on Today. Right-click
@@ -530,7 +549,7 @@ stopped daily use, not adding features.
     finished" (or "for Friday"), until dismissed or the next rollover. Its Not finished
     undoes all of that task's ticks made that way, and is left out when the rule above
     keeps them. A goal whose total was reached that way shows its congratulation and
-    choices on Today.
+    choices on Today (*changed* 2026-11-15: on its row in Goals & Later).
   - Blocks are **not focus time**: only the focus timer and time added by hand are
     recorded. A focus timer can run on a task with a block.
   - **Leaving Today:** whenever a task is no longer on Today's list, for any reason but
@@ -550,7 +569,7 @@ stopped daily use, not adding features.
     is asked when the first block is placed (if this is on); if it is denied, Settings
     says so.
   - **A repeating task's time slot** (*user*, 2026-11-10). A habit or a counted goal
-    can have a slot, set in Add and Edit: "On the timeline: at 8:00 for 60 min" (a
+    (*changed* 2026-11-15: habits only) can have a slot, set in Add and Edit: "On the timeline: at 8:00 for 60 min" (a
     start on a quarter hour of the wall clock, a length of 15, 30, 45, 60, 90 or 120
     minutes; off by default). Clew then places that block by itself.
     - **When:** a slot block is placed when the task has a slot, is on Today and still
@@ -619,8 +638,8 @@ stopped daily use, not adding features.
 - Ratings are 5 points (rough … great), shown after a tick and on hover; Settings has
   a sidebar: General, Summaries, Progress, Data (2026-11-09; more sections since, the
   last one About, 2026-11-13).
-- "Still want this?" lives only in the Later picker (*changed* 2026-11-15: on the
-  row in Goals & Later); untouched = not saved, edited,
+- "Still want this?" lives only in the Later picker (*changed* 2026-11-15: removed
+  with the picker); untouched = not saved, edited,
   moved to Later or kept for 42 days. Rating dots are built off by default, as a
   Settings switch (2026-11-09).
 - Clicking a row opens its details; the link mark, not the title, opens a link.
