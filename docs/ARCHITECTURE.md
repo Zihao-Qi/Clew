@@ -227,6 +227,19 @@ writes. Every action is a command; the UI has no business logic. A global shortc
 (default ⌘., stored in Settings as `openListShortcut`) opens the list by clicking
 Clew's own status item; Carbon registers the hotkey, so no Accessibility permission
 is required (2026-11-11).
+**Last week's card (2026-11-15).** **Domain** `WeekRecap` (pure): from the week's
+check-ins (with their items) and focus sessions, it counts done (ticks, voided left
+out, items of kind task/habit/goal), active days (distinct `localDay` of any tick),
+focus minutes, watched and read (ticks on YouTube and X collection items) and picks
+the highlights (habits and goals with ≥ 2 ticks, most first, ties by list order, at
+most 2; deleted items left out). **Core** `Clew.weekCard()` reads the clock once:
+today's `LocalDay`; the week is the Monday-to-Sunday before the one containing today;
+it returns nil when the switch is off, the card was closed for this week, or the
+recap has no tick. Closing stores this week's Monday in the settings table
+(`weekCard.closed`); the switch is `weekCard.on` (Clew's data, like other settings).
+**App:** the list screen shows it above the timeline card and refreshes it with the
+model (a new week at the rollover brings it).
+
 **About and updates (2026-11-13; Gemini review).** **Core** `UpdateCheck` (pure,
 injected time): parses a version (`v`-prefixed for a tag, bare for the running app;
 dot-separated numbers, else nil), compares part by part (missing parts 0),

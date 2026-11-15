@@ -124,7 +124,34 @@ stopped daily use, not adding features.
 
 ## Decisions (2026-11-08)
 
-- **About and updates (user, 2026-11-13).**
+- **Last week's card (user, 2026-11-15).** A reminder of how the last week went,
+  because looking back at what got done helps the next start (Design rules: celebrate
+  what got done). Weekly only: like a game's weekly reset, a missed day costs nothing
+  (the user chose this over a daily card and a "welcome back" card; no easy-step
+  suggestion; never a notification).
+  - **Where:** a small card at the **very top of the menu**, above the day timeline
+    (and above the calendar prompt), on the list screen only.
+  - **When:** from the first time the list is shown in a new week (weeks start on
+    Monday, at Clew's day rollover, 4 a.m.) until it is closed with **×** or that week
+    ends. Closed stays closed for that week. Only when last week had at least one
+    tick; otherwise no card at all.
+  - **What** (minimal text, numbers, never a comparison, a drop or anything missed):
+    - "Last week" and ×;
+    - one line: "23 done · 5 active days" and, when focus time was recorded,
+      "· 3 h 20 min focus". **Done** counts the week's ticks on tasks, habits and
+      goals (each +1 of a counted goal is one); **active days** are days with at
+      least one tick, as in Settings › Progress;
+    - when the week had any, one line for the collections: "4 watched · 2 read"
+      (videos and posts ticked or counted finished that week);
+    - up to two highlights: the habits and goals ticked most that week, at least twice
+      each ("Exercise 4× · Read papers 3×"; ties keep the list's order; items
+      deleted since are left out).
+    Ticks undone (voided) never count; ticks are counted on the Clew day they belong
+    to (the rollover rule), so a tick at 1 a.m. on Monday belongs to Sunday's week.
+  - **Off switch:** Settings › General › "Last week's card" (default on).
+  - VoiceOver reads the card as one element ("Last week: 23 done, 5 active days, …");
+    × is "Close last week's card".
+
   - **Opening Settings closes the menu** (the gear button and ⌘,), like any menu
     item that opens a window: the menu closes first, then Settings comes forward. The Settings window is **720 × 520** (was 620 × 440).
   - **About** (sidebar icon `info.circle`) is the last section of the sidebar: Clew's icon, "Clew", "Version 1.5.0
