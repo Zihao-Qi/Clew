@@ -79,7 +79,7 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
 6. **Gentle reminders** (optional, per item, off by default). One notification at
    a chosen time on each day the item is on Today (*changed* 2026-11-15: or in Goals
    & Later) and not done yet, with **Done**,
-   **Later** (once-items and links only: moves it to Goals & Later) and **Open**
+   **Later** (once-items and links only; *changed* 2026-11-15: removed) and **Open**
    (only when it has a link). No repeats within a day, no escalation.
 7. **Day summaries** (each optional): morning "6 today" at 9:00, evening "5/6 done"
    at 21:00, both changeable. Short, friendly, never a list of failures. A day
@@ -167,13 +167,13 @@ stopped daily use, not adding features.
     placed there and goes to Today's end), or right-click › **Move to Today** (Today's
     end). It then shows in Today until the rollover; the next day it is back in Goals
     & Later at its old place, unless it was done (a ticked once task or link leaves
-    for good, as on Today; a goal stays). Dragging it back down, right-click › **Move
-    to Goals & Later**, or a reminder's **Later** button undoes the move for today:
+    for good, as on Today; a goal stays). Dragging it back down or right-click › **Move
+    to Goals & Later** undoes the move for today:
     its blocks are removed as when any task leaves Today (ended blocks keep their
     ticks; ticks stay).
   - **Moving to Later:** a once task or link on Today that has no tick can be
     dragged down into Goals & Later (into the gap), or right-click › **Move to
-    Later** (its end), as the reminder's Later button does. Habits stay on Today on
+    Later** (its end). Habits stay on Today on
     their days (they cannot be dragged down).
   - **Ticking in Goals & Later** counts today and never moves the row; the row shows
     ticked until the rollover, as on Today, and can be undone. A ticked once task or
@@ -205,9 +205,10 @@ stopped daily use, not adding features.
     once a day at its time while the item is in **either list** and still needs
     something today: not done today, and for a goal not reached. So a goal in Goals &
     Later with a reminder nudges every day it has no +1 yet; a habit still only on its
-    days. The notification's **Later** button shows only for a once task or link on
-    Today (for an item moved to Today it moves it back); **Done** and **Open** as
-    before.
+    days. The notification's **Later** button is removed (*user*, 2026-11-15: a
+    reminder is a nudge the user asked for; moving tasks is done in the menu); it
+    keeps **Done** and **Open**. A reminder set earlier on a Later item now fires
+    daily too (accepted: it was set on purpose; Edit turns it off).
   - **Existing data just moves**, nothing is asked: on the first launch of this
     version every goal's schedule becomes none and its time slot is removed (past
     blocks and ticks stay); a goal with a live block today is moved to Today for

@@ -240,8 +240,8 @@ with no plan, it is in Goals & Later again. **Guards that change:** `checkIn` (a
 reminder's Done) accept `.later` items; a block decides (ticks) for a `.later` item
 with a live plan on the block's day, also late after the rollover; `settleBlocks`'
 "left Today" test reads the plan; the Core `today()` query and the notification
-planner read `.later` items with a plan for the day, not only `.active`. Moving back,
-deleting, or a reminder's Later on a moved item void the plan and remove today's
+planner read `.later` items with a plan for the day, not only `.active`. Moving back or
+deleting a moved item void the plan and remove today's
 blocks by the "Leaving Today" rule (ended blocks keep their ticks), not `removeBlock`
 (which voids its own tick); a running focus timer on it ends. **Domain:** `todayList`
 gains the Goals & Later rows and the counts: Today = items due today (once/link with
@@ -276,7 +276,7 @@ rows crosses the label (drop above it: Today, below: Goals & Later; into the gap
 reaches the timeline, as Today rows already do. **Reminders:** the notification planner
 reads both lists for each day (Today's due items and Goals & Later's items, not done
 that day; a goal not reached), so a reminder fires the same wherever the item is; the
-Later action is offered only for a once task or link on Today.
+notification's Later action is removed (Done and Open stay).
 
 **Last week's card (2026-11-15; Fable review).** **Domain** `WeekRecap` (pure):
 from the week's live check-ins (each with its item: kind, `source`, list order, whether
