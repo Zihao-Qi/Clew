@@ -227,6 +227,28 @@ writes. Every action is a command; the UI has no business logic. A global shortc
 (default ⌘., stored in Settings as `openListShortcut`) opens the list by clicking
 Clew's own status item; Carbon registers the hotkey, so no Accessibility permission
 is required (2026-11-11).
+**Today and Goals & Later (2026-11-15).** **Moved to Today** is a live `Plan` fact
+for today (`Plan` already records picks); moving back voids it (with today's blocks of
+that item, as "Remove" does; ticks stay). Nothing else changes on the item: a Later
+item keeps `state == .later` and `plannedDay == nil`, a goal stays `.active`, so the
+next day, with no plan for it, it is in Goals & Later again. **Domain:** `todayList`
+gains the Goals & Later rows and the counts: Today = items due today (once/link with
+`plannedDay <= day`, habits by schedule, as now) plus Goals & Later items with a live
+plan for the day; Goals & Later = active goals (not archived, not deleted; a reached
+goal keeps its congratulation row as now) and `.later` items that are not collection
+items, minus those planned for the day; `done/total` = Today's rows plus Goals & Later
+rows ticked today (counted, not moved). Both lists keep `(sortKey, createdAt, id)`
+order; a plan puts the item at Today's end by a **separate Today sort key** on the
+`Plan` (the item's own `sortKey` stays its Goals & Later place). **Core:**
+`moveToToday(itemId:)` (insert the plan; also the drop on an hour, with the block in the
+same write), `moveBack(itemId:)` (void today's plan and blocks), `moveToLater` (once
+tasks and links as now), reorder per list; `planForToday`'s Pick (1–3) is removed.
+**Migration** (one schema step, idempotent): every goal's `schedule` becomes
+`.unscheduled` and its `slot` nil (definition fields, mutable per §4.2); facts are not
+touched. **App:** one `ScrollView` holds both lists when they pass `rowsLimit`; the
+drag that reorders rows also crosses the label (drop above it: Today, below: Goals &
+Later) and reaches the timeline, as Today rows already do.
+
 **Last week's card (2026-11-15; Fable review).** **Domain** `WeekRecap` (pure):
 from the week's live check-ins (each with its item: kind, `source`, list order, whether
 the user deleted it, and for collection items whether it left the site's list) and
