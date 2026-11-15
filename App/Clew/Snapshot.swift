@@ -538,6 +538,21 @@ enum Snapshot {
                            to: dir.appendingPathComponent("newtask-\(appearance == .aqua ? "light" : "dark").png"))
                 }
             }
+            // Last week's card at the top of the menu (SPEC 2026-11-15): ticks dated a week ago.
+            do {
+                let rows = try clew.today().rows
+                clock.date = Date().addingTimeInterval(-7 * 86400)
+                for row in rows.prefix(3) { _ = try? clew.checkIn(itemId: row.id); _ = try? clew.checkIn(itemId: row.id) }
+                if let first = rows.first { _ = try? clew.addFocusTime(itemId: first.id, day: clew.currentDay(), minutes: 200) }
+                clock.date = Date()
+                model.refresh()
+                model.showWeekCardForSnapshot()
+                for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+                    render(RootView(model: model, screen: .list), appearance: appearance,
+                           to: dir.appendingPathComponent("list-weekcard-\(appearance == .aqua ? "light" : "dark").png"))
+                }
+                model.dropWeekCard()
+            }
             // The peek beside a collection row (SPEC 2026-11-13).
             for (name, source) in [("peek-youtube", Source.extensionYouTube), ("peek-x", .extensionX)] {
                 for appearance in [NSAppearance.Name.aqua, .darkAqua] {

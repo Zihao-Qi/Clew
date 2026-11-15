@@ -53,6 +53,10 @@ public protocol StoreReader {
     func watchProgress(itemIds: [UUID]) throws -> [UUID: WatchProgress]
     /// Non-voided focus sessions of these items, oldest first.
     func focusSessions(itemIds: [UUID]) throws -> [FocusSession]
+    /// Non-voided check-ins of any item with `from <= localDay <= through` (last week's card).
+    func checkIns(from: LocalDay, through: LocalDay) throws -> [CheckIn]
+    /// Non-voided focus sessions of any item with `from <= localDay <= through`.
+    func focusSessions(from: LocalDay, through: LocalDay) throws -> [FocusSession]
     func focusSession(id: UUID) throws -> FocusSession?
     /// Every time block of `from` and later days, removed ones included (a hand tick a
     /// removed block used stays used), by start.

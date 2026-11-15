@@ -43,11 +43,16 @@ struct TodayListView: View {
 
     private var showsTimeline: Bool { model.timelineShown && model.timeline != nil }
 
-    /// The rows may take what the screen has left after the timeline and the footer.
+    /// The rows may take what the screen has left after last week's card, the timeline
+    /// and the footer.
     private var rowsLimit: CGFloat {
         let screen = NSScreen.main?.visibleFrame.height ?? 800
-        return max(160, screen - (showsTimeline ? TimelineMetrics.height : 0) - 170)
+        let card = model.weekCard == nil ? 0 : weekCardHeight
+        return max(160, screen - card - (showsTimeline ? TimelineMetrics.height : 0) - 170)
     }
+
+    /// Last week's card's height, for `rowsLimit`.
+    @State private var weekCardHeight: CGFloat = 0
 
     /// Above the list's top, the pointer is over the hours.
     private func isOverTimeline(_ y: CGFloat) -> Bool { showsTimeline && y < timelineGeo.viewport.maxY + 4 }
@@ -285,6 +290,11 @@ struct TodayListView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // Last week's card (SPEC 2026-11-15): the very top, above the timeline.
+            if let recap = model.weekCard {
+                WeekCardView(recap: recap) { model.dropWeekCard() }
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { weekCardHeight = $0 }
+            }
             if showsTimeline, let day = model.timeline {
                 DayTimelineView(model: model, day: day, space: Self.listSpace,
                                 geometry: $timelineGeo, topQuarter: $topQuarter,
@@ -429,7 +439,11 @@ struct TodayListView: View {
         }
         .onChange(of: dragging != nil || lifted != nil) { _, active in PeekController.shared.dragChanged(active) }
         .onChange(of: model.collections) { _, lists in PeekController.shared.collectionsChanged(lists) }
-        .onDisappear { PeekController.shared.listLeft() }
+        .onDisappear {
+            PeekController.shared.listLeft()
+            // Leaving the list ends last week's card for this week.
+            model.dropWeekCard()
+        }
     }
 }
 

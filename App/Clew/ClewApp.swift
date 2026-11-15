@@ -138,10 +138,75 @@ struct RootView: View {
             }
         }
         .frame(width: 340)
+        // Last week's card (SPEC 2026-11-15): one opening of the menu's own window.
+        .background(MenuSessionWatcher(model: model, onList: screen == .list))
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
             // Opening the list always shows today as it is now.
             model.refresh()
         }
         .onChange(of: screen) { model.notice = nil }
+    }
+}
+
+/// Reports the menu's own window opening (becoming key) and closing (losing key or
+/// closing) to the model, for last week's card. Filtered to its own window: Settings
+/// and system panels becoming key are not an opening.
+struct MenuSessionWatcher: NSViewRepresentable {
+    let model: AppModel
+    let onList: Bool
+
+    func makeNSView(context: Context) -> Watcher {
+        let view = Watcher()
+        view.model = model
+        view.onList = onList
+        return view
+    }
+
+    func updateNSView(_ view: Watcher, context: Context) {
+        view.model = model
+        view.onList = onList
+    }
+
+    static func dismantleNSView(_ view: Watcher, coordinator: ()) { view.stop() }
+
+    final class Watcher: NSView {
+        weak var model: AppModel?
+        var onList = true
+        private var observers: [NSObjectProtocol] = []
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        func stop() {
+            observers.forEach(NotificationCenter.default.removeObserver)
+            observers = []
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            stop()
+            guard let window else { return }
+            let center = NotificationCenter.default
+            observers.append(center.addObserver(forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.opened() }
+            })
+            for name in [NSWindow.didResignKeyNotification, NSWindow.willCloseNotification] {
+                observers.append(center.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.model?.menuClosed() }
+                })
+            }
+            // The first opening after launch: the window may already be key when this
+            // view joins it, so no "became key" will come for this opening. Next turn,
+            // not while SwiftUI is attaching views.
+            if window.isKeyWindow {
+                DispatchQueue.main.async { [weak self] in
+                    MainActor.assumeIsolated {
+                        guard let self, self.window?.isKeyWindow == true else { return }
+                        self.opened()
+                    }
+                }
+            }
+        }
+
+        private func opened() { model?.menuOpened(onList: onList) }
     }
 }

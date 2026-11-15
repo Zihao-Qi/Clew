@@ -22,6 +22,8 @@ struct SettingsView: View {
     @State private var timelineShown = true
     @State private var blockAlerts = true
     @State private var recordsTime = true
+    @State private var weekCardOn = true
+    @State private var lastWeek: WeekRecap?
     @State private var pane: Pane?
 
     /// A plain column of sections; selected one highlighted, keyboard and VoiceOver
@@ -171,6 +173,17 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Toggle("Last week's card", isOn: Binding(get: { weekCardOn }, set: { on in
+                        weekCardOn = on
+                        model.setWeekCardOn(on)
+                    }))
+                } footer: {
+                    Text("Once a week, the first time you open Clew: what you got done last week. Settings › Progress always has it.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section {
                     Toggle("Show the day timeline", isOn: Binding(get: { timelineShown }, set: { on in
                         timelineShown = on
                         model.setTimelineShown(on)
@@ -246,6 +259,17 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                // Last week's card, to read again (SPEC 2026-11-15); absent when empty.
+                if let recap = lastWeek {
+                    Section {
+                        if let main = WeekRecapText.main(recap) { Text(verbatim: main).monospacedDigit() }
+                        if let lists = WeekRecapText.collections(recap) { Text(verbatim: lists).monospacedDigit() }
+                        if !recap.highlights.isEmpty { WeekHighlights(highlights: recap.highlights) }
+                    } header: {
+                        Text("Last week")
+                    }
+                }
+
                 case .calendar:
                 CalendarSettings(model: model)
 
@@ -314,6 +338,13 @@ struct SettingsView: View {
         // The gear asks for About while a newer version is known (SPEC 2026-11-13).
         .onAppear(perform: takePaneRequest)
         .onChange(of: model.updates.paneRequest) { _, _ in takePaneRequest() }
+        // Progress is read fresh when picked (a list turned off in General shows at once).
+        .onChange(of: pane) { _, new in
+            if new == .progress {
+                activeDays = model.activeDays()
+                lastWeek = model.lastWeek()
+            }
+        }
         // A menu bar app shows no window at launch, so macOS must not restore this one
         // if it was open when Clew quit.
         .background(NonRestorableWindow())
@@ -361,6 +392,10 @@ struct SettingsView: View {
         timelineShown = model.timelineShown
         blockAlerts = model.blockAlerts
         recordsTime = model.focusRecordsTime
+        weekCardOn = model.weekCardOn()
+        // Blocks settle first, as for the menu's card.
+        model.refresh()
+        lastWeek = model.lastWeek()
     }
 
     private func setOpenAtLogin(_ on: Bool) {

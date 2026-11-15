@@ -232,6 +232,20 @@ private struct Access: StoreWriter {
         ).map(Self.focusSession)
     }
 
+    func checkIns(from: LocalDay, through: LocalDay) throws -> [CheckIn] {
+        try Row.fetchAll(
+            db, sql: "SELECT * FROM checkIn WHERE voidedAt IS NULL AND localDay >= ? AND localDay <= ? ORDER BY at, id",
+            arguments: [from.description, through.description]
+        ).map(Self.checkIn)
+    }
+
+    func focusSessions(from: LocalDay, through: LocalDay) throws -> [FocusSession] {
+        try Row.fetchAll(
+            db, sql: "SELECT * FROM focusSession WHERE voidedAt IS NULL AND localDay >= ? AND localDay <= ? ORDER BY at, id",
+            arguments: [from.description, through.description]
+        ).map(Self.focusSession)
+    }
+
     func focusSession(id: UUID) throws -> FocusSession? {
         try Row.fetchOne(db, sql: "SELECT * FROM focusSession WHERE id = ?", arguments: [id.uuidString]).map(Self.focusSession)
     }
