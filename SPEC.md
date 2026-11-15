@@ -209,6 +209,19 @@ stopped daily use, not adding features.
     reminder is a nudge the user asked for; moving tasks is done in the menu); it
     keeps **Done** and **Open**. A reminder set earlier on a Later item now fires
     daily too (accepted: it was set on purpose; Edit turns it off).
+  - **Today or every day** (*user*, 2026-11-15). When "Remind me" is switched on, a
+    choice beside the time picks **Today** or **Every day** (default Every day, as
+    reminders worked so far; existing reminders are Every day).
+    - **Every day:** as above, each day the item is in a list and still needs
+      something.
+    - **Today:** once, at that time on the Clew day it was set (the rollover rule),
+      if the item still needs something then; after that day it is spent and Edit
+      shows "Remind me" off again. A time already past today cannot be chosen with
+      Today: the choice says "That time has passed today" and Save keeps the switch
+      off (no notification fires at once). Changing the time or the choice later the
+      same day resets it for today.
+    - Either way it fires at most once a day, and never for an item done today, a
+      reached goal, or a habit not due that day.
   - **Existing data just moves**, nothing is asked: on the first launch of this
     version every goal's schedule becomes none and its time slot is removed (past
     blocks and ticks stay); a goal with a live block today is moved to Today for

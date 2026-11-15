@@ -276,7 +276,13 @@ rows crosses the label (drop above it: Today, below: Goals & Later; into the gap
 reaches the timeline, as Today rows already do. **Reminders:** the notification planner
 reads both lists for each day (Today's due items and Goals & Later's items, not done
 that day; a goal not reached), so a reminder fires the same wherever the item is; the
-notification's Later action is removed (Done and Open stay).
+notification's Later action is removed (Done and Open stay). A reminder gains an optional
+`day: LocalDay?` (definition field, mutable): nil = every day (all existing rows), a
+day = that Clew day only, computed in Core from the injected clock when saved (a time
+already past that day is refused, `ClewError.notAllowed`). The planner plans a
+one-day reminder only for its day; after it, `reminder(forItem:)` reports it off (the
+row stays; Edit's switch reads it as off). Older exports decode a missing `day` as
+nil.
 
 **Last week's card (2026-11-15; Fable review).** **Domain** `WeekRecap` (pure):
 from the week's live check-ins (each with its item: kind, `source`, list order, whether
