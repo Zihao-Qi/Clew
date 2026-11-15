@@ -94,11 +94,12 @@ Item            id (UUID), kind, title, titleOrigin: typed | fetched, url?, note
                 createdAt, updatedAt, deletedAt?
 CheckIn         id, itemId, localDay, at (UTC), timeZoneId, amount (default 1),
                 rating? (1–3), ratedAt?, source, voidedAt?, voidReason?
-Plan            id, itemId, localDay, at, source, voidedAt?   ← "picked for today", kept as history
+Plan            id, itemId, localDay, at, source, todaySortKey? (2026-11-15), voidedAt?   ← "moved to Today", kept as history
 GoalRound       id, itemId, startedAt, localDay, target, source, voidedAt?   ← "next round" of a goal
 LaterReview     id, itemId, decision: keep | letGo, at, localDay, source, voidedAt?   ← "still want this?"
-Reminder        id, itemId, time (hour, minute; local), enabled, updatedAt, deletedAt?
-                ← at most one live reminder per item; it fires on the item's due days
+Reminder        id, itemId, time (hour, minute; local), day? (one-day: 2026-11-15), enabled, updatedAt, deletedAt?
+                ← at most one live reminder per item; it fires on days the item is in
+                  Today or Goals & Later and not done (2026-11-15)
 Settings        key (PK), value (JSON), updatedAt
 — later phases —
 WatchProgress   itemId (PK), fraction (0–1), observedAt, source   (v1.1) ← latest only, YouTube watch %
@@ -113,8 +114,9 @@ Award           id = hash(kind, itemId, milestone), kind (e.g. goal.finished),
 
 - `kind` is `once | habit | goal | link`. SPEC's "Once / Repeating / Counted goal"
   map to `once | habit | goal`; `link` is a saved link (Later pile items).
-  *Later pile* = items in state `later`. "Pick for today" sets `plannedDay` **and**
-  records a `Plan` fact, so pick history survives later re-planning.
+  *Later pile* = items in state `later` (shown as Goals & Later since 2026-11-15).
+  "Pick for today" set `plannedDay` **and** recorded a `Plan` fact; since 2026-11-15
+  moving to Today records only the `Plan` (see "Today and Goals & Later").
 - **"Finished" is derived, not stored:** a goal is reached when
   `sum(amount of non-voided CheckIns since the current round started) >= target`;
   a once-item when it has a non-voided CheckIn. Undoing the last tick therefore
@@ -227,6 +229,66 @@ writes. Every action is a command; the UI has no business logic. A global shortc
 (default ⌘., stored in Settings as `openListShortcut`) opens the list by clicking
 Clew's own status item; Carbon registers the hotkey, so no Accessibility permission
 is required (2026-11-11).
+**Today and Goals & Later (2026-11-15; Fable review).** **Moved to Today** is a live
+`Plan` fact for today (`Plan` already records picks) carrying a **Today sort key**
+(new optional column, absent in older exports and rows: decoded as nil). Plans are
+facts (immutable substance, §4.2): reordering a moved row inside Today voids its plan
+and inserts a new one with the new key; moving back voids it. For one item and day
+the earliest live plan wins. Nothing else changes on the item: a Later item keeps
+`state == .later` and `plannedDay == nil`, a goal stays `.active`, so the next day,
+with no plan, it is in Goals & Later again. **Guards that change:** `checkIn` (and a
+reminder's Done) accept `.later` items; a block decides (ticks) for a `.later` item
+with a live plan on the block's day, also late after the rollover; `settleBlocks`'
+"left Today" test reads the plan; the Core `today()` query and the notification
+planner read `.later` items with a plan for the day, not only `.active`. Moving back or
+deleting a moved item void the plan and remove today's
+blocks by the "Leaving Today" rule (ended blocks keep their ticks), not `removeBlock`
+(which voids its own tick); a running focus timer on it ends. **Domain:** `todayList`
+gains the Goals & Later rows and the counts: Today = items due today (once/link with
+`plannedDay <= day`, habits by schedule, as now) plus items with a live plan for the
+day (ordered by their plan's Today sort key, merged with Today's own `sortKey`s; a
+nil key, or an item due on its own, uses the item's `sortKey`);
+Goals & Later = active goals not reached (a goal reached today keeps its congratulation
+row where it is, then hides as now; Next round / Raise target bring it back) and
+`.later` non-collection items not done (a once/link with a live tick on an earlier day
+is done and left out, as `dueState` does), minus those planned for the day, ordered by
+`(sortKey, createdAt, id)`; `done/total` = Today's rows plus Goals & Later rows ticked
+today (counted, not moved). `maxSortKey` covers live plans' Today keys too, so
+"Today's end" is past both; `moveItem` reads the neighbours' effective keys in their
+list; `renumber` renumbers each list (Goals & Later spans `.active` goals and `.later`
+items; renumbering Today voids and re-inserts the moved rows' plans). History and the
+measures in docs/AGENT.md read one pick per (item, day): the latest plan, live or not,
+so a reorder's re-inserted plan is not a second pick (a reorder on one device and a
+move back on another is left for v2 sync). **Core:** `moveToToday(itemId:atKey:)` (insert the plan; the drop on an hour
+inserts the block in the same write), `moveBack(itemId:)`, `moveToLater` (a once task
+or link with no tick: `.later`, its own `sortKey` at Goals & Later's end, and today's
+plan voided if any), reorder per list; `planForToday` (Pick 1–3) is removed, and so are the user's Later review commands
+(`keepLater`, `letGo`, `laterPile`, `lettingGoCount`, `letGoCount`); the `LaterReview`
+table, `insert`/`voidLaterReview` for imports (an item that left a site's list) and
+the "kept" line in details history stay. `NewItemShape.goal` loses its schedule; `validSchedule` and `editItem`
+accept a goal with `.unscheduled`. **Migration** (one GRDB step, runs once; plain SQL, no clock):
+every goal's `schedule` becomes `.unscheduled` and its `slot` nil (definition fields,
+mutable per §4.2); for every goal with a live, undecided block, a plan is inserted for
+that block's own `localDay` (`at` = the block's `placedAt`, source `user`, no Today key),
+so `settleBlocks` keeps the block. Other facts are not touched. **App:** one `ScrollView` holds both lists when they pass
+`rowsLimit` (opens at the top; new: the list scrolls while a drag nears its edge); the drag that reorders
+rows crosses the label (drop above it: Today, below: Goals & Later; into the gap) and
+reaches the timeline, as Today rows already do. **Reminders:** the notification planner
+reads both lists for each day (Today's due items and Goals & Later's items, not done
+that day; a goal not reached), so a reminder fires the same wherever the item is; the
+notification's Later action is removed (Done and Open stay). A reminder gains an optional
+`day: LocalDay?` (definition field, mutable): nil = every day (all existing rows), a
+day = that Clew day only, computed in Core from the injected clock when saved (a time
+already past that day is refused, `ClewError.notAllowed`). The planner plans a
+one-day reminder only for its day; after it, it is off for every reader:
+`reminder(forItem:)`, `details`, `wantsNotifications` and the planner's filter (the
+row stays; Edit's switch reads it as off). Older exports decode a missing `day` as
+nil. The Edit view checks the reminder before saving the edit (its change test
+includes the choice), so a refused Today time saves nothing. An old delivered
+notification's "later" reply is ignored. **Schema** (one step with the migration
+above): nullable `reminder.day` and `plan.todaySortKey`; `plan_substance_immutable`
+covers `todaySortKey`.
+
 **Last week's card (2026-11-15; Fable review).** **Domain** `WeekRecap` (pure):
 from the week's live check-ins (each with its item: kind, `source`, list order, whether
 the user deleted it, and for collection items whether it left the site's list) and
