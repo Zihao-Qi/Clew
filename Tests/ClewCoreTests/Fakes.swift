@@ -150,6 +150,14 @@ final class FakeStore: ClewStore, @unchecked Sendable {
             return state.focusSessions.values.filter { ids.contains($0.itemId) && $0.voidedAt == nil }
                 .sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) }
         }
+        func checkIns(from: LocalDay, through: LocalDay) throws -> [CheckIn] {
+            state.checkIns.values.filter { $0.localDay >= from && $0.localDay <= through && !$0.isVoided }
+                .sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) }
+        }
+        func focusSessions(from: LocalDay, through: LocalDay) throws -> [FocusSession] {
+            state.focusSessions.values.filter { $0.localDay >= from && $0.localDay <= through && $0.voidedAt == nil }
+                .sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) }
+        }
         func focusSession(id: UUID) throws -> FocusSession? { state.focusSessions[id] }
         func timeBlocks(from: LocalDay) throws -> [TimeBlock] {
             state.timeBlocks.values.filter { $0.localDay >= from }.sorted { ($0.start, $0.id.uuidString) < ($1.start, $1.id.uuidString) }

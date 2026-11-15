@@ -296,6 +296,45 @@ final class AppModel {
 
     func activeDays() -> ActiveDays? { try? clew?.activeDays() }
 
+    // MARK: - Last week's card (SPEC 2026-11-15)
+
+    /// The card taken when the menu opened on the list; fixed for that opening.
+    private(set) var weekCard: WeekRecap?
+    /// Between the menu window becoming key and losing it: one opening.
+    @ObservationIgnored private var menuSessionOpen = false
+
+    /// The menu's own window became key: a new opening. On the list, it takes last
+    /// week's card if one is due, and marks the week shown only when it took one.
+    func menuOpened(onList: Bool) {
+        guard !menuSessionOpen else { return }
+        menuSessionOpen = true
+        weekCard = nil
+        guard onList, let clew else { return }
+        refresh()   // blocks settle first, so a Sunday block that ended counts
+        guard let card = try? clew.weekCard() else { return }
+        weekCard = card
+        try? clew.markWeekCardShown(card)
+    }
+
+    /// The menu window lost the keyboard or closed: the opening is over.
+    func menuClosed() {
+        menuSessionOpen = false
+        weekCard = nil
+    }
+
+    /// × on the card, or leaving the list: it does not come back this week.
+    func dropWeekCard() { weekCard = nil }
+
+    /// Settings › Progress: last week, whatever the switch says and whether shown.
+    func lastWeek() -> WeekRecap? { (try? clew?.lastWeek()) ?? nil }
+    func weekCardOn() -> Bool { (try? clew?.weekCardOn()) ?? true }
+    func setWeekCardOn(_ on: Bool) { run { try $0.setWeekCardOn(on) } }
+
+    #if DEBUG
+    /// The snapshot shows the card without a real menu opening.
+    func showWeekCardForSnapshot() { weekCard = (try? clew?.lastWeek()) ?? nil }
+    #endif
+
     /// Read fresh on every render; the details page is small.
     func details(for itemId: UUID) -> ItemDetails? { (try? clew?.details(itemId: itemId)) ?? nil }
 

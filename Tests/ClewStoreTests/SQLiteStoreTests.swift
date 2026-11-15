@@ -71,6 +71,33 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         #expect(r.maxSort == 2.5)
     }
 
+    /// Last week's card (SPEC 2026-11-15): the live ticks and focus of any item, deleted
+    /// ones too, inside a range of days, both ends included.
+    @Test func weekRangeQueriesKeepBothEndsAndLeaveOutVoids() throws {
+        let store = try SQLiteStore.inMemory()
+        let item = sampleItem()
+        var gone = sampleItem()
+        gone.deletedAt = t0
+        let before = sampleCheckIn(item, "2026-11-08"), monday = sampleCheckIn(item, "2026-11-09")
+        let sunday = sampleCheckIn(gone, "2026-11-15"), after = sampleCheckIn(item, "2026-11-16")
+        let voided = sampleCheckIn(item, "2026-11-10")
+        func session(_ d: String) -> FocusSession {
+            FocusSession(id: UUID(), itemId: item.id, localDay: day(d), at: t0, minutes: 25, kind: .timer)
+        }
+        let s1 = session("2026-11-09"), s2 = session("2026-11-15"), s0 = session("2026-11-08"), sv = session("2026-11-12")
+        try store.write { w in
+            try w.insert(item); try w.insert(gone)
+            for c in [before, monday, sunday, after, voided] { try w.insert(c) }
+            try w.voidCheckIn(id: voided.id, at: t0, reason: "undo")
+            for s in [s1, s2, s0, sv] { try w.insert(s) }
+            try w.voidFocusSession(id: sv.id, at: t0)
+        }
+        let ticks = try store.read { try $0.checkIns(from: day("2026-11-09"), through: day("2026-11-15")) }
+        #expect(Set(ticks.map(\.id)) == [monday.id, sunday.id])
+        let focus = try store.read { try $0.focusSessions(from: day("2026-11-09"), through: day("2026-11-15")) }
+        #expect(Set(focus.map(\.id)) == [s1.id, s2.id])
+    }
+
     @Test func aThrowingWriteRollsBackEverything() throws {
         struct Boom: Error {}
         let store = try SQLiteStore.inMemory()
