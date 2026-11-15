@@ -227,6 +227,34 @@ writes. Every action is a command; the UI has no business logic. A global shortc
 (default ⌘., stored in Settings as `openListShortcut`) opens the list by clicking
 Clew's own status item; Carbon registers the hotkey, so no Accessibility permission
 is required (2026-11-11).
+**Last week's card (2026-11-15; Fable review).** **Domain** `WeekRecap` (pure):
+from the week's live check-ins (each with its item: kind, `source`, list order, whether
+the user deleted it, and for collection items whether it left the site's list) and
+live focus sessions it computes done (sum of `amount` on items whose `source` is not a
+collection source), watched and read (distinct `extension.youtube` / `extension.x`
+items ticked that week, leaving out user-deleted ones and lists turned off), focus
+minutes and the highlights (habits and goals not deleted, ≥ 2 ticks or +1s, most first,
+ties by list order, at most 2); it is empty unless done, watched or read is above 0.
+**Core** passes the deletion facts: an item's `deletedAt` alone cannot tell "the user
+deleted it" from "it left the site's list" (soft-deleted with its tick), so Core reads
+each collection item's latest let-go source, as the collection page does, and the lists
+turned off. New store queries: the live check-ins (with items) and focus sessions with
+`localDay` in a range. `Clew.lastWeek()` (the recap or nil; for Settings › Progress)
+and `Clew.weekCard()` (the same, or nil when the switch is off or `weekCard.shown`
+equals this week's Monday) read the clock once, after `settleBlocks`: today's
+`LocalDay`, its week's Monday, and last week as the 7 days before. Settings keys
+`weekCard.on` and `weekCard.shown` (Clew's data, observed like `calendarPromptClosed`).
+**App:** the card is model state. `AppModel.menuOpened()` runs when the **menu's own
+window** becomes key (filtered to that window, as the peek does: the existing
+unfiltered `didBecomeKey` handlers also fire for Settings and system panels), after
+`refresh()`, and only when `screen == .list`; it takes `weekCard()`, marks the week
+shown (`markWeekCardShown`) only when it took a card, and keeps that copy. The card
+ends when the menu window resigns key or closes, when the list is left, or on ×.
+Whether the first opening after launch reaches the key notification, or needs the
+list's first appearance in a session too, is measured with a probe of the real menu
+before building. The debug snapshot sets the card directly. `rowsLimit` subtracts its
+height like the timeline's.
+
 **About and updates (2026-11-13; Gemini review).** **Core** `UpdateCheck` (pure,
 injected time): parses a version (`v`-prefixed for a tag, bare for the running app;
 dot-separated numbers, else nil), compares part by part (missing parts 0),

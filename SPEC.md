@@ -119,10 +119,71 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
 
 v1 is done when it has been **used on 5 of 7 days for two weeks**, not when its
 tests pass. Clew records active days locally (a day with at least one tick) and
-shows them only in Settings. Until that bar is met, the next work is fixing whatever
+shows them only in Settings (last week's card, 2026-11-15, shows the week's ticks, not
+active days). Until that bar is met, the next work is fixing whatever
 stopped daily use, not adding features.
 
 ## Decisions (2026-11-08)
+
+- **Last week's card (user, 2026-11-15; Fable review).** A reminder of how the last
+  week went, because looking back at what got done helps the next start (Design
+  rules: celebrate what got done). Weekly only: like a game's weekly reset, a missed
+  day costs nothing (the user chose this over a daily card and a "welcome back" card;
+  no easy-step suggestion; never a notification).
+  - **Where:** a small card at the **very top of the menu**, above the day timeline
+    (and above the calendar prompt and every timeline line), on the list screen only.
+    The menu grows by the card's height, never past the screen (the rows give way, as
+    for the timeline).
+  - **When:** last week is the Monday-to-Sunday just before the week that holds
+    today (Clew days: a week starts on Monday at Clew's rollover hour, 4 a.m.), even
+    when Clew was not opened for weeks. The card shows **once**: the first time the
+    menu opens on the list screen in a new week (by click or ⌘.), for that opening
+    only. The menu closing (its window losing the keyboard, also to a system alert;
+    a right-click menu or the hover peek do not), leaving the list (Add, Later,
+    Settings, details, a page) or × ends it, and it does not come back that week
+    (*user*, 2026-11-15: it should not sit above the list). It never appears while
+    the menu is open (a new week at the rollover, or a late tick, shows it the next
+    time the menu opens), nor when going back to the list inside one opening (Esc
+    from a page). An opening that is not on the list shows no card and does not use
+    it up; neither does an opening with no card to show (switch off, no tick yet).
+    Within the opening it was shown in, the card is fixed: it does not change if a
+    tick is undone meanwhile. "Shown" is stored as that week's Monday, compared for
+    equality, so setting the clock back never hides another week's card. Turning
+    the switch off and on again in the same week shows it again if it was not shown
+    yet. First launch ever: no card.
+  - **In Settings too:** Settings › Progress has a "Last week" section with the same
+    lines (no ×), so a card that went by too fast can be read later. It follows the
+    same numbers and the same "only when something shows" rule (absent otherwise),
+    ignores the switch and whether the card was shown, and is as fresh as the pane's
+    other numbers (read when the pane opens or Settings comes forward). VoiceOver
+    reads it as ordinary rows.
+  - **Only when something shows:** the card (and the Settings section) exist only
+    when done, watched or read is above 0 after the rules below; otherwise there is
+    no card at all, not an empty one (focus time alone does not bring it).
+  - **What** (minimal text, numbers, never a comparison, a drop or anything missed):
+    - "Last week" and ×;
+    - one line: "23 done" and, when focus time was recorded, "· 3 h 20 min focus"
+      (the details page's format: "25 min", "1 h", "2 h 5 min"). **Done** is the sum
+      of the week's tick amounts on items that are not from a collection (once
+      tasks, links, habits, goals; a goal's +1 is one). "N done" is left out when 0;
+    - when the week had any, one line for the collections: "4 watched · 2 read"
+      (YouTube and X items, by the item's own source, ticked or counted finished that
+      week; as on the collection page, items the user deleted are left out, items that
+      left the site's list are kept). A list turned off in Settings has no number;
+    - up to two highlights: the habits and goals ticked most that week, at least twice
+      each ("Exercise 4× · Read papers 3×"; a habit counts its ticks, a goal its +1s;
+      ties keep the list's order). Titles truncate; the count never does.
+    - **Deleted items:** done and focus count every tick and session not undone, even
+      of items deleted since (history is kept); only highlights and the collection
+      numbers leave deleted items out.
+    Ticks undone (voided) never count; ticks are counted on the Clew day they belong
+    to (a tick at 1 a.m. on Monday belongs to Sunday's week). **The numbers are live**,
+    not a snapshot: a Sunday block that settles on Monday, time added by hand to a past
+    day, or a "Not finished" changes them, and can bring or remove the card.
+  - **Off switch:** Settings › General › "Last week's card" (default on); it turns
+    off the menu's card only.
+  - VoiceOver reads the card as one element ("Last week: 23 done, 3 hours 20 minutes
+    of focus, …"); × is "Close last week's card". Every number has its singular form.
 
 - **About and updates (user, 2026-11-13).**
   - **Opening Settings closes the menu** (the gear button and ⌘,), like any menu
