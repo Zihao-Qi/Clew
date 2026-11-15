@@ -217,11 +217,16 @@ stopped daily use, not adding features.
     - **Today:** once, at that time on the Clew day it was set (the rollover rule),
       if the item still needs something then; after that day it is spent and Edit
       shows "Remind me" off again. A time already past today cannot be chosen with
-      Today: the choice says "That time has passed today" and Save keeps the switch
-      off (no notification fires at once). Changing the time or the choice later the
-      same day resets it for today.
-    - Either way it fires at most once a day, and never for an item done today, a
-      reached goal, or a habit not due that day.
+      Today: the row says "That time has passed today" and Save is refused until the
+      time or the choice changes (nothing is saved; an existing reminder is
+      untouched; no notification fires at once). Between midnight and 4 a.m. the
+      Clew day is still yesterday, so "Today 9:00" set then is refused as passed (the
+      rollover rule; not a bug). Changing the time or the choice later the same day
+      sets it again for today.
+    - Either way it fires at most once a day (unless its time or choice is changed
+      that day), and never for an item done today, a reached goal, or a habit not due
+      that day. Details show "Reminder 18:00" or "Reminder 18:00 today"; a spent
+      one-day reminder shows nothing.
   - **Existing data just moves**, nothing is asked: on the first launch of this
     version every goal's schedule becomes none and its time slot is removed (past
     blocks and ticks stay); a goal with a live block today is moved to Today for
@@ -673,8 +678,8 @@ stopped daily use, not adding features.
 - Clicking a row opens its details; the link mark, not the title, opens a link.
   Goal bars align in one column. Rows can be dragged to reorder (2026-11-08, after use).
 - Reminders fire on every day the item is on Today until done, once per day; "Later"
-  moves a once-item or link to the Later pile (*changed* 2026-11-15: either list;
-  Goals & Later); "Open" appears only for links
+  moves a once-item or link to the Later pile (*changed* 2026-11-15: fires in either
+  list; the Later button is removed); "Open" appears only for links
   (2026-11-08, v1b).
 - Counted goals have rounds; reaching the total stops counting until the user picks
   next round, a higher target, or done (2026-11-08, after first use).

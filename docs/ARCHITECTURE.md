@@ -94,10 +94,10 @@ Item            id (UUID), kind, title, titleOrigin: typed | fetched, url?, note
                 createdAt, updatedAt, deletedAt?
 CheckIn         id, itemId, localDay, at (UTC), timeZoneId, amount (default 1),
                 rating? (1–3), ratedAt?, source, voidedAt?, voidReason?
-Plan            id, itemId, localDay, at, source, voidedAt?   ← "picked for today", kept as history
+Plan            id, itemId, localDay, at, source, todaySortKey? (2026-11-15), voidedAt?   ← "moved to Today", kept as history
 GoalRound       id, itemId, startedAt, localDay, target, source, voidedAt?   ← "next round" of a goal
 LaterReview     id, itemId, decision: keep | letGo, at, localDay, source, voidedAt?   ← "still want this?"
-Reminder        id, itemId, time (hour, minute; local), enabled, updatedAt, deletedAt?
+Reminder        id, itemId, time (hour, minute; local), day? (one-day: 2026-11-15), enabled, updatedAt, deletedAt?
                 ← at most one live reminder per item; it fires on days the item is in
                   Today or Goals & Later and not done (2026-11-15)
 Settings        key (PK), value (JSON), updatedAt
@@ -280,9 +280,14 @@ notification's Later action is removed (Done and Open stay). A reminder gains an
 `day: LocalDay?` (definition field, mutable): nil = every day (all existing rows), a
 day = that Clew day only, computed in Core from the injected clock when saved (a time
 already past that day is refused, `ClewError.notAllowed`). The planner plans a
-one-day reminder only for its day; after it, `reminder(forItem:)` reports it off (the
+one-day reminder only for its day; after it, it is off for every reader:
+`reminder(forItem:)`, `details`, `wantsNotifications` and the planner's filter (the
 row stays; Edit's switch reads it as off). Older exports decode a missing `day` as
-nil.
+nil. The Edit view checks the reminder before saving the edit (its change test
+includes the choice), so a refused Today time saves nothing. An old delivered
+notification's "later" reply is ignored. **Schema** (one step with the migration
+above): nullable `reminder.day` and `plan.todaySortKey`; `plan_substance_immutable`
+covers `todaySortKey`.
 
 **Last week's card (2026-11-15; Fable review).** **Domain** `WeekRecap` (pure):
 from the week's live check-ins (each with its item: kind, `source`, list order, whether
