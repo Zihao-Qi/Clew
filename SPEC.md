@@ -77,7 +77,8 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
    2026-11-15). Any item can be deleted (right-click › Delete, or the Delete key).
    Delete hides it for good; its history is kept.
 6. **Gentle reminders** (optional, per item, off by default). One notification at
-   a chosen time on each day the item is on Today and not done yet, with **Done**,
+   a chosen time on each day the item is on Today (*changed* 2026-11-15: or in Goals
+   & Later) and not done yet, with **Done**,
    **Later** (once-items and links only: moves it to Goals & Later) and **Open**
    (only when it has a link). No repeats within a day, no escalation.
 7. **Day summaries** (each optional): morning "6 today" at 9:00, evening "5/6 done"
@@ -197,7 +198,15 @@ stopped daily use, not adding features.
     its ⌘L shortcut, and the "Saved to Later (N)" line.
   - **Goals lose their schedule and time slot.** A goal's "Repeats" and its
     repeating time slot are removed: it is placed on the timeline only by moving it,
-    for today. Gentle reminders still fire only on days the item is on Today.
+    for today.
+  - **Reminders work the same in both lists** (*user*, 2026-11-15: a goal may want
+    its nudge without being moved, and two behaviours would be odd). A reminder fires
+    once a day at its time while the item is in **either list** and still needs
+    something today: not done today, and for a goal not reached. So a goal in Goals &
+    Later with a reminder nudges every day it has no +1 yet; a habit still only on its
+    days. The notification's **Later** button shows only for a once task or link on
+    Today (for an item moved to Today it moves it back); **Done** and **Open** as
+    before.
   - **Existing data just moves**, nothing is asked: on the first launch of this
     version every goal's schedule becomes none and its time slot is removed (past
     blocks and ticks stay); a goal with a live block today is moved to Today for
