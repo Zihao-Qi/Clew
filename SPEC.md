@@ -137,20 +137,29 @@ stopped daily use, not adding features.
   - **When:** last week is the Monday-to-Sunday just before the week that holds
     today (Clew days: a week starts on Monday at Clew's rollover hour, 4 a.m.), even
     when Clew was not opened for weeks. The card shows **once**: the first time the
-    menu opens on the list screen in a new week, for that opening only. Closing the
-    menu, leaving the list (Add, Later, Settings, details, a page) or × ends it, and
-    it does not come back that week (*user*, 2026-11-15: it should not sit above the
-    list). It never appears while the menu is open (a new week at the rollover, or a
-    late tick, shows it the next time the menu opens). "Shown" is stored as that
-    week's Monday, compared for equality, so setting the clock back never hides
-    another week's card. Turning the switch off and on again in the same week shows
-    it again if it was not shown yet. First launch ever: no card.
+    menu opens on the list screen in a new week (by click or ⌘.), for that opening
+    only. The menu closing (its window losing the keyboard, also to a system alert;
+    a right-click menu or the hover peek do not), leaving the list (Add, Later,
+    Settings, details, a page) or × ends it, and it does not come back that week
+    (*user*, 2026-11-15: it should not sit above the list). It never appears while
+    the menu is open (a new week at the rollover, or a late tick, shows it the next
+    time the menu opens), nor when going back to the list inside one opening (Esc
+    from a page). An opening that is not on the list shows no card and does not use
+    it up; neither does an opening with no card to show (switch off, no tick yet).
+    Within the opening it was shown in, the card is fixed: it does not change if a
+    tick is undone meanwhile. "Shown" is stored as that week's Monday, compared for
+    equality, so setting the clock back never hides another week's card. Turning
+    the switch off and on again in the same week shows it again if it was not shown
+    yet. First launch ever: no card.
   - **In Settings too:** Settings › Progress has a "Last week" section with the same
     lines (no ×), so a card that went by too fast can be read later. It follows the
-    same numbers and the same "only when last week had a tick" rule, and ignores the
-    switch and whether the card was shown.
-  - **Only when last week had a tick** on anything (a task, habit, goal, video or
-    post); otherwise no card at all (focus time alone does not bring it).
+    same numbers and the same "only when something shows" rule (absent otherwise),
+    ignores the switch and whether the card was shown, and is as fresh as the pane's
+    other numbers (read when the pane opens or Settings comes forward). VoiceOver
+    reads it as ordinary rows.
+  - **Only when something shows:** the card (and the Settings section) exist only
+    when done, watched or read is above 0 after the rules below; otherwise there is
+    no card at all, not an empty one (focus time alone does not bring it).
   - **What** (minimal text, numbers, never a comparison, a drop or anything missed):
     - "Last week" and ×;
     - one line: "23 done" and, when focus time was recorded, "· 3 h 20 min focus"
