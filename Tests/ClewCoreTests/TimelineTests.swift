@@ -50,8 +50,10 @@ private let tuesday = LocalDay(string: "2026-11-10")!
     }
 
     @Test func onlyTasksOnTodaysListCanBePlaced() throws {
+        // A Goals & Later row dropped on an hour is moved to Today with it (SPEC 2026-11-15).
         let later = try clew.addItem(NewItem(title: "someday", shape: .later)).id
-        #expect(throws: ClewError.notAllowed) { try clew.placeOnTimeline(itemId: later, start: at(10, 10)) }
+        try clew.placeOnTimeline(itemId: later, start: at(10, 10))
+        #expect(try clew.today().moved.contains(later) && row(later) != nil)
         try clew.importExternal(ImportBatch(source: .extensionYouTube,
             entries: [ExternalEntry(externalRef: "aaaaaaaaaaa", title: "v")], listTotal: 1))
         let video = try #require(store.state.items.values.first { $0.externalRef == "aaaaaaaaaaa" }).id
@@ -362,10 +364,13 @@ private let tuesday = LocalDay(string: "2026-11-10")!
         let id = try goal(1)
         try clew.placeOnTimeline(itemId: id, start: at(10, 22, 30))
         try settle(at: at(11, 9))
-        let r = try #require(try row(id))
-        #expect(r.isGoalReached && r.isDone)
+        // Its row in Goals & Later shows the congratulation; the tick is the earlier
+        // day's, so it does not count today (SPEC 2026-11-15).
+        let list = try clew.today()
+        let r = try #require(list.goalsAndLater.first { $0.id == id })
+        #expect(r.isGoalReached && !r.isDone && list.total == 0)
         clock.set(at(12, 9))
-        #expect(try row(id) == nil)                        // gone after the next rollover
+        #expect(try clew.today().goalsAndLater.isEmpty)     // gone after the next rollover
     }
 
     @Test func aBlockEndingAtFourBelongsToTheDayThatEnds() throws {
@@ -399,9 +404,9 @@ private let tuesday = LocalDay(string: "2026-11-10")!
     @Test func aTaskThatLeavesTodayLosesItsBlocksButKeepsItsTicks() throws {
         let a = try task("a")
         let ba = try clew.placeOnTimeline(itemId: a, start: at(10, 11))
-        try clew.moveToLater(itemId: a)
-        try settle(at: at(10, 10))                         // before its end: removed at once
-        #expect(block(ba.id).removedAt == at(10, 10))
+        try clew.moveToLater(itemId: a)                    // before its end: removed at once
+        #expect(block(ba.id).removedAt == at(10, 9))
+        try settle(at: at(10, 10))
         try settle(at: at(10, 12))
         #expect(ticks(a).isEmpty)
         try clew.planForToday(itemIds: [a])                // back the same day, without blocks

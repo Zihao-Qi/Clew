@@ -146,6 +146,11 @@ private struct Access: StoreWriter {
         return result
     }
 
+    func plans(on day: LocalDay) throws -> [Plan] {
+        try Row.fetchAll(db, sql: "SELECT * FROM plan WHERE localDay = ? AND voidedAt IS NULL ORDER BY at, id",
+                         arguments: [day.description]).map(Self.plan)
+    }
+
     func plans(itemId: UUID) throws -> [Plan] {
         try Row.fetchAll(db, sql: "SELECT * FROM plan WHERE itemId = ? ORDER BY at", arguments: [itemId.uuidString])
             .map(Self.plan)
@@ -349,7 +354,11 @@ private struct Access: StoreWriter {
     }
 
     func maxSortKey() throws -> Double? {
-        try Double.fetchOne(db, sql: "SELECT MAX(sortKey) FROM item")
+        // Live plans' Today keys too, so "Today's end" is past both (SPEC 2026-11-15).
+        try Double.fetchOne(db, sql: """
+            SELECT MAX(k) FROM (SELECT sortKey AS k FROM item
+                                UNION ALL SELECT todaySortKey FROM plan WHERE voidedAt IS NULL)
+            """)
     }
 
     func insert(_ item: Item) throws {
@@ -406,10 +415,15 @@ private struct Access: StoreWriter {
 
     func insert(_ p: Plan) throws {
         try db.execute(
-            sql: "INSERT INTO plan (id, itemId, localDay, at, source, voidedAt) VALUES (?, ?, ?, ?, ?, ?)",
+            sql: "INSERT INTO plan (id, itemId, localDay, at, source, todaySortKey, voidedAt) VALUES (?, ?, ?, ?, ?, ?, ?)",
             arguments: [p.id.uuidString, p.itemId.uuidString, p.localDay.description, p.at, p.source.rawValue,
-                        p.voidedAt]
+                        p.todaySortKey, p.voidedAt]
         )
+    }
+
+    func voidPlan(id: UUID, at: Date) throws {
+        // The trigger rejects re-voiding.
+        try db.execute(sql: "UPDATE plan SET voidedAt = ? WHERE id = ?", arguments: [at, id.uuidString])
     }
 
     // MARK: Mapping
@@ -571,6 +585,7 @@ private struct Access: StoreWriter {
             localDay: try day(row, "localDay", table: t),
             at: try required(row, "at", table: t),
             source: try raw(row, "source", table: t),
+            todaySortKey: row["todaySortKey"],
             voidedAt: row["voidedAt"]
         )
     }

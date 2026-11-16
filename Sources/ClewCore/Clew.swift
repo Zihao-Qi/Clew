@@ -129,7 +129,8 @@ public final class Clew: Sendable {
     /// Today's list as `r` sees it, inside a read or a write. Goals reached by a time
     /// block's late tick stay on it (SPEC 2026-11-10).
     func todayList(_ r: any StoreReader, on day: LocalDay) throws -> TodayList {
-        let items = try r.items(inStates: [.active]).filter { !Self.isCollectionItem($0) }
+        // Today and Goals & Later (SPEC 2026-11-15): Later items are listed too.
+        let items = try r.items(inStates: [.active, .later]).filter { !Self.isCollectionItem($0) }
         let ids = items.map(\.id)
         let recent = Dictionary(grouping: try r.checkIns(itemIds: ids, from: day.weekStart), by: \.itemId)
         let progress = try r.progressAmounts(itemIds: ids)
@@ -139,7 +140,16 @@ public final class Clew: Sendable {
             facts[id] = ItemFacts(recent: recent[id] ?? [], progressAmount: progress[id] ?? 0, roundStart: rounds[id])
         }
         let late = Set(try lateBlockTicks(r, today: day).map(\.block.itemId))
-        return ClewDomain.todayList(items: items, facts: facts, on: day, keepReached: late)
+        return ClewDomain.todayList(items: items, facts: facts, on: day, keepReached: late,
+                                    planned: try Self.moved(r, on: day))
+    }
+
+    /// Items moved to Today for `day`: the earliest live plan of each wins (SPEC
+    /// 2026-11-15), with its Today sort key.
+    static func moved(_ r: any StoreReader, on day: LocalDay) throws -> [UUID: Double?] {
+        var keys: [UUID: Double?] = [:]
+        for plan in try r.plans(on: day) where keys[plan.itemId] == nil { keys[plan.itemId] = .some(plan.todaySortKey) }
+        return keys
     }
 
     /// One item by id, if it exists and is not deleted.
@@ -245,8 +255,11 @@ public final class Clew: Sendable {
         let day = LocalDay(of: now, in: zone, rolloverHour: rolloverHour)
         return try store.write { w in
             guard let item = try w.item(id: itemId), item.deletedAt == nil else { throw ClewError.itemNotFound }
-            // Today's items, and a collection's videos and posts, ticked from its page.
-            guard item.state == .active || Self.isCollectionItem(item) else { throw ClewError.notAllowed }
+            // Today's items, Goals & Later's (SPEC 2026-11-15), and a collection's videos
+            // and posts, ticked from its page.
+            guard item.state == .active || item.state == .later || Self.isCollectionItem(item) else {
+                throw ClewError.notAllowed
+            }
             if let target = item.progress.target {
                 if (try w.progressAmounts(itemIds: [itemId])[itemId] ?? 0) >= target {
                     throw ClewError.goalReached
@@ -330,15 +343,26 @@ public final class Clew: Sendable {
     /// Habits and goals cannot; they are paused or archived instead.
     public func moveToLater(itemId: UUID) throws {
         let now = clock.now()
+        let day = currentDay()
         try store.write { w in
             guard var item = try w.item(id: itemId), item.deletedAt == nil else { throw ClewError.itemNotFound }
+            // An item moved to Today for today goes back (SPEC 2026-11-15).
+            if item.state == .later, try todayList(w, on: day).moved.contains(itemId) {
+                try voidPlans(of: itemId, on: day, now: now, w)
+                try releaseBlocksLeftToday(today: day, now: now, w)
+                return
+            }
             guard item.kind == .once || item.kind == .link, item.state == .active,
                   (try w.progressAmounts(itemIds: [itemId])[itemId] ?? 0) == 0
             else { throw ClewError.notAllowed }
             item.state = .later
             item.plannedDay = nil
+            // Goals & Later's end, and off Today for today (an old pick's plan too).
+            item.sortKey = (try w.maxSortKey() ?? 0) + 1
             item.updatedAt = now
             try w.update(item)
+            try voidPlans(of: itemId, on: day, now: now, w)
+            try releaseBlocksLeftToday(today: day, now: now, w)
         }
     }
 

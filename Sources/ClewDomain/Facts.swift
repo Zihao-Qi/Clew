@@ -66,21 +66,27 @@ public struct GoalRound: Hashable, Sendable, Identifiable, Codable {
     }
 }
 
-/// "Picked for today", kept as history so pick history survives later re-planning.
+/// "Moved to Today" for one day (SPEC 2026-11-15; before: "picked for today"), kept as
+/// history. A fact: a reorder inside Today voids it and inserts a new one.
 public struct Plan: Hashable, Sendable, Identifiable, Codable {
     public let id: UUID
     public let itemId: UUID
     public let localDay: LocalDay
     public let at: Date
     public let source: Source
+    /// Its place in Today's order that day; nil for plans made before 2026-11-15 (and
+    /// then the item's own `sortKey` is used).
+    public let todaySortKey: Double?
     public var voidedAt: Date?
 
-    public init(id: UUID, itemId: UUID, localDay: LocalDay, at: Date, source: Source, voidedAt: Date? = nil) {
+    public init(id: UUID, itemId: UUID, localDay: LocalDay, at: Date, source: Source, todaySortKey: Double? = nil,
+                voidedAt: Date? = nil) {
         self.id = id
         self.itemId = itemId
         self.localDay = localDay
         self.at = at
         self.source = source
+        self.todaySortKey = todaySortKey
         self.voidedAt = voidedAt
     }
 }

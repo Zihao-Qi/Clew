@@ -75,8 +75,14 @@ final class AppModel {
         guard timelineShown, let placed = timeline?.placedItems, !placed.isEmpty else { return rows }
         return rows.filter { !placed.contains($0.id) }
     }
-    /// Today's row for a task, wherever it is shown.
-    func row(_ itemId: UUID) -> TodayRow? { today?.rows.first { $0.id == itemId } }
+    /// Today's row for a task, wherever it is shown (Goals & Later too).
+    func row(_ itemId: UUID) -> TodayRow? {
+        today?.rows.first { $0.id == itemId } ?? today?.goalsAndLater.first { $0.id == itemId }
+    }
+    /// Goals & Later (SPEC 2026-11-15): goals and Later items, below Today.
+    var goalsAndLater: [TodayRow] { today?.goalsAndLater ?? [] }
+    func isBelow(_ row: TodayRow) -> Bool { goalsAndLater.contains { $0.id == row.id } }
+    func isMoved(_ row: TodayRow) -> Bool { today?.moved.contains(row.id) == true }
     /// Today's calendar events laid out with the blocks (SPEC "Calendar events"), while
     /// calendar events are on and Clew may read Calendar.
     private(set) var calendarEvents: TimelineEvents?
@@ -176,7 +182,7 @@ final class AppModel {
             }
             // A closed congratulation stays closed only while that goal stays reached, so
             // reaching a raised target or a next round congratulates again.
-            let reached = Set(list.rows.filter(\.isGoalReached).map(\.id))
+            let reached = Set((list.rows + list.goalsAndLater).filter(\.isGoalReached).map(\.id))
             dismissedCelebrations.formIntersection(reached)
         } catch {
             notice = String(localized: "Couldn't load today's list.")
@@ -388,6 +394,8 @@ final class AppModel {
 
     func startFocus(_ row: TodayRow, minutes: Int) {
         askForNotifications()
+        // Focus on a Goals & Later row moves it to Today first (SPEC 2026-11-15).
+        if isBelow(row) { guard run({ try $0.moveToToday(itemId: row.id) }) else { return } }
         run { try $0.startFocus(itemId: row.id, minutes: minutes) }
     }
     func pauseFocus() { run { try $0.pauseFocus() } }
@@ -472,7 +480,30 @@ final class AppModel {
         guard run({ try $0.removeBlock(id: blockId) }) else { return }
         guard listRows.contains(where: { $0.id == itemId }), let all = today?.rows.map(\.id) else { return }
         let (after, before) = Clew.insertNeighbours(at: slot, in: visible, within: all, excluding: itemId)
-        run { try $0.moveItem(id: itemId, after: after, before: before) }
+        run { try $0.place(itemId: itemId, in: .today, after: after, before: before) }
+    }
+
+    /// A block dragged onto Goals & Later (SPEC 2026-11-15): off the timeline; a moved
+    /// item moves back, a once task or link with no tick goes to Later, in the gap
+    /// (`slot` among Goals & Later's rows); anything else stays at Today's end.
+    func putBackBelow(_ blockId: UUID, itemId: UUID, at slot: Int) {
+        // Only what may go down does (decided before the block is removed, which would
+        // undo an ended block's tick): a moved item, or an unticked once task or link.
+        guard let row = row(itemId), isMoved(row)
+                || ((row.item.kind == .once || row.item.kind == .link) && row.item.state == .active && row.progressAmount == 0)
+        else {
+            putBack(blockId, itemId: itemId, at: listRows.count)
+            return
+        }
+        let below = goalsAndLater.map(\.id).filter { $0 != itemId }
+        guard run({ try $0.removeBlock(id: blockId) }) else { return }
+        let placed = (try? clew?.place(itemId: itemId, in: .goalsAndLater,
+                                        after: slot > 0 && slot - 1 < below.count ? below[slot - 1] : nil,
+                                        before: slot < below.count ? below[slot] : nil)) != nil
+        if !placed, let last = today?.rows.last(where: { $0.id != itemId })?.id {
+            run { try $0.place(itemId: itemId, in: .today, after: last, before: nil) }
+        }
+        refresh()
     }
     func blockNotFinished(_ id: UUID) { run { try $0.blockNotFinished(id: id) } }
     func undoLateTicks(_ itemId: UUID) { run { try $0.undoLateTicks(itemId: itemId) } }
@@ -579,11 +610,22 @@ final class AppModel {
               let (above, below) = Clew.dropNeighbours(dragged: dragged, onto: target.id, in: listRows.map(\.id),
                                                         within: all)
         else { return false }
-        return run { try $0.moveItem(id: dragged, after: above, before: below) }
+        // `place` keeps a moved row's place in its plan (SPEC 2026-11-15).
+        return run { try $0.place(itemId: dragged, in: .today, after: above, before: below) }
     }
 
-    /// Move Up / Move Down: one place in today's list.
+    /// Move Up / Move Down: one place in the row's own list (they stop at its ends).
     func move(_ row: TodayRow, by step: Int) {
+        if isBelow(row) {
+            let rows = goalsAndLater
+            guard let index = rows.firstIndex(where: { $0.id == row.id }), rows.indices.contains(index + step) else { return }
+            let others = rows.filter { $0.id != row.id }.map(\.id)
+            let slot = index + step
+            run { try $0.place(itemId: row.id, in: .goalsAndLater,
+                               after: slot > 0 ? others[slot - 1] : nil,
+                               before: slot < others.count ? others[slot] : nil) }
+            return
+        }
         let rows = listRows
         guard let index = rows.firstIndex(where: { $0.id == row.id }) else { return }
         let target = index + step
@@ -591,6 +633,33 @@ final class AppModel {
         drop(row.id, onto: rows[target])
     }
     func moveToLater(_ row: TodayRow) { run { try $0.moveToLater(itemId: row.id) } }
+    func moveToToday(_ row: TodayRow) { run { try $0.moveToToday(itemId: row.id) } }
+    func moveBack(_ row: TodayRow) { run { try $0.moveBack(itemId: row.id) } }
+
+    /// A row dropped in the two lists shown as one (SPEC 2026-11-15): `order` is the
+    /// visible rows top to bottom with nil for the "Goals & Later" label; the dragged row
+    /// moved from `from` to `to`. Above the label it is Today, below it Goals & Later;
+    /// it lands in the gap it was dropped in.
+    @discardableResult
+    func drop(_ dragged: UUID, in order: [UUID?], from: Int, to: Int) -> Bool {
+        guard order.indices.contains(from), order.indices.contains(to), from != to, order[from] == dragged else { return false }
+        var moved = order
+        moved.remove(at: from)
+        moved.insert(dragged, at: to)
+        let label = moved.firstIndex(where: { $0 == nil }) ?? moved.count
+        guard let at = moved.firstIndex(of: dragged) else { return false }
+        if at < label {
+            let visible = moved[..<label].compactMap { $0 }
+            let all = today?.rows.map(\.id) ?? []
+            let (after, before) = Clew.insertNeighbours(at: at, in: visible, within: all, excluding: dragged)
+            return run { try $0.place(itemId: dragged, in: .today, after: after, before: before) }
+        }
+        let below = moved[(label + 1)...].compactMap { $0 }
+        let slot = at - label - 1
+        return run { try $0.place(itemId: dragged, in: .goalsAndLater,
+                                  after: slot > 0 ? below[slot - 1] : nil,
+                                  before: slot + 1 < below.count ? below[slot + 1] : nil) }
+    }
     /// The task deleted last, for a few seconds: "Deleted “…” · Undo" (SPEC 2026-11-10).
     private(set) var lastDeleted: (id: UUID, title: String)?
     @ObservationIgnored private var lastDeletedTask: Task<Void, Never>?

@@ -167,25 +167,34 @@ extension Clew {
             where b.localDay < today {
                 changed = try decide(b, now: now, zone: zone, today: today, asks: shown, w) || changed
             }
-            let rows = Dictionary(uniqueKeysWithValues: try todayList(w, on: today).rows.map { ($0.id, $0) })
-            for var b in try w.timeBlocks(from: today) where b.localDay == today && b.removedAt == nil {
-                if rows[b.itemId] == nil {
-                    b.removedAt = now
-                } else if b.releasedAt == nil, rows[b.itemId]?.isGoalReached == true {
-                    b.releasedAt = now          // a reached goal goes back to the list
-                } else {
-                    continue
-                }
-                b.updatedAt = now
-                try w.save(b)
-                changed = true
-            }
+            changed = try releaseBlocksLeftToday(today: today, now: now, w) || changed
             for b in try w.pendingTimeBlocks() where b.localDay == today && b.end <= now {
                 changed = try decide(b, now: now, zone: zone, today: today, asks: shown, w) || changed
             }
             if shown { changed = try placeSlotBlocks(rows: try todayList(w, on: today).rows, today: today, now: now, w) || changed }
             return changed
         }
+    }
+
+    /// "Leaving Today" (SPEC 2026-11-10): today's blocks of a task no longer on Today are
+    /// removed (ended ones keep their ticks); a reached goal's go back to the list.
+    @discardableResult
+    func releaseBlocksLeftToday(today: LocalDay, now: Date, _ w: any StoreWriter) throws -> Bool {
+        var changed = false
+        let rows = Dictionary(uniqueKeysWithValues: try todayList(w, on: today).rows.map { ($0.id, $0) })
+        for var b in try w.timeBlocks(from: today) where b.localDay == today && b.removedAt == nil {
+            if rows[b.itemId] == nil {
+                b.removedAt = now
+            } else if b.releasedAt == nil, rows[b.itemId]?.isGoalReached == true {
+                b.releasedAt = now          // a reached goal goes back to the list
+            } else {
+                continue
+            }
+            b.updatedAt = now
+            try w.save(b)
+            changed = true
+        }
+        return changed
     }
 
     /// What a block's end does when it decides now.
@@ -221,7 +230,11 @@ extension Clew {
                         _ w: any StoreWriter) throws -> Bool {
         var b = block
         b.updatedAt = now
-        guard let item = try w.item(id: b.itemId), item.deletedAt == nil, item.state == .active else {
+        // A Later item counts while moved to Today for the block's day (SPEC 2026-11-15).
+        let movedThatDay = try w.plans(on: b.localDay).contains { $0.itemId == b.itemId }
+        guard let item = try w.item(id: b.itemId), item.deletedAt == nil,
+              item.state == .active || (item.state == .later && movedThatDay)
+        else {
             b.removedAt = now
             try w.save(b)
             return true
@@ -347,6 +360,12 @@ extension Clew {
         let bounds = dayBounds(today)
         try Self.checkStart(start, bounds)
         return try storeForQueries.write { w in
+            // A Goals & Later row dropped on an hour is moved to Today first, in this
+            // write (SPEC 2026-11-15).
+            let list = try todayList(w, on: today)
+            if !list.rows.contains(where: { $0.id == itemId }), list.goalsAndLater.contains(where: { $0.id == itemId }) {
+                try place(itemId: itemId, in: .today, after: list.rows.last?.id, before: nil, day: today, now: now, w)
+            }
             // A reached goal stays in the list until a next round or a higher target.
             guard let row = try todayList(w, on: today).rows.first(where: { $0.id == itemId }), !row.isGoalReached else {
                 throw ClewError.notAllowed

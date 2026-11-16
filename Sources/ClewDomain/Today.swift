@@ -65,12 +65,9 @@ public func dueState(item: Item, on day: LocalDay, facts: ItemFacts) -> DueState
         return scheduledState(item.schedule, on: day, tickedToday: tickedToday, facts: facts)
 
     case .goal:
-        // A reached goal stays visible on the day it was reached, then leaves, unless
-        // a next round is started or the target raised.
-        if let target = item.progress.target, facts.progressAmount >= target, !tickedToday {
-            return .notDue
-        }
-        return scheduledState(item.schedule, on: day, tickedToday: tickedToday, facts: facts)
+        // Goals live in Goals & Later (SPEC 2026-11-15): never due on Today by
+        // themselves, only when moved there (see `todayList`).
+        return .notDue
     }
 }
 
@@ -110,39 +107,89 @@ public struct TodayRow: Hashable, Sendable, Identifiable {
 
 public struct TodayList: Hashable, Sendable {
     public let day: LocalDay
+    /// Today: what is due today, and what was moved here for today.
     public let rows: [TodayRow]
+    /// Goals & Later (SPEC 2026-11-15): goals not reached and Later items not done,
+    /// minus those moved to Today.
+    public let goalsAndLater: [TodayRow]
+    /// Items moved to Today for this day (live plans).
+    public let moved: Set<UUID>
 
-    public init(day: LocalDay, rows: [TodayRow]) {
+    public init(day: LocalDay, rows: [TodayRow], goalsAndLater: [TodayRow] = [], moved: Set<UUID> = []) {
         self.day = day
         self.rows = rows
+        self.goalsAndLater = goalsAndLater
+        self.moved = moved
     }
 
-    /// The `done/total` title counts exactly the visible rows.
-    public var done: Int { rows.lazy.filter(\.isDone).count }
-    public var total: Int { rows.count }
+    /// Goals & Later rows ticked today count without moving ("4/4", never "3/3 +1").
+    private var tickedBelow: Int { goalsAndLater.lazy.filter(\.isDone).count }
+    /// The `done/total` title: Today's rows, plus anything ticked in Goals & Later.
+    public var done: Int { rows.lazy.filter(\.isDone).count + tickedBelow }
+    public var total: Int { rows.count + tickedBelow }
+    /// Everything counted is done (and there is something): "All done for today".
+    public var allDone: Bool { total > 0 && done == total }
 }
 
-/// Pure: Today's list. Visible rows are `.due` and `.doneToday`; ticked rows stay
-/// until rollover so undo is one click away and nothing vanishes under the pointer.
-/// Order is stable (`sortKey`, then creation), so a row never moves when ticked.
-/// `keepReached`: goals reached by a time block's tick made today for an earlier day
-/// (the Mac slept through it) stay, so their congratulation shows (SPEC 2026-11-10).
+/// Pure: Today's list and Goals & Later (SPEC 2026-11-15). Visible rows are `.due` and
+/// `.doneToday`; ticked rows stay until rollover so undo is one click away and nothing
+/// vanishes under the pointer. Order is stable (sort key, then creation), so a row
+/// never moves when ticked.
+/// - items: `.active` and `.later` items (collection items left out by the caller).
+/// - planned: items moved to Today for `day`, with their plan's Today sort key (nil:
+///   a plan from before 2026-11-15; the item's own `sortKey` is used).
+/// - keepReached: goals reached by a time block's tick made today for an earlier day
+///   (the Mac slept through it) keep their row, so their congratulation shows.
 public func todayList(items: [Item], facts: [UUID: ItemFacts], on day: LocalDay,
-                      keepReached: Set<UUID> = []) -> TodayList {
-    let rows = items
-        .sorted { ($0.sortKey, $0.createdAt, $0.id.uuidString) < ($1.sortKey, $1.createdAt, $1.id.uuidString) }
-        .compactMap { item -> TodayRow? in
-            let f = facts[item.id] ?? .empty
-            var state = dueState(item: item, on: day, facts: f)
-            if state == .notDue, keepReached.contains(item.id), item.state == .active, item.deletedAt == nil,
-               let target = item.progress.target, f.progressAmount >= target {
-                state = .doneToday
-            }
-            guard state == .due || state == .doneToday else { return nil }
-            return TodayRow(item: item, state: state, todayAmount: f.amount(on: day), progressAmount: f.progressAmount,
-                            lastTickToday: f.lastTick(on: day))
+                      keepReached: Set<UUID> = [], planned: [UUID: Double?] = [:]) -> TodayList {
+    var today: [(key: Double, row: TodayRow)] = []
+    var below: [(key: Double, row: TodayRow)] = []
+    var moved: Set<UUID> = []
+    for item in items where item.deletedAt == nil && (item.state == .active || item.state == .later) {
+        let f = facts[item.id] ?? .empty
+        let tickedToday = f.amount(on: day) > 0
+        func row(_ state: DueState) -> TodayRow {
+            TodayRow(item: item, state: state, todayAmount: f.amount(on: day), progressAmount: f.progressAmount,
+                     lastTickToday: f.lastTick(on: day))
         }
-    return TodayList(day: day, rows: rows)
+        let reached = item.progress.target.map { f.progressAmount >= $0 } ?? false
+        // A once task or link with a tick on an earlier day is done: gone from both lists.
+        let doneBefore = (item.kind == .once || item.kind == .link) && f.progressAmount > 0 && !tickedToday
+        // A reached goal keeps its row on the day it was reached (or by a late tick),
+        // then hides until Next round or Raise target (as before).
+        let hiddenGoal = item.kind == .goal && reached && !tickedToday && !keepReached.contains(item.id)
+        let state: DueState = tickedToday ? .doneToday : .due
+        // Only goals and Later items are moved: a once task, link or habit of Today's own
+        // (an item picked from Later before 2026-11-15 has a plan too) stays by its own
+        // rules and sort key.
+        if let key = planned[item.id], item.kind == .goal || item.state == .later {
+            guard !doneBefore, !hiddenGoal else { continue }
+            moved.insert(item.id)
+            today.append((key ?? item.sortKey, row(state)))
+            continue
+        }
+        switch (item.kind, item.state) {
+        case (.goal, .active):
+            guard !hiddenGoal else { continue }
+            // A late tick's goal shows its row, but that tick is yesterday's: not counted.
+            below.append((item.sortKey, row(state)))
+        case (.once, .later), (.link, .later):
+            guard !doneBefore else { continue }
+            below.append((item.sortKey, row(state)))
+        case (_, .active):
+            let due = dueState(item: item, on: day, facts: f)
+            guard due == .due || due == .doneToday else { continue }
+            today.append((item.sortKey, row(due)))
+        default:
+            continue
+        }
+    }
+    func ordered(_ rows: [(key: Double, row: TodayRow)]) -> [TodayRow] {
+        rows.sorted { a, b in
+            (a.key, a.row.item.createdAt, a.row.item.id.uuidString) < (b.key, b.row.item.createdAt, b.row.item.id.uuidString)
+        }.map(\.row)
+    }
+    return TodayList(day: day, rows: ordered(today), goalsAndLater: ordered(below), moved: moved)
 }
 
 /// The clock, injected. Domain and Core never call `Date()` (AGENTS.md rule 5).

@@ -31,7 +31,11 @@ public protocol StoreReader {
     /// (all time if it has no round). Missing means 0.
     func progressAmounts(itemIds: [UUID]) throws -> [UUID: Int]
     func plans(itemId: UUID) throws -> [Plan]
+    /// Live (not voided) plans for `day`, any item, oldest first (SPEC 2026-11-15: items
+    /// moved to Today).
+    func plans(on day: LocalDay) throws -> [Plan]
     func goalRounds(itemId: UUID) throws -> [GoalRound]
+    /// The highest sort key of any item, or live plan's Today key.
     func maxSortKey() throws -> Double?
     /// Days that have at least one non-voided check-in, from `from` onward.
     func activeDays(from: LocalDay) throws -> Set<LocalDay>
@@ -127,6 +131,8 @@ public protocol StoreWriter: StoreReader {
     /// Sets `rating`/`ratedAt`, the check-in's only other mutable fields (§4.2).
     func rateCheckIn(id: UUID, rating: Int, at: Date) throws
     func insert(_ plan: Plan) throws
+    /// Sets the plan's `voidedAt`. Voids are monotonic: voiding twice is an error.
+    func voidPlan(id: UUID, at: Date) throws
     func insert(_ round: GoalRound) throws
     /// Inserts, or replaces the row with the same id.
     func save(_ reminder: Reminder) throws
