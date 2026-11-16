@@ -244,9 +244,9 @@ struct SplitMix64: RandomNumberGenerator {
     }
 
     @Test func aTickBelowCountsWithoutMovingFourOfFour() {
-        let task = item(.once, planned: wed, title: "task")
-        let goal = item(.goal, progress: .counter(target: 30), title: "goal")
-        let later = item(.once, state: .later, title: "later")
+        let task = item(.once, planned: wed, sortKey: 1, title: "task")
+        let goal = item(.goal, progress: .counter(target: 30), sortKey: 2, title: "goal")
+        let later = item(.once, state: .later, sortKey: 3, title: "later")
         let list = todayList(items: [task, goal, later],
                              facts: [task.id: facts([tick(task, "2026-11-11")]), goal.id: facts([tick(goal, "2026-11-11")])],
                              on: wed)
