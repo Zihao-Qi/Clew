@@ -183,6 +183,29 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         #expect(try store.read { try $0.checkIn(id: c.id) } == c)
     }
 
+    /// Schema v10 on a database with plans from before: they read with no Today key.
+    @Test func v10KeepsOlderPlans() throws {
+        let queue = try DatabaseQueue()
+        try Schema.migrator.migrate(queue, upTo: "v9-time-slots")
+        let item = sampleItem()
+        try queue.write { db in
+            try db.execute(sql: """
+                INSERT INTO item (id, kind, title, url, note, parentId, schedule, progress, state, plannedDay, sortKey,
+                                  source, externalRef, createdAt, updatedAt)
+                SELECT ?, kind, title, url, note, parentId, schedule, progress, state, plannedDay, sortKey,
+                       source, externalRef, createdAt, updatedAt FROM (SELECT 'once' AS kind, 'x' AS title, NULL AS url,
+                       NULL AS note, NULL AS parentId, '"unscheduled"' AS schedule, '"none"' AS progress, 'active' AS state,
+                       '2026-11-11' AS plannedDay, 1.0 AS sortKey, 'user' AS source, NULL AS externalRef, ? AS createdAt,
+                       ? AS updatedAt)
+                """, arguments: [item.id.uuidString, t0, t0])
+            try db.execute(sql: "INSERT INTO plan (id, itemId, localDay, at, source) VALUES (?, ?, '2026-11-11', ?, 'user')",
+                           arguments: [UUID().uuidString, item.id.uuidString, t0])
+        }
+        try Schema.migrator.migrate(queue)
+        let plans = try queue.read { db in try Row.fetchAll(db, sql: "SELECT todaySortKey FROM plan") }
+        #expect(plans.count == 1 && plans[0]["todaySortKey"] as Double? == nil)
+    }
+
     /// SPEC 2026-11-15: a plan's place in Today is part of the fact; a reorder voids it
     /// and inserts a new one, and the void is monotonic.
     @Test func aPlansTodayKeyIsSubstanceAndItsVoidIsMonotonic() throws {

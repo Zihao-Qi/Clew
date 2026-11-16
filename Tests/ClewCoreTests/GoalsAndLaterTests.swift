@@ -91,6 +91,28 @@ private func at(_ d: Int, _ h: Int, _ m: Int = 0) -> Date {
         #expect(throws: ClewError.notAllowed) { try clew.place(itemId: a, in: .goalsAndLater, after: nil, before: nil) }
     }
 
+    @Test func droppingAMovedRowBelowTakesItsBlocksOff() throws {
+        let later = try add("later", .later)
+        let block = try clew.placeOnTimeline(itemId: later, start: at(10, 11))
+        try clew.place(itemId: later, in: .goalsAndLater, after: nil, before: nil)
+        #expect(try store.state.timeBlocks[block.id]?.removedAt != nil && clew.today().moved.isEmpty)
+    }
+
+    @Test func twoRowsWithTheSameKeyStillTakeARowBetween() throws {
+        let a = try add("a", .later)
+        clock.set(at(10, 9, 1))
+        let b = try add("b", .later)
+        let c = try add("c", .later)
+        // Same sort key for a and b (then ordered by creation: a first).
+        try store.write { w in
+            var item = try #require(try w.item(id: b))
+            item.sortKey = try #require(try w.item(id: a)).sortKey
+            try w.update(item)
+        }
+        try clew.place(itemId: c, in: .goalsAndLater, after: a, before: b)
+        #expect(try below() == ["a", "c", "b"])
+    }
+
     @Test func aReachedGoalCannotMoveUp() throws {
         let goal = try add("goal", .goal(target: 1, schedule: .daily))
         try clew.checkIn(itemId: goal)

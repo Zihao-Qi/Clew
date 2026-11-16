@@ -603,6 +603,8 @@ M = [
  ("GL10 move to later on moved", C+"Clew.swift", "            if item.state == .later, try todayList(w, on: day).moved.contains(itemId) {", "            if false {", "GoalsAndLaterTests"),
  ("GL11 reminders today only", C+"NotificationPlanner.swift", "for row in list.rows + list.goalsAndLater where row.state == .due {", "for row in list.rows where row.state == .due {", "GoalsAndLaterTests"),
  ("GL12 move to later stays put", C+"Clew.swift", "            item.sortKey = (try w.maxSortKey() ?? 0) + 1\n", "", "GoalsAndLaterTests"),
+ ("GL13 old picks are moved", D+"Today.swift", "if let key = planned[item.id], item.kind == .goal || item.state == .later {", "if let key = planned[item.id] {", "TodayTests"),
+ ("GL14 equal keys refused", C+"GoalsAndLater.swift", "            let middle = (low + high) / 2\n            if low < middle, middle < high { return middle }", "            guard low < high else { throw ClewError.notAllowed }\n            let middle = (low + high) / 2\n            if low < middle, middle < high { return middle }", "GoalsAndLaterTests"),
  ("WR1 collections are done", D+"WeekRecap.swift", "let done = inWeek.filter { !collectionSources.contains($0.item.source) }.reduce(0) { $0 + $1.checkIn.amount }", "let done = inWeek.reduce(0) { $0 + $1.checkIn.amount }", "WeekRecapTests"),
  ("WR2 ticks not amounts", D+"WeekRecap.swift", "let done = inWeek.filter { !collectionSources.contains($0.item.source) }.reduce(0) { $0 + $1.checkIn.amount }", "let done = inWeek.filter { !collectionSources.contains($0.item.source) }.count", "WeekRecapTests"),
  ("WR3 week end open", D+"WeekRecap.swift", "$0.checkIn.localDay <= end &&", "$0.checkIn.localDay < end &&", "WeekRecapTests"),

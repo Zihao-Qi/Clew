@@ -295,6 +295,15 @@ struct SplitMix64: RandomNumberGenerator {
         #expect(todayList(items: [goal], facts: [goal.id: reachedBefore], on: wed, planned: [goal.id: 1]).rows.isEmpty)
     }
 
+    /// Gemini review: an item of Today's own with a plan (picked from Later before the
+    /// update) is not "moved"; a habit with a plan is still only due on its days.
+    @Test func onlyGoalsAndLaterItemsAreMoved() {
+        let old = item(.once, planned: wed, sortKey: 5, title: "old pick")
+        let habit = item(.habit, schedule: .weekdays([.friday]), sortKey: 1, title: "habit")
+        let list = todayList(items: [old, habit], facts: [:], on: wed, planned: [old.id: 1, habit.id: 2])
+        #expect(list.rows.map(\.item.title) == ["old pick"] && list.moved.isEmpty)
+    }
+
     @Test func habitsAndDeletedItemsNeverGoBelow() {
         let habit = item(.habit, schedule: .weekdays([.friday]))
         var gone = item(.goal, progress: .counter(target: 3))

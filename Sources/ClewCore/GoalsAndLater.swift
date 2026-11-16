@@ -109,10 +109,10 @@ extension Clew {
         }
         switch (try key(above), try key(below)) {
         case let (low?, high?):
-            guard low < high else { throw ClewError.notAllowed }
             let middle = (low + high) / 2
             if low < middle, middle < high { return middle }
-            // Out of floating-point room (about 50 moves into one gap): renumber.
+            // Out of floating-point room (about 50 moves into one gap), or two rows with
+            // the same key (ordered by creation): renumber.
             try renumber(list, day: day, now: now, w)
             places = try keys()
             return places[above!]! + 0.5

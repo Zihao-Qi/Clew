@@ -487,6 +487,14 @@ final class AppModel {
     /// item moves back, a once task or link with no tick goes to Later, in the gap
     /// (`slot` among Goals & Later's rows); anything else stays at Today's end.
     func putBackBelow(_ blockId: UUID, itemId: UUID, at slot: Int) {
+        // Only what may go down does (decided before the block is removed, which would
+        // undo an ended block's tick): a moved item, or an unticked once task or link.
+        guard let row = row(itemId), isMoved(row)
+                || ((row.item.kind == .once || row.item.kind == .link) && row.item.state == .active && row.progressAmount == 0)
+        else {
+            putBack(blockId, itemId: itemId, at: listRows.count)
+            return
+        }
         let below = goalsAndLater.map(\.id).filter { $0 != itemId }
         guard run({ try $0.removeBlock(id: blockId) }) else { return }
         let placed = (try? clew?.place(itemId: itemId, in: .goalsAndLater,

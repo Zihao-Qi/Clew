@@ -159,8 +159,11 @@ public func todayList(items: [Item], facts: [UUID: ItemFacts], on day: LocalDay,
         // then hides until Next round or Raise target (as before).
         let hiddenGoal = item.kind == .goal && reached && !tickedToday && !keepReached.contains(item.id)
         let state: DueState = tickedToday ? .doneToday : .due
-        if let key = planned[item.id] {
-            guard !doneBefore, !hiddenGoal, item.kind != .habit || item.state == .active else { continue }
+        // Only goals and Later items are moved: a once task, link or habit of Today's own
+        // (an item picked from Later before 2026-11-15 has a plan too) stays by its own
+        // rules and sort key.
+        if let key = planned[item.id], item.kind == .goal || item.state == .later {
+            guard !doneBefore, !hiddenGoal else { continue }
             moved.insert(item.id)
             today.append((key ?? item.sortKey, row(state)))
             continue
