@@ -48,7 +48,7 @@ public enum NotificationPlanner {
 
     public static func plan(
         now: Date, zone: TimeZone, rolloverHour: Int, items: [Item], facts: [UUID: ItemFacts],
-        reminders: [Reminder], summaries: SummarySettings
+        reminders: [Reminder], summaries: SummarySettings, movedToday: [UUID: Double?] = [:]
     ) -> [PlannedNotification] {
         let today = LocalDay(of: now, in: zone, rolloverHour: rolloverHour)
         let remindersByItem = Dictionary(
@@ -58,7 +58,8 @@ public enum NotificationPlanner {
         var planned: [PlannedNotification] = []
         for offset in 0..<windowDays {
             let day = today.adding(days: offset)
-            let list = todayList(items: items, facts: facts, on: day)
+            // Moves to Today are for today only (SPEC 2026-11-15).
+            let list = todayList(items: items, facts: facts, on: day, planned: offset == 0 ? movedToday : [:])
             func add(_ id: String, _ time: TimeOfDay, _ content: PlannedContent) {
                 let fireAt = day.instant(at: time, in: zone, rolloverHour: rolloverHour)
                 guard fireAt > now else { return }
@@ -75,13 +76,14 @@ public enum NotificationPlanner {
                     add("evening", summaries.eveningTime, content)
                 }
             }
-            // A reminder fires on each day its item is on the list and not done yet.
-            for row in list.rows where row.state == .due {
+            // A reminder fires on each day its item is in either list and not done yet
+            // (SPEC 2026-11-15: Today or Goals & Later).
+            for row in list.rows + list.goalsAndLater where row.state == .due {
                 guard let reminder = remindersByItem[row.id] else { continue }
                 let item = row.item
                 add("reminder.\(item.id.uuidString)", reminder.time, .reminder(
                     itemId: item.id, title: item.title, canOpen: item.url != nil,
-                    canMoveToLater: item.kind == .once || item.kind == .link
+                    canMoveToLater: (item.kind == .once || item.kind == .link) && item.state == .active
                 ))
             }
         }

@@ -334,6 +334,33 @@ enum Snapshot {
                 print("drop() A onto C returned", model.drop(rows[0].id, onto: rows[2]), "→", order())
                 print("drop() C onto A returned", model.drop(model.today!.rows[2].id, onto: model.today!.rows[0]), "→", order())
 
+                // Across the "Goals & Later" label (SPEC 2026-11-15): the order is Today's
+                // rows, nil for the label, then Goals & Later's.
+                for t in ["X", "Y"] { _ = try clew.addItem(NewItem(title: t, shape: .later)) }
+                _ = try clew.addItem(NewItem(title: "T", shape: .today))
+                model.refresh()
+                @MainActor func both() -> String {
+                    order() + "|" + model.goalsAndLater.map(\.item.title).joined()
+                }
+                @MainActor func seq() -> [UUID?] {
+                    model.listRows.map(\.id) as [UUID?] + [nil] + model.goalsAndLater.map(\.id)
+                }
+                print("lists:", both())
+                // Y (last below) up onto the label's place: Today's end.
+                var s = seq()
+                print("Y onto the label:", model.drop(s.last!!, in: s, from: s.count - 1, to: s.firstIndex(of: nil)!), "→", both())
+                // T (Today's own once task) down onto the label's place: first below.
+                s = seq()
+                let t = model.today!.rows.first { $0.item.title == "T" }!.id
+                print("T onto the label:", model.drop(t, in: s, from: s.firstIndex(of: t)!, to: s.firstIndex(of: nil)!), "→", both())
+                // Y (moved up) down onto X's place: X slides up, Y after it.
+                s = seq()
+                let y = model.today!.rows.first { $0.item.title == "Y" }!.id
+                print("Y onto X:", model.drop(y, in: s, from: s.firstIndex(of: y)!, to: s.count - 1), "→", both())
+                // A habit cannot go down: nothing changes.
+                s = seq()
+                print("A down (habit):", model.drop(s[0]!, in: s, from: 0, to: s.count - 1), "→", both())
+
                 // A real drag can't be simulated: SwiftUI checks the actual mouse-button state,
                 // which posted events don't change. Row targeting is unit-tested in Core
                 // (Clew.dragSlot, dragShift, clampDrag); the drag itself is checked by hand.

@@ -110,7 +110,14 @@ final class FakeStore: ClewStore, @unchecked Sendable {
         func plans(itemId: UUID) throws -> [Plan] {
             state.plans.values.filter { $0.itemId == itemId }.sorted { $0.at < $1.at }
         }
-        func maxSortKey() throws -> Double? { state.items.values.map(\.sortKey).max() }
+        func maxSortKey() throws -> Double? {
+            (state.items.values.map(\.sortKey)
+                + state.plans.values.filter { $0.voidedAt == nil }.compactMap(\.todaySortKey)).max()
+        }
+        func plans(on day: LocalDay) throws -> [Plan] {
+            state.plans.values.filter { $0.localDay == day && $0.voidedAt == nil }
+                .sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) }
+        }
         func activeDays(from: LocalDay) throws -> Set<LocalDay> {
             Set(state.checkIns.values.filter { !$0.isVoided && $0.localDay >= from }.map(\.localDay))
         }
@@ -248,6 +255,12 @@ final class FakeStore: ClewStore, @unchecked Sendable {
         func insert(_ plan: Plan) throws {
             guard state.plans[plan.id] == nil else { throw FactViolation.duplicate }
             state.plans[plan.id] = plan
+        }
+        func voidPlan(id: UUID, at: Date) throws {
+            guard var p = state.plans[id] else { throw FactViolation.missingItem }
+            guard p.voidedAt == nil else { throw FactViolation.revoid }
+            p.voidedAt = at
+            state.plans[id] = p
         }
     }
 }

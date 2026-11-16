@@ -30,7 +30,7 @@ struct DetailView: View {
             if let details = model.details(for: itemId) {
                 header(details)
                 if details.isOneOff {
-                    OneOffDetails(details: details)
+                    OneOffDetails(moved: model.today?.moved.contains(itemId) == true, details: details)
                 } else {
                     Heatmap(details: details)
                     statTiles(details)
@@ -160,6 +160,8 @@ extension DetailView {
 /// A one-off item's page body: watch progress (videos), where it is now, and what
 /// happened to it, newest last.
 struct OneOffDetails: View {
+    /// Moved to Today for today (SPEC 2026-11-15).
+    var moved = false
     let details: ItemDetails
 
     var body: some View {
@@ -197,14 +199,14 @@ struct OneOffDetails: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// "Done Nov 9", "On Today" or "In Later".
+    /// "Done Nov 9", "On Today" or "In Goals & Later" (SPEC 2026-11-15).
     private var status: String? {
         if let done = details.history.last(where: { if case .done = $0.event { true } else { false } }) {
             return String(localized: "Done \(Self.day(done.at))")
         }
         switch details.item.state {
         case .active: return String(localized: "On Today")
-        case .later: return String(localized: "In Later")
+        case .later: return moved ? String(localized: "On Today") : String(localized: "In Goals & Later")
         case .paused, .archived: return nil
         }
     }

@@ -299,8 +299,10 @@ extension Clew {
 
     /// The notification for the end of the running phase, if it is running and not over.
     func focusNotification(_ r: any StoreReader, now: Date) throws -> PlannedNotification? {
+        // Only while its task is on Today (moved there too, SPEC 2026-11-15).
+        let today = LocalDay(of: now, in: zonesForQueries.current(), rolloverHour: rolloverHour)
         guard let timer = try Self.focusTimer(r), let endsAt = timer.endsAt, endsAt > now,
-              let item = try r.item(id: timer.itemId), item.deletedAt == nil, item.state == .active
+              let item = try todayList(r, on: today).rows.first(where: { $0.id == timer.itemId })?.item
         else { return nil }
         return PlannedNotification(
             id: NotificationPlanner.idPrefix + "focus",

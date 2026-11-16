@@ -14,7 +14,22 @@ enum Schema {
         migrator.registerMigration("v7-focus-sessions", migrate: v7)
         migrator.registerMigration("v8-time-blocks", migrate: v8)
         migrator.registerMigration("v9-time-slots", migrate: v9)
+        migrator.registerMigration("v10-plan-today-key", migrate: v10)
         return migrator
+    }
+
+    /// Moved to Today (SPEC 2026-11-15): a plan's place in Today's order. Part of the
+    /// fact's substance, so the immutability trigger now covers it.
+    private static func v10(_ db: Database) throws {
+        try db.execute(sql: """
+            ALTER TABLE plan ADD COLUMN todaySortKey REAL;
+            DROP TRIGGER plan_substance_immutable;
+            CREATE TRIGGER plan_substance_immutable BEFORE UPDATE ON plan
+            WHEN NEW.id IS NOT OLD.id OR NEW.itemId IS NOT OLD.itemId
+              OR NEW.localDay IS NOT OLD.localDay OR NEW.at IS NOT OLD.at
+              OR NEW.source IS NOT OLD.source OR NEW.todaySortKey IS NOT OLD.todaySortKey
+            BEGIN SELECT RAISE(ABORT, 'fact substance is immutable'); END;
+            """)
     }
 
     /// A repeating task's time slot, and where a block came from (SPEC 2026-11-10).

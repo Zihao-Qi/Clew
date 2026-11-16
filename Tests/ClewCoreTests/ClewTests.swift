@@ -110,7 +110,7 @@ private struct Harness {
         let h = Harness()
         let goal = try h.clew.addItem(NewItem(title: "ML course", shape: .goal(target: 30, schedule: .daily)))
         for _ in 0..<3 { try h.clew.checkIn(itemId: goal.id) }
-        let row = try #require(try h.clew.today().rows.first)
+        let row = try #require(try h.clew.today().goalsAndLater.first)
         #expect(row.progressAmount == 3)
         #expect(row.isDone)
     }
@@ -126,10 +126,17 @@ private struct Harness {
         #expect(c.at == local(2026, 11, 12, 2))
     }
 
-    @Test func laterItemsCannotBeTicked() throws {
+    /// SPEC 2026-11-15: a Later item is ticked in Goals & Later; it counts today without
+    /// moving ("4/4"), and is done the next day.
+    @Test func laterItemsAreTickedInGoalsAndLater() throws {
         let h = Harness()
         let item = try h.clew.addItem(NewItem(title: "x", shape: .later))
-        #expect(throws: ClewError.notAllowed) { try h.clew.checkIn(itemId: item.id) }
+        try h.clew.checkIn(itemId: item.id)
+        let list = try h.clew.today()
+        #expect(list.rows.isEmpty && list.goalsAndLater.first?.isDone == true)
+        #expect(list.done == 1 && list.total == 1 && list.allDone)
+        h.clock.set(local(2026, 11, 12, 10))
+        #expect(try h.clew.today().goalsAndLater.isEmpty)
         #expect(throws: ClewError.itemNotFound) { try h.clew.checkIn(itemId: UUID()) }
     }
 
@@ -155,8 +162,10 @@ private struct Harness {
         try h.clew.checkIn(itemId: weekly.id)
         h.clock.set(local(2026, 11, 11, 10)) // Wednesday
         let today = try h.clew.today()
-        #expect(today.rows.map(\.id) == [goal.id]) // weekly target met on Mon + Tue
-        #expect(today.rows.first?.progressAmount == 2) // ticks from last week count
+        #expect(today.rows.isEmpty) // weekly target met on Mon + Tue
+        // Goals live in Goals & Later (SPEC 2026-11-15).
+        #expect(today.goalsAndLater.map(\.id) == [goal.id])
+        #expect(today.goalsAndLater.first?.progressAmount == 2) // ticks from last week count
     }
 
     @Test func unfinishedOnceItemShowsUpTomorrow() throws {
@@ -191,7 +200,7 @@ private struct Harness {
         h.clock.set(local(2026, 11, 11, 11))
         let last = try h.clew.checkIn(itemId: goal.id)
         #expect(try h.clew.undoToday(itemId: goal.id)?.id == last.id)
-        #expect(try h.clew.today().rows.first?.progressAmount == 1)
+        #expect(try h.clew.today().goalsAndLater.first?.progressAmount == 1)
     }
 
     @Test func undoDoesNotReachIntoEarlierDays() throws {
@@ -200,7 +209,7 @@ private struct Harness {
         try h.clew.checkIn(itemId: goal.id)
         h.clock.set(local(2026, 11, 12, 10))
         #expect(try h.clew.undoToday(itemId: goal.id) == nil)
-        #expect(try h.clew.today().rows.first?.progressAmount == 1)
+        #expect(try h.clew.today().goalsAndLater.first?.progressAmount == 1)
     }
 
     @Test func voidingAnUnknownCheckInIsAnError() {
@@ -286,11 +295,11 @@ private struct Harness {
         let h = Harness()
         let goal = try reachedGoal(h)
         #expect(throws: ClewError.goalReached) { try h.clew.checkIn(itemId: goal.id) }
-        let row = try #require(try h.clew.today().rows.first)
+        let row = try #require(try h.clew.today().goalsAndLater.first)
         #expect(row.progressAmount == 2 && row.isGoalReached && row.isDone)
         // The next day it has left the list.
         h.clock.set(local(2026, 11, 12, 10))
-        #expect(try h.clew.today().rows.isEmpty)
+        #expect(try h.clew.today().goalsAndLater.isEmpty)
     }
 
     @Test func nextRoundStartsFromZeroAndKeepsHistory() throws {
@@ -299,11 +308,11 @@ private struct Harness {
         h.clock.set(local(2026, 11, 11, 11))
         let round = try h.clew.startNextRound(itemId: goal.id)
         #expect(round.target == 2 && round.localDay == day("2026-11-11") && round.startedAt == local(2026, 11, 11, 11))
-        var row = try #require(try h.clew.today().rows.first)
+        var row = try #require(try h.clew.today().goalsAndLater.first)
         #expect(row.progressAmount == 0 && row.state == .due)
         h.clock.set(local(2026, 11, 11, 12))
         try h.clew.checkIn(itemId: goal.id)
-        row = try #require(try h.clew.today().rows.first)
+        row = try #require(try h.clew.today().goalsAndLater.first)
         #expect(row.progressAmount == 1 && row.todayAmount == 1)
         #expect(h.store.state.checkIns.count == 3) // round 1 is still in the history
     }
@@ -324,7 +333,7 @@ private struct Harness {
         let goal = try reachedGoal(h)
         try h.clew.editItem(id: goal.id, ItemEdit(title: "g", url: nil, schedule: .daily, target: 4))
         try h.clew.checkIn(itemId: goal.id)
-        let row = try #require(try h.clew.today().rows.first)
+        let row = try #require(try h.clew.today().goalsAndLater.first)
         #expect(row.progressAmount == 3 && !row.isGoalReached)
     }
 

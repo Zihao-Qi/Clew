@@ -21,8 +21,12 @@ private let eightToNine = TimeSlot(hour: 8, minute: 0, minutes: 60)!
     private func habit(_ schedule: Schedule = .daily, slot: TimeSlot? = eightToNine) throws -> UUID {
         try clew.addItem(NewItem(title: "stretch", shape: .habit(schedule), slot: slot)).id
     }
+    /// Goals live in Goals & Later (SPEC 2026-11-15); these are moved to Today, where a
+    /// slot places its block. (Goals lose their slots in the next step.)
     private func goal(_ target: Int = 30) throws -> UUID {
-        try clew.addItem(NewItem(title: "read", shape: .goal(target: target, schedule: .daily), slot: eightToNine)).id
+        let id = try clew.addItem(NewItem(title: "read", shape: .goal(target: target, schedule: .daily), slot: eightToNine)).id
+        try clew.moveToToday(itemId: id)
+        return id
     }
     private func blocks(_ id: UUID, day: Int = 10) -> [TimeBlock] {
         store.state.timeBlocks.values.filter { $0.itemId == id && $0.localDay.day == day }.sorted { $0.placedAt < $1.placedAt }

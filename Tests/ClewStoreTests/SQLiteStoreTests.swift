@@ -183,6 +183,25 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         #expect(try store.read { try $0.checkIn(id: c.id) } == c)
     }
 
+    /// SPEC 2026-11-15: a plan's place in Today is part of the fact; a reorder voids it
+    /// and inserts a new one, and the void is monotonic.
+    @Test func aPlansTodayKeyIsSubstanceAndItsVoidIsMonotonic() throws {
+        let store = try SQLiteStore.inMemory()
+        let item = sampleItem()
+        let plan = Plan(id: UUID(), itemId: item.id, localDay: day("2026-11-11"), at: t0, source: .user, todaySortKey: 4.5)
+        try store.write { w in try w.insert(item); try w.insert(plan) }
+        #expect(try store.read { try $0.plans(on: day("2026-11-11")) } == [plan])
+        #expect(try store.read { try $0.maxSortKey() } == 4.5)                // past the item's 2.5
+        #expect(throws: DatabaseError.self) {
+            try store.writer.write { try $0.execute(sql: "UPDATE plan SET todaySortKey = 9 WHERE id = ?", arguments: [plan.id.uuidString]) }
+        }
+        try store.write { try $0.voidPlan(id: plan.id, at: t0) }
+        #expect(try store.read { try $0.plans(on: day("2026-11-11")) }.isEmpty)
+        #expect(throws: (any Error).self) { try store.write { try $0.voidPlan(id: plan.id, at: t0.addingTimeInterval(1)) } }
+        // Its key counts for "Today's end" while it is live only.
+        #expect(try store.read { try $0.maxSortKey() } == item.sortKey)
+    }
+
     @Test func ratingCanChangeAndSettingAFieldToItsOwnValueIsAllowed() throws {
         let (store, c, _) = try seeded()
         try store.writer.write { db in
@@ -608,18 +627,21 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         try clew.checkIn(itemId: goal.id)
         try clew.checkIn(itemId: habit.id)
         try clew.undoToday(itemId: habit.id)
-        try clew.planForToday(itemIds: [link.id])
+        try clew.moveToToday(itemId: link.id)          // for today only (SPEC 2026-11-15)
 
         let today = try clew.today()
-        #expect(today.rows.map(\.id) == [goal.id, habit.id, link.id])
+        #expect(today.rows.map(\.id) == [habit.id, link.id])
+        #expect(today.goalsAndLater.map(\.id) == [goal.id])
+        // The goal's +1s count today without moving it: 1 of 3.
         #expect(today.done == 1 && today.total == 3)
-        #expect(today.rows[0].progressAmount == 2)
-        #expect(try clew.laterCount() == 0)
-        #expect(try store.read { try $0.plans(itemId: link.id) }.count == 1)
+        #expect(today.goalsAndLater[0].progressAmount == 2)
+        let plans = try store.read { try $0.plans(itemId: link.id) }
+        #expect(plans.count == 1 && plans.first?.todaySortKey != nil)
+        #expect(try store.read { try $0.item(id: link.id) }?.state == .later)   // nothing else changed
 
         // Delete is a tombstone on the real database too: the row and its facts remain.
         try clew.deleteItem(itemId: goal.id)
-        #expect(try clew.today().rows.map(\.id) == [habit.id, link.id])
+        #expect(try clew.today().rows.map(\.id) == [habit.id, link.id] && clew.today().goalsAndLater.isEmpty)
         #expect(try store.read { try $0.item(id: goal.id) }?.deletedAt == t0)
         #expect(try store.read { try $0.checkIns(itemIds: [goal.id], from: day("2000-01-01")) }.count == 2)
     }

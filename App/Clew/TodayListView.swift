@@ -100,14 +100,14 @@ struct TodayListView: View {
         edgeScroll = timer
     }
 
-    private func offset(for row: TodayRow, at index: Int, in rows: [TodayRow]) -> CGFloat {
+    private func offset(for id: UUID, at index: Int, in ids: [UUID]) -> CGFloat {
         // A block coming down from the timeline opens a gap where it would land.
         if let lifted, lifted.blockId != nil, let slot = lifted.slot {
             let height = Double(dragFrames.first?.height ?? 34)
             return CGFloat(Clew.insertShift(index: index, slot: slot, height: height))
         }
-        guard let dragging, let from = rows.firstIndex(where: { $0.id == dragging }) else { return 0 }
-        if row.id == dragging { return dragTranslation }
+        guard let dragging, let from = ids.firstIndex(of: dragging) else { return 0 }
+        if id == dragging { return dragTranslation }
         let height = Double(dragFrames.indices.contains(from) ? dragFrames[from].height : 0)
         return CGFloat(Clew.dragShift(index: index, from: from, to: dragSlot ?? from, draggedHeight: height))
     }
@@ -122,15 +122,17 @@ struct TodayListView: View {
 
     // MARK: Dragging a row
 
-    private func drag(_ row: TodayRow, in rows: [TodayRow]) -> some Gesture {
+    /// Today's visible rows, the "Goals & Later" label and its rows, as one sequence a
+    /// row is dragged through (SPEC 2026-11-15).
+    private func drag(_ row: TodayRow, in ids: [UUID]) -> some Gesture {
         DragGesture(minimumDistance: 3, coordinateSpace: .named(Self.listSpace))
             .updating($rowDragLive) { _, live, _ in live = true }
             .onChanged { value in
                 if dragging == nil {
-                    dragFrames = rows.map { rowFrames[$0.id] ?? .zero }
+                    dragFrames = ids.map { rowFrames[$0] ?? .zero }
                     dragging = row.id
                 }
-                let from = rows.firstIndex(where: { $0.id == row.id }) ?? 0
+                let from = ids.firstIndex(of: row.id) ?? 0
                 let own = dragFrames.indices.contains(from) ? dragFrames[from] : rowFrame(centeredAt: value.location.y)
                 // Up over the hours: the card becomes the block it would be, at the
                 // quarter hour under the pointer; the other rows stay where they are.
@@ -170,8 +172,8 @@ struct TodayListView: View {
                 withTransaction(t) {
                     if let landing, landing.overTimeline, let start = landing.start {
                         model.place(landing.itemId, at: start, minutes: landing.minutes)
-                    } else if let from = rows.firstIndex(where: { $0.id == row.id }), let to = dragSlot, to != from {
-                        model.drop(row.id, onto: rows[to])
+                    } else if let from = ids.firstIndex(of: row.id), let to = dragSlot, to != from {
+                        model.drop(row.id, in: ids.map { $0 == Self.labelID ? nil : $0 }, from: from, to: to)
                     }
                     endDrag()
                 }
@@ -185,7 +187,7 @@ struct TodayListView: View {
         guard let value else { return endDrag() }      // cancelled
         let b = block.block
         if lifted == nil {
-            dragFrames = model.listRows.map { rowFrames[$0.id] ?? .zero }
+            dragFrames = sequence.map { rowFrames[$0] ?? .zero }
             blockGrab = value.startLocation.y - blockFrame(start: b.start, minutes: b.minutes).minY
         }
         if isOverTimeline(value.location.y), let day = model.timeline {
@@ -221,7 +223,13 @@ struct TodayListView: View {
         t.disablesAnimations = true
         withTransaction(t) {
             if let landing, !landing.overTimeline {
-                model.putBack(block.block.id, itemId: block.block.itemId, at: landing.slot ?? 0)
+                let slot = landing.slot ?? 0
+                if let label = sequence.firstIndex(of: Self.labelID), slot > label {
+                    // Dropped in Goals & Later (SPEC 2026-11-15).
+                    model.putBackBelow(block.block.id, itemId: block.block.itemId, at: slot - label - 1)
+                } else {
+                    model.putBack(block.block.id, itemId: block.block.itemId, at: slot)
+                }
             } else if let landing, let start = landing.start, start != block.block.start {
                 model.moveBlock(block.block.id, to: start)
             }
@@ -251,27 +259,63 @@ struct TodayListView: View {
         }
     }
 
+    /// One row of either list; Move Up / Move Down stop at its own list's ends.
+    private func listRow(_ row: TodayRow, index: Int, count: Int, ids: [UUID]) -> some View {
+        RowView(row: row, model: model, onEdit: { screen = .edit(row.item, back: .list) },
+                onOpen: { screen = .detail(row.id) },
+                onPlace: showsTimeline ? { screen = .place(row.id, block: nil) } : nil,
+                canMoveUp: index > 0, canMoveDown: index < count - 1,
+                isDragged: dragging == row.id,
+                dragActive: dragging != nil || lifted != nil,
+                onHoverChange: { inside in
+                    if inside { hoveredItem = row.id } else if hoveredItem == row.id { hoveredItem = nil }
+                })
+            .background(GeometryReader { g in
+                Color.clear.preference(key: RowFrames.self,
+                                       value: [row.id: g.frame(in: .named(Self.listSpace))])
+            })
+            .offset(y: offset(for: row.id, at: ids.firstIndex(of: row.id) ?? 0, in: ids))
+            // The lifted card draws the dragged row, here or over the hours.
+            .opacity(dragging == row.id ? 0 : 1)
+            .gesture(drag(row, in: ids))
+    }
+
+    /// The id standing for the "Goals & Later" label in the dragged sequence.
+    static let labelID = UUID(uuidString: "60A15A4D-1A7E-4000-8000-000000000000")!
+
+    /// Today's visible rows, then (when it has any) the label and Goals & Later's rows.
+    private var sequence: [UUID] {
+        let below = model.goalsAndLater
+        return model.listRows.map(\.id) + (below.isEmpty ? [] : [Self.labelID] + below.map(\.id))
+    }
+
     @ViewBuilder
-    private func rowsStack(_ rows: [TodayRow]) -> some View {
+    private func rowsStack() -> some View {
+        let today = model.listRows
+        let below = model.goalsAndLater
+        let ids = sequence
         VStack(spacing: 0) {
-            ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                RowView(row: row, model: model, onEdit: { screen = .edit(row.item, back: .list) },
-                        onOpen: { screen = .detail(row.id) },
-                        onPlace: showsTimeline ? { screen = .place(row.id, block: nil) } : nil,
-                        canMoveUp: index > 0, canMoveDown: index < rows.count - 1,
-                        isDragged: dragging == row.id,
-                        dragActive: dragging != nil || lifted != nil,
-                        onHoverChange: { inside in
-                            if inside { hoveredItem = row.id } else if hoveredItem == row.id { hoveredItem = nil }
-                        })
+            ForEach(Array(today.enumerated()), id: \.element.id) { index, row in
+                listRow(row, index: index, count: today.count, ids: ids)
+            }
+            if !below.isEmpty {
+                // A quiet section label (SPEC 2026-11-15).
+                Text("Goals & Later")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 12 + TaskColumns.circleWidth + 8)
+                    .padding(.top, today.isEmpty ? 2 : 10)
+                    .padding(.bottom, 2)
+                    .accessibilityAddTraits(.isHeader)
                     .background(GeometryReader { g in
                         Color.clear.preference(key: RowFrames.self,
-                                               value: [row.id: g.frame(in: .named(Self.listSpace))])
+                                               value: [Self.labelID: g.frame(in: .named(Self.listSpace))])
                     })
-                    .offset(y: offset(for: row, at: index, in: rows))
-                    // The lifted card draws the dragged row, here or over the hours.
-                    .opacity(dragging == row.id ? 0 : 1)
-                    .gesture(drag(row, in: rows))
+                    .offset(y: offset(for: Self.labelID, at: today.count, in: ids))
+                ForEach(Array(below.enumerated()), id: \.element.id) { index, row in
+                    listRow(row, index: index, count: below.count, ids: ids)
+                }
             }
         }
         .padding(.vertical, 6)
@@ -307,18 +351,15 @@ struct TodayListView: View {
             ForEach(model.lateTicks) { late in
                 LateTickLine(late: late, today: model.today?.day, model: model)
             }
-            if case let rows = model.listRows, !rows.isEmpty {
-                Group {
-                    if rowsHeight > rowsLimit {
-                        // A long list scrolls rather than pushing the menu past the screen.
-                        ScrollView(.vertical) { rowsStack(rows) }
-                            .frame(height: rowsLimit)
-                    } else {
-                        rowsStack(rows)
-                    }
-                }
-                .onPreferenceChange(RowFrames.self) { rowFrames = $0 }
-            } else {
+            // "All done for today" only when everything counted is done; otherwise the
+            // empty states as before (SPEC 2026-11-15).
+            if model.today?.allDone == true {
+                Text("All done for today")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, 10)
+                    .padding(.bottom, model.listRows.isEmpty ? 4 : 0)
+            } else if model.listRows.isEmpty {
                 Group {
                     if model.today?.rows.isEmpty == false {
                         // Everything is placed; drag a block here to bring it back.
@@ -329,7 +370,20 @@ struct TodayListView: View {
                 }
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.vertical, 20)
+                .padding(.vertical, model.goalsAndLater.isEmpty ? 20 : 10)
+            }
+            if !sequence.isEmpty {
+                Group {
+                    if rowsHeight > rowsLimit {
+                        // Long lists scroll together rather than pushing the menu past the
+                        // screen (SPEC 2026-11-15: Today and Goals & Later).
+                        ScrollView(.vertical) { rowsStack() }
+                            .frame(height: rowsLimit)
+                    } else {
+                        rowsStack()
+                    }
+                }
+                .onPreferenceChange(RowFrames.self) { rowFrames = $0 }
             }
 
             // Imported lists, below the tasks with no heading (SPEC 2026-11-09).
@@ -650,6 +704,14 @@ struct RowView: View {
         .accessibilityAction(named: Text("Move Down")) { if canMoveDown { model.move(row, by: 1) } }
         .accessibilityActions {
             if let onPlace { Button("Put on timeline…", action: onPlace) }
+            // Nothing needs a drag (SPEC 2026-11-15).
+            if model.isBelow(row) {
+                if !row.isGoalReached { Button("Move to Today") { model.moveToToday(row) } }
+            } else if model.isMoved(row) {
+                Button("Move to Goals & Later") { model.moveBack(row) }
+            } else if (item.kind == .once || item.kind == .link), row.progressAmount == 0 {
+                Button("Move to Later") { model.moveToLater(row) }
+            }
         }
         .contextMenu {
             if row.todayAmount > 0 {
@@ -671,7 +733,12 @@ struct RowView: View {
                     }
                 }
             }
-            if (item.kind == .once || item.kind == .link), row.progressAmount == 0 {
+            // Between the two lists (SPEC 2026-11-15).
+            if model.isBelow(row) {
+                if !row.isGoalReached { Button("Move to Today") { model.moveToToday(row) } }
+            } else if model.isMoved(row) {
+                Button("Move to Goals & Later") { model.moveBack(row) }
+            } else if (item.kind == .once || item.kind == .link), row.progressAmount == 0 {
                 Button("Move to Later") { model.moveToLater(row) }
             }
             Divider()
