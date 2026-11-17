@@ -235,6 +235,29 @@ private let eightToNine = TimeSlot(hour: 8, minute: 0, minutes: 60)!
         #expect(ticks(id).first?.source == .timeline)
     }
 
+    @Test func aHabitIsAnsweredFromItsSlotBlock() throws {
+        let id = try habit()
+        try settle(at: at(10, 5))
+        try settle(at: at(10, 9))
+        let b = try #require(blocks(id).first)
+        try clew.answerSlotBlock(id: b.id)                       // the notification's Done
+        #expect(ticks(id).count == 1 && ticks(id).first?.source == .notification)
+        // Answered: the block is decided and stops asking.
+        #expect(try store.state.timeBlocks[b.id]?.decidedAt != nil && clew.askingBlockIds().isEmpty)
+    }
+
+    @Test func focusDoneCountsTheAnswerAsTheSittingsTick() throws {
+        let id = try habit()
+        try settle(at: at(10, 5))
+        clock.set(at(10, 8, 40)); try clew.startFocus(itemId: id, minutes: 25)
+        try settle(at: at(10, 9))
+        try clew.answerSlotBlock(id: try #require(blocks(id).first).id)
+        clock.set(at(10, 9, 5))
+        // A habit is ticked once a day: Done keeps the answer's tick, no second one.
+        let answer = try #require(ticks(id).first)
+        #expect(try clew.finishFocus()?.id == answer.id && ticks(id).count == 1)
+    }
+
     @Test func slotNotificationsAskAtTheEnd() throws {
         let id = try habit()
         try settle(at: at(10, 5))

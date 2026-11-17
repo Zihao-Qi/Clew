@@ -214,13 +214,14 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         let e = JSONEncoder()
         e.outputFormatting = [.sortedKeys]
         func json(_ v: some Encodable) throws -> String { String(decoding: try e.encode(v), as: UTF8.self) }
-        let goal = UUID(), habit = UUID(), done = UUID()
+        let goal = UUID(), habit = UUID(), done = UUID(), deleted = UUID()
         let slot = try json(TimeSlot(hour: 8, minute: 0, minutes: 60)!)
         try queue.write { db in
             for (id, kind, schedule, progress) in [
                 (goal, "goal", try json(Schedule.daily), try json(ProgressSpec.counter(target: 30))),
                 (done, "goal", try json(Schedule.weekdays([.monday])), try json(ProgressSpec.counter(target: 5))),
                 (habit, "habit", try json(Schedule.daily), try json(ProgressSpec.none)),
+                (deleted, "goal", try json(Schedule.daily), try json(ProgressSpec.counter(target: 3))),
             ] {
                 try db.execute(sql: """
                     INSERT INTO item (id, kind, title, titleOrigin, schedule, progress, state, sortKey, source,
@@ -237,6 +238,8 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
             try block(goal, decided: nil)        // open: kept, with a plan
             try block(done, decided: t0)         // already decided: no plan
             try block(habit, decided: nil)       // habits keep their schedule and slot
+            try db.execute(sql: "UPDATE item SET deletedAt = ? WHERE id = ?", arguments: [t0, deleted.uuidString])
+            try block(deleted, decided: nil)     // a deleted goal: no plan
         }
         let store = try SQLiteStore(writer: queue)      // runs v11
         let read = try store.read { r in (try r.item(id: goal), try r.item(id: done), try r.item(id: habit)) }

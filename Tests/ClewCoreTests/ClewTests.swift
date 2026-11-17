@@ -460,6 +460,13 @@ private struct Harness {
         #expect(h.store.state.items[goal.id] == edited)
     }
 
+    @Test func editChangesAHabitsSchedule() throws {
+        let h = Harness()
+        let habit = try h.clew.addItem(NewItem(title: "h", shape: .habit(.daily)))
+        let edited = try h.clew.editItem(id: habit.id, ItemEdit(title: "h", url: nil, schedule: .weekdays([.monday])))
+        #expect(edited.schedule == .weekdays([.monday]) && h.store.state.items[habit.id]?.schedule == .weekdays([.monday]))
+    }
+
     @Test func editRejectsFieldsThatDoNotApplyToTheKind() throws {
         let h = Harness()
         let once = try h.clew.addItem(NewItem(title: "o", shape: .today))

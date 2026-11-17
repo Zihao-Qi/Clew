@@ -29,7 +29,8 @@ enum Schema {
         let blocks = try Row.fetchAll(db, sql: """
             SELECT b.itemId, b.localDay, MIN(b.placedAt) AS placedAt FROM timeBlock b
             JOIN item i ON i.id = b.itemId
-            WHERE i.kind = 'goal' AND b.removedAt IS NULL AND b.decidedAt IS NULL
+            WHERE i.kind = 'goal' AND i.deletedAt IS NULL AND i.state = 'active'
+              AND b.removedAt IS NULL AND b.decidedAt IS NULL
               AND NOT EXISTS (SELECT 1 FROM plan p WHERE p.itemId = b.itemId AND p.localDay = b.localDay
                               AND p.voidedAt IS NULL)
             GROUP BY b.itemId, b.localDay

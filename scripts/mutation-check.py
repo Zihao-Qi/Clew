@@ -610,6 +610,7 @@ M = [
  ("G2-5 migration keeps schedules", "Sources/ClewStore/Schema.swift", "UPDATE item SET schedule = ?, slot = NULL WHERE kind = 'goal'", "UPDATE item SET slot = NULL WHERE kind = 'goal' AND ? IS NOT NULL", "v11MovesGoalsBelow"),
  ("G2-6 migration drops open blocks", "Sources/ClewStore/Schema.swift", "WHERE i.kind = 'goal' AND b.removedAt IS NULL AND b.decidedAt IS NULL", "WHERE i.kind = 'goal' AND 0", "v11MovesGoalsBelow"),
  ("G2-7 migration plans decided", "Sources/ClewStore/Schema.swift", "WHERE i.kind = 'goal' AND b.removedAt IS NULL AND b.decidedAt IS NULL", "WHERE i.kind = 'goal' AND b.removedAt IS NULL", "v11MovesGoalsBelow"),
+ ("G2-9 migration plans deleted goals", "Sources/ClewStore/Schema.swift", "            WHERE i.kind = 'goal' AND i.deletedAt IS NULL AND i.state = 'active'\n", "            WHERE i.kind = 'goal'\n", "v11MovesGoalsBelow"),
  ("WR1 collections are done", D+"WeekRecap.swift", "let done = inWeek.filter { !collectionSources.contains($0.item.source) }.reduce(0) { $0 + $1.checkIn.amount }", "let done = inWeek.reduce(0) { $0 + $1.checkIn.amount }", "WeekRecapTests"),
  ("WR2 ticks not amounts", D+"WeekRecap.swift", "let done = inWeek.filter { !collectionSources.contains($0.item.source) }.reduce(0) { $0 + $1.checkIn.amount }", "let done = inWeek.filter { !collectionSources.contains($0.item.source) }.count", "WeekRecapTests"),
  ("WR3 week end open", D+"WeekRecap.swift", "$0.checkIn.localDay <= end &&", "$0.checkIn.localDay < end &&", "WeekRecapTests"),

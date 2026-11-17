@@ -62,7 +62,8 @@ public enum SlotEdit: Hashable, Sendable {
 }
 
 /// The editable fields of an item, as a full replacement. `schedule` applies to
-/// habits and goals, `target` to goals; both must be nil otherwise.
+/// habits, `target` to goals (which have no schedule since 2026-11-15); both must be
+/// nil otherwise.
 public struct ItemEdit: Hashable, Sendable {
     public var title: String
     public var url: URL?
