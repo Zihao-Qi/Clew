@@ -116,20 +116,6 @@ public struct LaterReview: Hashable, Sendable, Identifiable, Codable {
     }
 }
 
-/// How long a Later item has waited, and whether to ask "still want this?".
-public enum LaterAge {
-    /// SPEC §5: items untouched for 6 weeks get a one-tap "still want this?".
-    public static let askAfterDays = 42
-
-    /// Days since the item was last touched: saved, edited, moved to Later, or kept.
-    public static func daysWaiting(lastTouched: LocalDay, today: LocalDay) -> Int {
-        max(0, today.ordinal - lastTouched.ordinal)
-    }
-
-    public static func asksStillWant(daysWaiting: Int) -> Bool {
-        daysWaiting >= askAfterDays
-    }
-}
 
 /// Time spent focusing on a task (SPEC decision 2026-11-10): one finished or stopped
 /// focus timer, or time added by hand. A fact: inserted, never changed in substance,

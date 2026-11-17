@@ -151,7 +151,7 @@ extension DetailView {
         }
         if let r = d.reminder {
             let time = r.time.pickerDate.formatted(date: .omitted, time: .shortened)
-            parts.append(String(localized: "Reminder \(time)"))
+            parts.append(r.day == nil ? String(localized: "Reminder \(time)") : String(localized: "Reminder \(time) today"))
         }
         return parts.joined(separator: " · ")
     }
@@ -215,7 +215,7 @@ struct OneOffDetails: View {
         switch event {
         case .added(.extensionYouTube): String(localized: "Saved from Watch Later")
         case .added: details.item.kind == .link ? String(localized: "Saved") : String(localized: "Added")
-        case .picked: String(localized: "Picked for today")
+        case .picked: String(localized: "Moved to Today")
         case .done(let rating?): String(localized: "Done · felt \(RatingDots.word(rating))")
         case .done(nil): String(localized: "Done")
         case .kept: String(localized: "Kept in Later")

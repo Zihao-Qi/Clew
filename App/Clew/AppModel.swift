@@ -19,7 +19,6 @@ struct SystemTimeZone: TimeZoneSource {
 @MainActor @Observable
 final class AppModel {
     private(set) var today: TodayList?
-    private(set) var laterCount = 0
     /// How much of each video on today's list was watched (0–1), from Watch Later.
     private(set) var watched: [UUID: Double] = [:]
     /// Imported lists (YouTube Watch Later), shown below the tasks.
@@ -32,9 +31,6 @@ final class AppModel {
     private(set) var fatalMessage: String?
     /// A short, transient message for a rejected action.
     var notice: String?
-    /// A short confirmation that fades by itself, e.g. "Saved to Later (13)".
-    private(set) var confirmation: String?
-    @ObservationIgnored private var confirmationTask: Task<Void, Never>?
     /// Goals whose "goal reached" line was closed with Done. UI-only; the goal leaves
     /// the list at rollover anyway.
     private(set) var dismissedCelebrations: Set<UUID> = []
@@ -158,7 +154,6 @@ final class AppModel {
             let list = try clew.today()
             today = list
             ratingsOn = (try? clew.ratingsEnabled()) ?? false
-            laterCount = try clew.laterCount()
             watched = try clew.watchProgress(itemIds: list.rows.map(\.id))
             barStyle = (try? clew.barStyle()) ?? Clew.defaultBarStyle
             do { openListShortcut = try clew.openListShortcut() } catch { }
@@ -260,10 +255,14 @@ final class AppModel {
     func summaries() -> SummarySettings { (try? clew?.summaries()) ?? .defaults }
 
     @discardableResult
-    func setReminder(_ itemId: UUID, _ time: TimeOfDay?) -> Bool {
+    func setReminder(_ itemId: UUID, _ time: TimeOfDay?, todayOnly: Bool = false) -> Bool {
         if time != nil { askForNotifications() }
-        return run { try $0.setReminder(itemId: itemId, time: time) }
+        return run { try $0.setReminder(itemId: itemId, time: time, todayOnly: todayOnly) }
     }
+
+    /// "Today" at a time already past today (SPEC 2026-11-15): checked before Edit saves
+    /// anything.
+    func reminderTimePassed(_ time: TimeOfDay) -> Bool { clew?.isPastToday(time) ?? false }
 
     func setSummaries(_ settings: SummarySettings) {
         if settings.morningEnabled || settings.eveningEnabled { askForNotifications() }
@@ -292,7 +291,6 @@ final class AppModel {
         switch action {
         case .done(let id): run { try $0.checkIn(itemId: id, source: .notification) }
         case .answer(let blockId): run { try $0.answerSlotBlock(id: blockId) }
-        case .later(let id): run { try $0.moveToLater(itemId: id) }
         case .open(let id):
             // From the database, not today's rows: the notification may be clicked after
             // rollover, or for an item that is not on today's list any more.
@@ -346,15 +344,8 @@ final class AppModel {
 
     func exportData() -> Data? { try? clew?.exportDocument().encoded() }
 
-    func laterPile() -> [LaterEntry] { (try? clew?.laterPile()) ?? [] }
-    func lettingGoCount() -> Int { (try? clew?.lettingGoCount()) ?? 0 }
-    func keepLater(_ id: UUID) { run { try $0.keepLater(itemId: id) } }
 
     /// Letting go is a win (SPEC §5), and the line says so.
-    func letGo(_ id: UUID) {
-        guard run({ try $0.letGo(itemId: id) }) else { return }
-        showConfirmation(String(localized: "Let go — that's a win too."))
-    }
 
 
     // MARK: - Commands
@@ -685,21 +676,6 @@ final class AppModel {
     func nextRound(_ row: TodayRow) { run { try $0.startNextRound(itemId: row.id) } }
     func dismissCelebration(_ row: TodayRow) { dismissedCelebrations.insert(row.id) }
 
-    /// Later is hidden, so say where the item went (SPEC §5).
-    func confirmSavedToLater() {
-        showConfirmation(String(localized: "Saved to Later (\(laterCount))"))
-    }
-
-    private func showConfirmation(_ text: String) {
-        confirmation = text
-        confirmationTask?.cancel()
-        confirmationTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(4))
-            guard !Task.isCancelled, self?.confirmation == text else { return }
-            self?.confirmation = nil
-        }
-    }
-
     /// The page title for a pasted link, or nil.
     func fetchTitle(for url: URL) async -> String? {
         await TitleFetcher.title(for: url)
@@ -717,9 +693,6 @@ final class AppModel {
         return run { try $0.editItem(id: id, edit) }
     }
 
-    @discardableResult
-    func pick(_ ids: [UUID]) -> Bool { run { try $0.planForToday(itemIds: ids) } }
-
     /// Replaced only by the debug click test, so it never opens a browser.
     @ObservationIgnored var urlOpener: @MainActor (URL) -> Void = { NSWorkspace.shared.open($0) }
 
@@ -734,7 +707,6 @@ final class AppModel {
         do {
             _ = try command(clew)
             notice = nil
-            confirmation = nil
             refresh()
             return true
         } catch let error as ClewError {
@@ -753,7 +725,7 @@ final class AppModel {
         case .invalidURL: String(localized: "Links must start with http:// or https://.")
         case .invalidTarget: String(localized: "Pick a total between 1 and 100,000.")
         case .invalidSchedule: String(localized: "Pick at least one day.")
-        case .pickCount: String(localized: "Pick 1 to 3 items.")
+        case .reminderTimePassed: String(localized: "That time has passed today.")
         case .goalReached: String(localized: "Goal reached! Start a next round or raise the target.")
         case .itemNotFound, .checkInNotFound, .notAllowed, .tooManyEntries: String(localized: "That can't be done right now.")
         case .listTurnedOff: String(localized: "That list is turned off in Settings › General.")

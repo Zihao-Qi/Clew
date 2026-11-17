@@ -93,7 +93,7 @@ struct MenuBarLabel: View {
 }
 
 enum Screen: Equatable {
-    case list, add, pick
+    case list, add
     case detail(UUID)
     /// An imported list's page (YouTube Watch Later).
     case collection(Source)
@@ -122,7 +122,6 @@ struct RootView: View {
                 switch screen {
                 case .list: TodayListView(model: model, screen: $screen)
                 case .add: AddView(model: model) { screen = .list }
-                case .pick: PickView(model: model) { screen = .list }
                 case .detail(let id):
                     DetailView(model: model, itemId: id,
                                onEdit: { screen = .edit($0, back: .detail) },

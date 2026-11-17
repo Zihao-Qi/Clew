@@ -71,12 +71,4 @@ struct ParisZone: TimeZoneSource { func current() -> TimeZone { TimeZone(identif
         #expect(items.contains { $0.deletedAt != nil })
         #expect(!items.contains { $0.id == user.id })
     }
-
-    @Test func onlyTheUsersLetGosAreCounted() throws {
-        try clew.importExternal(batch(["aaaaaaaaaaa", "bbbbbbbbbbb"]))
-        try clew.importExternal(batch(["aaaaaaaaaaa"]))                 // import lets b go
-        let own = try clew.addItem(NewItem(title: "mine", shape: .later))
-        try clew.letGo(itemId: own.id)                                  // the user lets one go
-        #expect(try clew.lettingGoCount() == 1)
-    }
 }

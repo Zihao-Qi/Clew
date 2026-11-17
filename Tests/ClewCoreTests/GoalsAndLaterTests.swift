@@ -185,4 +185,16 @@ private func at(_ d: Int, _ h: Int, _ m: Int = 0) -> Date {
         let after = try clew.plannedNotifications().filter { if case .reminder = $0.content { true } else { false } }
         #expect(after.first?.fireAt == at(11, 18))
     }
+
+    /// A saved link's site beside its title in Goals & Later (as Pick showed it).
+    @Test func aSavedLinkShowsItsSite() throws {
+        func site(_ link: String?) throws -> String? {
+            try clew.addItem(NewItem(title: "t", url: link.flatMap(URL.init(string:)), shape: .later)).siteLabel
+        }
+        #expect(try site("https://www.medium.com/a") == "medium.com")
+        #expect(try site("https://Blog.Example.org/x") == "blog.example.org")
+        #expect(try site("https://www.youtube.com/watch?v=x") == nil)   // a video: the title says it
+        #expect(try site("https://youtu.be/x") == nil && site("https://m.youtube.com/x") == nil)
+        #expect(try site(nil) == nil)                                    // a once task, no link
+    }
 }

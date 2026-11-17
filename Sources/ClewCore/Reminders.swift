@@ -6,8 +6,12 @@ extension Clew {
 
     // MARK: - Queries
 
+    /// The item's reminder; a one-day reminder whose day is over is spent: none.
     public func reminder(forItem itemId: UUID) throws -> Reminder? {
-        try storeForQueries.read { try $0.reminders().first { $0.itemId == itemId } }
+        let today = currentDay()
+        return try storeForQueries.read { r in
+            try r.reminders().first { $0.itemId == itemId && !$0.isSpent(today: today) }
+        }
     }
 
     public func summaries() throws -> SummarySettings {
@@ -20,9 +24,10 @@ extension Clew {
     /// Whether anything could ever notify: used to ask for permission only when needed.
     public func wantsNotifications() throws -> Bool {
         let s = try summaries()
+        let today = currentDay()
         let anyReminder = try storeForQueries.read { r in
             let live = Set(try r.items(inStates: [.active, .later, .paused]).map(\.id))
-            return try r.reminders().contains { $0.enabled && live.contains($0.itemId) }
+            return try r.reminders().contains { $0.enabled && !$0.isSpent(today: today) && live.contains($0.itemId) }
         }
         let now = clockForQueries.now()
         let anyBlock = try blockAlerts() && storeForQueries.read { r in
@@ -59,12 +64,25 @@ extension Clew {
         }
     }
 
+    /// `time` on today's Clew day has already passed (between midnight and 4 a.m. the
+    /// Clew day is still yesterday, so a morning time then is past; the rollover rule).
+    public func isPastToday(_ time: TimeOfDay) -> Bool {
+        let now = clockForQueries.now()
+        let zone = zonesForQueries.current()
+        let today = LocalDay(of: now, in: zone, rolloverHour: rolloverHour)
+        return today.instant(at: time, in: zone, rolloverHour: rolloverHour) <= now
+    }
+
     // MARK: - Commands
 
-    /// Sets the item's one reminder to `time`, or removes it (a tombstone) when nil.
+    /// Sets the item's one reminder to `time`, every day or (`todayOnly`) on today's
+    /// Clew day only, or removes it (a tombstone) when nil. Today at a time already past
+    /// is refused, and nothing changes (SPEC 2026-11-15).
     @discardableResult
-    public func setReminder(itemId: UUID, time: TimeOfDay?) throws -> Reminder? {
+    public func setReminder(itemId: UUID, time: TimeOfDay?, todayOnly: Bool = false) throws -> Reminder? {
         let now = clockForQueries.now()
+        let today = currentDay()
+        if let time, todayOnly, isPastToday(time) { throw ClewError.reminderTimePassed }
         return try storeForQueries.write { w in
             guard let item = try w.item(id: itemId), item.deletedAt == nil else { throw ClewError.itemNotFound }
             let existing = try w.reminders().first { $0.itemId == itemId }
@@ -78,6 +96,7 @@ extension Clew {
             var reminder = existing ?? Reminder(id: newID(), itemId: itemId, time: time, updatedAt: now)
             reminder.time = time
             reminder.enabled = true
+            reminder.day = todayOnly ? today : nil
             reminder.updatedAt = now
             try w.save(reminder)
             return reminder

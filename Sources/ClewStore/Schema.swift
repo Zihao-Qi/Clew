@@ -18,7 +18,14 @@ enum Schema {
         migrator.registerMigration("v9-time-slots", migrate: v9)
         migrator.registerMigration("v10-plan-today-key", migrate: v10)
         migrator.registerMigration("v11-goals-without-schedule", migrate: v11)
+        migrator.registerMigration("v12-one-day-reminders", migrate: v12)
         return migrator
+    }
+
+    /// A reminder for today only (SPEC 2026-11-15): its Clew day; null is every day,
+    /// which every existing reminder stays.
+    private static func v12(_ db: Database) throws {
+        try db.execute(sql: "ALTER TABLE reminder ADD COLUMN day TEXT")
     }
 
     /// Goals lose their schedule and time slot (SPEC 2026-11-15): they live in Goals &

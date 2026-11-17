@@ -12,7 +12,7 @@ public enum PlannedContent: Hashable, Sendable {
     /// (AGENT §6), never "0/6". Pre-scheduled for every future evening, so a static
     /// "0/6 done" can never fire (ARCHITECTURE §6).
     case eveningKindLine(index: Int)
-    case reminder(itemId: UUID, title: String, canOpen: Bool, canMoveToLater: Bool)
+    case reminder(itemId: UUID, title: String, canOpen: Bool)
     /// Focus time on a task is up (SPEC 2026-11-10).
     case focusEnded(itemId: UUID, title: String)
     /// The 5-minute break is over.
@@ -79,11 +79,11 @@ public enum NotificationPlanner {
             // A reminder fires on each day its item is in either list and not done yet
             // (SPEC 2026-11-15: Today or Goals & Later).
             for row in list.rows + list.goalsAndLater where row.state == .due {
-                guard let reminder = remindersByItem[row.id] else { continue }
+                // Every day, or a one-day reminder on its own day only.
+                guard let reminder = remindersByItem[row.id], reminder.fires(on: day) else { continue }
                 let item = row.item
                 add("reminder.\(item.id.uuidString)", reminder.time, .reminder(
-                    itemId: item.id, title: item.title, canOpen: item.url != nil,
-                    canMoveToLater: (item.kind == .once || item.kind == .link) && item.state == .active
+                    itemId: item.id, title: item.title, canOpen: item.url != nil
                 ))
             }
         }

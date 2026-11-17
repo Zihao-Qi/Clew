@@ -406,8 +406,8 @@ struct TodayListView: View {
                 .padding(.vertical, 6)
             }
 
-            NoticeView(text: model.notice ?? model.confirmation)
-                .animation(.easeOut(duration: 0.4), value: model.notice ?? model.confirmation)
+            NoticeView(text: model.notice)
+                .animation(.easeOut(duration: 0.4), value: model.notice)
             if let deleted = model.lastDeleted {
                 // A delete is for good, so it can be taken back for a few seconds.
                 HStack(spacing: 8) {
@@ -442,9 +442,8 @@ struct TodayListView: View {
                     .keyboardShortcut("n")
                     .accessibilityLabel(Text("Add an item"))
                 Spacer()
-                Button { screen = .pick } label: { Text("Later (\(model.laterCount))") }
-                    .keyboardShortcut("l")
-                    .accessibilityLabel(Text("Later pile, \(model.laterCount) items. Pick some for today."))
+                // No "Later (N)" button or ⌘L: Later items are in Goals & Later (SPEC
+                // 2026-11-15).
                 // One click straight to Settings; Quit lives there. The menu closes first,
                 // like any menu item that opens a window; with a newer version known, the
                 // dot shows and Settings opens at About (SPEC 2026-11-13).
@@ -919,6 +918,14 @@ struct RowView: View {
                 .modifier(LinkPointer())
                 .help(url.absoluteString)
                 .accessibilityLabel(Text("Open link for \(item.title)"))
+            }
+            // A saved link's site in Goals & Later, as Pick showed it (SPEC 2026-11-15).
+            if model.isBelow(row), let site = item.siteLabel {
+                Text(verbatim: site)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .layoutPriority(-1)
             }
         }
     }

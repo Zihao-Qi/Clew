@@ -30,14 +30,13 @@
     "%lld to watch" : {},
     "%lld today" : {},
     "%lld watched" : {},
-    "%lld weeks" : {},
     "%lld%% watched" : {},
     "%lld/%lld done" : {},
     "%lld× a week" : {},
     "+1" : {},
     "+1 and stop" : {},
     "5 more min" : {},
-    "A day with at least one tick. Letting go of what you no longer want counts as a win." : {},
+    "A day with at least one tick." : {},
     "A focus timer is already running. Stop it first." : {},
     "A fresh start is waiting tomorrow." : {},
     "A list that's off is hidden from the menu and stops importing. What's in it stays, and comes back when you turn it on." : {},
@@ -52,7 +51,6 @@
     "Add one to %@" : {},
     "Add one to %@ and stop" : {},
     "Add time…" : {},
-    "Add to today" : {},
     "Added" : {},
     "All day: %@" : {},
     "All done for today" : {},
@@ -111,7 +109,6 @@
     "Days" : {},
     "Days this week" : {},
     "Delete" : {},
-    "Delete %@" : {},
     "Deleted “%@”" : {},
     "Details" : {},
     "Done" : {},
@@ -128,6 +125,7 @@
     "Ended" : {},
     "Ended. Done?" : {},
     "Evening" : {},
+    "Every day" : {},
     "Everything Clew stores, as one JSON file." : {},
     "Everything is on the timeline." : {},
     "Export failed. Try again." : {},
@@ -151,8 +149,6 @@
     "Imported" : {},
     "In Goals & Later" : {},
     "In progress (%lld)" : {},
-    "Keep" : {},
-    "Keep %@" : {},
     "Keep the name under %lld characters." : {},
     "Kept in Later" : {},
     "Kind" : {},
@@ -164,35 +160,7 @@
     "Last week's card" : {},
     "Last week: %@" : {},
     "Later" : {},
-    "Later (%lld)" : {},
-    "Later is empty." : {},
-    "Later pile, %lld items. Pick some for today." : {
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Later pile, %lld item. Pick some for today."
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Later pile, %lld items. Pick some for today."
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "Length" : {},
-    "Let go" : {},
-    "Let go from Later" : {},
-    "Let go of %@" : {},
-    "Let go — that's a win too." : {},
     "Link" : {},
     "Link (optional)" : {},
     "Links must start with http:// or https://." : {},
@@ -212,6 +180,7 @@
     "Move to Later" : {},
     "Move to Today" : {},
     "Move to…" : {},
+    "Moved to Today" : {},
     "Name" : {},
     "Name or link" : {},
     "Never" : {},
@@ -260,12 +229,9 @@
     "Pairing code %@" : {},
     "Pause the timer" : {},
     "Per week" : {},
-    "Pick 1 to 3 items." : {},
-    "Pick 1–3 for today" : {},
     "Pick a total between 1 and 100,000." : {},
     "Pick at least one day." : {},
     "Pick between 1 and %lld minutes." : {},
-    "Picked for today" : {},
     "Progress" : {},
     "Progress bars" : {},
     "Put %@ on the timeline" : {},
@@ -280,13 +246,16 @@
     "Record focus time" : {},
     "Release notes" : {},
     "Remind me" : {},
+    "Remind today or every day" : {},
     "Reminder %@" : {},
+    "Reminder %@ today" : {},
     "Reminder time" : {},
     "Remove" : {},
     "Remove %@" : {},
     "Remove %@ on %@" : {},
     "Remove block" : {},
     "Remove one from %@" : {},
+    "Repeat" : {},
     "Repeats" : {},
     "Replace your current data with this backup?" : {},
     "Rest is part of the plan." : {},
@@ -305,7 +274,6 @@
     "Saved before a restore" : {},
     "Saved from Watch Later" : {},
     "Saved link" : {},
-    "Saved to Later (%lld)" : {},
     "Saved." : {},
     "Settings" : {},
     "Settings, update available" : {},
@@ -323,7 +291,6 @@
     "Start a next round of %@" : {},
     "Start hour" : {},
     "Start minutes" : {},
-    "Still want this?" : {},
     "Stop" : {},
     "Stop the timer" : {},
     "Summaries" : {},
@@ -332,6 +299,7 @@
     "That can't be done right now." : {},
     "That didn't save. Try again." : {},
     "That list is turned off in Settings › General." : {},
+    "That time has passed today." : {},
     "The backup from %@ replaces today's list and history. Your current data is saved first." : {},
     "The browser extension is on the same page (Clew-Extension zip); load the new one in your browser." : {},
     "The extension copies your YouTube Watch Later and X bookmarks into Clew, each as one list below your tasks. It talks only to Clew on this Mac." : {},

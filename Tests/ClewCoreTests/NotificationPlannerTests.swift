@@ -138,8 +138,8 @@ private func plan(now: Date = at(2026, 11, 11, 8), items: [Item], ticks: [CheckI
         let p = plan(now: at(2026, 11, 17, 8), items: [link, habit],
                      reminders: [reminder(link, t(18)), reminder(habit, t(19))])
         #expect(p.prefix(2).map(\.content) == [
-            .reminder(itemId: link.id, title: "link", canOpen: true, canMoveToLater: true),
-            .reminder(itemId: habit.id, title: "habit", canOpen: false, canMoveToLater: false),
+            .reminder(itemId: link.id, title: "link", canOpen: true),
+            .reminder(itemId: habit.id, title: "habit", canOpen: false),
         ])
     }
 

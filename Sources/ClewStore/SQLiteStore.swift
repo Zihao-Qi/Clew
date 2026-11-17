@@ -210,11 +210,6 @@ private struct Access: StoreWriter {
         ).map(Self.laterReview)
     }
 
-    func letGoCount() throws -> Int {
-        try Int.fetchOne(db, sql: """
-            SELECT COUNT(*) FROM laterReview WHERE decision = 'letGo' AND voidedAt IS NULL AND source = 'user'
-            """) ?? 0
-    }
 
     func items(source: Source) throws -> [Item] {
         try Row.fetchAll(db, sql: "SELECT * FROM item WHERE source = ?", arguments: [source.rawValue]).map(Self.item)
@@ -332,14 +327,14 @@ private struct Access: StoreWriter {
     func save(_ r: Reminder) throws {
         try db.execute(
             sql: """
-                INSERT INTO reminder (id, itemId, hour, minute, enabled, updatedAt, deletedAt)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO reminder (id, itemId, hour, minute, enabled, day, updatedAt, deletedAt)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET itemId = excluded.itemId, hour = excluded.hour,
-                    minute = excluded.minute, enabled = excluded.enabled, updatedAt = excluded.updatedAt,
-                    deletedAt = excluded.deletedAt
+                    minute = excluded.minute, enabled = excluded.enabled, day = excluded.day,
+                    updatedAt = excluded.updatedAt, deletedAt = excluded.deletedAt
                 """,
-            arguments: [r.id.uuidString, r.itemId.uuidString, r.time.hour, r.time.minute, r.enabled, r.updatedAt,
-                        r.deletedAt]
+            arguments: [r.id.uuidString, r.itemId.uuidString, r.time.hour, r.time.minute, r.enabled,
+                        r.day?.description, r.updatedAt, r.deletedAt]
         )
     }
 
@@ -515,6 +510,7 @@ private struct Access: StoreWriter {
             itemId: try uuid(row, "itemId", table: t),
             time: time,
             enabled: try required(row, "enabled", table: t),
+            day: try optionalDay(row, "day", table: t),
             updatedAt: try required(row, "updatedAt", table: t),
             deletedAt: row["deletedAt"]
         )
