@@ -64,4 +64,25 @@ private func at(_ d: Int, _ h: Int, _ m: Int = 0) -> Date {
         // One live reminder per item, whatever the choice.
         #expect(store.state.reminders.values.filter { $0.itemId == id && $0.deletedAt == nil }.count == 1)
     }
+
+    @Test func aSpentReminderCanBeSetAgainLater() throws {
+        let id = try clew.addItem(NewItem(title: "task", shape: .later)).id
+        try clew.setReminder(itemId: id, time: six, todayOnly: true)
+        clock.set(at(12, 9))                                              // two days on: spent
+        #expect(try clew.reminder(forItem: id) == nil)
+        let again = try #require(try clew.setReminder(itemId: id, time: six, todayOnly: true))
+        #expect(try again.day == LocalDay(string: "2026-11-12")! && reminders() == [at(12, 18)])
+        // Still one row for the item.
+        #expect(store.state.reminders.values.filter { $0.itemId == id && $0.deletedAt == nil }.count == 1)
+    }
+
+    /// An export from before 2026-11-15 has reminders without "day": every day.
+    @Test func anOlderExportsReminderIsEveryDay() throws {
+        let json = """
+            {"id":"00000000-0000-0000-0000-000000000001","itemId":"00000000-0000-0000-0000-000000000002",
+             "time":{"hour":18,"minute":0},"enabled":true,"updatedAt":0}
+            """
+        let r = try JSONDecoder().decode(Reminder.self, from: Data(json.utf8))
+        #expect(r.day == nil && r.fires(on: LocalDay(string: "2026-11-10")!))
+    }
 }

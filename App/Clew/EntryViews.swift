@@ -252,6 +252,12 @@ struct EditView: View {
         _remindAt = State(initialValue: reminder?.time ?? TimeOfDay(hour: 18, minute: 0)!)
     }
 
+    /// The reminder (on/off, time, Today / Every day) differs from the saved one.
+    private var reminderChanged: Bool {
+        let wanted: TimeOfDay? = remind ? remindAt : nil
+        return wanted != existingReminder?.time || (wanted != nil && remindToday != (existingReminder?.day != nil))
+    }
+
     /// Only habits repeat (goals lost "Repeats" and their slot, SPEC 2026-11-15).
     private var hasSchedule: Bool { item.kind == .habit }
 
@@ -273,7 +279,7 @@ struct EditView: View {
                 SlotRow(draft: $slot)
             }
             ReminderRow(enabled: $remind, time: $remindAt, today: $remindToday,
-                        passed: remind && remindToday && model.reminderTimePassed(remindAt))
+                        passed: reminderChanged && remind && remindToday && model.reminderTimePassed(remindAt))
             if model.notificationsDenied, remind {
                 NotificationsOffNotice()
             }
@@ -310,13 +316,14 @@ struct EditView: View {
         )
         let wanted: TimeOfDay? = remind ? remindAt : nil
         // Today at a passed time: nothing is saved until the time or the choice changes.
-        if let wanted, remindToday, model.reminderTimePassed(wanted) {
+        // An unchanged Today reminder whose time has passed is left as it is (Gemini
+        // review: it blocked every other edit that day).
+        if reminderChanged, let wanted, remindToday, model.reminderTimePassed(wanted) {
             model.notice = AppModel.message(for: .reminderTimePassed)
             return
         }
         guard model.edit(item.id, edit) else { return }
-        let changed = wanted != existingReminder?.time || (wanted != nil && remindToday != (existingReminder?.day != nil))
-        if changed {
+        if reminderChanged {
             guard model.setReminder(item.id, wanted, todayOnly: remindToday) else { return }
         }
         done()

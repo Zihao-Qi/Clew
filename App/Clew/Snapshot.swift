@@ -674,7 +674,7 @@ enum Snapshot {
         for _ in 0..<3 { try clew.checkIn(itemId: pushups.id) }
         try clew.checkIn(itemId: exercise.id)
         try clew.checkIn(itemId: job.id)
-        // A Later item saved 7 weeks ago, so the picker asks "still want this?".
+        // A Later item saved 7 weeks ago (a link: its site shows in Goals & Later).
         clock.date = now.addingTimeInterval(-49 * 86_400)
         _ = try clew.addItem(NewItem(title: "Rust ownership article", url: URL(string: "https://medium.com/x"), shape: .later))
         clock.date = now
