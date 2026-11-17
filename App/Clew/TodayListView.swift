@@ -280,6 +280,9 @@ struct TodayListView: View {
             .gesture(drag(row, in: ids))
     }
 
+    /// Where a row's circle starts: the "Goals & Later" label lines up with it.
+    static let circleLeading: CGFloat = 14
+
     /// The id standing for the "Goals & Later" label in the dragged sequence.
     static let labelID = UUID(uuidString: "60A15A4D-1A7E-4000-8000-000000000000")!
 
@@ -299,15 +302,21 @@ struct TodayListView: View {
                 listRow(row, index: index, count: today.count, ids: ids)
             }
             if !below.isEmpty {
-                // A quiet section label (SPEC 2026-11-15).
-                Text("Goals & Later")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                // A divider, then a quiet section label lined up with the circles (SPEC
+                // 2026-11-15; *changed* after use: a line above it, label at the left).
+                VStack(alignment: .leading, spacing: 0) {
+                    if !today.isEmpty {
+                        Divider().padding(.horizontal, 12).padding(.top, 6)
+                    }
+                    Text("Goals & Later")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, Self.circleLeading)
+                        .padding(.top, 8)
+                        .padding(.bottom, 2)
+                        .accessibilityAddTraits(.isHeader)
+                }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.leading, 12 + TaskColumns.circleWidth + 8)
-                    .padding(.top, today.isEmpty ? 2 : 10)
-                    .padding(.bottom, 2)
-                    .accessibilityAddTraits(.isHeader)
                     .background(GeometryReader { g in
                         Color.clear.preference(key: RowFrames.self,
                                                value: [Self.labelID: g.frame(in: .named(Self.listSpace))])
