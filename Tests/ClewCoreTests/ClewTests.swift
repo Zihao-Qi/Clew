@@ -47,7 +47,7 @@ private struct Harness {
         #expect(note.kind == .once)
         #expect(link.state == .later && link.plannedDay == nil)
         #expect(try h.clew.today().rows.isEmpty)
-        #expect(try h.clew.laterCount() == 2)
+        #expect(try h.clew.today().goalsAndLater.map(\.id) == [link.id, note.id])
     }
 
     @Test func newItemsGoToTheEnd() throws {
@@ -230,38 +230,6 @@ private struct Harness {
 }
 
 @Suite struct LaterTests {
-    @Test func pickingMovesItemsToTodayAndRecordsPlans() throws {
-        let h = Harness()
-        let a = try h.clew.addItem(NewItem(title: "a", url: URL(string: "https://a.example"), shape: .later))
-        let b = try h.clew.addItem(NewItem(title: "b", shape: .later))
-        let habit = try h.clew.addItem(NewItem(title: "h", shape: .habit(.daily)))
-        try h.clew.planForToday(itemIds: [b.id, a.id])
-        let today = try h.clew.today()
-        #expect(today.rows.map(\.id) == [habit.id, b.id, a.id])
-        #expect(try h.clew.laterCount() == 0)
-        let plans = h.store.state.plans.values
-        #expect(Set(plans.map(\.itemId)) == [a.id, b.id])
-        #expect(plans.allSatisfy { $0.localDay == day("2026-11-11") && $0.source == .user })
-    }
-
-    @Test func pickingAllowsOneToThreeDistinctItems() throws {
-        let h = Harness()
-        let ids = try (0..<4).map { try h.clew.addItem(NewItem(title: "\($0)", shape: .later)).id }
-        #expect(throws: ClewError.pickCount) { try h.clew.planForToday(itemIds: []) }
-        #expect(throws: ClewError.pickCount) { try h.clew.planForToday(itemIds: ids) }
-        try h.clew.planForToday(itemIds: [ids[0], ids[0], ids[1], ids[2]])
-        #expect(h.store.state.plans.count == 3)
-    }
-
-    @Test func aFailedPickChangesNothing() throws {
-        let h = Harness()
-        let later = try h.clew.addItem(NewItem(title: "l", shape: .later))
-        let active = try h.clew.addItem(NewItem(title: "a", shape: .today))
-        #expect(throws: ClewError.notAllowed) { try h.clew.planForToday(itemIds: [later.id, active.id]) }
-        #expect(h.store.state.items[later.id]?.state == .later)
-        #expect(h.store.state.plans.isEmpty)
-    }
-
     @Test func moveToLaterOnlyForUnfinishedOnceItemsAndLinks() throws {
         let h = Harness()
         let once = try h.clew.addItem(NewItem(title: "o", shape: .today))
@@ -275,13 +243,6 @@ private struct Harness {
         #expect(throws: ClewError.notAllowed) { try h.clew.moveToLater(itemId: done.id) }
     }
 
-    @Test func laterItemsAreNewestFirst() throws {
-        let h = Harness()
-        let old = try h.clew.addItem(NewItem(title: "old", shape: .later))
-        h.clock.set(local(2026, 11, 11, 11))
-        let new = try h.clew.addItem(NewItem(title: "new", shape: .later))
-        #expect(try h.clew.laterItems().map(\.id) == [new.id, old.id])
-    }
 }
 
 @Suite struct GoalRoundCommandTests {
@@ -356,8 +317,7 @@ private struct Harness {
         h.clock.set(local(2026, 11, 11, 12))
         try h.clew.deleteItem(itemId: habit.id)
         try h.clew.deleteItem(itemId: later.id)
-        #expect(try h.clew.today().rows.isEmpty)
-        #expect(try h.clew.laterCount() == 0)
+        #expect(try h.clew.today().rows.isEmpty && h.clew.today().goalsAndLater.isEmpty)
         #expect(h.store.state.items[habit.id]?.deletedAt == local(2026, 11, 11, 12))
         #expect(h.store.state.items[habit.id]?.updatedAt == local(2026, 11, 11, 12))
         #expect(h.store.state.checkIns.count == 1)

@@ -11,7 +11,7 @@ import UserNotifications
 final class NotificationsAdapter: NSObject, UNUserNotificationCenterDelegate {
     /// `answer`: Done (or +1) on a slot block's "Done?", by block, so it never ticks a
     /// later day (SPEC 2026-11-10).
-    enum Action: Sendable { case done(UUID), later(UUID), open(UUID), answer(UUID) }
+    enum Action: Sendable { case done(UUID), open(UUID), answer(UUID) }
 
     private let center = UNUserNotificationCenter.current()
     private let onAction: @MainActor (Action) -> Void
@@ -106,11 +106,11 @@ final class NotificationsAdapter: NSObject, UNUserNotificationCenterDelegate {
             content.title = String(localized: "\(done)/\(total) done")
         case .eveningKindLine(let index):
             content.title = Self.kindLines[index % Self.kindLines.count]
-        case .reminder(let itemId, let title, let canOpen, let canMoveToLater):
+        case .reminder(let itemId, let title, let canOpen):
             content.title = title
             content.sound = .default
             content.userInfo["itemId"] = itemId.uuidString
-            category = Self.category(open: canOpen, later: canMoveToLater)
+            category = Self.category(open: canOpen)
         case .focusEnded(let itemId, let title):
             content.title = String(localized: "Time's up: \(title)")
             content.body = String(localized: "Open Clew to tick it, add 5 minutes or take a break.")
@@ -159,7 +159,6 @@ final class NotificationsAdapter: NSObject, UNUserNotificationCenterDelegate {
     // MARK: Actions
 
     private static let doneAction = UNNotificationAction(identifier: "done", title: String(localized: "Done"))
-    private static let laterAction = UNNotificationAction(identifier: "later", title: String(localized: "Later"))
     private static let openAction = UNNotificationAction(identifier: "open", title: String(localized: "Open"),
                                                          options: [.foreground])
 
@@ -175,21 +174,19 @@ final class NotificationsAdapter: NSObject, UNUserNotificationCenterDelegate {
         if !stale.isEmpty { center.removeDeliveredNotifications(withIdentifiers: stale) }
     }
 
-    private static func category(open: Bool, later: Bool) -> String {
-        "clew.reminder\(open ? ".open" : "")\(later ? ".later" : "")"
+    /// A reminder's buttons: Done, and Open for a link (the Later button is gone,
+    /// SPEC 2026-11-15: moving tasks happens in the menu).
+    private static func category(open: Bool) -> String {
+        "clew.reminder\(open ? ".open" : "")"
     }
 
     private static var categories: Set<UNNotificationCategory> {
         var result = Set<UNNotificationCategory>()
         for open in [false, true] {
-            for later in [false, true] {
-                var actions: [UNNotificationAction] = []
-                if open { actions.append(openAction) }
-                actions.append(doneAction)
-                if later { actions.append(laterAction) }
-                result.insert(UNNotificationCategory(identifier: category(open: open, later: later),
-                                                     actions: actions, intentIdentifiers: []))
-            }
+            var actions: [UNNotificationAction] = []
+            if open { actions.append(openAction) }
+            actions.append(doneAction)
+            result.insert(UNNotificationCategory(identifier: category(open: open), actions: actions, intentIdentifiers: []))
         }
         result.insert(UNNotificationCategory(identifier: askCategory, actions: [doneAction], intentIdentifiers: []))
         result.insert(UNNotificationCategory(identifier: askGoalCategory, actions: [plusOneAction], intentIdentifiers: []))
@@ -208,7 +205,7 @@ final class NotificationsAdapter: NSObject, UNUserNotificationCenterDelegate {
               let itemId = UUID(uuidString: raw) else { return }
         let action: Action? = switch actionId {
         case "done": .done(itemId)
-        case "later": .later(itemId)
+        // An old notification's "later" (before 2026-11-15) does nothing.
         case "open": .open(itemId)
         default: nil
         }

@@ -172,7 +172,7 @@ private func video(_ ref: String, watched: Double? = nil) -> ExternalEntry {
         #expect(throws: ClewError.notAllowed) { try clew.markNotFinished(itemId: try id("aaaaaaaaaaa")) }
         #expect(throws: ClewError.notAllowed) { try clew.markNotFinished(itemId: try id("ccccccccccc")) }
         let task = try clew.addItem(NewItem(title: "t", shape: .later))
-        try clew.letGo(itemId: task.id)                              // removed by a let-go, but the user's
+        try pastReview(store, task.id, .letGo, at: clock.now())     // removed by a let-go, but the user's
         #expect(throws: ClewError.notAllowed) { try clew.markNotFinished(itemId: task.id) }
         // Back on Watch Later, it is to watch again.
         clock.set(local(3)); try load([video("aaaaaaaaaaa"), video("bbbbbbbbbbb")])

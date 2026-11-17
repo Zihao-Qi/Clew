@@ -206,6 +206,27 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         #expect(plans.count == 1 && plans[0]["todaySortKey"] as Double? == nil)
     }
 
+    /// Schema v12 (SPEC 2026-11-15): a reminder's day round-trips; older ones are every day.
+    @Test func v12RemindersKeepTheirDay() throws {
+        let queue = try DatabaseQueue()
+        try Schema.migrator.migrate(queue, upTo: "v11-goals-without-schedule")
+        let item = UUID(), old = UUID()
+        try queue.write { db in
+            try db.execute(sql: """
+                INSERT INTO item (id, kind, title, titleOrigin, schedule, progress, state, sortKey, source, createdAt, updatedAt)
+                VALUES (?, 'once', 'x', 'typed', '{"type":"unscheduled","v":1}', '{"type":"none","v":1}', 'later', 1, 'user', ?, ?)
+                """, arguments: [item.uuidString, t0, t0])
+            try db.execute(sql: "INSERT INTO reminder (id, itemId, hour, minute, enabled, updatedAt) VALUES (?, ?, 18, 0, 1, ?)",
+                           arguments: [old.uuidString, item.uuidString, t0])
+        }
+        let store = try SQLiteStore(writer: queue)
+        #expect(try store.read { try $0.reminders() }.first?.day == nil)
+        var r = try #require(try store.read { try $0.reminders() }.first)
+        r.day = day("2026-11-11")
+        try store.write { try $0.save(r) }
+        #expect(try store.read { try $0.reminders() }.first?.day == day("2026-11-11"))
+    }
+
     /// Schema v11 (SPEC 2026-11-15): goals lose their schedule and slot; a goal with a
     /// live, undecided block gets a plan for that block's day so the block stays.
     @Test func v11MovesGoalsBelowAndKeepsTheirOpenBlocks() throws {
@@ -520,7 +541,7 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         try clew.checkIn(itemId: goal.id)
         try clew.checkIn(itemId: goal.id)
         try clew.startNextRound(itemId: goal.id)
-        try clew.planForToday(itemIds: [later.id])
+        try clew.moveToToday(itemId: later.id)
         try clew.checkIn(itemId: habit.id)
         try clew.undoToday(itemId: habit.id)
         try clew.deleteItem(itemId: habit.id)
@@ -626,7 +647,6 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
             for r in [gone, kept, voided] { try w.insert(r) }
         }
         try store.writer.write { try $0.execute(sql: "UPDATE laterReview SET voidedAt = ? WHERE id = ?", arguments: [t0, voided.id.uuidString]) }
-        #expect(try store.read { try $0.letGoCount() } == 1)
         #expect(try store.read { try $0.laterReviews(itemIds: [b.id]) }.map(\.id) == [kept.id])
         for assignment in ["decision = 'keep'", "at = '2030-01-01 00:00:00.000'", "localDay = '2026-11-10'", "source = 'dayflow'"] {
             #expect(throws: DatabaseError.self) {

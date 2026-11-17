@@ -14,7 +14,6 @@ struct SettingsView: View {
     @State private var openAtLogin = LoginItem.isEnabled
     @State private var loginMessage: String?
     @State private var activeDays: ActiveDays?
-    @State private var letGoCount = 0
     @State private var ratingDots = false
     @State private var barStyle = Clew.defaultBarStyle
     @State private var listsOff: Set<Source> = []
@@ -248,13 +247,8 @@ struct SettingsView: View {
                     } label: {
                         Text("Active days")
                     }
-                    LabeledContent {
-                        Text(verbatim: "\(letGoCount)").monospacedDigit()
-                    } label: {
-                        Text("Let go from Later")
-                    }
                 } footer: {
-                    Text("A day with at least one tick. Letting go of what you no longer want counts as a win.")
+                    Text("A day with at least one tick.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -384,7 +378,6 @@ struct SettingsView: View {
         }
         activeDays = model.activeDays()
         backupList = model.backupList()
-        letGoCount = model.lettingGoCount()
         ratingDots = model.ratingsOn
         barStyle = model.barStyle
         listsOff = model.collectionsOff()

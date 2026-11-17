@@ -216,7 +216,6 @@ struct AddView: View {
         let timeSlot = kind == .habit ? slot.slot : nil
         if model.add(NewItem(title: parsed.title, titleOrigin: origin, url: parsed.url, shape: shape, slot: timeSlot)) {
             done()
-            if kind == .later { model.confirmSavedToLater() }
         }
     }
 }
@@ -232,6 +231,8 @@ struct EditView: View {
     @State private var target: Int
     @State private var remind: Bool
     @State private var remindAt: TimeOfDay
+    /// Today only, or every day (SPEC 2026-11-15).
+    @State private var remindToday = false
     @State private var slot: SlotDraft
     private let existingReminder: Reminder?
 
@@ -247,6 +248,7 @@ struct EditView: View {
         let reminder = model.reminder(for: item.id)
         existingReminder = reminder
         _remind = State(initialValue: reminder != nil)
+        _remindToday = State(initialValue: reminder?.day != nil)
         _remindAt = State(initialValue: reminder?.time ?? TimeOfDay(hour: 18, minute: 0)!)
     }
 
@@ -270,7 +272,8 @@ struct EditView: View {
             if hasSchedule {
                 SlotRow(draft: $slot)
             }
-            ReminderRow(enabled: $remind, time: $remindAt)
+            ReminderRow(enabled: $remind, time: $remindAt, today: $remindToday,
+                        passed: remind && remindToday && model.reminderTimePassed(remindAt))
             if model.notificationsDenied, remind {
                 NotificationsOffNotice()
             }
@@ -305,137 +308,18 @@ struct EditView: View {
             target: item.kind == .goal ? target : nil,
             slot: hasSchedule ? .set(slot.slot) : .keep
         )
-        guard model.edit(item.id, edit) else { return }
         let wanted: TimeOfDay? = remind ? remindAt : nil
-        if wanted != existingReminder?.time {
-            guard model.setReminder(item.id, wanted) else { return }
+        // Today at a passed time: nothing is saved until the time or the choice changes.
+        if let wanted, remindToday, model.reminderTimePassed(wanted) {
+            model.notice = AppModel.message(for: .reminderTimePassed)
+            return
+        }
+        guard model.edit(item.id, edit) else { return }
+        let changed = wanted != existingReminder?.time || (wanted != nil && remindToday != (existingReminder?.day != nil))
+        if changed {
+            guard model.setReminder(item.id, wanted, todayOnly: remindToday) else { return }
         }
         done()
-    }
-}
-
-struct PickView: View {
-    let model: AppModel
-    let done: () -> Void
-
-    @State private var items: [LaterEntry] = []
-    @State private var picked: [UUID] = []
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Pick 1–3 for today")
-                .font(.headline)
-                .accessibilityAddTraits(.isHeader)
-
-            if items.isEmpty {
-                Text("Later is empty.")
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 8)
-            } else if items.count <= 6 {
-                pickList
-            } else {
-                // A menu bar window sizes to its content, so the scroll area needs a
-                // fixed height or it collapses to one row.
-                ScrollView { pickList }
-                    .frame(height: 280)
-            }
-
-            NoticeView(text: model.notice ?? model.confirmation)
-
-            HStack {
-                Spacer()
-                Button("Cancel", action: done)
-                    .keyboardShortcut(.cancelAction)
-                Button("Add to today") {
-                    if model.pick(picked) { done() }
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(picked.isEmpty)
-            }
-        }
-        .padding(12)
-        .onAppear { items = model.laterPile() }
-    }
-
-    private var pickList: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(items) { entry in
-                let item = entry.item
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
-                        Toggle(isOn: binding(for: item.id)) {
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(item.title).lineLimit(1)
-                                let site = entry.siteLabel
-                                if site != nil || entry.asksStillWant {
-                                    Text(verbatim: [site, entry.asksStillWant ? Self.weeks(entry.daysWaiting) : nil]
-                                        .compactMap { $0 }.joined(separator: " · "))
-                                        .font(.caption).foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                        .toggleStyle(.checkbox)
-                        .disabled(!picked.contains(item.id) && picked.count >= Clew.maxPicks)
-                        .accessibilityLabel(Text(item.title))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                        Button { delete(item) } label: { Image(systemName: "xmark") }
-                            .buttonStyle(.borderless)
-                            .foregroundStyle(.secondary)
-                            .accessibilityLabel(Text("Delete \(item.title)"))
-                    }
-                    // SPEC §5: waited 6+ weeks untouched. Saying no counts as a win.
-                    if entry.asksStillWant {
-                        HStack(spacing: 8) {
-                            Text("Still want this?").font(.caption).foregroundStyle(.secondary)
-                            Button("Keep") { keep(item) }
-                                .accessibilityLabel(Text("Keep \(item.title)"))
-                            Button("Let go") { letGo(item) }
-                                .accessibilityLabel(Text("Let go of \(item.title)"))
-                        }
-                        .controlSize(.small)
-                        .padding(.leading, 22)
-                    }
-                }
-                .padding(.vertical, 2)
-                .padding(.horizontal, 4)
-                .contextMenu {
-                    Button("Delete", role: .destructive) { delete(item) }
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    /// "7 weeks", in the user's language.
-    static func weeks(_ days: Int) -> String {
-        String(localized: "\(days / 7) weeks")
-    }
-
-    private func keep(_ item: Item) {
-        model.keepLater(item.id)
-        items = model.laterPile()
-    }
-
-    private func letGo(_ item: Item) {
-        model.letGo(item.id)
-        picked.removeAll { $0 == item.id }
-        items = model.laterPile()
-    }
-
-    private func delete(_ item: Item) {
-        model.delete(item.id)
-        picked.removeAll { $0 == item.id }
-        items = model.laterPile()
-    }
-
-    private func binding(for id: UUID) -> Binding<Bool> {
-        Binding(
-            get: { picked.contains(id) },
-            set: { on in
-                if on { if !picked.contains(id) { picked.append(id) } } else { picked.removeAll { $0 == id } }
-            }
-        )
     }
 }
 
@@ -511,21 +395,47 @@ struct SlotRow: View {
     }
 }
 
-/// "Remind me [18:00]": one gentle notification on each day the item is on the list.
+/// "Remind me [18:00] [Today | Every day]": one gentle notification, today only or on
+/// each day the item is in a list and not done (SPEC 2026-11-15).
 struct ReminderRow: View {
     @Binding var enabled: Bool
     @Binding var time: TimeOfDay
+    @Binding var today: Bool
+    /// Today at a time already past: said under the row, and Save is refused.
+    var passed = false
 
     var body: some View {
-        HStack {
-            Toggle("Remind me", isOn: $enabled)
-                .accessibilityLabel(Text("Remind me"))
-            if enabled {
-                TimePicker(time: $time)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Toggle("Remind me", isOn: $enabled)
                     .fixedSize()
-                    .accessibilityLabel(Text("Reminder time"))
+                    .accessibilityLabel(Text("Remind me"))
+                if enabled {
+                    TimePicker(time: $time)
+                        .fixedSize()
+                        .accessibilityLabel(Text("Reminder time"))
+                }
+                Spacer()
             }
-            Spacer()
+            if enabled {
+                // On its own line, under the switch's label, so "Remind me" never wraps.
+                Picker(selection: $today) {
+                    Text("Today").tag(true)
+                    Text("Every day").tag(false)
+                } label: {
+                    Text("Repeat")
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .fixedSize()
+                .padding(.leading, 20)
+                .accessibilityLabel(Text("Remind today or every day"))
+            }
+            if passed {
+                Text("That time has passed today.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 }

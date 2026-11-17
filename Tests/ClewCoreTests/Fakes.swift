@@ -143,9 +143,6 @@ final class FakeStore: ClewStore, @unchecked Sendable {
             let ids = Set(itemIds)
             return state.laterReviews.values.filter { ids.contains($0.itemId) && $0.voidedAt == nil }.sorted { $0.at < $1.at }
         }
-        func letGoCount() throws -> Int {
-            state.laterReviews.values.filter { $0.decision == .letGo && $0.voidedAt == nil && $0.source == .user }.count
-        }
         func items(source: Source) throws -> [Item] {
             state.items.values.filter { $0.source == source }.sorted { $0.sortKey < $1.sortKey }
         }
@@ -261,6 +258,21 @@ final class FakeStore: ClewStore, @unchecked Sendable {
             guard p.voidedAt == nil else { throw FactViolation.revoid }
             p.voidedAt = at
             state.plans[id] = p
+        }
+    }
+}
+
+
+/// "Keep" and "Let go" as versions before 2026-11-15 recorded them (the commands are
+/// gone; the facts stay in history and the import rules still read them).
+func pastReview(_ store: any ClewStore, _ itemId: UUID, _ decision: LaterReview.Decision, at: Date,
+                day: LocalDay = LocalDay(string: "2026-11-11")!) throws {
+    try store.write { w in
+        try w.insert(LaterReview(id: UUID(), itemId: itemId, decision: decision, at: at, localDay: day, source: .user))
+        if decision == .letGo, var item = try w.item(id: itemId) {
+            item.deletedAt = at
+            item.updatedAt = at
+            try w.update(item)
         }
     }
 }

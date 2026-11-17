@@ -80,7 +80,6 @@ private let a = "aaaaaaaaaaa", b = "bbbbbbbbbbb", c = "ccccccccccc", d = "dddddd
         #expect(try listed() == 1)
         // Recorded as the import's decision, not counted as the user's win.
         #expect(store.state.laterReviews.values.allSatisfy { $0.decision == .letGo && $0.source == .extensionYouTube })
-        #expect(try clew.lettingGoCount() == 0)
     }
 
     @Test func aLetGoItemTakesItsReminderWithIt() throws {
@@ -140,8 +139,8 @@ private let a = "aaaaaaaaaaa", b = "bbbbbbbbbbb", c = "ccccccccccc", d = "dddddd
     @Test func collectionItemsStayInTheirCollection() throws {
         try clew.importExternal(batch([video(a)], total: 1))
         let item = try #require(imported(a))
-        #expect(throws: ClewError.notAllowed) { try clew.planForToday(itemIds: [item.id]) }
-        #expect(try clew.laterCount() == 0 && clew.laterPile().isEmpty && clew.laterItems().isEmpty)
+        #expect(throws: ClewError.notAllowed) { try clew.moveToToday(itemId: item.id) }
+        #expect(try clew.today().goalsAndLater.isEmpty)   // never in Goals & Later
         #expect(try clew.today().rows.isEmpty)
         // Picked before collections existed: still not on Today.
         try store.write { w in
@@ -181,7 +180,7 @@ private let a = "aaaaaaaaaaa", b = "bbbbbbbbbbb", c = "ccccccccccc", d = "dddddd
     @Test func whatTheUserDeletedOrLetGoStaysGone() throws {
         try clew.importExternal(batch([video(a), video(b)], total: 2))
         try clew.deleteItem(itemId: try #require(imported(a)).id)
-        try clew.letGo(itemId: try #require(imported(b)).id)
+        try pastReview(store, try #require(imported(b)).id, .letGo, at: clock.now())
         let r = try clew.importExternal(batch([video(a), video(b)], total: 2))
         #expect(r.restored == 0 && r.added == 0)
         #expect(imported(a)?.deletedAt != nil && imported(b)?.deletedAt != nil)
@@ -194,7 +193,7 @@ private let a = "aaaaaaaaaaa", b = "bbbbbbbbbbb", c = "ccccccccccc", d = "dddddd
         try clew.importExternal(batch([video(d)], total: 1))
         clock.set(local(11, 10))
         try clew.importExternal(batch([video(a)], total: 1))
-        try clew.letGo(itemId: try #require(imported(a)).id)
+        try pastReview(store, try #require(imported(a)).id, .letGo, at: clock.now())
         #expect(try clew.importExternal(batch([video(a)], total: 1)).restored == 0)
         #expect(imported(a)?.deletedAt != nil)
     }

@@ -7,13 +7,14 @@ public enum ClewError: Error, Equatable, Sendable {
     case invalidURL
     case invalidTarget
     case invalidSchedule
-    case pickCount
     /// A counted goal has reached its target: start a next round or raise it first.
     case goalReached
     case itemNotFound
     case checkInNotFound
     /// The command does not apply to this item in its current kind or state.
     case notAllowed
+    /// A reminder for today at a time already past today (SPEC 2026-11-15).
+    case reminderTimePassed
     /// An import batch is larger than any list the site offers.
     case tooManyEntries(max: Int)
     /// The user turned this imported list off in Settings.
@@ -87,7 +88,6 @@ public struct ItemEdit: Hashable, Sendable {
 public final class Clew: Sendable {
     public static let maxTitleLength = 200
     public static let maxTarget = 100_000
-    public static let maxPicks = 3
 
     private let store: any ClewStore
     private let clock: any Clock
@@ -158,17 +158,6 @@ public final class Clew: Sendable {
     /// One item by id, if it exists and is not deleted.
     public func item(id: UUID) throws -> Item? {
         try store.read { try $0.item(id: id) }.flatMap { $0.deletedAt == nil ? $0 : nil }
-    }
-
-    /// The Later pile, newest first. Its contents are shown only when picking.
-    public func laterItems() throws -> [Item] {
-        try store.read { r in
-            try r.items(inStates: [.later]).filter { !Self.isCollectionItem($0) }.sorted { ($0.createdAt, $0.id.uuidString) > ($1.createdAt, $1.id.uuidString) }
-        }
-    }
-
-    public func laterCount() throws -> Int {
-        try store.read { try $0.items(inStates: [.later]).filter { !Self.isCollectionItem($0) }.count }
     }
 
     public func observeChanges(_ onChange: @escaping @Sendable () -> Void) -> any StoreObservation {
@@ -315,31 +304,6 @@ public final class Clew: Sendable {
             guard let checkIn = try w.checkIn(id: id) else { throw ClewError.checkInNotFound }
             guard !checkIn.isVoided else { return }
             try w.voidCheckIn(id: id, at: now, reason: reason)
-        }
-    }
-
-    /// "Pick 1–3 for today": moves Later items onto Today's list and records a
-    /// `Plan` fact for each, so pick history survives later re-planning.
-    public func planForToday(itemIds: [UUID], source: Source = .user) throws {
-        var seen = Set<UUID>()
-        let ids = itemIds.filter { seen.insert($0).inserted }
-        guard (1...Self.maxPicks).contains(ids.count) else { throw ClewError.pickCount }
-        let now = clock.now()
-        let day = currentDay()
-        try store.write { w in
-            var sortKey = (try w.maxSortKey() ?? 0)
-            for id in ids {
-                guard var item = try w.item(id: id), item.deletedAt == nil else { throw ClewError.itemNotFound }
-                // A collection's items stay in their collection (SPEC 2026-11-09).
-                guard item.state == .later, !Self.isCollectionItem(item) else { throw ClewError.notAllowed }
-                sortKey += 1
-                item.state = .active
-                item.plannedDay = day
-                item.sortKey = sortKey
-                item.updatedAt = now
-                try w.update(item)
-                try w.insert(Plan(id: makeID(), itemId: id, localDay: day, at: now, source: source))
-            }
         }
     }
 

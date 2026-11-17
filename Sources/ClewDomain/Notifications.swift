@@ -23,17 +23,27 @@ public struct Reminder: Hashable, Sendable, Identifiable, Codable {
     public var itemId: UUID
     public var time: TimeOfDay
     public var enabled: Bool
+    /// Today only (SPEC 2026-11-15): the Clew day it fires on; after it the reminder is
+    /// spent. Nil: every day.
+    public var day: LocalDay?
     public var updatedAt: Date
     public var deletedAt: Date?
 
-    public init(id: UUID, itemId: UUID, time: TimeOfDay, enabled: Bool = true, updatedAt: Date, deletedAt: Date? = nil) {
+    public init(id: UUID, itemId: UUID, time: TimeOfDay, enabled: Bool = true, day: LocalDay? = nil,
+                updatedAt: Date, deletedAt: Date? = nil) {
         self.id = id
         self.itemId = itemId
         self.time = time
         self.enabled = enabled
+        self.day = day
         self.updatedAt = updatedAt
         self.deletedAt = deletedAt
     }
+
+    /// Fires on `day`: every day, or its own day only.
+    public func fires(on day: LocalDay) -> Bool { enabled && (self.day == nil || self.day == day) }
+    /// A one-day reminder whose day is over is off for everyone.
+    public func isSpent(today: LocalDay) -> Bool { day.map { $0 < today } ?? false }
 }
 
 /// Day summaries (SPEC §7): each optional, off until switched on.

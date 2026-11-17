@@ -47,9 +47,6 @@ public protocol StoreReader {
     func setting(_ key: String) throws -> String?
     /// Non-voided "still want this?" answers for these items.
     func laterReviews(itemIds: [UUID]) throws -> [LaterReview]
-    /// How many items the user let go (non-voided), all time. Let-gos made by an
-    /// import (an item that left an external list) are not the user's, so not counted.
-    func letGoCount() throws -> Int
     /// Every item from `source`, soft-deleted ones included (imports are keyed by
     /// `(source, externalRef)`).
     func items(source: Source) throws -> [Item]

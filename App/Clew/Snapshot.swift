@@ -34,7 +34,7 @@ enum Snapshot {
                 titles.enumerated().map { i, t in
                     PlannedNotification(id: "clew.selftest.\(i)", fireAt: fire.addingTimeInterval(Double(i) * 60),
                                         content: .reminder(itemId: UUID(uuidString: "00000000-0000-0000-0000-00000000000\(i)")!,
-                                                           title: t, canOpen: false, canMoveToLater: true))
+                                                           title: t, canOpen: false))
                 }
             }
             let settings = await UNUserNotificationCenter.current().notificationSettings()
@@ -410,7 +410,7 @@ enum Snapshot {
                     "entries": [["externalRef": "dQw4w9WgXcQ", "title": "Debug video"]],
                     "scan": ["found": 1, "parsed": 1, "selectorVersion": "debug"],
                 ], token: token)
-                print("import:", importStatus, answer["laterCount"] ?? "-", "later:", try clew.laterItems().map(\.title))
+                print("import:", importStatus, "watch later:", try clew.collection(.extensionYouTube)?.notStarted.map(\.item.title) ?? [])
                 let (bad, _) = try await post("/import", ["source": "extension.youtube", "entries": []], token: "wrong")
                 print("wrong token:", bad)
                 listener.stop()
@@ -506,11 +506,17 @@ enum Snapshot {
                 render(RootView(model: model, screen: .edit(pages.item, back: .list)), appearance: .aqua,
                        to: dir.appendingPathComponent("edit-slot-light.png"))
             }
+            // A reminder's Today / Every day choice (SPEC 2026-11-15), on the goal with one.
+            if let course = (model.today?.rows ?? []).first(where: { $0.item.title == "ML course" })
+                ?? model.goalsAndLater.first(where: { $0.item.title == "ML course" }) {
+                render(RootView(model: model, screen: .edit(course.item, back: .list)), appearance: .aqua,
+                       to: dir.appendingPathComponent("edit-reminder-light.png"))
+            }
             if let papers = model.today?.rows.first(where: { $0.item.title == "Write intro" }) {
                 render(RootView(model: model, screen: .place(papers.id, block: nil)), appearance: .aqua,
                        to: dir.appendingPathComponent("place-light.png"))
             }
-            for (name, screen) in [("list", Screen.list), ("add", .add), ("pick", .pick),
+            for (name, screen) in [("list", Screen.list), ("add", .add),
                                    ("edit", .edit(editing, back: .list)), ("detail", .detail(editing.id)),
                                    ("collection", .collection(.extensionYouTube)),
                                    ("collection-x", .collection(.extensionX))] {

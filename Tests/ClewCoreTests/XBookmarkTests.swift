@@ -49,7 +49,7 @@ private let a = "1850000000000000001", b = "1850000000000000002", c = "185000000
         #expect(i.titleOrigin == .fetched && i.source == .extensionX)
         let row = try #require(try clew.collections().first { $0.source == .extensionX })
         #expect(row.toWatch == 1 && row.onList == 1)
-        #expect(try clew.today().total == 0 && clew.laterPile().isEmpty)
+        #expect(try clew.today().total == 0 && clew.today().goalsAndLater.isEmpty)
     }
 
     @Test func toReadFollowsXsOrderNewestBookmarkFirst() throws {

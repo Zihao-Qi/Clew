@@ -409,7 +409,7 @@ private let tuesday = LocalDay(string: "2026-11-10")!
         try settle(at: at(10, 10))
         try settle(at: at(10, 12))
         #expect(ticks(a).isEmpty)
-        try clew.planForToday(itemIds: [a])                // back the same day, without blocks
+        try clew.moveToToday(itemId: a)                    // back the same day, without blocks
         #expect(try clew.timeline().blocks.isEmpty)
         // Before Clew settles, a block of a task gone from Today gets no second block.
         let c = try task("c")

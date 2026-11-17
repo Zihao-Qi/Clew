@@ -39,8 +39,8 @@ private func local(_ d: Int, _ h: Int) -> Date {
         let clew = Clew(store: store, clock: clock, zones: FixedZone("America/New_York"))
         try clew.setRatingsEnabled(true)
         let link = try clew.addItem(NewItem(title: "v", url: URL(string: "https://example.com/v"), shape: .later))
-        clock.set(local(5, 10)); try clew.keepLater(itemId: link.id)
-        clock.set(local(9, 10)); try clew.planForToday(itemIds: [link.id])
+        clock.set(local(5, 10)); try pastReview(store, link.id, .keep, at: local(5, 10))
+        clock.set(local(9, 10)); try clew.moveToToday(itemId: link.id)
         clock.set(local(9, 12)); let tick = try clew.checkIn(itemId: link.id)
         try clew.rate(checkInId: tick.id, rating: 4)
 
@@ -50,13 +50,29 @@ private func local(_ d: Int, _ h: Int) -> Date {
         #expect(d.history.map(\.at) == [local(3, 10), local(5, 10), local(9, 10), local(9, 12)])
     }
 
+    /// SPEC 2026-11-15: one "Moved to Today" line per day, its latest plan, live or not
+    /// (a reorder re-inserts the plan; moving back voids it).
+    @Test func movedToTodayIsOneLinePerDayEvenIfMovedBack() throws {
+        let store = FakeStore()
+        let clock = TestClock(local(3, 10))
+        let clew = Clew(store: store, clock: clock, zones: FixedZone("America/New_York"))
+        let link = try clew.addItem(NewItem(title: "v", url: URL(string: "https://example.com/v"), shape: .later))
+        let other = try clew.addItem(NewItem(title: "o", shape: .today))
+        clock.set(local(3, 11)); try clew.moveToToday(itemId: link.id)
+        clock.set(local(3, 12)); try clew.place(itemId: link.id, in: .today, after: nil, before: other.id)  // reorder
+        clock.set(local(3, 13)); try clew.moveBack(itemId: link.id)
+        let d = try #require(try clew.details(itemId: link.id))
+        #expect(d.history.map(\.event) == [.added(.user), .picked])
+        #expect(d.history.last?.at == local(3, 12))
+    }
+
     @Test func historyIsTheLatestLinesWithoutUndoneTicks() throws {
         let store = FakeStore()
         let clock = TestClock(local(1, 10))
         let clew = Clew(store: store, clock: clock, zones: FixedZone("America/New_York"))
         let link = try clew.addItem(NewItem(title: "v", url: URL(string: "https://example.com/v"), shape: .later))
-        for day in 2...8 { clock.set(local(day, 10)); try clew.keepLater(itemId: link.id) }
-        clock.set(local(9, 10)); try clew.planForToday(itemIds: [link.id])
+        for day in 2...8 { clock.set(local(day, 10)); try pastReview(store, link.id, .keep, at: local(day, 10)) }
+        clock.set(local(9, 10)); try clew.moveToToday(itemId: link.id)
         try clew.checkIn(itemId: link.id)
         try clew.undoToday(itemId: link.id)
 

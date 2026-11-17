@@ -65,15 +65,19 @@ extension Clew {
             var history: [HistoryEntry] = []
             if item.kind == .once || item.kind == .link {
                 history.append(HistoryEntry(at: item.createdAt, event: .added(item.source)))
-                history += try r.plans(itemId: itemId).filter { $0.voidedAt == nil }
-                    .map { HistoryEntry(at: $0.at, event: .picked) }
+                // Moved to Today: one line per day, its latest plan, live or not (a reorder
+                // re-inserts the plan; moving back voids it; SPEC 2026-11-15).
+                let plans = Dictionary(grouping: try r.plans(itemId: itemId), by: \.localDay)
+                    .compactMapValues { $0.max { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) } }
+                history += plans.values.map { HistoryEntry(at: $0.at, event: .picked) }
                 history += checkIns.map { HistoryEntry(at: $0.at, event: .done(rating: $0.rating)) }
                 history += try r.laterReviews(itemIds: [itemId]).filter { $0.decision == .keep }
                     .map { HistoryEntry(at: $0.at, event: .kept) }
                 history = Array(history.sorted { $0.at < $1.at }.suffix(Self.historyLength))
             }
             return ItemDetails(item: item, today: today, stats: stats, progressAmount: progress,
-                               reminder: try r.reminders().first { $0.itemId == itemId },
+                               // A spent one-day reminder shows nothing (SPEC 2026-11-15).
+                               reminder: try r.reminders().first { $0.itemId == itemId && !$0.isSpent(today: today) },
                                watch: try r.watchProgress(itemIds: [itemId])[itemId], history: history)
         }
     }
