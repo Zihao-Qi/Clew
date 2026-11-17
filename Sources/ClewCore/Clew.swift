@@ -32,7 +32,8 @@ public enum NewItemShape: Hashable, Sendable {
     /// Into the Later pile: a `link` if it has a URL, otherwise a `once`.
     case later
     case habit(Schedule)
-    case goal(target: Int, schedule: Schedule)
+    /// A counted goal: it lives in Goals & Later and has no schedule (SPEC 2026-11-15).
+    case goal(target: Int)
 }
 
 public struct NewItem: Hashable, Sendable {
@@ -40,7 +41,8 @@ public struct NewItem: Hashable, Sendable {
     public var titleOrigin: TitleOrigin
     public var url: URL?
     public var shape: NewItemShape
-    /// A habit's or goal's time slot on the day timeline (SPEC 2026-11-10).
+    /// A habit's time slot on the day timeline (SPEC 2026-11-10; goals have none since
+    /// 2026-11-15).
     public var slot: TimeSlot?
 
     public init(title: String, titleOrigin: TitleOrigin = .typed, url: URL? = nil, shape: NewItemShape,
@@ -60,13 +62,14 @@ public enum SlotEdit: Hashable, Sendable {
 }
 
 /// The editable fields of an item, as a full replacement. `schedule` applies to
-/// habits and goals, `target` to goals; both must be nil otherwise.
+/// habits, `target` to goals (which have no schedule since 2026-11-15); both must be
+/// nil otherwise.
 public struct ItemEdit: Hashable, Sendable {
     public var title: String
     public var url: URL?
     public var schedule: Schedule?
     public var target: Int?
-    /// Habits and goals only; `.keep` leaves the slot as it is.
+    /// Habits only (goals have none since 2026-11-15); `.keep` leaves the slot as it is.
     public var slot: SlotEdit
 
     public init(title: String, url: URL?, schedule: Schedule? = nil, target: Int? = nil, slot: SlotEdit = .keep) {
@@ -195,13 +198,13 @@ public final class Clew: Sendable {
             (kind, schedule, progress, state, planned) = (url == nil ? .once : .link, .unscheduled, .none, .later, nil)
         case .habit(let s):
             (kind, schedule, progress, state, planned) = (.habit, try Self.validSchedule(s), .none, .active, nil)
-        case .goal(let target, let s):
+        case .goal(let target):
             (kind, schedule, progress, state, planned) =
-                (.goal, try Self.validSchedule(s), .counter(target: try Self.validTarget(target)), .active, nil)
+                (.goal, .unscheduled, .counter(target: try Self.validTarget(target)), .active, nil)
         }
 
-        // Only repeating tasks have a slot.
-        guard new.slot == nil || kind == .habit || kind == .goal else { throw ClewError.notAllowed }
+        // Only habits have a slot (goals lost theirs, SPEC 2026-11-15).
+        guard new.slot == nil || kind == .habit else { throw ClewError.notAllowed }
         let item = Item(
             id: makeID(), kind: kind, title: title, titleOrigin: new.titleOrigin, url: url,
             schedule: schedule, progress: progress,
@@ -227,9 +230,10 @@ public final class Clew: Sendable {
                 guard edit.target == nil, let s = edit.schedule else { throw ClewError.invalidSchedule }
                 item.schedule = try Self.validSchedule(s)
             case .goal:
-                guard let s = edit.schedule else { throw ClewError.invalidSchedule }
+                // No schedule and no slot (SPEC 2026-11-15).
+                guard edit.schedule == nil else { throw ClewError.notAllowed }
+                if case .set(let slot) = edit.slot, slot != nil { throw ClewError.notAllowed }
                 guard let t = edit.target else { throw ClewError.invalidTarget }
-                item.schedule = try Self.validSchedule(s)
                 item.progress = .counter(target: try Self.validTarget(t))
             }
             if title != item.title { item.titleOrigin = .typed }

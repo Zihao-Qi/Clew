@@ -9,7 +9,7 @@ import Testing
     var clew: Clew { Clew(store: store, clock: clock, zones: FixedZone("UTC")) }
 
     @Test func goalsAreRatedOnHoverOnlySoTheirCountStaysVisible() throws {
-        let goal = try clew.addItem(NewItem(title: "g", shape: .goal(target: 30, schedule: .daily)))
+        let goal = try clew.addItem(NewItem(title: "g", shape: .goal(target: 30)))
         let habit = try clew.addItem(NewItem(title: "h", shape: .habit(.daily)))
         let once = try clew.addItem(NewItem(title: "o", shape: .today))
         #expect(!Clew.hintsRatingAfterTick(goal))
@@ -50,7 +50,7 @@ import Testing
     }
 
     @Test func detailsCountHowRatedTicksFelt() throws {
-        let item = try clew.addItem(NewItem(title: "g", shape: .goal(target: 99, schedule: .daily)))
+        let item = try clew.addItem(NewItem(title: "g", shape: .goal(target: 99)))
         let ticks = try (0..<4).map { i in
             clock.set(Date(timeIntervalSince1970: 1_800_000_000 + Double(i) * 60)) // one minute apart
             return try clew.checkIn(itemId: item.id)

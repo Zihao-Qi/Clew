@@ -198,7 +198,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Day timeline")
                 } footer: {
-                    Text("Today's hours above the list. Drag a task onto an hour; when its block ends, the task is ticked. A habit or goal can have its own time in Edit: it appears there each day and asks \"Done?\" at its end. Block alerts: when a block starts, and that question.")
+                    Text("Today's hours above the list. Drag a task onto an hour; when its block ends, the task is ticked. A habit can have its own time in Edit: it appears there each day and asks \"Done?\" at its end. Block alerts: when a block starts, and that question.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

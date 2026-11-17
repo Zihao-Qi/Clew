@@ -68,7 +68,7 @@ enum Snapshot {
             do {
                 let clew = Clew(store: try SQLiteStore.inMemory(), clock: SystemClock(), zones: SystemTimeZone())
                 let goal = try clew.addItem(NewItem(title: "ML course", url: URL(string: "https://course.example"),
-                                                    shape: .goal(target: 30, schedule: .daily)))
+                                                    shape: .goal(target: 30)))
                 try clew.checkIn(itemId: goal.id)
                 try clew.checkIn(itemId: goal.id)
                 let model = AppModel(clew: clew, notify: false)
@@ -643,7 +643,7 @@ enum Snapshot {
         let exercise = try clew.addItem(NewItem(title: "Exercise", shape: .habit(.daily)))
         let job = try clew.addItem(NewItem(title: "Apply to 1 job", shape: .today))
         let course = try clew.addItem(NewItem(title: "ML course", url: URL(string: "https://course.example"),
-                                              shape: .goal(target: 30, schedule: .daily)))
+                                              shape: .goal(target: 30)))
         _ = try clew.addItem(NewItem(title: "Stretch", shape: .habit(.timesPerWeek(3))))
         _ = try clew.addItem(NewItem(title: "A very long item title that should truncate nicely in the row",
                                      shape: .today))
@@ -661,10 +661,10 @@ enum Snapshot {
         summaries.morningEnabled = true
         summaries.eveningEnabled = true
         try clew.setSummaries(summaries)
-        _ = try clew.addItem(NewItem(title: "Read papers", shape: .goal(target: 30, schedule: .daily)))
-        let pages = try clew.addItem(NewItem(title: "Book pages", shape: .goal(target: 500, schedule: .daily)))
+        _ = try clew.addItem(NewItem(title: "Read papers", shape: .goal(target: 30)))
+        let pages = try clew.addItem(NewItem(title: "Book pages", shape: .goal(target: 500)))
         for _ in 0..<120 { try clew.checkIn(itemId: pages.id) }
-        let pushups = try clew.addItem(NewItem(title: "Push-ups", shape: .goal(target: 3, schedule: .daily)))
+        let pushups = try clew.addItem(NewItem(title: "Push-ups", shape: .goal(target: 3)))
         for _ in 0..<3 { try clew.checkIn(itemId: pushups.id) }
         try clew.checkIn(itemId: exercise.id)
         try clew.checkIn(itemId: job.id)

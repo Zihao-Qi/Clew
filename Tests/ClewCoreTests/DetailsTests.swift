@@ -14,7 +14,7 @@ private func local(_ d: Int, _ h: Int) -> Date {
         let store = FakeStore()
         let clock = TestClock(local(2, 10))
         let clew = Clew(store: store, clock: clock, zones: FixedZone("America/New_York"))
-        let goal = try clew.addItem(NewItem(title: "g", shape: .goal(target: 2, schedule: .daily)))
+        let goal = try clew.addItem(NewItem(title: "g", shape: .goal(target: 2)))
         try clew.checkIn(itemId: goal.id)
         clock.set(local(9, 10))
         try clew.checkIn(itemId: goal.id)           // round 1 reached on Nov 9

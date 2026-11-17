@@ -166,8 +166,10 @@ extension Clew {
         let now = clockForQueries.now()
         let blockTicked = try storeForQueries.read { r in
             try r.timeBlocks(from: currentDay().adding(days: -1)).contains { b in
-                // A block's tick, or the answer to a slot block's "Done?".
-                let id = b.tickId ?? (b.origin == .slot ? b.coverId : nil)
+                // A block's tick. (A slot block's answer was recorded as `coverId` only
+                // for a goal's +1; goals have no slots since 2026-11-15, and a habit's
+                // answered block is skipped with no `coverId`, as before.)
+                let id = b.tickId
                 guard b.itemId == running.itemId, let id, let t = try r.checkIn(id: id) else { return false }
                 return !t.isVoided && t.at >= running.startedAt && t.at <= now
             }

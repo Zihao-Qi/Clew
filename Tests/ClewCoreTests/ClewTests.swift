@@ -71,7 +71,7 @@ private struct Harness {
             try h.clew.addItem(NewItem(title: "x", url: URL(string: "javascript:alert(1)"), shape: .later))
         }
         #expect(throws: ClewError.invalidTarget) {
-            try h.clew.addItem(NewItem(title: "x", shape: .goal(target: 0, schedule: .daily)))
+            try h.clew.addItem(NewItem(title: "x", shape: .goal(target: 0)))
         }
         #expect(throws: ClewError.invalidSchedule) { try h.clew.addItem(NewItem(title: "x", shape: .habit(.weekdays([])))) }
         #expect(throws: ClewError.invalidSchedule) { try h.clew.addItem(NewItem(title: "x", shape: .habit(.timesPerWeek(8)))) }
@@ -79,7 +79,7 @@ private struct Harness {
         #expect(h.store.state.items.isEmpty)
         // The boundaries themselves are valid.
         try h.clew.addItem(NewItem(title: String(repeating: "a", count: 200), shape: .habit(.timesPerWeek(7))))
-        try h.clew.addItem(NewItem(title: "x", shape: .goal(target: 1, schedule: .daily)))
+        try h.clew.addItem(NewItem(title: "x", shape: .goal(target: 1)))
     }
 }
 
@@ -108,7 +108,7 @@ private struct Harness {
 
     @Test func goalRecordsPlusOneEveryClick() throws {
         let h = Harness()
-        let goal = try h.clew.addItem(NewItem(title: "ML course", shape: .goal(target: 30, schedule: .daily)))
+        let goal = try h.clew.addItem(NewItem(title: "ML course", shape: .goal(target: 30)))
         for _ in 0..<3 { try h.clew.checkIn(itemId: goal.id) }
         let row = try #require(try h.clew.today().goalsAndLater.first)
         #expect(row.progressAmount == 3)
@@ -152,7 +152,7 @@ private struct Harness {
     @Test func todayReadsThisWeeksTicksAndLifetimeTotals() throws {
         let h = Harness()
         h.clock.set(local(2026, 11, 4, 10)) // the Wednesday before
-        let goal = try h.clew.addItem(NewItem(title: "g", shape: .goal(target: 30, schedule: .daily)))
+        let goal = try h.clew.addItem(NewItem(title: "g", shape: .goal(target: 30)))
         let weekly = try h.clew.addItem(NewItem(title: "w", shape: .habit(.timesPerWeek(2))))
         try h.clew.checkIn(itemId: goal.id)
         try h.clew.checkIn(itemId: goal.id)
@@ -195,7 +195,7 @@ private struct Harness {
 
     @Test func undoOnAGoalRemovesOnlyTheLastPlusOne() throws {
         let h = Harness()
-        let goal = try h.clew.addItem(NewItem(title: "g", shape: .goal(target: 30, schedule: .daily)))
+        let goal = try h.clew.addItem(NewItem(title: "g", shape: .goal(target: 30)))
         try h.clew.checkIn(itemId: goal.id)
         h.clock.set(local(2026, 11, 11, 11))
         let last = try h.clew.checkIn(itemId: goal.id)
@@ -205,7 +205,7 @@ private struct Harness {
 
     @Test func undoDoesNotReachIntoEarlierDays() throws {
         let h = Harness()
-        let goal = try h.clew.addItem(NewItem(title: "g", shape: .goal(target: 30, schedule: .daily)))
+        let goal = try h.clew.addItem(NewItem(title: "g", shape: .goal(target: 30)))
         try h.clew.checkIn(itemId: goal.id)
         h.clock.set(local(2026, 11, 12, 10))
         #expect(try h.clew.undoToday(itemId: goal.id) == nil)
@@ -286,7 +286,7 @@ private struct Harness {
 
 @Suite struct GoalRoundCommandTests {
     private func reachedGoal(_ h: Harness, target: Int = 2) throws -> Item {
-        let goal = try h.clew.addItem(NewItem(title: "g", shape: .goal(target: target, schedule: .daily)))
+        let goal = try h.clew.addItem(NewItem(title: "g", shape: .goal(target: target)))
         for _ in 0..<target { try h.clew.checkIn(itemId: goal.id) }
         return goal
     }
@@ -319,7 +319,7 @@ private struct Harness {
 
     @Test func nextRoundOnlyAfterTheTargetIsReached() throws {
         let h = Harness()
-        let goal = try h.clew.addItem(NewItem(title: "g", shape: .goal(target: 5, schedule: .daily)))
+        let goal = try h.clew.addItem(NewItem(title: "g", shape: .goal(target: 5)))
         try h.clew.checkIn(itemId: goal.id)
         #expect(throws: ClewError.notAllowed) { try h.clew.startNextRound(itemId: goal.id) }
         let habit = try h.clew.addItem(NewItem(title: "h", shape: .habit(.daily)))
@@ -331,7 +331,7 @@ private struct Harness {
     @Test func raisingTheTargetLetsCountingContinue() throws {
         let h = Harness()
         let goal = try reachedGoal(h)
-        try h.clew.editItem(id: goal.id, ItemEdit(title: "g", url: nil, schedule: .daily, target: 4))
+        try h.clew.editItem(id: goal.id, ItemEdit(title: "g", url: nil, target: 4))
         try h.clew.checkIn(itemId: goal.id)
         let row = try #require(try h.clew.today().goalsAndLater.first)
         #expect(row.progressAmount == 3 && !row.isGoalReached)
@@ -433,20 +433,38 @@ private struct Harness {
 @Suite struct EditAndArchiveTests {
     @Test func editChangesTitleURLScheduleAndTarget() throws {
         let h = Harness()
-        let goal = try h.clew.addItem(NewItem(title: "g", shape: .goal(target: 30, schedule: .daily)))
+        let goal = try h.clew.addItem(NewItem(title: "g", shape: .goal(target: 30)))
+        // A goal has no schedule and no slot (SPEC 2026-11-15).
+        #expect(goal.schedule == .unscheduled && goal.slot == nil)
+        #expect(throws: ClewError.notAllowed) {
+            try h.clew.editItem(id: goal.id, ItemEdit(title: "g", url: nil, schedule: .daily, target: 30))
+        }
+        #expect(throws: ClewError.notAllowed) {
+            try h.clew.editItem(id: goal.id, ItemEdit(title: "g", url: nil, target: 30,
+                                                       slot: .set(TimeSlot(hour: 8, minute: 0, minutes: 30))))
+        }
+        #expect(throws: ClewError.notAllowed) {
+            try h.clew.addItem(NewItem(title: "g2", shape: .goal(target: 5), slot: TimeSlot(hour: 8, minute: 0, minutes: 30)))
+        }
         h.clock.set(local(2026, 11, 11, 12))
         let edited = try h.clew.editItem(
             id: goal.id,
-            ItemEdit(title: "ML course", url: URL(string: "https://course.example"),
-                     schedule: .weekdays([.monday]), target: 40)
+            ItemEdit(title: "ML course", url: URL(string: "https://course.example"), target: 40)
         )
         #expect(edited.title == "ML course")
         #expect(edited.url?.absoluteString == "https://course.example")
-        #expect(edited.schedule == .weekdays([.monday]))
+        #expect(edited.schedule == .unscheduled)
         #expect(edited.progress == .counter(target: 40))
         #expect(edited.updatedAt == local(2026, 11, 11, 12))
         #expect(edited.createdAt == goal.createdAt)
         #expect(h.store.state.items[goal.id] == edited)
+    }
+
+    @Test func editChangesAHabitsSchedule() throws {
+        let h = Harness()
+        let habit = try h.clew.addItem(NewItem(title: "h", shape: .habit(.daily)))
+        let edited = try h.clew.editItem(id: habit.id, ItemEdit(title: "h", url: nil, schedule: .weekdays([.monday])))
+        #expect(edited.schedule == .weekdays([.monday]) && h.store.state.items[habit.id]?.schedule == .weekdays([.monday]))
     }
 
     @Test func editRejectsFieldsThatDoNotApplyToTheKind() throws {

@@ -7,7 +7,7 @@ enum AddKind: Hashable, CaseIterable {
     case today, habit, goal, later
 }
 
-/// Editable form of a habit or goal schedule.
+/// Editable form of a habit's schedule.
 struct ScheduleDraft: Equatable {
     enum Mode: Hashable { case daily, days, perWeek }
     var mode: Mode = .daily
@@ -154,13 +154,14 @@ struct AddView: View {
             .labelsHidden()
             .accessibilityLabel(Text("Kind"))
 
-            if kind == .habit || kind == .goal {
+            // Goals have a total only; they live in Goals & Later (SPEC 2026-11-15).
+            if kind == .habit {
                 ScheduleEditor(draft: $schedule)
             }
             if kind == .goal {
                 TargetField(target: $target)
             }
-            if kind == .habit || kind == .goal {
+            if kind == .habit {
                 SlotRow(draft: $slot)
             }
 
@@ -209,10 +210,10 @@ struct AddView: View {
         case .today: .today
         case .later: .later
         case .habit: .habit(schedule.schedule)
-        case .goal: .goal(target: target, schedule: schedule.schedule)
+        case .goal: .goal(target: target)
         }
         let origin: TitleOrigin = parsed.title == fetchedTitle ? .fetched : .typed
-        let timeSlot = kind == .habit || kind == .goal ? slot.slot : nil
+        let timeSlot = kind == .habit ? slot.slot : nil
         if model.add(NewItem(title: parsed.title, titleOrigin: origin, url: parsed.url, shape: shape, slot: timeSlot)) {
             done()
             if kind == .later { model.confirmSavedToLater() }
@@ -249,7 +250,8 @@ struct EditView: View {
         _remindAt = State(initialValue: reminder?.time ?? TimeOfDay(hour: 18, minute: 0)!)
     }
 
-    private var hasSchedule: Bool { item.kind == .habit || item.kind == .goal }
+    /// Only habits repeat (goals lost "Repeats" and their slot, SPEC 2026-11-15).
+    private var hasSchedule: Bool { item.kind == .habit }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {

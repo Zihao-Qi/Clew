@@ -21,13 +21,6 @@ private let eightToNine = TimeSlot(hour: 8, minute: 0, minutes: 60)!
     private func habit(_ schedule: Schedule = .daily, slot: TimeSlot? = eightToNine) throws -> UUID {
         try clew.addItem(NewItem(title: "stretch", shape: .habit(schedule), slot: slot)).id
     }
-    /// Goals live in Goals & Later (SPEC 2026-11-15); these are moved to Today, where a
-    /// slot places its block. (Goals lose their slots in the next step.)
-    private func goal(_ target: Int = 30) throws -> UUID {
-        let id = try clew.addItem(NewItem(title: "read", shape: .goal(target: target, schedule: .daily), slot: eightToNine)).id
-        try clew.moveToToday(itemId: id)
-        return id
-    }
     private func blocks(_ id: UUID, day: Int = 10) -> [TimeBlock] {
         store.state.timeBlocks.values.filter { $0.itemId == id && $0.localDay.day == day }.sorted { $0.placedAt < $1.placedAt }
     }
@@ -73,13 +66,6 @@ private let eightToNine = TimeSlot(hour: 8, minute: 0, minutes: 60)!
         clock.set(at(10, 4, 30)); try clew.checkIn(itemId: id)       // done before Clew settled
         try settle(at: at(10, 5))
         #expect(blocks(id).isEmpty)
-    }
-
-    @Test func aGoalWithAPlusOneTodayStillGetsItsSlot() throws {
-        let id = try goal()
-        clock.set(at(10, 4, 30)); try clew.checkIn(itemId: id)       // 1/30 before the slot is placed
-        try settle(at: at(10, 5))
-        #expect(blocks(id).count == 1)
     }
 
     @Test func answeredQuestionsAreWithdrawn() {
@@ -142,17 +128,6 @@ private let eightToNine = TimeSlot(hour: 8, minute: 0, minutes: 60)!
         try settle(at: at(10, 9, 1))
         let b = try #require(blocks(id).first)
         #expect(b.askedAt == nil && b.decidedAt != nil)
-    }
-
-    @Test func aGoalIsAnsweredByItsFirstUnusedPlusOne() throws {
-        let id = try goal()
-        try settle(at: at(10, 5))
-        try settle(at: at(10, 9))
-        let b = try #require(blocks(id).first)
-        try clew.answerSlotBlock(id: b.id)                       // the notification's +1
-        #expect(ticks(id).count == 1 && ticks(id).first?.source == .notification)
-        #expect(store.state.timeBlocks[b.id]?.coverId == ticks(id).first?.id)
-        #expect(throws: ClewError.notAllowed) { try clew.answerSlotBlock(id: b.id) }
     }
 
     @Test func theQuestionEndsAtTheRollover() throws {
@@ -237,9 +212,11 @@ private let eightToNine = TimeSlot(hour: 8, minute: 0, minutes: 60)!
         #expect(blocks(id).first?.start == at(10, 8))
     }
 
+    /// A reached goal's hand block goes back to the list and stays (goals have no slot
+    /// since 2026-11-15; dropping one on an hour moves it to Today).
     @Test func aReachedGoalGoesBackToTheListAndStays() throws {
-        let id = try goal(1)
-        try settle(at: at(10, 5))
+        let id = try clew.addItem(NewItem(title: "read", shape: .goal(target: 1))).id
+        clock.set(at(10, 5)); try clew.placeOnTimeline(itemId: id, start: at(10, 8))
         clock.set(at(10, 6)); try clew.checkIn(itemId: id)            // 1/1 by hand, from the block's menu
         try settle(at: at(10, 6, 1))
         #expect(try clew.timeline().placedItems.isEmpty)
@@ -251,7 +228,6 @@ private let eightToNine = TimeSlot(hour: 8, minute: 0, minutes: 60)!
         try clew.placeOnTimeline(itemId: id, start: at(10, 12))
         #expect(try clew.timeline().placedItems == [id])                // until placed again
     }
-
     @Test func aBlockByHandStillTicksAtItsEnd() throws {
         let id = try habit(slot: nil)
         try clew.placeOnTimeline(itemId: id, start: at(10, 6))
@@ -259,14 +235,27 @@ private let eightToNine = TimeSlot(hour: 8, minute: 0, minutes: 60)!
         #expect(ticks(id).first?.source == .timeline)
     }
 
+    @Test func aHabitIsAnsweredFromItsSlotBlock() throws {
+        let id = try habit()
+        try settle(at: at(10, 5))
+        try settle(at: at(10, 9))
+        let b = try #require(blocks(id).first)
+        try clew.answerSlotBlock(id: b.id)                       // the notification's Done
+        #expect(ticks(id).count == 1 && ticks(id).first?.source == .notification)
+        // Answered: the block is decided and stops asking.
+        #expect(try store.state.timeBlocks[b.id]?.decidedAt != nil && clew.askingBlockIds().isEmpty)
+    }
+
     @Test func focusDoneCountsTheAnswerAsTheSittingsTick() throws {
-        let id = try goal()
+        let id = try habit()
         try settle(at: at(10, 5))
         clock.set(at(10, 8, 40)); try clew.startFocus(itemId: id, minutes: 25)
         try settle(at: at(10, 9))
         try clew.answerSlotBlock(id: try #require(blocks(id).first).id)
         clock.set(at(10, 9, 5))
-        #expect(try clew.finishFocus() == nil && ticks(id).count == 1)
+        // A habit is ticked once a day: Done keeps the answer's tick, no second one.
+        let answer = try #require(ticks(id).first)
+        #expect(try clew.finishFocus()?.id == answer.id && ticks(id).count == 1)
     }
 
     @Test func slotNotificationsAskAtTheEnd() throws {

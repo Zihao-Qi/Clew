@@ -24,12 +24,12 @@ private func at(_ d: Int, _ h: Int, _ m: Int = 0) -> Date {
     @Test func movedToTodayForTodayOnlyThenBackAtItsOldPlace() throws {
         _ = try add("task", .today)
         _ = try add("first", .later)
-        let goal = try add("goal", .goal(target: 30, schedule: .daily))
+        let goal = try add("goal", .goal(target: 30))
         _ = try add("last", .later)
         try clew.moveToToday(itemId: goal)
         #expect(try today() == ["task", "goal"] && below() == ["first", "last"])
         let item = try #require(store.state.items[goal])
-        #expect(item.state == .active && item.schedule == .daily)   // nothing else changed
+        #expect(item.state == .active && item.schedule == .unscheduled)   // nothing else changed
         clock.set(at(11, 9))                                         // the next day
         #expect(try today() == ["task"] && below() == ["first", "goal", "last"])
     }
@@ -61,7 +61,7 @@ private func at(_ d: Int, _ h: Int, _ m: Int = 0) -> Date {
 
     @Test func goalsAndLaterHasItsOwnOrder() throws {
         let one = try add("one", .later)
-        let two = try add("two", .goal(target: 5, schedule: .daily))
+        let two = try add("two", .goal(target: 5))
         let three = try add("three", .later)
         try clew.place(itemId: three, in: .goalsAndLater, after: nil, before: one)
         #expect(try below() == ["three", "one", "two"])
@@ -114,7 +114,7 @@ private func at(_ d: Int, _ h: Int, _ m: Int = 0) -> Date {
     }
 
     @Test func aReachedGoalCannotMoveUp() throws {
-        let goal = try add("goal", .goal(target: 1, schedule: .daily))
+        let goal = try add("goal", .goal(target: 1))
         try clew.checkIn(itemId: goal)
         #expect(throws: ClewError.notAllowed) { try clew.moveToToday(itemId: goal) }
     }
@@ -176,7 +176,7 @@ private func at(_ d: Int, _ h: Int, _ m: Int = 0) -> Date {
     }
 
     @Test func remindersFireInBothLists() throws {
-        let goal = try add("goal", .goal(target: 30, schedule: .daily))
+        let goal = try add("goal", .goal(target: 30))
         _ = try clew.setReminder(itemId: goal, time: TimeOfDay(hour: 18, minute: 0)!)
         let reminders = try clew.plannedNotifications().filter { if case .reminder = $0.content { true } else { false } }
         #expect(reminders.first?.fireAt == at(10, 18))
