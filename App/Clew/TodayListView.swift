@@ -306,7 +306,7 @@ struct TodayListView: View {
                 // 2026-11-15; *changed* after use: a line above it, label at the left).
                 VStack(alignment: .leading, spacing: 0) {
                     if !today.isEmpty {
-                        Divider().padding(.horizontal, 12).padding(.top, 6)
+                        Divider().padding(.horizontal, 12).padding(.top, 6).accessibilityHidden(true)
                     }
                     Text("Goals & Later")
                         .font(.caption.weight(.semibold))
