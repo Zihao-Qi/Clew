@@ -146,7 +146,9 @@ stopped daily use, not adding features.
     `done/total`, the morning and evening summaries and the "all done" line count
     Today, plus any Goals & Later item ticked today (it counts without moving: a
     finished day with one goal +1 reads "4/4", never "3/3 +1").
-  - **Goals & Later** (a quiet section label, then its rows): every counted goal
+  - **Goals & Later** (a divider line, then a quiet section label lined up with the
+    circles, then its rows; *changed* 2026-11-16 after use: the line was missing and the
+    label sat at the titles; Today has no label, the timeline above says it is today): every counted goal
     that is not reached (see below), and every Later item (once tasks and links saved
     for no day) that is not done. Its rows look and work like Today's (circle, `+1`,
     bars, link mark, a link's site as Pick showed it, details, rating, right-click,
