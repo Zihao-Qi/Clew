@@ -206,6 +206,47 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         #expect(plans.count == 1 && plans[0]["todaySortKey"] as Double? == nil)
     }
 
+    /// Schema v11 (SPEC 2026-11-15): goals lose their schedule and slot; a goal with a
+    /// live, undecided block gets a plan for that block's day so the block stays.
+    @Test func v11MovesGoalsBelowAndKeepsTheirOpenBlocks() throws {
+        let queue = try DatabaseQueue()
+        try Schema.migrator.migrate(queue, upTo: "v10-plan-today-key")
+        let e = JSONEncoder()
+        e.outputFormatting = [.sortedKeys]
+        func json(_ v: some Encodable) throws -> String { String(decoding: try e.encode(v), as: UTF8.self) }
+        let goal = UUID(), habit = UUID(), done = UUID()
+        let slot = try json(TimeSlot(hour: 8, minute: 0, minutes: 60)!)
+        try queue.write { db in
+            for (id, kind, schedule, progress) in [
+                (goal, "goal", try json(Schedule.daily), try json(ProgressSpec.counter(target: 30))),
+                (done, "goal", try json(Schedule.weekdays([.monday])), try json(ProgressSpec.counter(target: 5))),
+                (habit, "habit", try json(Schedule.daily), try json(ProgressSpec.none)),
+            ] {
+                try db.execute(sql: """
+                    INSERT INTO item (id, kind, title, titleOrigin, schedule, progress, state, sortKey, source,
+                                      createdAt, updatedAt, slot)
+                    VALUES (?, ?, 'x', 'typed', ?, ?, 'active', 1, 'user', ?, ?, ?)
+                    """, arguments: [id.uuidString, kind, schedule, progress, t0, t0, slot])
+            }
+            func block(_ item: UUID, decided: Date?) throws {
+                try db.execute(sql: """
+                    INSERT INTO timeBlock (id, itemId, localDay, start, minutes, placedAt, updatedAt, decidedAt)
+                    VALUES (?, ?, '2026-11-11', ?, 30, ?, ?, ?)
+                    """, arguments: [UUID().uuidString, item.uuidString, t0, t0, t0, decided])
+            }
+            try block(goal, decided: nil)        // open: kept, with a plan
+            try block(done, decided: t0)         // already decided: no plan
+            try block(habit, decided: nil)       // habits keep their schedule and slot
+        }
+        let store = try SQLiteStore(writer: queue)      // runs v11
+        let read = try store.read { r in (try r.item(id: goal), try r.item(id: done), try r.item(id: habit)) }
+        #expect(read.0?.schedule == .unscheduled && read.0?.slot == nil)
+        #expect(read.1?.schedule == .unscheduled && read.1?.slot == nil)
+        #expect(read.2?.schedule == .daily && read.2?.slot != nil)
+        let plans = try store.read { try $0.plans(on: day("2026-11-11")) }
+        #expect(plans.map(\.itemId) == [goal] && plans.first?.at == t0 && plans.first?.todaySortKey == nil)
+    }
+
     /// SPEC 2026-11-15: a plan's place in Today is part of the fact; a reorder voids it
     /// and inserts a new one, and the void is monotonic.
     @Test func aPlansTodayKeyIsSubstanceAndItsVoidIsMonotonic() throws {
@@ -470,7 +511,7 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         let clew = Clew(store: store, clock: Clock(date: t0.addingTimeInterval(0.123)), zones: Zone())
         let goal = try clew.addItem(NewItem(title: "Goal \"quoted\" / ünïcode", titleOrigin: .fetched,
                                             url: URL(string: "https://example.com/a?b=1&c=2"),
-                                            shape: .goal(target: 2, schedule: .weekdays([.monday, .sunday]))))
+                                            shape: .goal(target: 2)))
         let later = try clew.addItem(NewItem(title: "Later", shape: .later))
         let habit = try clew.addItem(NewItem(title: "Habit", shape: .habit(.timesPerWeek(3))))
         try clew.checkIn(itemId: goal.id)
@@ -643,7 +684,7 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
     @Test func dayInTheLife() throws {
         let store = try SQLiteStore.inMemory()
         let clew = Clew(store: store, clock: Clock(date: t0), zones: Zone())
-        let goal = try clew.addItem(NewItem(title: "ML course", shape: .goal(target: 30, schedule: .daily)))
+        let goal = try clew.addItem(NewItem(title: "ML course", shape: .goal(target: 30)))
         let habit = try clew.addItem(NewItem(title: "Stretch", shape: .habit(.timesPerWeek(3))))
         let link = try clew.addItem(NewItem(title: "Talk", url: URL(string: "https://youtu.be/x"), shape: .later))
         try clew.checkIn(itemId: goal.id)

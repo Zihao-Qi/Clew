@@ -15,7 +15,7 @@ private func local(_ y: Int, _ m: Int, _ d: Int, _ h: Int) -> Date {
         let clock = TestClock(local(2026, 11, 1, 10))
         let clew = Clew(store: store, clock: clock, zones: FixedZone("America/New_York"))
         let habit = try clew.addItem(NewItem(title: "h", shape: .habit(.daily)))
-        let goal = try clew.addItem(NewItem(title: "g", shape: .goal(target: 99, schedule: .daily)))
+        let goal = try clew.addItem(NewItem(title: "g", shape: .goal(target: 99)))
         // The 14 days ending Nov 16 start Nov 3; the 7 days start Nov 10.
         // Nov 2 (outside), Nov 3 (first of 14), Nov 9 (outside 7), Nov 10 (first of 7),
         // Nov 16 twice (one day), Nov 15 voided only (not active), Nov 17 (a future day,

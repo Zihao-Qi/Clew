@@ -22,7 +22,7 @@ private let tuesday = LocalDay(string: "2026-11-10")!
         try clew.addItem(NewItem(title: title, shape: .today)).id
     }
     private func goal(_ target: Int = 30) throws -> UUID {
-        try clew.addItem(NewItem(title: "read", shape: .goal(target: target, schedule: .daily))).id
+        try clew.addItem(NewItem(title: "read", shape: .goal(target: target))).id
     }
     private func ticks(_ id: UUID, source: Source? = nil) -> [CheckIn] {
         store.state.checkIns.values.filter { $0.itemId == id && !$0.isVoided && (source == nil || $0.source == source) }
@@ -329,7 +329,7 @@ private let tuesday = LocalDay(string: "2026-11-10")!
         clock.set(at(10, 9))
         let b = try clew.placeOnTimeline(itemId: id, start: at(10, 9))
         try settle(at: at(10, 9, 30))
-        try clew.editItem(id: id, ItemEdit(title: "read", url: nil, schedule: .daily, target: 4))
+        try clew.editItem(id: id, ItemEdit(title: "read", url: nil, target: 4))
         try clew.blockNotFinished(id: b.id)
         #expect(ticks(id).count == 1)
     }

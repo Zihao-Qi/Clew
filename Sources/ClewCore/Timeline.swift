@@ -298,9 +298,10 @@ extension Clew {
     private func placeSlotBlocks(rows: [TodayRow], today: LocalDay, now: Date, _ w: any StoreWriter) throws -> Bool {
         let had = Set(try w.timeBlocks(from: today).filter { $0.localDay == today }.map(\.itemId))
         var changed = false
+        // Only habits have slots (goals lost theirs, SPEC 2026-11-15: Add, Edit and the
+        // v11 migration see to it).
         for row in rows where row.item.slot != nil && !had.contains(row.id) {
-            let needs = row.item.progress.target != nil ? !row.isGoalReached : !row.isDone
-            guard needs, let slot = row.item.slot, let place = slotPlacement(slot, on: today), place.start > now
+            guard !row.isDone, let slot = row.item.slot, let place = slotPlacement(slot, on: today), place.start > now
             else { continue }
             try w.save(TimeBlock(id: newID(), itemId: row.id, localDay: today, start: place.start,
                                  minutes: place.minutes, placedAt: now, updatedAt: now, origin: .slot))

@@ -1,3 +1,5 @@
+import ClewDomain
+import Foundation
 import GRDB
 
 /// Forward-only, versioned migrations (ARCHITECTURE §7). Never edit a shipped
@@ -15,7 +17,33 @@ enum Schema {
         migrator.registerMigration("v8-time-blocks", migrate: v8)
         migrator.registerMigration("v9-time-slots", migrate: v9)
         migrator.registerMigration("v10-plan-today-key", migrate: v10)
+        migrator.registerMigration("v11-goals-without-schedule", migrate: v11)
         return migrator
+    }
+
+    /// Goals lose their schedule and time slot (SPEC 2026-11-15): they live in Goals &
+    /// Later. A goal with a live, undecided block first gets a plan for that block's own
+    /// day, so the block stays (moved to Today). Runs once; no clock (the plan's `at` is
+    /// the block's `placedAt`). Facts are only inserted, never changed.
+    private static func v11(_ db: Database) throws {
+        let blocks = try Row.fetchAll(db, sql: """
+            SELECT b.itemId, b.localDay, MIN(b.placedAt) AS placedAt FROM timeBlock b
+            JOIN item i ON i.id = b.itemId
+            WHERE i.kind = 'goal' AND b.removedAt IS NULL AND b.decidedAt IS NULL
+              AND NOT EXISTS (SELECT 1 FROM plan p WHERE p.itemId = b.itemId AND p.localDay = b.localDay
+                              AND p.voidedAt IS NULL)
+            GROUP BY b.itemId, b.localDay
+            """)
+        for row in blocks {
+            try db.execute(sql: "INSERT INTO plan (id, itemId, localDay, at, source) VALUES (?, ?, ?, ?, 'user')",
+                           arguments: [UUID().uuidString, row["itemId"] as String, row["localDay"] as String,
+                                       row["placedAt"] as DatabaseValue])
+        }
+        // Encoded as the store encodes item definitions (sorted keys).
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let unscheduled = String(decoding: try encoder.encode(Schedule.unscheduled), as: UTF8.self)
+        try db.execute(sql: "UPDATE item SET schedule = ?, slot = NULL WHERE kind = 'goal'", arguments: [unscheduled])
     }
 
     /// Moved to Today (SPEC 2026-11-15): a plan's place in Today's order. Part of the

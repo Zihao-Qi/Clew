@@ -140,7 +140,7 @@ private func local(_ h: Int, _ m: Int = 0, _ s: Int = 0) -> Date {
         try clew.startFocus(itemId: other, minutes: 10)
         #expect(try clew.finishFocus()?.itemId == other)
         // A goal gets +1; one at its target gets nothing and no error.
-        let goal = try clew.addItem(NewItem(title: "pages", shape: .goal(target: 1, schedule: .daily))).id
+        let goal = try clew.addItem(NewItem(title: "pages", shape: .goal(target: 1))).id
         try clew.moveToToday(itemId: goal)                         // Focus moves it first (SPEC 2026-11-15)
         try clew.startFocus(itemId: goal, minutes: 10)
         #expect(try clew.finishFocus()?.amount == 1)
