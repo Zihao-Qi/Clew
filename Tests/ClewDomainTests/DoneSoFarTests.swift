@@ -30,6 +30,24 @@ import Testing
         #expect(done.series(from: day("2026-11-07"), through: day("2026-11-06")).isEmpty)
     }
 
+    @Test func thePlotStartsTheDayBeforeAndThinsLongHistories() {
+        // A first day alone: two points, so a line, rising by that day's count.
+        let first = DoneSoFar(perDay: [day("2026-11-18"): 3], goalReached: [])
+        #expect(first.plot(from: day("2026-11-18"), through: day("2026-11-18")).map(\.total) == [0, 3])
+        #expect(first.plot(from: day("2026-11-18"), through: day("2026-11-18")).first?.day == day("2026-11-17"))
+        // Long: one a week, the goal's day and the last day kept.
+        var perDay: [LocalDay: Int] = [:]
+        for i in 0..<1000 { perDay[day("2024-01-01").adding(days: i)] = 1 }
+        let goal = day("2024-01-01").adding(days: 500)
+        let long = DoneSoFar(perDay: perDay, goalReached: [goal])
+        let points = long.plot(from: day("2024-01-01"), through: day("2024-01-01").adding(days: 999))
+        #expect(points.count < 160 && points.last?.day == day("2024-01-01").adding(days: 999))
+        #expect(points.contains { $0.day == goal && $0.goalReached })
+        #expect(points.first?.total == 0 && points.last?.total == 1000)
+        // Short ranges are daily.
+        #expect(long.plot(from: day("2024-01-01"), through: day("2024-01-30")).count == 31)
+    }
+
     @Test func rangesStartWhereTheSpecSays() {
         let today = day("2026-11-18")
         #expect(ProgressRange.days30.start(today: today, first: day("2026-01-01")) == day("2026-10-20"))

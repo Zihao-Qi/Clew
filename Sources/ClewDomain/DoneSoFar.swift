@@ -44,6 +44,19 @@ public struct DoneSoFar: Equatable, Sendable {
         }
     }
 
+    /// The line to draw: from the day before `from`, at the total then (so a first day
+    /// alone still draws a line, and the first day's rise shows), through `through`. Over
+    /// `dailyUpTo` points, one a week, plus every goal's day and the last day.
+    public func plot(from: LocalDay, through: LocalDay, dailyUpTo: Int = 400) -> [Point] {
+        let floor = from.adding(days: -1)
+        let all = [Point(day: floor, total: total(through: floor), added: 0, goalReached: false)]
+            + series(from: from, through: through)
+        guard all.count > dailyUpTo else { return all }
+        return all.enumerated()
+            .filter { index, p in index % 7 == 0 || index == all.count - 1 || p.goalReached }
+            .map(\.element)
+    }
+
     /// - ticks: check-ins with their items (voided and deleted ones too: `DoneCount` decides).
     /// - goals: each goal (deleted ones too), with its rounds and its check-ins.
     public static func make(ticks: [(checkIn: CheckIn, item: Item)],

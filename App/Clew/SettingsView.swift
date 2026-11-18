@@ -243,7 +243,9 @@ struct SettingsView: View {
                 case .progress:
                 if let doneSoFar, let today = model.currentDay {
                     Section {
-                        DoneSoFarSection(done: doneSoFar, today: today, range: $progressRange)
+                        // Saved only when picked (review: reading it back on opening saved it again).
+                        DoneSoFarSection(done: doneSoFar, today: today, range: Binding(
+                            get: { progressRange }, set: { progressRange = $0; model.setProgressRange($0) }))
                     } footer: {
                         Text("Each task once a day it was done. Dots: a goal reached.")
                             .font(.caption)
@@ -354,7 +356,6 @@ struct SettingsView: View {
                 doneSoFar = model.doneSoFar()
             }
         }
-        .onChange(of: progressRange) { _, new in model.setProgressRange(new) }
         // A menu bar app shows no window at launch, so macOS must not restore this one
         // if it was open when Clew quit.
         .background(NonRestorableWindow())
