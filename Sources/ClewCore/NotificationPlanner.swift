@@ -87,7 +87,7 @@ public enum NotificationPlanner {
                 // Waiting for its day: an every-day reminder is quiet until then; a
                 // one-day reminder was asked for that day (SPEC 2026-11-17).
                 if reminder.day == nil, row.item.state == .later, !list.moved.contains(row.id),
-                   ahead.contains(where: { $0.itemId == row.id && $0.localDay > day }) { continue }
+                   ahead.contains(where: { $0.itemId == row.id && $0.localDay > day && $0.voidedAt == nil }) { continue }
                 let item = row.item
                 add("reminder.\(item.id.uuidString)", reminder.time, .reminder(
                     itemId: item.id, title: item.title, canOpen: item.url != nil

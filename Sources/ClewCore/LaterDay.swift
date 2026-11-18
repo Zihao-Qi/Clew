@@ -35,7 +35,8 @@ extension Clew {
 
     /// The day each Goals & Later row is waiting for: its earliest live plan after `day`.
     static func waitingDays(_ r: any StoreReader, after day: LocalDay, among rows: [TodayRow]) throws -> [UUID: LocalDay] {
-        let ids = Set(rows.filter { $0.item.state == .later }.map(\.id))
+        // A row ticked while it waits is done: it shows no day (Gemini review).
+        let ids = Set(rows.filter { $0.item.state == .later && canHaveDay($0) }.map(\.id))
         guard !ids.isEmpty else { return [:] }
         var days: [UUID: LocalDay] = [:]
         for plan in try r.plans(from: day.adding(days: 1)) where ids.contains(plan.itemId) {
@@ -97,18 +98,20 @@ extension Clew {
     }
 
     /// On its day, a plan booked ahead gets a Today place at the end, in the order the
-    /// days were set (void + insert, as a reorder does). Only plans recorded before the
-    /// day began; a nil-key plan made that day keeps the item's own key. Returns whether
-    /// anything changed. Run on refresh, with `settleBlocks()`.
+    /// days were set (void + insert, as a reorder does). A booked plan is a Later task's
+    /// plan with no Today place (moving a task by hand always gives it one); a goal's
+    /// nil-key plan (the v11 migration's) keeps the item's own key. Not decided by when it
+    /// was recorded, which a time-zone change could confuse (Gemini review). Returns
+    /// whether anything changed. Run on refresh, with `settleBlocks()`.
     @discardableResult
     public func settlePlans() throws -> Bool {
         let now = clockForQueries.now()
         let today = currentDay()
-        let start = dayBounds(today).start
         return try storeForQueries.write { w in
-            let moved = try todayList(w, on: today).moved
+            let list = try todayList(w, on: today)
+            let later = Set(list.rows.filter { $0.item.state == .later }.map(\.id))
             let booked = try w.plans(on: today).filter {
-                $0.todaySortKey == nil && $0.at < start && moved.contains($0.itemId)
+                $0.todaySortKey == nil && list.moved.contains($0.itemId) && later.contains($0.itemId)
             }
             for plan in booked {
                 try w.voidPlan(id: plan.id, at: now)

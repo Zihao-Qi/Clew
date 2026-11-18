@@ -74,8 +74,11 @@ extension Clew {
                 let zone = zonesForQueries.current()
                 let rollover = TimeOfDay(hour: rolloverHour, minute: 0)!
                 func start(_ day: LocalDay) -> Date { day.instant(at: rollover, in: zone, rolloverHour: rolloverHour) }
+                // A day after it was done (ticked while it waited) never came either.
+                let doneOn = checkIns.filter { !$0.isVoided }.map(\.localDay).min()
                 let came = try r.plans(itemId: itemId).filter { plan in
                     plan.localDay <= today && (plan.voidedAt.map { $0 >= start(plan.localDay) } ?? true)
+                        && doneOn.map { plan.localDay <= $0 } ?? true
                 }
                 let plans = Dictionary(grouping: came, by: \.localDay)
                     .compactMapValues { $0.max { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) } }

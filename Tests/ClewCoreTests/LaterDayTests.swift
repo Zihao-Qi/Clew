@@ -29,11 +29,12 @@ private func day(_ d: Int) -> LocalDay { LocalDay(year: 2026, month: 11, day: d)
         let call = try add("call", .later, day: day(12))
         _ = try add("other", .later)
         #expect(try today() == ["task"] && below() == ["call", "other"])
-        #expect(try clew.today().waiting == [call: day(12)])
+        #expect(try clew.today().waiting == [call: day(12)] && clew.laterDay(itemId: call) == day(12))
         clock.set(at(11, 9))                                            // still waiting
         #expect(try today() == ["task"] && clew.today().waiting[call] == day(12))
         clock.set(at(12, 9))                                            // its day
         #expect(try today() == ["task", "call"] && below() == ["other"] && clew.today().moved == [call])
+        #expect(try clew.laterDay(itemId: call) == nil)                // its day is today: not waiting
         #expect(try clew.today().total == 2)                            // it counts
         clock.set(at(13, 9))                                            // not ticked: back, no day
         #expect(try today() == ["task"] && below() == ["call", "other"] && clew.today().waiting.isEmpty)
@@ -41,6 +42,7 @@ private func day(_ d: Int) -> LocalDay { LocalDay(year: 2026, month: 11, day: d)
 
     @Test func aDayMustBeAfterTodayAndOnlyForLater() throws {
         #expect(throws: ClewError.notAllowed) { try add("a", .later, day: day(10)) }
+        #expect(throws: ClewError.notAllowed) { try add("past", .later, day: day(9)) }
         #expect(throws: ClewError.notAllowed) { try add("b", .today, day: day(12)) }
         // Before 4 a.m. the Clew day is still yesterday: "tomorrow" is the coming morning.
         clock.set(at(11, 2))
@@ -57,6 +59,7 @@ private func day(_ d: Int) -> LocalDay { LocalDay(year: 2026, month: 11, day: d)
         let ticked = try add("ticked", .today)
         try clew.moveToToday(itemId: moved)
         let block = try clew.placeOnTimeline(itemId: own, start: at(10, 11))
+        let movedBlock = try clew.placeOnTimeline(itemId: moved, start: at(10, 12))
         try clew.checkIn(itemId: ticked)
         #expect(try today() == ["own", "habit", "ticked", "moved"] && below() == ["waiting", "goal"])
 
@@ -69,6 +72,7 @@ private func day(_ d: Int) -> LocalDay { LocalDay(year: 2026, month: 11, day: d)
         // A moved row goes back down to its place first.
         try clew.setLaterDay(itemId: moved, day: day(12))
         #expect(try today() == ["habit", "ticked"] && clew.today().moved.isEmpty)
+        #expect(store.state.timeBlocks[movedBlock.id]?.removedAt == at(10, 9))   // its blocks too
         // One in Goals & Later keeps its place; choosing another day replaces it.
         try clew.setLaterDay(itemId: waiting, day: day(20))
         let before = try below()
@@ -82,6 +86,15 @@ private func day(_ d: Int) -> LocalDay { LocalDay(year: 2026, month: 11, day: d)
             #expect(throws: ClewError.notAllowed) { try clew.setLaterDay(itemId: id, day: day(12)) }
         }
         #expect(throws: ClewError.notAllowed) { try clew.setLaterDay(itemId: waiting, day: day(10)) }
+        #expect(throws: ClewError.notAllowed) { try clew.setLaterDay(itemId: waiting, day: day(9)) }
+        // A saved link can wait too; a YouTube or X item never.
+        let link = try clew.addItem(NewItem(title: "article", url: URL(string: "https://medium.com/a"), shape: .later))
+        #expect(link.kind == .link)
+        try clew.setLaterDay(itemId: link.id, day: day(12))
+        #expect(try clew.today().waiting[link.id] == day(12))
+        let video = Item(id: UUID(), kind: .link, title: "video", schedule: .unscheduled, progress: .none, state: .later,
+                         sortKey: 1, source: .extensionYouTube, createdAt: at(10, 9), updatedAt: at(10, 9))
+        #expect(!Clew.canHaveDay(TodayRow(item: video, state: .due, todayAmount: 0, progressAmount: 0, lastTickToday: nil)))
     }
 
     @Test func movedEarlyItsDayIsDropped() throws {
@@ -121,20 +134,32 @@ private func day(_ d: Int) -> LocalDay { LocalDay(year: 2026, month: 11, day: d)
         #expect(try today() == ["late", "task", "added", "early", "newest"])
     }
 
-    @Test func aPlanMadeOnItsOwnDayIsNotSettled() throws {
+    /// A goal's nil-key plan (as the v11 migration made) keeps the item's own key; a
+    /// Later task's is settled whenever it was recorded (a time-zone change can make a
+    /// plan booked the evening before look recorded after its day began).
+    @Test func onlyALaterTasksNilKeyPlanIsSettled() throws {
         let g = try add("goal", .goal(target: 9))
+        let l = try add("later", .later)
         try store.write { w in
             try w.insert(Plan(id: UUID(), itemId: g, localDay: day(10), at: at(10, 5), source: .user, todaySortKey: nil))
         }
         #expect(try !clew.settlePlans())
+        try store.write { w in
+            try w.insert(Plan(id: UUID(), itemId: l, localDay: day(10), at: at(10, 6), source: .user, todaySortKey: nil))
+        }
+        #expect(try clew.settlePlans())
+        #expect(livePlans(l).first?.todaySortKey != nil && livePlans(g).first?.todaySortKey == nil)
     }
 
     @Test func tickedWhileWaitingItIsDoneAndNeverArrives() throws {
         let a = try add("a", .later, day: day(12))
         try clew.checkIn(itemId: a)
-        #expect(try below() == ["a"])
+        #expect(try below() == ["a"] && clew.today().waiting.isEmpty)    // done: no day shown
+        #expect(try clew.details(itemId: a)?.waitingFor == nil)
         clock.set(at(12, 9))
-        #expect(try today().isEmpty && below().isEmpty)
+        #expect(try today().isEmpty && below().isEmpty && !clew.settlePlans())
+        // Its day never came: no "Moved to Today" line.
+        #expect(try #require(try clew.details(itemId: a)).history.allSatisfy { $0.event != .picked })
     }
 
     @Test func labelsAndNextMonday() {
