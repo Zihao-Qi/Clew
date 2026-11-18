@@ -366,6 +366,7 @@ struct EditView: View {
                 Button("Save", action: save)
                     .keyboardShortcut(.defaultAction)
             }
+            .padding(.top, 4)   // as in Add (design review)
         }
         .padding(12)
     }

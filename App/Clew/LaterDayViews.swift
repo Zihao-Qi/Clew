@@ -173,16 +173,20 @@ struct MonthCalendar: View {
         return Button { selection = day } label: {
             Text(verbatim: "\(day.day)")
                 .font(.body.monospacedDigit())
-                .foregroundStyle(chosen ? Color.white : allowed ? Color.primary : Color.secondary.opacity(0.5))
+                // Past days are dimmed once, by .disabled (design review: dimmed twice they
+                // nearly vanished in dark mode).
+                .foregroundStyle(chosen ? Color.white : allowed ? Color.primary : Color.secondary)
                 .frame(width: 32, height: 32)
                 .background(Circle().fill(chosen ? Color.accentColor : Color.clear))
-                // Today, which cannot be chosen, keeps a thin ring as a landmark.
-                .overlay(Circle().strokeBorder(Color.secondary.opacity(day == first.adding(days: -1) ? 0.6 : 0), lineWidth: 1))
                 .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(!allowed)
+        // Today, which cannot be chosen, keeps a thin ring as a landmark, outside the
+        // disabled button so it is not dimmed with it.
+        .overlay(Circle().strokeBorder(Color.secondary, lineWidth: 1).frame(width: 32, height: 32)
+            .opacity(day == first.adding(days: -1) ? 1 : 0).accessibilityHidden(true))
         .accessibilityLabel(Text(verbatim: day.noon.formatted(.dateTime.weekday(.wide).month(.wide).day())))
         .accessibilityAddTraits(chosen ? .isSelected : [])
     }
@@ -202,7 +206,7 @@ struct DayRow: View {
     private var day: LocalDay { max(LocalDay(picked: date), tomorrow) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 // A checkbox, like "On the timeline" and "Remind me" (user, 2026-11-18).
                 Toggle(isOn: $on) { Text("On a day") }
@@ -222,11 +226,16 @@ struct DayRow: View {
                 }
                 Spacer(minLength: 0)
             }
+            // The same height checked or not, so the checkbox never jumps (design review).
+            .frame(minHeight: 24)
             if on, open {
+                // On a light card, like Details' tiles, so it reads as the day button's.
                 MonthCalendar(selection: Binding(get: { day }, set: { picked in
                     date = picked.noon
                     withAnimation(.snappy(duration: 0.25)) { open = false }
                 }), first: tomorrow)
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
                 .transition(.opacity)
             }
         }

@@ -284,8 +284,11 @@ stopped daily use, not adding features.
     on; today or an earlier day cannot be chosen. One day at a time: choosing another
     replaces it.
   - **Where it is set:**
-    - **Add:** with **Later** chosen, one optional row under the line: a switch **"On a
-      day"** and a date (default tomorrow). While it is on, the line reads "Comes to
+    - **Add:** with **Later** chosen, one optional row under the line: a checkbox **"On a
+      day"** and the day as a button ("Thu, Nov 19"; default tomorrow) that opens the
+      same calendar as Pick a day right below it, on a light card; picking a day closes
+      it, and checking the box opens it (*changed* after use, 2026-11-18: a switch and the
+      system date field, whose calendar was small and looked foreign). While it is on, the line reads "Comes to
       Today on that day." Off adds a plain Later task, as now.
     - **Edit** of a once task or link with no tick (on Today or in Goals & Later): the
       same row. Turning it on for a task of Today's own makes it a Later task with a
@@ -703,7 +706,9 @@ stopped daily use, not adding features.
     says so.
   - **A repeating task's time slot** (*user*, 2026-11-10). A habit or a counted goal
     (*changed* 2026-11-15: habits only) can have a slot, set in Add and Edit: "On the timeline: at 8:00 for 60 min" (a
-    start on a quarter hour of the wall clock, a length of 15, 30, 45, 60, 90 or 120
+    checkbox, then "at [time] for [length]" indented under it; the start is one menu of
+    quarter hours, *changed* after use 2026-11-18: it was an hour menu and a minutes menu;
+    a start on a quarter hour of the wall clock, a length of 15, 30, 45, 60, 90 or 120
     minutes; off by default). Clew then places that block by itself.
     - **When:** a slot block is placed when the task has a slot, is on Today and still
       needs something (a habit not done today; a goal not reached, even after a +1
