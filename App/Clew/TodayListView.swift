@@ -144,11 +144,15 @@ struct TodayListView: View {
     private func autoScrollTick() {
         let step = ListAutoScroll.step(pointerY: Double(lastPointerY),
                                        viewport: (Double(rowsViewport.minY), Double(rowsViewport.maxY)))
-        let draggingRow = dragging != nil
-        let draggingBlock = lifted?.blockId != nil && lifted?.overTimeline == false
-        guard listScrolls, step != 0, draggingRow || draggingBlock else { return listEdgeScroll(nil) }
+        // Only over the list (a tick already queued when the pointer went up onto the
+        // timeline does nothing; review).
+        let overList = lifted?.overTimeline != true
+        let draggingRow = dragging != nil && overList
+        let draggingBlock = lifted?.blockId != nil && overList
+        guard listScroll != nil, listScrolls, step != 0, draggingRow || draggingBlock else { return listEdgeScroll(nil) }
         let next = CGFloat(ListAutoScroll.clamp(Double(scroller.offset) + step, maxOffset: Double(scroller.maxOffset)))
-        guard next != scroller.offset else { return }
+        // At the list's end it stops (review: it kept ticking); moving the pointer starts it again.
+        guard next != scroller.offset else { return listEdgeScroll(nil) }
         scroller.offset = next
         // The rows moved under a pointer that did not: the gap follows.
         let spans = dragFrames.map { (minY: Double($0.minY), maxY: Double($0.maxY)) }
@@ -265,14 +269,18 @@ struct TodayListView: View {
             listEdgeScroll(value.location.y)
             let spans = dragFrames.map { (minY: Double($0.minY), maxY: Double($0.maxY)) }
             let slot = Clew.insertSlot(pointerY: Double(value.location.y + scrolledSinceDrag), spans: spans)
+            // The card stays over the part of a long list that shows (review: it could
+            // be drawn over the footer).
+            var cardY = value.location.y
+            if listScrolls { cardY = min(max(cardY, rowsViewport.minY + 17), rowsViewport.maxY - 17) }
             if lifted?.slot != slot {
                 withAnimation(.easeOut(duration: 0.15)) {
                     lifted = Lifted(itemId: b.itemId, blockId: b.id, title: block.title, overTimeline: false,
-                                    frame: rowFrame(centeredAt: value.location.y), slot: slot)
+                                    frame: rowFrame(centeredAt: cardY), slot: slot)
                 }
             } else {
                 lifted?.overTimeline = false
-                lifted?.frame = rowFrame(centeredAt: value.location.y)
+                lifted?.frame = rowFrame(centeredAt: cardY)
             }
             scrollAtEdge(nil)
         }
@@ -587,6 +595,8 @@ struct TodayListView: View {
         .onChange(of: dragging != nil || lifted != nil) { _, active in PeekController.shared.dragChanged(active) }
         .onChange(of: model.collections) { _, lists in PeekController.shared.collectionsChanged(lists) }
         .onDisappear {
+            // Leaving the list mid-drag (⌘N, ⌘,) ends the drag and its timers (review).
+            endDrag()
             PeekController.shared.listLeft()
             // Leaving the list ends last week's card for this week.
             model.dropWeekCard()
