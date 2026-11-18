@@ -156,7 +156,8 @@ stopped daily use, not adding features.
     the Delete key) and have their own order, dragged as on Today; Move Up / Move
     Down stop at each list's ends. New items go to its end. It is always shown in
     full; when the menu reaches the bottom of the screen, Today and Goals & Later
-    scroll together (the timeline above and the collection rows and footer below stay
+    scroll together (and while a row or a block is dragged near the list's top or
+    bottom edge, the list scrolls by itself, faster nearer the edge; *user*, 2026-11-18) (the timeline above and the collection rows and footer below stay
     put; it opens scrolled to the top, and scrolls by itself while a row is dragged
     near its edge). With nothing in it, its label is hidden too.
   - **Empty Today:** "Nothing for today." (or "Everything is on the timeline.") stays

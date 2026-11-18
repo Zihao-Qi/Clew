@@ -37,6 +37,11 @@ struct ClewApp: App {
             Snapshot.startClickTest()
             return
         }
+        if ProcessInfo.processInfo.environment["CLEW_SCROLL_TEST"] != nil {
+            _model = State(initialValue: AppModel(clew: nil, notify: false))
+            Snapshot.startScrollTest()
+            return
+        }
         if ProcessInfo.processInfo.environment["CLEW_TIME_TEST"] != nil {
             _model = State(initialValue: AppModel(clew: nil, notify: false))
             Snapshot.startTimeFieldTest()
