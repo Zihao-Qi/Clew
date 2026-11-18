@@ -54,7 +54,8 @@ extension Clew {
             }
             let planned = (NotificationPlanner.plan(
                 now: now, zone: zone, rolloverHour: rolloverHour, items: items, facts: facts,
-                reminders: try r.reminders(), summaries: summaries, movedToday: try Self.moved(r, on: today)
+                reminders: try r.reminders(), summaries: summaries, movedToday: try Self.moved(r, on: today),
+                ahead: try r.plans(from: today)
             ) + (try blockNotifications(r, now: now, today: today)))
                 .sorted { ($0.fireAt, $0.id) < ($1.fireAt, $1.id) }
                 .prefix(NotificationPlanner.maxPending)

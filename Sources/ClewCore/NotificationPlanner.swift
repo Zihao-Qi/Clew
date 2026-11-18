@@ -48,7 +48,8 @@ public enum NotificationPlanner {
 
     public static func plan(
         now: Date, zone: TimeZone, rolloverHour: Int, items: [Item], facts: [UUID: ItemFacts],
-        reminders: [Reminder], summaries: SummarySettings, movedToday: [UUID: Double?] = [:]
+        reminders: [Reminder], summaries: SummarySettings, movedToday: [UUID: Double?] = [:],
+        ahead: [Plan] = []
     ) -> [PlannedNotification] {
         let today = LocalDay(of: now, in: zone, rolloverHour: rolloverHour)
         let remindersByItem = Dictionary(
@@ -58,8 +59,10 @@ public enum NotificationPlanner {
         var planned: [PlannedNotification] = []
         for offset in 0..<windowDays {
             let day = today.adding(days: offset)
-            // Moves to Today are for today only (SPEC 2026-11-15).
-            let list = todayList(items: items, facts: facts, on: day, planned: offset == 0 ? movedToday : [:])
+            // Moves to Today are for today only (SPEC 2026-11-15); a day for Later is a
+            // plan booked ahead, so the days after today have theirs (SPEC 2026-11-17).
+            let list = todayList(items: items, facts: facts, on: day,
+                                 planned: offset == 0 ? movedToday : moved(ahead, on: day))
             func add(_ id: String, _ time: TimeOfDay, _ content: PlannedContent) {
                 let fireAt = day.instant(at: time, in: zone, rolloverHour: rolloverHour)
                 guard fireAt > now else { return }
@@ -81,6 +84,10 @@ public enum NotificationPlanner {
             for row in list.rows + list.goalsAndLater where row.state == .due {
                 // Every day, or a one-day reminder on its own day only.
                 guard let reminder = remindersByItem[row.id], reminder.fires(on: day) else { continue }
+                // Waiting for its day: an every-day reminder is quiet until then; a
+                // one-day reminder was asked for that day (SPEC 2026-11-17).
+                if reminder.day == nil, row.item.state == .later, !list.moved.contains(row.id),
+                   ahead.contains(where: { $0.itemId == row.id && $0.localDay > day && $0.voidedAt == nil }) { continue }
                 let item = row.item
                 add("reminder.\(item.id.uuidString)", reminder.time, .reminder(
                     itemId: item.id, title: item.title, canOpen: item.url != nil
@@ -88,6 +95,16 @@ public enum NotificationPlanner {
             }
         }
         return Array(planned.sorted { ($0.fireAt, $0.id) < ($1.fireAt, $1.id) }.prefix(maxPending))
+    }
+
+    /// Items moved to Today for `day` among `plans` (live, oldest first): the earliest
+    /// plan of each wins, as `Clew.moved` does.
+    static func moved(_ plans: [Plan], on day: LocalDay) -> [UUID: Double?] {
+        var keys: [UUID: Double?] = [:]
+        for plan in plans where plan.localDay == day && plan.voidedAt == nil && keys[plan.itemId] == nil {
+            keys[plan.itemId] = .some(plan.todaySortKey)
+        }
+        return keys
     }
 
     /// Delivered "Done?" questions to withdraw: those of slot blocks no longer asking

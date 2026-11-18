@@ -122,6 +122,9 @@ public struct TodayList: Hashable, Sendable {
     public let goalsAndLater: [TodayRow]
     /// Items moved to Today for this day (live plans).
     public let moved: Set<UUID>
+    /// Goals & Later rows waiting for a day (SPEC 2026-11-17, "A day for Later"): the
+    /// day each comes to Today. Filled by Core, which reads the plans booked ahead.
+    public var waiting: [UUID: LocalDay] = [:]
 
     public init(day: LocalDay, rows: [TodayRow], goalsAndLater: [TodayRow] = [], moved: Set<UUID> = []) {
         self.day = day

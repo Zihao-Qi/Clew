@@ -118,6 +118,10 @@ final class FakeStore: ClewStore, @unchecked Sendable {
             state.plans.values.filter { $0.localDay == day && $0.voidedAt == nil }
                 .sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) }
         }
+        func plans(from day: LocalDay) throws -> [Plan] {
+            state.plans.values.filter { $0.localDay >= day && $0.voidedAt == nil }
+                .sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) }
+        }
         func activeDays(from: LocalDay) throws -> Set<LocalDay> {
             Set(state.checkIns.values.filter { !$0.isVoided && $0.localDay >= from }.map(\.localDay))
         }

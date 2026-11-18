@@ -326,9 +326,9 @@ stopped daily use, not adding features.
     removing the day, or moving it early, voids that plan. On its day, Clew's first
     refresh gives it a Today place at the end: the plan is voided and a new one for the
     day inserted with a key (as a reorder does), in the order the plans were recorded.
-    Only plans recorded before their day starts are settled this way (a nil-key plan
-    made that day, as by the v11 migration, keeps using the item's own `sortKey`, as
-    now).
+    Only a Later task's nil-key plan is settled this way (moving a task by hand always
+    gives it a place; a goal's nil-key plan, as from the v11 migration, keeps using the
+    item's own `sortKey`, as now).
 
 - **Last week's card (user, 2026-11-15; Fable review).** A reminder of how the last
   week went, because looking back at what got done helps the next start (Design

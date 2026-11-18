@@ -151,6 +151,8 @@ final class AppModel {
             // A block whose end passed ticks first (it writes only when something
             // changes, so the refresh its write causes does nothing more).
             _ = try? clew.settleBlocks()
+            // A day for Later that has come goes to Today's end (SPEC 2026-11-17).
+            _ = try? clew.settlePlans()
             let list = try clew.today()
             today = list
             ratingsOn = (try? clew.ratingsEnabled()) ?? false
@@ -630,6 +632,17 @@ final class AppModel {
         drop(row.id, onto: rows[target])
     }
     func moveToLater(_ row: TodayRow) { run { try $0.moveToLater(itemId: row.id) } }
+
+    // MARK: A day for Later (SPEC 2026-11-17)
+
+    /// Today's Clew day (it starts at the rollover).
+    var currentDay: LocalDay? { clew?.currentDay() }
+    func canHaveDay(_ row: TodayRow) -> Bool { clew != nil && Clew.canHaveDay(row) }
+    /// The day a Goals & Later row waits for.
+    func waitingDay(_ row: TodayRow) -> LocalDay? { today?.waiting[row.id] }
+    @discardableResult
+    func setLaterDay(_ itemId: UUID, _ day: LocalDay?) -> Bool { run { try $0.setLaterDay(itemId: itemId, day: day) } }
+    func laterDay(_ itemId: UUID) -> LocalDay? { (try? clew?.laterDay(itemId: itemId)) ?? nil }
     func moveToToday(_ row: TodayRow) { run { try $0.moveToToday(itemId: row.id) } }
     func moveBack(_ row: TodayRow) { run { try $0.moveBack(itemId: row.id) } }
 

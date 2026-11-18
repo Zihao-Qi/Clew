@@ -45,14 +45,17 @@ public struct NewItem: Hashable, Sendable {
     /// A habit's time slot on the day timeline (SPEC 2026-11-10; goals have none since
     /// 2026-11-15).
     public var slot: TimeSlot?
+    /// A Later task's day (SPEC 2026-11-17, "A day for Later"); after today.
+    public var laterDay: LocalDay?
 
     public init(title: String, titleOrigin: TitleOrigin = .typed, url: URL? = nil, shape: NewItemShape,
-                slot: TimeSlot? = nil) {
+                slot: TimeSlot? = nil, laterDay: LocalDay? = nil) {
         self.title = title
         self.titleOrigin = titleOrigin
         self.url = url
         self.shape = shape
         self.slot = slot
+        self.laterDay = laterDay
     }
 }
 
@@ -143,8 +146,10 @@ public final class Clew: Sendable {
             facts[id] = ItemFacts(recent: recent[id] ?? [], progressAmount: progress[id] ?? 0, roundStart: rounds[id])
         }
         let late = Set(try lateBlockTicks(r, today: day).map(\.block.itemId))
-        return ClewDomain.todayList(items: items, facts: facts, on: day, keepReached: late,
-                                    planned: try Self.moved(r, on: day))
+        var list = ClewDomain.todayList(items: items, facts: facts, on: day, keepReached: late,
+                                        planned: try Self.moved(r, on: day))
+        list.waiting = try Self.waitingDays(r, after: day, among: list.goalsAndLater)
+        return list
     }
 
     /// Items moved to Today for `day`: the earliest live plan of each wins (SPEC
@@ -194,6 +199,10 @@ public final class Clew: Sendable {
 
         // Only habits have a slot (goals lost theirs, SPEC 2026-11-15).
         guard new.slot == nil || kind == .habit else { throw ClewError.notAllowed }
+        // Only a Later task has a day, and it is after today (SPEC 2026-11-17).
+        if let laterDay = new.laterDay {
+            guard state == .later, laterDay > day else { throw ClewError.notAllowed }
+        }
         let item = Item(
             id: makeID(), kind: kind, title: title, titleOrigin: new.titleOrigin, url: url,
             schedule: schedule, progress: progress,
@@ -201,6 +210,9 @@ public final class Clew: Sendable {
             slot: new.slot, createdAt: now, updatedAt: now
         )
         try w.insert(item)
+        if let laterDay = new.laterDay {
+            try w.insert(Plan(id: makeID(), itemId: item.id, localDay: laterDay, at: now, source: source, todaySortKey: nil))
+        }
         return item
     }
 

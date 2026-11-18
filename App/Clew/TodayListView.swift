@@ -264,6 +264,7 @@ struct TodayListView: View {
         RowView(row: row, model: model, onEdit: { screen = .edit(row.item, back: .list) },
                 onOpen: { screen = .detail(row.id) },
                 onPlace: showsTimeline ? { screen = .place(row.id, block: nil) } : nil,
+                onPickDay: { screen = .pickDay(row.id) },
                 canMoveUp: index > 0, canMoveDown: index < count - 1,
                 isDragged: dragging == row.id,
                 dragActive: dragging != nil || lifted != nil,
@@ -602,6 +603,8 @@ struct RowView: View {
     let onOpen: () -> Void
     /// "Put on timeline…", when the timeline is shown.
     var onPlace: (() -> Void)? = nil
+    /// Right-click › Later until › Pick a day… (SPEC 2026-11-17).
+    var onPickDay: (() -> Void)? = nil
     var canMoveUp = false
     var canMoveDown = false
     /// This row is being dragged: it gets a solid background so rows sliding under it
@@ -720,6 +723,15 @@ struct RowView: View {
             } else if (item.kind == .once || item.kind == .link), row.progressAmount == 0 {
                 Button("Move to Later") { model.moveToLater(row) }
             }
+            // A day for Later (SPEC 2026-11-17).
+            if let onPickDay, model.canHaveDay(row), let today = model.currentDay {
+                Button("Later until tomorrow") { model.setLaterDay(row.id, today.adding(days: 1)) }
+                if Clew.nextMonday(after: today) != today.adding(days: 1) {
+                    Button("Later until next Monday") { model.setLaterDay(row.id, Clew.nextMonday(after: today)) }
+                }
+                Button("Later until a day…", action: onPickDay)
+                if model.waitingDay(row) != nil { Button("No day") { model.setLaterDay(row.id, nil) } }
+            }
         }
         .contextMenu {
             if row.todayAmount > 0 {
@@ -748,6 +760,9 @@ struct RowView: View {
                 Button("Move to Goals & Later") { model.moveBack(row) }
             } else if (item.kind == .once || item.kind == .link), row.progressAmount == 0 {
                 Button("Move to Later") { model.moveToLater(row) }
+            }
+            if let onPickDay, model.canHaveDay(row) {
+                LaterUntilMenu(row: row, model: model, onPick: onPickDay)
             }
             Divider()
             // The keyboard and VoiceOver way to reorder (dragging needs a pointer).
@@ -919,15 +934,23 @@ struct RowView: View {
                 .help(url.absoluteString)
                 .accessibilityLabel(Text("Open link for \(item.title)"))
             }
-            // A saved link's site in Goals & Later, as Pick showed it (SPEC 2026-11-15).
-            if model.isBelow(row), let site = item.siteLabel {
-                Text(verbatim: site)
+            // A saved link's site in Goals & Later, as Pick showed it (SPEC 2026-11-15),
+            // and the day it waits for (SPEC 2026-11-17): "medium.com · Thu".
+            if model.isBelow(row), let text = belowLabel {
+                Text(verbatim: text)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .layoutPriority(-1)
             }
         }
+    }
+
+    /// The site and the waiting day after a Goals & Later row's title.
+    private var belowLabel: String? {
+        let day = model.waitingDay(row).flatMap { d in model.currentDay.map { dayLabel(d, today: $0) } }
+        let parts = [item.siteLabel, day].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     /// "999/999" measures 41.7 pt in the caption font; larger counts widen only their

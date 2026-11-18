@@ -34,6 +34,9 @@ public protocol StoreReader {
     /// Live (not voided) plans for `day`, any item, oldest first (SPEC 2026-11-15: items
     /// moved to Today).
     func plans(on day: LocalDay) throws -> [Plan]
+    /// Live plans for `day` and the days after it, any item, oldest first (SPEC
+    /// 2026-11-17: a day for Later is a plan booked ahead).
+    func plans(from day: LocalDay) throws -> [Plan]
     func goalRounds(itemId: UUID) throws -> [GoalRound]
     /// The highest sort key of any item, or live plan's Today key.
     func maxSortKey() throws -> Double?
