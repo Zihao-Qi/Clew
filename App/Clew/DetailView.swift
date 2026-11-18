@@ -257,8 +257,12 @@ struct Heatmap: View {
     }
     /// Fills the 316 pt content width exactly (the tiles' width):
     /// 10 pt labels + 16 cells + 16 gaps of 2.5 pt → cell = (316 − 10 − 40) / 16.
-    private let gap: CGFloat = 2.5
-    private var cell: CGFloat { (316 - 10 - gap * CGFloat(Clew.heatmapWeeks)) / CGFloat(Clew.heatmapWeeks) }
+    private let gap: CGFloat = Self.gap
+    private var cell: CGFloat { Self.cell }
+    static let gap: CGFloat = 2.5
+    static let cell: CGFloat = (316 - 10 - gap * CGFloat(Clew.heatmapWeeks)) / CGFloat(Clew.heatmapWeeks)
+    /// Seven rows: a goal's Bars take the same height, so switching does not resize the menu.
+    static let height: CGFloat = 7 * cell + 6 * gap
 
     var body: some View {
         let columns = heatmapColumns(endingAt: today, weeks: Clew.heatmapWeeks)
