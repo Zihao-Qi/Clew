@@ -324,6 +324,8 @@ final class AppModel {
     func menuClosed() {
         menuSessionOpen = false
         weekCard = nil
+        // A refusal line never greets the next opening or the next day (SPEC 2026-11-17).
+        notice = nil
     }
 
     /// × on the card, or leaving the list: it does not come back this week.
@@ -483,7 +485,11 @@ final class AppModel {
         guard let row = row(itemId), isMoved(row)
                 || ((row.item.kind == .once || row.item.kind == .link) && row.item.state == .active && row.progressAmount == 0)
         else {
+            let reason = self.row(itemId).flatMap { StaysOnToday.reason(for: $0, moved: isMoved($0)) }
             putBack(blockId, itemId: itemId, at: listRows.count)
+            // Only a habit's block says why; a task's block took its tick with it (SPEC
+            // 2026-11-17). Not when putting it back failed: that line stays.
+            if reason == .habit, notice == nil { notice = Self.message(for: .habit) }
             return
         }
         let below = goalsAndLater.map(\.id).filter { $0 != itemId }
@@ -647,9 +653,19 @@ final class AppModel {
         }
         let below = moved[(label + 1)...].compactMap { $0 }
         let slot = at - label - 1
-        return run { try $0.place(itemId: dragged, in: .goalsAndLater,
-                                  after: slot > 0 ? below[slot - 1] : nil,
-                                  before: slot + 1 < below.count ? below[slot + 1] : nil) }
+        let placed = run { try $0.place(itemId: dragged, in: .goalsAndLater,
+                                        after: slot > 0 ? below[slot - 1] : nil,
+                                        before: slot + 1 < below.count ? below[slot + 1] : nil) }
+        // Refused: say why, when it is a habit or a task done today (SPEC 2026-11-17).
+        // Only in place of the general line (a failed save keeps its own), and asked of
+        // the list as it is now (the rollover may have just passed).
+        if !placed, notice == Self.message(for: ClewError.notAllowed) {
+            refresh()
+            if let row = row(dragged), !isBelow(row), let reason = StaysOnToday.reason(for: row, moved: isMoved(row)) {
+                notice = Self.message(for: reason)
+            }
+        }
+        return placed
     }
     /// The task deleted last, for a few seconds: "Deleted “…” · Undo" (SPEC 2026-11-10).
     private(set) var lastDeleted: (id: UUID, title: String)?
@@ -715,6 +731,13 @@ final class AppModel {
         } catch {
             notice = String(localized: "That didn't save. Try again.")
             return false
+        }
+    }
+
+    static func message(for reason: StaysOnToday) -> String {
+        switch reason {
+        case .habit: String(localized: "Habits stay on Today. Change when it repeats in Edit.")
+        case .doneToday: String(localized: "Done today. Undo the tick to move it.")
         }
     }
 

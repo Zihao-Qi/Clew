@@ -91,6 +91,58 @@ private func at(_ d: Int, _ h: Int, _ m: Int = 0) -> Date {
         #expect(throws: ClewError.notAllowed) { try clew.place(itemId: a, in: .goalsAndLater, after: nil, before: nil) }
     }
 
+    /// SPEC 2026-11-17: the hint for a refused drag down names why.
+    @Test func whyARowStaysOnToday() throws {
+        let task = try add("task", .today)
+        let habit = try add("habit", .habit(.daily))
+        let later = try add("later", .later)
+        _ = try add("goal", .goal(target: 30))
+        try clew.moveToToday(itemId: later)
+        func reason(_ id: UUID) throws -> StaysOnToday? {
+            let list = try clew.today()
+            let row = try #require(list.rows.first { $0.id == id })
+            return StaysOnToday.reason(for: row, moved: list.moved.contains(id))
+        }
+        // Unticked: a habit stays; a task and a moved row may go down, so no hint.
+        #expect(try reason(habit) == .habit && reason(task) == nil && reason(later) == nil)
+        try clew.checkIn(itemId: task)
+        try clew.checkIn(itemId: habit)
+        try clew.checkIn(itemId: later)
+        // Ticked: the task is done today; a ticked habit still gets the habit hint; a
+        // moved row ticked today can still go back (SPEC 2026-11-15).
+        #expect(try reason(task) == .doneToday && reason(habit) == .habit && reason(later) == nil)
+        try clew.moveToToday(itemId: try #require(clew.today().goalsAndLater.first { $0.item.kind == .goal }).id)
+        let goalRow = try #require(clew.today().rows.first { $0.item.kind == .goal })
+        try clew.checkIn(itemId: goalRow.id)
+        #expect(try reason(goalRow.id) == nil)                       // moved, ticked: goes back
+        #expect(StaysOnToday.reason(for: try #require(clew.today().rows.first { $0.id == goalRow.id }), moved: false) == nil)
+        // A moved row never gets a hint, whatever it is; a Later item ticked in place is
+        // not one of Today's own.
+        let taskRow = try #require(clew.today().rows.first { $0.id == task })
+        #expect(StaysOnToday.reason(for: taskRow, moved: true) == nil)
+        let inPlace = try add("in place", .later)
+        try clew.checkIn(itemId: inPlace)
+        let inPlaceRow = try #require(clew.today().goalsAndLater.first { $0.id == inPlace })
+        #expect(StaysOnToday.reason(for: inPlaceRow, moved: false) == nil)
+    }
+
+    /// The rows the list itself does not make today: a link of Today's own (picked from
+    /// Later before 2026-11-15), a habit asked about as moved, a tick on an earlier day.
+    @Test func whyARowStaysOnTodayForEveryKind() throws {
+        func row(_ kind: ItemKind, today: Int, progress: Int) -> TodayRow {
+            let item = Item(id: UUID(), kind: kind, title: "x", schedule: kind == .habit ? .daily : .unscheduled,
+                            progress: .none, state: .active, sortKey: 1, source: .user, createdAt: at(10, 9), updatedAt: at(10, 9))
+            return TodayRow(item: item, state: today > 0 ? .doneToday : .due, todayAmount: today,
+                            progressAmount: progress, lastTickToday: nil)
+        }
+        #expect(StaysOnToday.reason(for: row(.link, today: 1, progress: 1), moved: false) == .doneToday)
+        #expect(StaysOnToday.reason(for: row(.link, today: 0, progress: 0), moved: false) == nil)
+        #expect(StaysOnToday.reason(for: row(.habit, today: 0, progress: 0), moved: true) == nil)
+        // Ticked on an earlier day only: not "done today".
+        #expect(StaysOnToday.reason(for: row(.once, today: 0, progress: 1), moved: false) == nil)
+        #expect(StaysOnToday.reason(for: row(.once, today: 2, progress: 2), moved: false) == .doneToday)
+    }
+
     @Test func droppingAMovedRowBelowTakesItsBlocksOff() throws {
         let later = try add("later", .later)
         let block = try clew.placeOnTimeline(itemId: later, start: at(10, 11))

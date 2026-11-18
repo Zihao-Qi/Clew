@@ -97,6 +97,14 @@ public struct TodayRow: Hashable, Sendable, Identifiable {
     /// Today's latest live tick, if any: the one rating dots rate.
     public let lastTickToday: CheckIn?
 
+    public init(item: Item, state: DueState, todayAmount: Int, progressAmount: Int, lastTickToday: CheckIn?) {
+        self.item = item
+        self.state = state
+        self.todayAmount = todayAmount
+        self.progressAmount = progressAmount
+        self.lastTickToday = lastTickToday
+    }
+
     public var id: UUID { item.id }
     public var isDone: Bool { state == .doneToday }
     /// A counted goal whose current round has reached its target.
