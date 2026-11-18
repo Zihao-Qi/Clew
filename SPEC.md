@@ -271,47 +271,56 @@ stopped daily use, not adding features.
     line never greets the next opening or the next day. They still clear at the next
     action that succeeds, as before.
 
-- **A day for Later (user, 2026-11-17).** "Not today, Thursday" in one step: a task
-  in Goals & Later can wait for a day and then come to Today by itself (Distractibility
-  delay: park it with a day, so it is not forgotten).
-  - **What can have a day:** once tasks and links (not habits, not goals, not YouTube
-    or X items). The day is a Clew day (it starts at the rollover, 4 a.m.), from
-    tomorrow on; today or an earlier day cannot be chosen.
+- **A day for Later (user, 2026-11-17; Gemini Carbon review).** "Not today, Thursday" in
+  one step: a task can wait in Goals & Later for a day, then come to Today **for that
+  day** by itself, as if moved there by hand that morning (Distractibility delay:
+  park it with a day, so it is not forgotten).
+  - **What can have a day:** once tasks and links (not habits, goals, YouTube or X
+    items). The day is a Clew day (it starts at the rollover, 4 a.m.), from tomorrow
+    on; today or an earlier day cannot be chosen. One day at a time: choosing another
+    replaces it.
   - **Where it is set:**
     - **Add:** with **Later** chosen, one optional row under the line: a switch **"On a
-      day"** and a date (default tomorrow). Off adds a plain Later task, as now.
-    - **Edit** of a Later task or a task waiting for its day: the same row. Turning it
-      off makes it a plain Later task; changing the date moves its day.
-    - **Right-click › Later until ›** **Tomorrow**, **Monday** (the next Monday; from
-      a Monday, the one a week on) and **Pick a day…** (a small screen in the menu
-      with a date and Save, like "Put on timeline…"). Offered on a Later task or one
-      waiting for its day in Goals & Later (moved to Today or not), and on a once task
-      or link of Today's own with no tick (the same ones that can be dragged down).
-      Not on habits, goals or ticked tasks. VoiceOver has the same three as actions.
-  - **While it waits:** the row is in Goals & Later at the end (setting a day puts it
-    there; it can be dragged within the list afterwards), with its day in quiet
-    secondary text after the title: "Tomorrow", a weekday ("Thu") within the next six
-    days, otherwise the date ("Nov 27"); a link shows "medium.com · Thu". It can be
-    ticked there (it is then done and leaves the next day, as any Later task), moved
-    to Today, dragged onto an hour, deleted or edited as any Later row.
+      day"** and a date (default tomorrow). While it is on, the line reads "Comes to
+      Today on that day." Off adds a plain Later task, as now.
+    - **Edit** of a once task or link with no tick (on Today or in Goals & Later): the
+      same row. Turning it on for a task of Today's own makes it a Later task with a
+      day; turning it off leaves a plain Later task; changing the date moves its day.
+    - **Right-click › Later until ›** **Tomorrow**, **Next Monday** (the Monday that
+      starts the next Clew week; left out when that is tomorrow), **Pick a day…** (a
+      small screen in the menu with a date and Save, like "Put on timeline…"), and
+      **No day** when it has one. Offered on the rows Edit offers it on (not on ticked
+      rows, habits or goals). Timeline blocks do not offer it. VoiceOver has the same
+      as actions: "Later until tomorrow", "Later until next Monday", "Later until a
+      day…", "No day".
+  - **Giving a day** to a task of Today's own moves it to Later (as Move to Later: off
+    Today, at Goals & Later's end, today's blocks removed). A Later task moved to Today
+    for today goes back down first (as Move to Goals & Later). A task already in Goals
+    & Later keeps its place.
+  - **While it waits:** its row in Goals & Later shows its day in quiet secondary text
+    after the title (after a link's site: "medium.com · Thu"): "Tomorrow" for the next
+    day, a weekday ("Thu") for two to six days on, otherwise the date ("Nov 27"). It can
+    be ticked there (done; it leaves the next day, as any Later task), dragged within
+    Goals & Later (its day stays), deleted or edited.
   - **Moving it to Today early** (drag up, Move to Today, an hour on the timeline,
-    Focus): it becomes a Today task from today (its day is dropped) and carries over
-    until ticked. Not "for today only": it was going to Today anyway. Dragging it
-    back down, or Move to Later, makes it a plain Later task (no day).
-  - **On its day** it is on Today by itself, at Today's end among what was there
-    before, as a **Today task**: it carries over until ticked (*user*: like any Today
-    task; it never goes back to Goals & Later by itself). Nothing is announced (no
-    notification, no line); it counts in Today's `done/total` from that day.
-  - **Details** say "In Goals & Later until Thu, Nov 20" while it waits; then "On
-    Today", as any Today task.
-  - **Reminders** are unchanged (a reminder on it fires while it is in either list and
-    not done).
-  - **Data:** no new field. A waiting task is a once task or link in state active
-    with its `plannedDay` after today (the rule "planned for today or earlier is on
-    Today" already makes it appear on its day and carry over); Goals & Later shows such
-    items until then. A plain Later task stays state later with no `plannedDay`.
-    Exports already carry `plannedDay`; an older Clew reading one simply does not show
-    it until its day.
+    Focus) moves it for today as any Later task, and its day is dropped.
+  - **On its day** it is on Today, after the rows that were there at the rollover
+    (several arriving the same day keep the order their days were set in), and counts
+    in Today's `done/total`. Nothing is announced. It can be dragged, placed on the
+    timeline, focused on and moved back down, as any row moved to Today. **If it is not
+    ticked that day** (*user*), the next day it is back in Goals & Later at its place,
+    a plain Later task with no day, as any row moved to Today for a day. The same if
+    the Mac was off or asleep all that day.
+  - **Reminders:** while it waits, its reminder does not fire (*user*: a task parked
+    until Monday does not nudge before Monday). On its day it fires as on any Today
+    row; afterwards, back in Later with no day, as for any Later task.
+  - **Details** show "Comes to Today Thu, Nov 20" while it waits; a day not yet
+    reached is not in the history.
+  - **Data:** no new field. A day is a `Plan` (the "moved to Today" fact) recorded now
+    for that future day, with no Today place (`todaySortKey` nil). Changing or
+    removing the day, or moving it early, voids that plan; a plan's day passing is
+    simply its history. On the day, a plan with no Today place puts the row after the
+    rows with one, in the order the plans were recorded.
 
 - **Last week's card (user, 2026-11-15; Fable review).** A reminder of how the last
   week went, because looking back at what got done helps the next start (Design

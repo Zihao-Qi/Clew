@@ -117,9 +117,10 @@ Award           id = hash(kind, itemId, milestone), kind (e.g. goal.finished),
   *Later pile* = items in state `later` (shown as Goals & Later since 2026-11-15).
   "Pick for today" set `plannedDay` **and** recorded a `Plan` fact; since 2026-11-15
   moving to Today records only the `Plan` (see "Today and Goals & Later").
-  A once task or link in state `active` whose `plannedDay` is after today is
-  **waiting for its day** (SPEC "A day for Later", 2026-11-17): it shows in Goals &
-  Later until then, and on that day the usual rule puts it on Today.
+  A Later task **waiting for its day** (SPEC "A day for Later", 2026-11-17) has a
+  live `Plan` for a future day, recorded when the day was set, with `todaySortKey`
+  nil; on that day it is moved to Today like any plan (rows with no Today place after
+  the others, in `at` order), and its reminder is quiet until then.
 - **"Finished" is derived, not stored:** a goal is reached when
   `sum(amount of non-voided CheckIns since the current round started) >= target`;
   a once-item when it has a non-voided CheckIn. Undoing the last tick therefore
