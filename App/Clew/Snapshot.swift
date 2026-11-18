@@ -562,6 +562,8 @@ enum Snapshot {
                     }
                     render(AddView(model: model, kind: .later, onADay: true, text: "Call the dentist") {}.frame(width: 340),
                            appearance: appearance, to: dir.appendingPathComponent("add-later-day-\(suffix).png"))
+                    render(AddView(model: model, kind: .habit, onADay: false, slotOn: true, text: "Stretch") {}.frame(width: 340),
+                           appearance: appearance, to: dir.appendingPathComponent("add-habit-slot-\(suffix).png"))
                     render(AddView(model: model, kind: .later, onADay: true, dayOpen: true, text: "Call the dentist") {}
                         .frame(width: 340),
                            appearance: appearance, to: dir.appendingPathComponent("add-later-calendar-\(suffix).png"))

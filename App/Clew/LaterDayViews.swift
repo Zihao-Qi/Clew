@@ -204,9 +204,9 @@ struct DayRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
+                // A checkbox, like "On the timeline" and "Remind me" (user, 2026-11-18).
                 Toggle(isOn: $on) { Text("On a day") }
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
+                    .fixedSize()
                     .accessibilityLabel(Text("On a day"))
                 if on {
                     Button { withAnimation(.snappy(duration: 0.25)) { open.toggle() } } label: {
