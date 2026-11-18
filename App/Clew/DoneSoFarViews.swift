@@ -290,6 +290,10 @@ struct GoalBars: View {
                     .foregroundStyle(Color.accentColor.opacity(hovered == nil || d.day == hovered ? 0.9 : 0.6))
                     .cornerRadius(2)
             }
+            // A faint floor, so days with nothing are a gap on a line, not a hole (review).
+            RuleMark(y: .value("None", 0))
+                .foregroundStyle(Color.primary.opacity(0.15))
+                .lineStyle(StrokeStyle(lineWidth: 1))
             if let most {
                 RuleMark(y: .value("Most", most.amount))
                     .foregroundStyle(.secondary)
