@@ -267,11 +267,11 @@ struct GoalDaysSection: View {
             } else {
                 Heatmap(details: details)
             }
-            if shown.total > 0 {
-                Text(verbatim: DoneSoFarText.onDays(total: shown.total, days: shown.daysWorked))
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
+            // Always takes its line, so switching never changes the height.
+            Text(verbatim: shown.total > 0 ? DoneSoFarText.onDays(total: shown.total, days: shown.daysWorked) : " ")
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(shown.total == 0)
         }
     }
 }
@@ -327,7 +327,8 @@ struct GoalBars: View {
                     }
                 }
         }
-        .frame(height: 96)
+        // With the labels below, as tall as the Heatmap (switching kept resizing the menu).
+        .frame(height: Heatmap.height - 14)
         // The first day at the left, "Today" at the right, under the bars (as axis labels
         // the last one was cut off).
         .overlay(alignment: .bottom) {
