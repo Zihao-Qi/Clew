@@ -320,6 +320,48 @@ enum Snapshot {
         }
     }
 
+    /// `CLEW_SCROLL_TEST=1`: a list longer than the screen (user, 2026-11-18). The drag
+    /// itself can't be posted (SwiftUI checks the real mouse button), so this checks the
+    /// part that can be: the list's scroll view is found, and scrolling it moves the rows.
+    static func startScrollTest() {
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1))
+            do {
+                let clew = Clew(store: try SQLiteStore.inMemory(), clock: SystemClock(), zones: SystemTimeZone())
+                for i in 1...60 { _ = try clew.addItem(NewItem(title: "Task \(i)", shape: i % 2 == 0 ? .today : .later)) }
+                let model = AppModel(clew: clew, notify: false)
+                let host = NSHostingView(rootView: RootView(model: model))
+                let size = host.fittingSize
+                let window = NSWindow(contentRect: NSRect(x: -10_000, y: -10_000, width: size.width, height: size.height),
+                                      styleMask: [.titled], backing: .buffered, defer: false)
+                window.contentView = host
+                window.makeKeyAndOrderFront(nil)
+                try? await Task.sleep(for: .milliseconds(600))
+                func finders(_ v: NSView) -> [NSView] {
+                    (v is ScrollViewFinder.FinderView ? [v] : []) + v.subviews.flatMap(finders)
+                }
+                guard let finder = finders(host).first, let scroll = finder.enclosingScrollView else {
+                    print("FAIL: no list scroll view found"); exit(1)
+                }
+                let scroller = ListScroller()
+                scroller.scrollView = scroll
+                let before = finder.convert(finder.bounds, to: nil).maxY
+                print("window", size, "list: visible", scroll.contentView.bounds.height, "content", scroll.documentView?.frame.height ?? -1,
+                      "max offset", scroller.maxOffset)
+                scroller.offset = 300
+                try? await Task.sleep(for: .milliseconds(200))
+                let after = finder.convert(finder.bounds, to: nil).maxY
+                // Window coordinates grow upward: rows moving up the screen gain y.
+                print("offset", scroller.offset, "rows moved up by", after - before)
+                scroller.offset = CGFloat(ListAutoScroll.clamp(1_000_000, maxOffset: Double(scroller.maxOffset)))
+                print("clamped to the end:", scroller.offset == scroller.maxOffset)
+                exit(after - before == 300 ? 0 : 1)
+            } catch {
+                print("FAIL:", error); exit(1)
+            }
+        }
+    }
+
     /// `CLEW_TIME_TEST=1`: a real quarter-hour time field (user, 2026-11-18): click the
     /// hour or the minutes, press the arrow keys, type, leave the field; prints the value.
     static func startTimeFieldTest() {

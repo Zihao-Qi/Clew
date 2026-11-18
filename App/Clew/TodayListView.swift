@@ -25,6 +25,18 @@ struct TodayListView: View {
     @State private var edgeScroll: Timer?
     /// The rows' full height, so a long list scrolls instead of passing the screen.
     @State private var rowsHeight: CGFloat = 0
+    /// A long list scrolls by itself while a row is dragged near its edge (user,
+    /// 2026-11-18): its scroll view, where it shows, the scroll when the drag began, the
+    /// pointer's last place and the timer that scrolls.
+    @State private var scroller = ListScroller()
+    @State private var rowsViewport: CGRect = .zero
+    @State private var dragScrollStart: CGFloat = 0
+    @State private var lastPointerY: CGFloat = 0
+    @State private var listScroll: Timer?
+    private var listScrolls: Bool { rowsHeight > rowsLimit }
+    /// How far the list has scrolled since the drag began: the frozen row frames are
+    /// measured against the pointer moved by this much.
+    private var scrolledSinceDrag: CGFloat { listScrolls ? scroller.offset - dragScrollStart : 0 }
     /// What is being dragged, drawn as one lifted card above the list and the timeline:
     /// a row over the list, a block over the hours (user, 2026-11-10: the same thing,
     /// moving smoothly between the two).
@@ -112,7 +124,50 @@ struct TodayListView: View {
         return CGFloat(Clew.dragShift(index: index, from: from, to: dragSlot ?? from, draggedHeight: height))
     }
 
+    /// Near the long list's top or bottom edge while dragging, it scrolls by itself.
+    private func listEdgeScroll(_ y: CGFloat?) {
+        lastPointerY = y ?? lastPointerY
+        let step = y.map { ListAutoScroll.step(pointerY: Double($0), viewport: (Double(rowsViewport.minY), Double(rowsViewport.maxY))) } ?? 0
+        guard listScrolls, step != 0 else {
+            listScroll?.invalidate()
+            listScroll = nil
+            return
+        }
+        guard listScroll == nil else { return }
+        let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { _ in
+            Task { @MainActor in autoScrollTick() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        listScroll = timer
+    }
+
+    private func autoScrollTick() {
+        let step = ListAutoScroll.step(pointerY: Double(lastPointerY),
+                                       viewport: (Double(rowsViewport.minY), Double(rowsViewport.maxY)))
+        // Only over the list (a tick already queued when the pointer went up onto the
+        // timeline does nothing; review).
+        let overList = lifted?.overTimeline != true
+        let draggingRow = dragging != nil && overList
+        let draggingBlock = lifted?.blockId != nil && overList
+        guard listScroll != nil, listScrolls, step != 0, draggingRow || draggingBlock else { return listEdgeScroll(nil) }
+        let next = CGFloat(ListAutoScroll.clamp(Double(scroller.offset) + step, maxOffset: Double(scroller.maxOffset)))
+        // At the list's end it stops (review: it kept ticking); moving the pointer starts it again.
+        guard next != scroller.offset else { return listEdgeScroll(nil) }
+        scroller.offset = next
+        // The rows moved under a pointer that did not: the gap follows.
+        let spans = dragFrames.map { (minY: Double($0.minY), maxY: Double($0.maxY)) }
+        let y = Double(lastPointerY + scrolledSinceDrag)
+        if draggingRow {
+            let slot = Clew.dragSlot(pointerY: y, spans: spans)
+            if slot != dragSlot { withAnimation(.easeOut(duration: 0.15)) { dragSlot = slot } }
+        } else if let lifted {
+            let slot = Clew.insertSlot(pointerY: y, spans: spans)
+            if lifted.slot != slot { withAnimation(.easeOut(duration: 0.15)) { self.lifted?.slot = slot } }
+        }
+    }
+
     private func endDrag() {
+        listEdgeScroll(nil)
         scrollAtEdge(nil)
         lifted = nil
         dragging = nil
@@ -130,6 +185,7 @@ struct TodayListView: View {
             .onChanged { value in
                 if dragging == nil {
                     dragFrames = ids.map { rowFrames[$0] ?? .zero }
+                    dragScrollStart = scroller.offset
                     dragging = row.id
                 }
                 let from = ids.firstIndex(of: row.id) ?? 0
@@ -145,22 +201,28 @@ struct TodayListView: View {
                     dragTranslation = value.translation.height
                     if dragSlot != nil { withAnimation(.easeOut(duration: 0.15)) { dragSlot = nil } }
                     scrollAtEdge(value.location.y)
+                    listEdgeScroll(nil)
                     return
                 }
                 scrollAtEdge(nil)
-                // Kept inside the rows: never over the footer (Add, Later, Settings).
+                listEdgeScroll(value.location.y)
+                let scrolled = scrolledSinceDrag
+                // Kept inside the rows: never over the footer (Add, Later, Settings), and
+                // in a long list inside the part that shows.
                 if let first = dragFrames.first, let last = dragFrames.last {
+                    var top = Double(first.minY - scrolled), bottom = Double(last.maxY - scrolled)
+                    if listScrolls { top = max(top, Double(rowsViewport.minY)); bottom = min(bottom, Double(rowsViewport.maxY)) }
                     dragTranslation = CGFloat(Clew.clampDrag(
                         translation: Double(value.translation.height),
                         row: (minY: Double(own.minY), maxY: Double(own.maxY)),
-                        list: (minY: Double(first.minY), maxY: Double(last.maxY))))
+                        list: (minY: top, maxY: bottom)))
                 } else {
                     dragTranslation = value.translation.height
                 }
                 lifted = Lifted(itemId: row.id, blockId: nil, title: row.item.title, overTimeline: false,
                                 frame: own.offsetBy(dx: 0, dy: dragTranslation))
                 let spans = dragFrames.map { (minY: Double($0.minY), maxY: Double($0.maxY)) }
-                let slot = Clew.dragSlot(pointerY: Double(value.location.y), spans: spans)
+                let slot = Clew.dragSlot(pointerY: Double(value.location.y + scrolled), spans: spans)
                 if slot != dragSlot {
                     withAnimation(.easeOut(duration: 0.15)) { dragSlot = slot }
                 }
@@ -188,6 +250,7 @@ struct TodayListView: View {
         let b = block.block
         if lifted == nil {
             dragFrames = sequence.map { rowFrames[$0] ?? .zero }
+            dragScrollStart = scroller.offset
             blockGrab = value.startLocation.y - blockFrame(start: b.start, minutes: b.minutes).minY
         }
         if isOverTimeline(value.location.y), let day = model.timeline {
@@ -200,18 +263,24 @@ struct TodayListView: View {
             lifted = Lifted(itemId: b.itemId, blockId: b.id, title: block.title, overTimeline: true,
                             frame: blockFrame(start: start, minutes: b.minutes), start: start, minutes: b.minutes)
             scrollAtEdge(value.location.y)
+            listEdgeScroll(nil)
         } else {
             // Down over the list: a row, with the rows opening the gap it would take.
+            listEdgeScroll(value.location.y)
             let spans = dragFrames.map { (minY: Double($0.minY), maxY: Double($0.maxY)) }
-            let slot = Clew.insertSlot(pointerY: Double(value.location.y), spans: spans)
+            let slot = Clew.insertSlot(pointerY: Double(value.location.y + scrolledSinceDrag), spans: spans)
+            // The card stays over the part of a long list that shows (review: it could
+            // be drawn over the footer).
+            var cardY = value.location.y
+            if listScrolls { cardY = min(max(cardY, rowsViewport.minY + 17), rowsViewport.maxY - 17) }
             if lifted?.slot != slot {
                 withAnimation(.easeOut(duration: 0.15)) {
                     lifted = Lifted(itemId: b.itemId, blockId: b.id, title: block.title, overTimeline: false,
-                                    frame: rowFrame(centeredAt: value.location.y), slot: slot)
+                                    frame: rowFrame(centeredAt: cardY), slot: slot)
                 }
             } else {
                 lifted?.overTimeline = false
-                lifted?.frame = rowFrame(centeredAt: value.location.y)
+                lifted?.frame = rowFrame(centeredAt: cardY)
             }
             scrollAtEdge(nil)
         }
@@ -405,8 +474,13 @@ struct TodayListView: View {
                     if rowsHeight > rowsLimit {
                         // Long lists scroll together rather than pushing the menu past the
                         // screen (SPEC 2026-11-15: Today and Goals & Later).
-                        ScrollView(.vertical) { rowsStack() }
-                            .frame(height: rowsLimit)
+                        ScrollView(.vertical) {
+                            rowsStack().background(ScrollViewFinder(scroller: scroller))
+                        }
+                        .frame(height: rowsLimit)
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.listSpace)) } action: {
+                            rowsViewport = $0
+                        }
                     } else {
                         rowsStack()
                     }
@@ -521,6 +595,8 @@ struct TodayListView: View {
         .onChange(of: dragging != nil || lifted != nil) { _, active in PeekController.shared.dragChanged(active) }
         .onChange(of: model.collections) { _, lists in PeekController.shared.collectionsChanged(lists) }
         .onDisappear {
+            // Leaving the list mid-drag (⌘N, ⌘,) ends the drag and its timers (review).
+            endDrag()
             PeekController.shared.listLeft()
             // Leaving the list ends last week's card for this week.
             model.dropWeekCard()
