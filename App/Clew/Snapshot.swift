@@ -546,6 +546,12 @@ enum Snapshot {
                 render(RootView(model: model, screen: .edit(course.item, back: .list)), appearance: .aqua,
                        to: dir.appendingPathComponent("edit-reminder-light.png"))
             }
+            if let dentist = model.today?.goalsAndLater.first(where: { $0.item.title == "Call the dentist" }) {
+                render(RootView(model: model, screen: .pickDay(dentist.id)), appearance: .aqua,
+                       to: dir.appendingPathComponent("pickday-light.png"))
+                render(RootView(model: model, screen: .detail(dentist.id)), appearance: .aqua,
+                       to: dir.appendingPathComponent("detail-waiting-light.png"))
+            }
             if let papers = model.today?.rows.first(where: { $0.item.title == "Write intro" }) {
                 render(RootView(model: model, screen: .place(papers.id, block: nil)), appearance: .aqua,
                        to: dir.appendingPathComponent("place-light.png"))
@@ -710,8 +716,12 @@ enum Snapshot {
         try clew.checkIn(itemId: job.id)
         // A Later item saved 7 weeks ago (a link: its site shows in Goals & Later).
         clock.date = now.addingTimeInterval(-49 * 86_400)
-        _ = try clew.addItem(NewItem(title: "Rust ownership article", url: URL(string: "https://medium.com/x"), shape: .later))
+        let rust = try clew.addItem(NewItem(title: "Rust ownership article", url: URL(string: "https://medium.com/x"), shape: .later))
         clock.date = now
+        // Days for Later (SPEC 2026-11-17): a link waiting for Thursday-ish, a task tomorrow.
+        let today = clew.currentDay()
+        try clew.setLaterDay(itemId: rust.id, day: today.adding(days: 3))
+        _ = try clew.addItem(NewItem(title: "Call the dentist", shape: .later, laterDay: today.adding(days: 1)))
         for title in ["Talk on attention", "Interview prep video"] {
             _ = try clew.addItem(NewItem(title: title, url: URL(string: "https://youtube.com/watch?v=x"), shape: .later))
         }

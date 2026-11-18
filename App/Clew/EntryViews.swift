@@ -15,6 +15,9 @@ enum AddKind: Hashable, CaseIterable {
         case .later: "For another day. Waits in Goals & Later until you get to it."
         }
     }
+
+    /// With "On a day" switched on (SPEC 2026-11-17).
+    static var laterOnADay: LocalizedStringKey { "Comes to Today on that day." }
 }
 
 /// Editable form of a habit's schedule.
@@ -130,6 +133,9 @@ struct AddView: View {
     @State private var schedule = ScheduleDraft()
     @State private var target = 30
     @State private var slot = SlotDraft()
+    /// A Later task's day (SPEC 2026-11-17).
+    @State private var onADay = false
+    @State private var day = Date()
     /// The title fetched for the pasted link, if any; it is put into the field so it
     /// can be edited, and recorded as `.fetched` only if left as fetched.
     @State private var fetchedTitle: String?
@@ -165,7 +171,7 @@ struct AddView: View {
             .accessibilityLabel(Text("Kind"))
 
             // What each kind is, since it cannot be changed later (SPEC 2026-11-17).
-            Text(kind.explanation)
+            Text(kind == .later && onADay ? AddKind.laterOnADay : kind.explanation)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -179,6 +185,9 @@ struct AddView: View {
             }
             if kind == .habit {
                 SlotRow(draft: $slot)
+            }
+            if kind == .later {
+                DayRow(model: model, on: $onADay, date: $day)
             }
 
             NoticeView(text: model.notice)
@@ -230,7 +239,9 @@ struct AddView: View {
         }
         let origin: TitleOrigin = parsed.title == fetchedTitle ? .fetched : .typed
         let timeSlot = kind == .habit ? slot.slot : nil
-        if model.add(NewItem(title: parsed.title, titleOrigin: origin, url: parsed.url, shape: shape, slot: timeSlot)) {
+        let laterDay = kind == .later && onADay ? LocalDay(picked: day) : nil
+        if model.add(NewItem(title: parsed.title, titleOrigin: origin, url: parsed.url, shape: shape, slot: timeSlot,
+                             laterDay: laterDay)) {
             done()
         }
     }
@@ -251,6 +262,11 @@ struct EditView: View {
     @State private var remindToday = false
     @State private var slot: SlotDraft
     private let existingReminder: Reminder?
+    /// A day for Later (SPEC 2026-11-17): offered on a once task or link with no tick.
+    private let canHaveDay: Bool
+    private let existingDay: LocalDay?
+    @State private var onADay: Bool
+    @State private var day: Date
 
     init(model: AppModel, item: Item, done: @escaping () -> Void) {
         self.model = model
@@ -266,6 +282,17 @@ struct EditView: View {
         _remind = State(initialValue: reminder != nil)
         _remindToday = State(initialValue: reminder?.day != nil)
         _remindAt = State(initialValue: reminder?.time ?? TimeOfDay(hour: 18, minute: 0)!)
+        canHaveDay = model.row(item.id).map(model.canHaveDay) ?? false
+        existingDay = model.laterDay(item.id)
+        _onADay = State(initialValue: existingDay != nil)
+        _day = State(initialValue: existingDay?.noon ?? Date())
+    }
+
+    /// The day as it will be saved, if it differs from the one it has.
+    private var dayChanged: Bool {
+        guard canHaveDay else { return false }
+        let wanted = onADay ? LocalDay(picked: day) : nil
+        return wanted != existingDay
     }
 
     /// The reminder (on/off, time, Today / Every day) differs from the saved one.
@@ -293,6 +320,9 @@ struct EditView: View {
             }
             if hasSchedule {
                 SlotRow(draft: $slot)
+            }
+            if canHaveDay {
+                DayRow(model: model, on: $onADay, date: $day)
             }
             ReminderRow(enabled: $remind, time: $remindAt, today: $remindToday,
                         passed: reminderChanged && remind && remindToday && model.reminderTimePassed(remindAt))
@@ -341,6 +371,9 @@ struct EditView: View {
         guard model.edit(item.id, edit) else { return }
         if reminderChanged {
             guard model.setReminder(item.id, wanted, todayOnly: remindToday) else { return }
+        }
+        if dayChanged {
+            guard model.setLaterDay(item.id, onADay ? LocalDay(picked: day) : nil) else { return }
         }
         done()
     }

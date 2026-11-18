@@ -206,7 +206,13 @@ struct OneOffDetails: View {
         }
         switch details.item.state {
         case .active: return String(localized: "On Today")
-        case .later: return moved ? String(localized: "On Today") : String(localized: "In Goals & Later")
+        case .later:
+            if moved { return String(localized: "On Today") }
+            // A day for Later (SPEC 2026-11-17).
+            if let day = details.waitingFor {
+                return String(localized: "Comes to Today \(day.noon.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))")
+            }
+            return String(localized: "In Goals & Later")
         case .paused, .archived: return nil
         }
     }

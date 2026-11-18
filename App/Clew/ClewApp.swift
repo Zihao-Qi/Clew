@@ -101,6 +101,8 @@ enum Screen: Equatable {
     case edit(Item, back: Back)
     /// "Put on timeline…" (block nil) or a block's "Move to…" (SPEC 2026-11-10).
     case place(UUID, block: UUID?)
+    /// Right-click › Later until › Pick a day… (SPEC 2026-11-17).
+    case pickDay(UUID)
 
     enum Back: Equatable { case list, detail }
 }
@@ -133,6 +135,8 @@ struct RootView: View {
                     EditView(model: model, item: item) { screen = back == .detail ? .detail(item.id) : .list }
                 case .place(let itemId, let block):
                     PlaceView(model: model, itemId: itemId, blockId: block) { screen = .list }
+                case .pickDay(let itemId):
+                    PickDayView(model: model, itemId: itemId) { screen = .list }
                 }
             }
         }
