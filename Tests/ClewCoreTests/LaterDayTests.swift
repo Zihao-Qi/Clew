@@ -210,3 +210,32 @@ private func day(_ d: Int) -> LocalDay { LocalDay(year: 2026, month: 11, day: d)
         #expect(try clew.details(itemId: a)?.waitingFor == nil)
     }
 }
+
+/// The "Pick a day…" grid (user, 2026-11-18): Gregorian, any first weekday.
+@Suite struct MonthGridTests {
+    private func d(_ y: Int, _ m: Int, _ day: Int) -> LocalDay { LocalDay(year: y, month: m, day: day)! }
+
+    @Test func cellsStartOnTheFirstWeekday() {
+        // November 2026 starts on a Sunday.
+        let sundayFirst = MonthGrid.cells(of: d(2026, 11, 18), firstWeekday: 1)
+        #expect(sundayFirst.first == d(2026, 11, 1) && sundayFirst.count == 30)
+        let mondayFirst = MonthGrid.cells(of: d(2026, 11, 18), firstWeekday: 2)
+        #expect(mondayFirst.prefix(6).allSatisfy { $0 == nil } && mondayFirst[6] == d(2026, 11, 1))
+        #expect(mondayFirst.last == d(2026, 11, 30) && mondayFirst.count == 36)
+        // Saturday first: Sunday the 1st is the second cell.
+        #expect(MonthGrid.cells(of: d(2026, 11, 1), firstWeekday: 7).firstIndex(of: d(2026, 11, 1)) == 1)
+    }
+
+    @Test func monthLengthsAndLeapYears() {
+        #expect(MonthGrid.cells(of: d(2028, 2, 10), firstWeekday: 2).compactMap { $0 }.count == 29)
+        #expect(MonthGrid.cells(of: d(2026, 2, 10), firstWeekday: 2).compactMap { $0 }.count == 28)
+        #expect(MonthGrid.cells(of: d(2026, 12, 10), firstWeekday: 2).compactMap { $0 }.last == d(2026, 12, 31))
+    }
+
+    @Test func monthsAddAcrossYears() {
+        #expect(MonthGrid.adding(1, to: d(2026, 12, 1)) == d(2027, 1, 1))
+        #expect(MonthGrid.adding(-1, to: d(2026, 1, 1)) == d(2025, 12, 1))
+        #expect(MonthGrid.adding(1, to: d(2026, 1, 1)) == d(2026, 2, 1))
+        #expect(MonthGrid.month(of: d(2026, 11, 18)) == d(2026, 11, 1))
+    }
+}

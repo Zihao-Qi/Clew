@@ -123,3 +123,27 @@ extension Clew {
         }
     }
 }
+
+/// The "Pick a day…" calendar's month grid (user, 2026-11-18), always Gregorian like
+/// `LocalDay`, whatever calendar the system uses; only the first weekday follows it.
+public enum MonthGrid {
+    /// The first day of `day`'s month.
+    public static func month(of day: LocalDay) -> LocalDay { LocalDay(year: day.year, month: day.month, day: 1)! }
+
+    /// The first day of the month `n` months after `month`'s.
+    public static func adding(_ n: Int, to month: LocalDay) -> LocalDay {
+        let index = month.year * 12 + (month.month - 1) + n
+        let (year, m) = (index / 12, index % 12 + 1)
+        return LocalDay(year: year, month: m, day: 1)!
+    }
+
+    /// The month's days in rows of seven, nil for the cells before the 1st.
+    /// `firstWeekday` as `Calendar` has it: 1 = Sunday … 7 = Saturday.
+    public static func cells(of month: LocalDay, firstWeekday: Int) -> [LocalDay?] {
+        let first = Self.month(of: month)
+        let weekday = first.weekday.rawValue % 7 + 1                        // Calendar's numbering
+        let lead = (weekday - firstWeekday + 7) % 7
+        let count = (28...31).last { LocalDay(year: first.year, month: first.month, day: $0) != nil } ?? 28
+        return Array(repeating: nil, count: lead) + (0..<count).map { first.adding(days: $0) }
+    }
+}

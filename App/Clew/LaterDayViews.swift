@@ -85,6 +85,8 @@ struct PickDayView: View {
         }
         .padding(12)
         .onAppear { selection = model.laterDay(itemId) ?? tomorrow }
+        // Open across the rollover: a day that is now today moves on to tomorrow.
+        .onChange(of: tomorrow) { if let s = selection, s < tomorrow { selection = tomorrow } }
     }
 }
 
@@ -98,27 +100,17 @@ struct MonthCalendar: View {
     /// The first of the month shown.
     @State private var month: LocalDay?
 
+    /// Gregorian like `LocalDay` (Gemini review: a Persian or Hijri system calendar
+    /// broke the grid); the user's first weekday and language are kept.
     private var calendar: Calendar {
-        var c = Calendar.current
+        var c = Calendar(identifier: .gregorian)
+        c.locale = .current
         c.timeZone = .current
+        c.firstWeekday = Calendar.current.firstWeekday
         return c
     }
-    private func firstOfMonth(_ day: LocalDay) -> LocalDay { LocalDay(year: day.year, month: day.month, day: 1)! }
-    private var shown: LocalDay { month ?? firstOfMonth(selection) }
-
-    private func addingMonths(_ n: Int, to day: LocalDay) -> LocalDay {
-        let date = calendar.date(byAdding: .month, value: n, to: day.noon) ?? day.noon
-        return firstOfMonth(LocalDay(picked: date))
-    }
-
-    /// The month's days, with nil for the empty cells before the 1st.
-    private var cells: [LocalDay?] {
-        let start = shown
-        let weekday = calendar.component(.weekday, from: start.noon)        // 1 = Sunday
-        let lead = (weekday - calendar.firstWeekday + 7) % 7
-        let count = calendar.range(of: .day, in: .month, for: start.noon)?.count ?? 30
-        return Array(repeating: nil, count: lead) + (0..<count).map { start.adding(days: $0) }
-    }
+    private var shown: LocalDay { month ?? MonthGrid.month(of: selection) }
+    private var cells: [LocalDay?] { MonthGrid.cells(of: shown, firstWeekday: calendar.firstWeekday) }
 
     private var weekdaySymbols: [String] {
         let symbols = calendar.veryShortStandaloneWeekdaySymbols
@@ -126,20 +118,26 @@ struct MonthCalendar: View {
         return Array(symbols[f...] + symbols[..<f])
     }
 
+    private var monthTitle: String {
+        var style = Date.FormatStyle.dateTime.month(.wide).year()
+        style.calendar = calendar
+        return shown.noon.formatted(style)
+    }
+
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
 
     var body: some View {
         VStack(spacing: 6) {
             HStack {
-                Text(verbatim: shown.noon.formatted(.dateTime.month(.wide).year()))
+                Text(verbatim: monthTitle)
                     .font(.headline)
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
-                Button { month = addingMonths(-1, to: shown) } label: { Image(systemName: "chevron.left") }
+                Button { month = MonthGrid.adding(-1, to: shown) } label: { Image(systemName: "chevron.left") }
                     .buttonStyle(.borderless)
-                    .disabled(shown <= firstOfMonth(first))
+                    .disabled(shown <= MonthGrid.month(of: first))
                     .accessibilityLabel(Text("Previous month"))
-                Button { month = addingMonths(1, to: shown) } label: { Image(systemName: "chevron.right") }
+                Button { month = MonthGrid.adding(1, to: shown) } label: { Image(systemName: "chevron.right") }
                     .buttonStyle(.borderless)
                     .accessibilityLabel(Text("Next month"))
             }
