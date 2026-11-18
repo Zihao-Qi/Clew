@@ -290,6 +290,26 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         #expect(try store.read { try $0.maxSortKey() } == item.sortKey)
     }
 
+    /// SPEC 2026-11-17: a day for Later is a plan booked ahead; `plans(from:)` reads the
+    /// live ones from a day on, oldest first.
+    @Test func plansFromADayAreLiveAndOnOrAfterIt() throws {
+        let store = try SQLiteStore.inMemory()
+        let item = sampleItem()
+        func plan(_ d: String, _ at: Date) -> Plan {
+            Plan(id: UUID(), itemId: item.id, localDay: day(d), at: at, source: .user, todaySortKey: nil)
+        }
+        let before = plan("2026-11-10", t0)
+        let later = plan("2026-11-20", t0.addingTimeInterval(2))
+        let on = plan("2026-11-11", t0.addingTimeInterval(1))
+        let voided = plan("2026-11-12", t0)
+        try store.write { w in
+            try w.insert(item)
+            for p in [before, later, on, voided] { try w.insert(p) }
+            try w.voidPlan(id: voided.id, at: t0)
+        }
+        #expect(try store.read { try $0.plans(from: day("2026-11-11")) } == [on, later])
+    }
+
     @Test func ratingCanChangeAndSettingAFieldToItsOwnValueIsAllowed() throws {
         let (store, c, _) = try seeded()
         try store.writer.write { db in

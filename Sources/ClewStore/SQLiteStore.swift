@@ -151,6 +151,11 @@ private struct Access: StoreWriter {
                          arguments: [day.description]).map(Self.plan)
     }
 
+    func plans(from day: LocalDay) throws -> [Plan] {
+        try Row.fetchAll(db, sql: "SELECT * FROM plan WHERE localDay >= ? AND voidedAt IS NULL ORDER BY at, id",
+                         arguments: [day.description]).map(Self.plan)
+    }
+
     func plans(itemId: UUID) throws -> [Plan] {
         try Row.fetchAll(db, sql: "SELECT * FROM plan WHERE itemId = ? ORDER BY at", arguments: [itemId.uuidString])
             .map(Self.plan)

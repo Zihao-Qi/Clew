@@ -93,6 +93,8 @@ extension Clew {
             } else {
                 // Moved here (or moving up now): its place is its plan's.
                 if moved[itemId] != nil { try voidPlans(of: itemId, on: day, now: now, w) }
+                // Moved early: its day for Later is dropped (SPEC 2026-11-17).
+                if crossing { try voidDaysAhead(of: itemId, after: day, now: now, w) }
                 try w.insert(Plan(id: newID(), itemId: itemId, localDay: day, at: now, source: .user, todaySortKey: key))
             }
         case .goalsAndLater:

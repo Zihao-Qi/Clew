@@ -15,6 +15,8 @@ public struct ItemDetails: Hashable, Sendable {
     /// first, at most the last `Clew.historyLength`. Empty for habits and goals, whose
     /// page shows the heatmap instead.
     public let history: [HistoryEntry]
+    /// The day a Later task waits for (SPEC 2026-11-17): "Comes to Today Thu, Nov 20".
+    public var waitingFor: LocalDay?
 
     /// Once-tasks and saved links: a status and a short history, not a heatmap.
     public var isOneOff: Bool { item.kind == .once || item.kind == .link }
@@ -66,19 +68,31 @@ extension Clew {
             if item.kind == .once || item.kind == .link {
                 history.append(HistoryEntry(at: item.createdAt, event: .added(item.source)))
                 // Moved to Today: one line per day, its latest plan, live or not (a reorder
-                // re-inserts the plan; moving back voids it; SPEC 2026-11-15).
-                let plans = Dictionary(grouping: try r.plans(itemId: itemId), by: \.localDay)
+                // re-inserts the plan; moving back voids it; SPEC 2026-11-15). A day for
+                // Later counts once its day has come, dated by that day; one changed or
+                // removed before then never happened (SPEC 2026-11-17).
+                let zone = zonesForQueries.current()
+                let rollover = TimeOfDay(hour: rolloverHour, minute: 0)!
+                func start(_ day: LocalDay) -> Date { day.instant(at: rollover, in: zone, rolloverHour: rolloverHour) }
+                let came = try r.plans(itemId: itemId).filter { plan in
+                    plan.localDay <= today && (plan.voidedAt.map { $0 >= start(plan.localDay) } ?? true)
+                }
+                let plans = Dictionary(grouping: came, by: \.localDay)
                     .compactMapValues { $0.max { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) } }
-                history += plans.values.map { HistoryEntry(at: $0.at, event: .picked) }
+                history += plans.values.map { HistoryEntry(at: max($0.at, start($0.localDay)), event: .picked) }
                 history += checkIns.map { HistoryEntry(at: $0.at, event: .done(rating: $0.rating)) }
                 history += try r.laterReviews(itemIds: [itemId]).filter { $0.decision == .keep }
                     .map { HistoryEntry(at: $0.at, event: .kept) }
                 history = Array(history.sorted { $0.at < $1.at }.suffix(Self.historyLength))
             }
-            return ItemDetails(item: item, today: today, stats: stats, progressAmount: progress,
+            var details = ItemDetails(item: item, today: today, stats: stats, progressAmount: progress,
                                // A spent one-day reminder shows nothing (SPEC 2026-11-15).
                                reminder: try r.reminders().first { $0.itemId == itemId && !$0.isSpent(today: today) },
                                watch: try r.watchProgress(itemIds: [itemId])[itemId], history: history)
+            if item.state == .later, progress == 0 {
+                details.waitingFor = try r.plans(from: today.adding(days: 1)).filter { $0.itemId == itemId }.map(\.localDay).min()
+            }
+            return details
         }
     }
 }
