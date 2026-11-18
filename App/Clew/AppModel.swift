@@ -641,6 +641,8 @@ final class AppModel {
 
     // MARK: A day for Later (SPEC 2026-11-17)
 
+    /// The hour a Clew day starts (4 a.m.).
+    var rolloverHour: Int { clew?.rolloverHour ?? 4 }
     /// Today's Clew day (it starts at the rollover).
     var currentDay: LocalDay? { clew?.currentDay() }
     func canHaveDay(_ row: TodayRow) -> Bool { clew != nil && Clew.canHaveDay(row) }

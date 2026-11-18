@@ -620,7 +620,13 @@ stopped daily use, not adding features.
     lengths that would pass 4 a.m. are not offered), **Add another block** (right after it, the
     same length; not offered when that would pass 4 a.m.), **Not finished**, **Remove
     block**, **Delete**. Clicking a block opens the task's details. The row's right-click ›
-    **Put on timeline…** places it without dragging.
+    **Put on timeline…** places it without dragging: "at [10:15] for [30 min]".
+  - **Times on the timeline** (Put on timeline…, a habit's slot; *user*, 2026-11-18):
+    one time field, as Remind me has. Click the hour or the minutes, and the arrow keys
+    (or the field's stepper) change that part; the minutes step a quarter hour and carry
+    into the hour (8:00 ↓ is 7:45). A typed minute shows as typed, and becomes the
+    nearest quarter hour when the field is left (8:37 → 8:30). Before 4 a.m. a time is
+    the night at the timeline's end.
   - **The Delete key** deletes the task under the pointer, a row or a block, like the
     menu's Delete (*user*, 2026-11-10: delete is a real delete; taking a block off the
     timeline is Remove block or dragging it back). Every delete shows "Deleted “Write
@@ -706,8 +712,9 @@ stopped daily use, not adding features.
     says so.
   - **A repeating task's time slot** (*user*, 2026-11-10). A habit or a counted goal
     (*changed* 2026-11-15: habits only) can have a slot, set in Add and Edit: "On the timeline: at 8:00 for 60 min" (a
-    checkbox, then "at [time] for [length]" indented under it; the start is one menu of
-    quarter hours, *changed* after use 2026-11-18: it was an hour menu and a minutes menu;
+    checkbox, then "at [time] for [length]" indented under it; the start is one time
+    field in quarter hours (see "Times on the timeline"), *changed* after use 2026-11-18:
+    it was an hour menu and a minutes menu;
     a start on a quarter hour of the wall clock, a length of 15, 30, 45, 60, 90 or 120
     minutes; off by default). Clew then places that block by itself.
     - **When:** a slot block is placed when the task has a slot, is on Today and still

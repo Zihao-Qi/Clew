@@ -446,10 +446,10 @@ struct SlotDraft: Equatable {
 struct SlotRow: View {
     @Binding var draft: SlotDraft
 
-    /// Quarter hours since midnight: 0 = 0:00 … 95 = 23:45.
-    private var start: Binding<Int> {
-        Binding(get: { draft.hour * 4 + draft.quarter },
-                set: { draft.hour = $0 / 4; draft.quarter = $0 % 4 })
+    /// The start as a time; the field keeps it on a quarter hour.
+    private var start: Binding<TimeOfDay> {
+        Binding(get: { TimeOfDay(hour: draft.hour, minute: draft.quarter * 15)! },
+                set: { draft.hour = $0.hour; draft.quarter = $0.minute / 15 })
     }
 
     var body: some View {
@@ -459,12 +459,11 @@ struct SlotRow: View {
             if draft.enabled {
                 HStack(spacing: 6) {
                     Text("at")
-                    Picker(selection: start) {
-                        ForEach(0..<96, id: \.self) { q in Text(verbatim: Self.timeText(q)).tag(q) }
-                    } label: { EmptyView() }
-                    .labelsHidden()
-                    .fixedSize()
-                    .accessibilityLabel(Text("Start time"))
+                    // Click the hour or the minutes; the arrow keys change it (user,
+                    // 2026-11-18), the minutes by a quarter hour.
+                    TimePicker(time: start, quarterHours: true)
+                        .fixedSize()
+                        .accessibilityLabel(Text("Start time"))
                     Text("for")
                     Picker(selection: $draft.minutes) {
                         ForEach(TimeSlot.lengths, id: \.self) { m in Text("\(m) min").tag(m) }
@@ -479,11 +478,6 @@ struct SlotRow: View {
         }
     }
 
-    /// "8:00 AM" or "08:00", as the user's clock shows times.
-    static func timeText(_ quarter: Int) -> String {
-        let date = Calendar.current.date(bySettingHour: quarter / 4, minute: quarter % 4 * 15, second: 0, of: Date()) ?? Date()
-        return date.formatted(.dateTime.hour().minute())
-    }
 }
 
 /// "Remind me [18:00] [Today | Every day]": one gentle notification, today only or on
