@@ -320,6 +320,71 @@ enum Snapshot {
         }
     }
 
+    /// `CLEW_TIME_TEST=1`: a real quarter-hour time field (user, 2026-11-18): click the
+    /// hour or the minutes, press the arrow keys, type, leave the field; prints the value.
+    static func startTimeFieldTest() {
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1))
+            final class Box { var time = TimeOfDay(hour: 8, minute: 0)! }
+            let box = Box()
+            let field = TimePicker(time: Binding(get: { box.time }, set: { box.time = $0 }), quarterHours: true)
+            let host = NSHostingView(rootView: HStack { field.fixedSize(); TextField(String("other"), text: .constant("")) }.padding(20))
+            let size = host.fittingSize
+            let window = NSWindow(contentRect: NSRect(x: -10_000, y: -10_000, width: size.width, height: size.height),
+                                  styleMask: [.titled], backing: .buffered, defer: false)
+            window.contentView = host
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            try? await Task.sleep(for: .milliseconds(400))
+            func find(_ v: NSView) -> NSDatePicker? {
+                if let p = v as? NSDatePicker { return p }
+                for s in v.subviews { if let p = find(s) { return p } }
+                return nil
+            }
+            guard let picker = find(host) else { print("FAIL no picker"); exit(1) }
+            let frame = picker.convert(picker.bounds, to: nil)
+            @MainActor func post(_ e: NSEvent) { NSApp.postEvent(e, atStart: false) }
+            @MainActor func click(_ x: CGFloat) async {
+                let p = NSPoint(x: x, y: frame.midY)
+                for (i, type) in [NSEvent.EventType.leftMouseDown, .leftMouseUp].enumerated() {
+                    post(NSEvent.mouseEvent(with: type, location: p, modifierFlags: [],
+                                            timestamp: ProcessInfo.processInfo.systemUptime + Double(i) * 0.05,
+                                            windowNumber: window.windowNumber, context: nil, eventNumber: i,
+                                            clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0)!)
+                }
+                try? await Task.sleep(for: .milliseconds(250))
+            }
+            @MainActor func key(_ chars: String, _ code: UInt16) async {
+                for type in [NSEvent.EventType.keyDown, .keyUp] {
+                    post(NSEvent.keyEvent(with: type, location: .zero, modifierFlags: [],
+                                          timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                                          context: nil, characters: chars, charactersIgnoringModifiers: chars,
+                                          isARepeat: false, keyCode: code)!)
+                }
+                try? await Task.sleep(for: .milliseconds(200))
+            }
+            let up = String(UnicodeScalar(UInt16(NSUpArrowFunctionKey))!), down = String(UnicodeScalar(UInt16(NSDownArrowFunctionKey))!)
+            func shown() -> String { String(format: "%02d:%02d", Calendar.current.component(.hour, from: picker.dateValue),
+                                            Calendar.current.component(.minute, from: picker.dateValue)) }
+            func report(_ what: String) { print(what, "→ field", shown(), "value", box.time); fflush(stdout) }
+            print("field frame", frame); report("start")
+            // The minutes are the text's second half (+24…+48 pt; the stepper is past it).
+            await click(frame.minX + 32); report("click minutes")
+            await key(up, 126); report("up")
+            await key(up, 126); report("up")
+            await key(down, 125); report("down")
+            await key(down, 125); await key(down, 125); report("down ×2")
+            await click(frame.minX + 12); report("click hour")
+            await key(up, 126); report("up")
+            // Typing: leave the field first, so the click selects the minutes afresh.
+            window.makeFirstResponder(nil); try? await Task.sleep(for: .milliseconds(200))
+            await click(frame.minX + 32); report("click minutes")
+            await key("3", 20); await key("7", 26); report("type 37")
+            window.makeFirstResponder(nil); try? await Task.sleep(for: .milliseconds(200)); report("leave the field")
+            exit(0)
+        }
+    }
+
     /// `CLEW_DROP_TEST=1`: three rows; calls the drop logic the drag gesture uses.
     static func startDropTest() {
         Task { @MainActor in

@@ -727,41 +727,47 @@ struct PlaceView: View {
     let blockId: UUID?
     let onDone: () -> Void
 
-    @State private var hour = 0          // hours after the day's start
-    @State private var quarter = 0
+    /// The start's wall-clock time, on a quarter hour (user, 2026-11-18: one time field,
+    /// the hour or the minutes selected and changed with the arrow keys).
+    @State private var time = TimeOfDay(hour: 9, minute: 0)!
     @State private var minutes = Clew.blockDefaultMinutes
 
     private var day: TimelineDay? { model.timeline }
     private var title: String { model.today?.rows.first { $0.id == itemId }?.item.title ?? "" }
+    /// The time on today's timeline: before the rollover hour it is the night after
+    /// midnight, at the timeline's end.
     private var start: Date? {
-        day.map { $0.start.addingTimeInterval(TimeInterval((hour * 60 + quarter * 15) * 60)) }
+        guard let day else { return nil }
+        // The Clew day's own rule, so a daylight-saving day is right too.
+        let at = day.day.instant(at: time, in: .current, rolloverHour: model.rolloverHour)
+        return min(max(at, day.start), day.end.addingTimeInterval(-TimeInterval(Clew.blockStepMinutes * 60)))
     }
     private var room: Int { day.flatMap { d in start.map { TimelineMetrics.room(after: $0, in: d) } } ?? 0 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title).font(.headline).lineLimit(1)
-            if let day {
-                HStack {
-                    Picker(selection: $hour) {
-                        ForEach(0..<(TimelineMetrics.quarters(day) / 4), id: \.self) { h in
-                            Text(verbatim: day.start.addingTimeInterval(TimeInterval(h * 3600)).formatted(.dateTime.hour())).tag(h)
+            if day != nil {
+                // "at [10:15] for [30 min]", as a habit's slot reads; on the text baseline.
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("at")
+                    TimePicker(time: $time, quarterHours: true)
+                        .fixedSize()
+                        // The field reports no text baseline; its digits' baseline is 6 pt
+                        // above its bottom (measured), so they sit level with "at" and "for".
+                        .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 6 }
+                        .accessibilityLabel(Text("Start time"))
+                    Text("for").padding(.leading, 4)   // past the field's stepper (design review)
+                    Picker(selection: $minutes) {
+                        ForEach(Clew.blockLengths.filter { $0 <= max(room, Clew.blockStepMinutes) }, id: \.self) { m in
+                            Text("\(m) min").tag(m)
                         }
-                    } label: { Text("Start") }
-                    .accessibilityLabel(Text("Start hour"))
-                    Picker(selection: $quarter) {
-                        ForEach(0..<4, id: \.self) { q in Text(verbatim: String(format: ":%02d", q * 15)).tag(q) }
                     } label: { EmptyView() }
                     .labelsHidden()
-                    .frame(width: 70)
-                    .accessibilityLabel(Text("Start minutes"))
+                    .fixedSize()
+                    .accessibilityLabel(Text("Length"))
+                    Spacer()
                 }
-                Picker(selection: $minutes) {
-                    ForEach(Clew.blockLengths.filter { $0 <= max(room, Clew.blockStepMinutes) }, id: \.self) { m in
-                        Text("\(m) min").tag(m)
-                    }
-                } label: { Text("Length") }
-                .accessibilityLabel(Text("Length"))
             }
             HStack {
                 Spacer()
@@ -786,9 +792,8 @@ struct PlaceView: View {
         let block = day.blocks.first { $0.id == blockId }?.block
         // A new block starts at the next quarter hour; a moved one where it is.
         let from = block?.start ?? Date()
-        let q = min(Int(ceil(from.timeIntervalSince(day.start) / 60 / 15)), TimelineMetrics.quarters(day) - 1)
-        hour = max(0, q) / 4
-        quarter = max(0, q) % 4
+        let q = min(max(0, Int(ceil(from.timeIntervalSince(day.start) / 60 / 15))), TimelineMetrics.quarters(day) - 1)
+        time = QuarterTime.nearest(TimeOfDay(pickerDate: day.start.addingTimeInterval(TimeInterval(q * 15 * 60))))
         minutes = block?.minutes ?? Clew.blockDefaultMinutes
     }
 
