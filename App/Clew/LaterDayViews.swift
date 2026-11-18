@@ -2,8 +2,9 @@ import ClewCore
 import ClewDomain
 import SwiftUI
 
-// A day for Later (SPEC 2026-11-17): the day a waiting row shows, the right-click
-// "Later until ›" menu, the "Pick a day…" screen, and Add's and Edit's "On a day" row.
+// A day for Later (SPEC 2026-11-17): the day a waiting row shows, the month calendar,
+// and Add's and Edit's "On a day" row (the right-click "Later until ›" and its Pick a
+// day screen were removed, user 2026-11-18).
 
 extension LocalDay {
     /// Noon on this calendar date, for date pickers and formatting (never for timing).
@@ -28,65 +29,6 @@ func dayLabel(_ day: LocalDay, today: LocalDay) -> String {
     case .tomorrow: String(localized: "Tomorrow")
     case .weekday(let d): d.noon.formatted(.dateTime.weekday(.abbreviated))
     case .date(let d): d.noon.formatted(.dateTime.month(.abbreviated).day())
-    }
-}
-
-/// Right-click › Later until ›, for a row that can have a day.
-struct LaterUntilMenu: View {
-    let row: TodayRow
-    let model: AppModel
-    let onPick: () -> Void
-
-    var body: some View {
-        if let today = model.currentDay {
-            Menu("Later until") {
-                Button("Tomorrow") { model.setLaterDay(row.id, today.adding(days: 1)) }
-                if Clew.nextMonday(after: today) != today.adding(days: 1) {
-                    Button("Next Monday") { model.setLaterDay(row.id, Clew.nextMonday(after: today)) }
-                }
-                Button("Pick a day…", action: onPick)
-                if model.waitingDay(row) != nil {
-                    Divider()
-                    Button("No day") { model.setLaterDay(row.id, nil) }
-                }
-            }
-        }
-    }
-}
-
-/// "Pick a day…": a date, from tomorrow on, and Save.
-struct PickDayView: View {
-    let model: AppModel
-    let itemId: UUID
-    let onDone: () -> Void
-
-    @State private var selection: LocalDay?
-
-    private var title: String { model.row(itemId)?.item.title ?? "" }
-    private var tomorrow: LocalDay { (model.currentDay ?? LocalDay(picked: Date())).adding(days: 1) }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title).font(.headline).lineLimit(1)
-            // As wide as the menu (user, 2026-11-18: the system calendar was too small).
-            MonthCalendar(selection: Binding(get: { selection ?? tomorrow }, set: { selection = $0 }),
-                          first: tomorrow)
-            NoticeView(text: model.notice)
-            HStack {
-                Spacer()
-                Button("Cancel", action: onDone)
-                    .keyboardShortcut(.cancelAction)
-                Button("Save") {
-                    if model.setLaterDay(itemId, selection ?? tomorrow) { onDone() }
-                }
-                .keyboardShortcut(.defaultAction)
-                .accessibilityLabel(Text("Save the day for \(title)"))
-            }
-        }
-        .padding(12)
-        .onAppear { selection = model.laterDay(itemId) ?? tomorrow }
-        // Open across the rollover: a day that is now today moves on to tomorrow.
-        .onChange(of: tomorrow) { if let s = selection, s < tomorrow { selection = tomorrow } }
     }
 }
 
@@ -227,7 +169,7 @@ struct DayRow: View {
                 Spacer(minLength: 0)
             }
             // The same height checked or not, so the checkbox never jumps (design review).
-            .frame(minHeight: 24)
+            .frame(minHeight: CheckRow.height)
             if on, open {
                 // On a light card, like Details' tiles, so it reads as the day button's.
                 MonthCalendar(selection: Binding(get: { day }, set: { picked in

@@ -20,6 +20,9 @@ struct TimePicker: NSViewRepresentable {
         picker.datePickerStyle = .textFieldAndStepper
         picker.datePickerElements = .hourMinute
         picker.isBezeled = true
+        // The extra width is shared on both sides, so the digits sit centred (review:
+        // 2 pt on the left, 7 on the right).
+        picker.alignment = .center
         picker.target = context.coordinator
         picker.action = #selector(Coordinator.changed(_:))
         picker.setContentHuggingPriority(.required, for: .horizontal)

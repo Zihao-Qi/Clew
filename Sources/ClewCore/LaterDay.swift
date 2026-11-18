@@ -23,8 +23,6 @@ public enum DayLabel: Hashable, Sendable {
 }
 
 extension Clew {
-    /// Right-click › Later until › Next Monday: the Monday that starts the next Clew week.
-    public static func nextMonday(after today: LocalDay) -> LocalDay { today.weekStart.adding(days: 7) }
 
     /// Whether `row` can be given a day: a once task or link with no tick, on Today or
     /// in Goals & Later (not a habit, a goal or a collection's item).

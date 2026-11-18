@@ -263,8 +263,6 @@ struct TodayListView: View {
     private func listRow(_ row: TodayRow, index: Int, count: Int, ids: [UUID]) -> some View {
         RowView(row: row, model: model, onEdit: { screen = .edit(row.item, back: .list) },
                 onOpen: { screen = .detail(row.id) },
-                onPlace: showsTimeline ? { screen = .place(row.id, block: nil) } : nil,
-                onPickDay: { screen = .pickDay(row.id) },
                 canMoveUp: index > 0, canMoveDown: index < count - 1,
                 isDragged: dragging == row.id,
                 dragActive: dragging != nil || lifted != nil,
@@ -621,10 +619,7 @@ struct RowView: View {
     let model: AppModel
     let onEdit: () -> Void
     let onOpen: () -> Void
-    /// "Put on timeline…", when the timeline is shown.
-    var onPlace: (() -> Void)? = nil
-    /// Right-click › Later until › Pick a day… (SPEC 2026-11-17).
-    var onPickDay: (() -> Void)? = nil
+    /// Move Up / Move Down (VoiceOver actions) stop at the row's own list's ends.
     var canMoveUp = false
     var canMoveDown = false
     /// This row is being dragged: it gets a solid background so rows sliding under it
@@ -734,8 +729,7 @@ struct RowView: View {
         .accessibilityAction(named: Text("Move Up")) { if canMoveUp { model.move(row, by: -1) } }
         .accessibilityAction(named: Text("Move Down")) { if canMoveDown { model.move(row, by: 1) } }
         .accessibilityActions {
-            if let onPlace { Button("Put on timeline…", action: onPlace) }
-            // Nothing needs a drag (SPEC 2026-11-15).
+            // Nothing needs a drag (SPEC 2026-11-15); a day and a time are set in Edit.
             if model.isBelow(row) {
                 if !row.isGoalReached { Button("Move to Today") { model.moveToToday(row) } }
             } else if model.isMoved(row) {
@@ -743,16 +737,9 @@ struct RowView: View {
             } else if (item.kind == .once || item.kind == .link), row.progressAmount == 0 {
                 Button("Move to Later") { model.moveToLater(row) }
             }
-            // A day for Later (SPEC 2026-11-17).
-            if let onPickDay, model.canHaveDay(row), let today = model.currentDay {
-                Button("Later until tomorrow") { model.setLaterDay(row.id, today.adding(days: 1)) }
-                if Clew.nextMonday(after: today) != today.adding(days: 1) {
-                    Button("Later until next Monday") { model.setLaterDay(row.id, Clew.nextMonday(after: today)) }
-                }
-                Button("Later until a day…", action: onPickDay)
-                if model.waitingDay(row) != nil { Button("No day") { model.setLaterDay(row.id, nil) } }
-            }
         }
+        // Kept short (user, 2026-11-18): a time on the timeline and a day for Later are
+        // set in Edit; Move Up / Move Down stay for VoiceOver above.
         .contextMenu {
             if row.todayAmount > 0 {
                 if item.kind == .goal {
@@ -763,9 +750,6 @@ struct RowView: View {
             }
             Button("Details", action: onOpen)
             Button("Edit…", action: onEdit)
-            if let onPlace {
-                Button("Put on timeline…", action: onPlace)
-            }
             if timer == nil, model.focus?.phase != .focus, !row.isGoalReached {
                 Menu("Focus") {
                     ForEach(Clew.focusMinutes, id: \.self) { m in
@@ -781,13 +765,6 @@ struct RowView: View {
             } else if (item.kind == .once || item.kind == .link), row.progressAmount == 0 {
                 Button("Move to Later") { model.moveToLater(row) }
             }
-            if let onPickDay, model.canHaveDay(row) {
-                LaterUntilMenu(row: row, model: model, onPick: onPickDay)
-            }
-            Divider()
-            // The keyboard and VoiceOver way to reorder (dragging needs a pointer).
-            Button("Move Up") { model.move(row, by: -1) }.disabled(!canMoveUp)
-            Button("Move Down") { model.move(row, by: 1) }.disabled(!canMoveDown)
             Divider()
             Button("Delete", role: .destructive) { model.delete(row.id) }
         }

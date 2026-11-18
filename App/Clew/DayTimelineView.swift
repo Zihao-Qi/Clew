@@ -720,6 +720,22 @@ enum EventColor {
 
 /// "Put on timeline…" and a block's "Move to…": a start time and a length, without
 /// dragging (SPEC 2026-11-10; also the VoiceOver way).
+extension TimelineDay {
+    /// A wall-clock time on this timeline, by the Clew day's own rule (so a daylight-saving
+    /// day is right too): before the rollover hour it is the night at the end. Kept
+    /// inside the timeline, a quarter hour before its end at the latest.
+    func start(at time: TimeOfDay, rolloverHour: Int) -> Date {
+        let at = day.instant(at: time, in: .current, rolloverHour: rolloverHour)
+        return min(max(at, start), end.addingTimeInterval(-TimeInterval(Clew.blockStepMinutes * 60)))
+    }
+
+    /// The next quarter hour from `now` on this timeline, as a time (its last if none is left).
+    func nextQuarter(after now: Date) -> TimeOfDay {
+        let q = min(max(0, Int(ceil(now.timeIntervalSince(start) / 60 / 15))), TimelineMetrics.quarters(self) - 1)
+        return QuarterTime.nearest(TimeOfDay(pickerDate: start.addingTimeInterval(TimeInterval(q * 15 * 60))))
+    }
+}
+
 struct PlaceView: View {
     let model: AppModel
     let itemId: UUID
@@ -737,10 +753,7 @@ struct PlaceView: View {
     /// The time on today's timeline: before the rollover hour it is the night after
     /// midnight, at the timeline's end.
     private var start: Date? {
-        guard let day else { return nil }
-        // The Clew day's own rule, so a daylight-saving day is right too.
-        let at = day.day.instant(at: time, in: .current, rolloverHour: model.rolloverHour)
-        return min(max(at, day.start), day.end.addingTimeInterval(-TimeInterval(Clew.blockStepMinutes * 60)))
+        day?.start(at: time, rolloverHour: model.rolloverHour)
     }
     private var room: Int { day.flatMap { d in start.map { TimelineMetrics.room(after: $0, in: d) } } ?? 0 }
 
@@ -748,26 +761,9 @@ struct PlaceView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title).font(.headline).lineLimit(1)
             if day != nil {
-                // "at [10:15] for [30 min]", as a habit's slot reads; on the text baseline.
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text("at")
-                    TimePicker(time: $time, quarterHours: true)
-                        .fixedSize()
-                        // The field reports no text baseline; its digits' baseline is 6 pt
-                        // above its bottom (measured), so they sit level with "at" and "for".
-                        .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 6 }
-                        .accessibilityLabel(Text("Start time"))
-                    Text("for").padding(.leading, 4)   // past the field's stepper (design review)
-                    Picker(selection: $minutes) {
-                        ForEach(Clew.blockLengths.filter { $0 <= max(room, Clew.blockStepMinutes) }, id: \.self) { m in
-                            Text("\(m) min").tag(m)
-                        }
-                    } label: { EmptyView() }
-                    .labelsHidden()
-                    .fixedSize()
-                    .accessibilityLabel(Text("Length"))
-                    Spacer()
-                }
+                // "at [10:15] for [30 min]", as a habit's slot reads.
+                AtForLine(time: $time, minutes: $minutes,
+                          lengths: Clew.blockLengths.filter { $0 <= max(room, Clew.blockStepMinutes) })
             }
             HStack {
                 Spacer()
@@ -791,9 +787,7 @@ struct PlaceView: View {
         guard let day else { return }
         let block = day.blocks.first { $0.id == blockId }?.block
         // A new block starts at the next quarter hour; a moved one where it is.
-        let from = block?.start ?? Date()
-        let q = min(max(0, Int(ceil(from.timeIntervalSince(day.start) / 60 / 15))), TimelineMetrics.quarters(day) - 1)
-        time = QuarterTime.nearest(TimeOfDay(pickerDate: day.start.addingTimeInterval(TimeInterval(q * 15 * 60))))
+        time = day.nextQuarter(after: block?.start ?? Date())
         minutes = block?.minutes ?? Clew.blockDefaultMinutes
     }
 

@@ -466,7 +466,10 @@ final class AppModel {
     func resizeBlock(_ id: UUID, minutes: Int) { run { try $0.resizeBlock(id: id, minutes: minutes) } }
     func addBlock(after id: UUID) { run { try $0.addBlock(after: id) } }
     func canAddBlock(after block: TimeBlock) -> Bool { clew?.canAddBlock(after: block) ?? false }
-    func removeBlock(_ id: UUID) { run { try $0.removeBlock(id: id) } }
+    @discardableResult
+    func removeBlock(_ id: UUID) -> Bool { run { try $0.removeBlock(id: id) } }
+    /// The task's block of today that has not ended (Edit's "On today's timeline").
+    func openBlock(_ itemId: UUID) -> TimeBlock? { (try? clew?.openBlock(itemId: itemId)) ?? nil }
 
     /// A block dragged onto the list: off the timeline, and the task (if it has no other
     /// blocks) lands in the gap it was dropped in, `slot` among the list's rows.
