@@ -60,34 +60,119 @@ struct PickDayView: View {
     let itemId: UUID
     let onDone: () -> Void
 
-    @State private var date = Date()
+    @State private var selection: LocalDay?
 
     private var title: String { model.row(itemId)?.item.title ?? "" }
-    private var tomorrow: Date { (model.currentDay ?? LocalDay(picked: Date())).adding(days: 1).noon }
+    private var tomorrow: LocalDay { (model.currentDay ?? LocalDay(picked: Date())).adding(days: 1) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title).font(.headline).lineLimit(1)
-            DatePicker(selection: $date, in: tomorrow..., displayedComponents: .date) {
-                Text("Later until")
-            }
-            .datePickerStyle(.graphical)
-            .labelsHidden()
-            .accessibilityLabel(Text("Later until"))
+            // As wide as the menu (user, 2026-11-18: the system calendar was too small).
+            MonthCalendar(selection: Binding(get: { selection ?? tomorrow }, set: { selection = $0 }),
+                          first: tomorrow)
             NoticeView(text: model.notice)
             HStack {
                 Spacer()
                 Button("Cancel", action: onDone)
                     .keyboardShortcut(.cancelAction)
                 Button("Save") {
-                    if model.setLaterDay(itemId, LocalDay(picked: date)) { onDone() }
+                    if model.setLaterDay(itemId, selection ?? tomorrow) { onDone() }
                 }
                 .keyboardShortcut(.defaultAction)
                 .accessibilityLabel(Text("Save the day for \(title)"))
             }
         }
         .padding(12)
-        .onAppear { date = model.laterDay(itemId)?.noon ?? tomorrow }
+        .onAppear { selection = model.laterDay(itemId) ?? tomorrow }
+        // Open across the rollover: a day that is now today moves on to tomorrow.
+        .onChange(of: tomorrow) { if let s = selection, s < tomorrow { selection = tomorrow } }
+    }
+}
+
+/// A month of days filling the width it is given: a header with the month and arrows,
+/// the weekdays (in the user's order), and a button per day. Days before `first` are
+/// shown dimmed and cannot be chosen.
+struct MonthCalendar: View {
+    @Binding var selection: LocalDay
+    let first: LocalDay
+
+    /// The first of the month shown.
+    @State private var month: LocalDay?
+
+    /// Gregorian like `LocalDay` (Gemini review: a Persian or Hijri system calendar
+    /// broke the grid); the user's first weekday and language are kept.
+    private var calendar: Calendar {
+        var c = Calendar(identifier: .gregorian)
+        c.locale = .current
+        c.timeZone = .current
+        c.firstWeekday = Calendar.current.firstWeekday
+        return c
+    }
+    private var shown: LocalDay { month ?? MonthGrid.month(of: selection) }
+    private var cells: [LocalDay?] { MonthGrid.cells(of: shown, firstWeekday: calendar.firstWeekday) }
+
+    private var weekdaySymbols: [String] {
+        let symbols = calendar.veryShortStandaloneWeekdaySymbols
+        let f = calendar.firstWeekday - 1
+        return Array(symbols[f...] + symbols[..<f])
+    }
+
+    private var monthTitle: String {
+        var style = Date.FormatStyle.dateTime.month(.wide).year()
+        style.calendar = calendar
+        return shown.noon.formatted(style)
+    }
+
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
+
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack {
+                Text(verbatim: monthTitle)
+                    .font(.headline)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer()
+                Button { month = MonthGrid.adding(-1, to: shown) } label: { Image(systemName: "chevron.left") }
+                    .buttonStyle(.borderless)
+                    .disabled(shown <= MonthGrid.month(of: first))
+                    .accessibilityLabel(Text("Previous month"))
+                Button { month = MonthGrid.adding(1, to: shown) } label: { Image(systemName: "chevron.right") }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(Text("Next month"))
+            }
+            .padding(.horizontal, 4)
+            LazyVGrid(columns: columns, spacing: 2) {
+                ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, symbol in
+                    Text(verbatim: symbol)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityHidden(true)
+                }
+                ForEach(Array(cells.enumerated()), id: \.offset) { _, day in
+                    if let day { dayButton(day) } else { Color.clear.frame(height: 32) }
+                }
+            }
+        }
+    }
+
+    private func dayButton(_ day: LocalDay) -> some View {
+        let chosen = day == selection
+        let allowed = day >= first
+        return Button { selection = day } label: {
+            Text(verbatim: "\(day.day)")
+                .font(.body.monospacedDigit())
+                .foregroundStyle(chosen ? Color.white : allowed ? Color.primary : Color.secondary.opacity(0.5))
+                .frame(width: 32, height: 32)
+                .background(Circle().fill(chosen ? Color.accentColor : Color.clear))
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!allowed)
+        .accessibilityLabel(Text(verbatim: day.noon.formatted(.dateTime.weekday(.wide).month(.wide).day())))
+        .accessibilityAddTraits(chosen ? .isSelected : [])
     }
 }
 
