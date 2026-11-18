@@ -23,6 +23,9 @@ struct SettingsView: View {
     @State private var recordsTime = true
     @State private var weekCardOn = true
     @State private var lastWeek: WeekRecap?
+    /// Done so far (SPEC 2026-11-18): read with the pane's other numbers.
+    @State private var doneSoFar: DoneSoFar?
+    @State private var progressRange: ProgressRange = .all
     @State private var pane: Pane?
 
     /// A plain column of sections; selected one highlighted, keyboard and VoiceOver
@@ -238,6 +241,17 @@ struct SettingsView: View {
                 }
 
                 case .progress:
+                if let doneSoFar, let today = model.currentDay {
+                    Section {
+                        // Saved only when picked (review: reading it back on opening saved it again).
+                        DoneSoFarSection(done: doneSoFar, today: today, range: Binding(
+                            get: { progressRange }, set: { progressRange = $0; model.setProgressRange($0) }))
+                    } footer: {
+                        Text("Each task once a day it was done. Dots: a goal reached.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 Section {
                     LabeledContent {
                         if let days = activeDays {
@@ -335,8 +349,11 @@ struct SettingsView: View {
         // Progress is read fresh when picked (a list turned off in General shows at once).
         .onChange(of: pane) { _, new in
             if new == .progress {
+                // Blocks settle first, as for the menu's card (review).
+                model.refresh()
                 activeDays = model.activeDays()
                 lastWeek = model.lastWeek()
+                doneSoFar = model.doneSoFar()
             }
         }
         // A menu bar app shows no window at launch, so macOS must not restore this one
@@ -389,6 +406,8 @@ struct SettingsView: View {
         // Blocks settle first, as for the menu's card.
         model.refresh()
         lastWeek = model.lastWeek()
+        doneSoFar = model.doneSoFar()
+        progressRange = model.progressRange()
     }
 
     private func setOpenAtLogin(_ on: Bool) {

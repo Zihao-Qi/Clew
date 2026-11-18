@@ -27,7 +27,9 @@ import Testing
         WeekRecap.make(weekStart: monday, ticks: ticks, focus: focus, userDeleted: userDeleted, listsOff: listsOff)
     }
 
-    @Test func doneSumsTheWeeksTicksOnYourOwnItemsOnly() {
+    /// SPEC 2026-11-18: each item once on each day it was done; a goal's many +1s on a
+    /// day are one.
+    @Test func doneCountsEachItemOnceADayOnYourOwnItemsOnly() {
         let task = item(.once), link = item(.link), goal = item(.goal)
         let video = item(.link, source: .extensionYouTube)
         let r = make([
@@ -37,7 +39,7 @@ import Testing
             tick(task, "2026-11-08"), tick(task, "2026-11-16"), // the weeks around it
             tick(task, "2026-11-11", voided: true),          // undone
         ])
-        #expect(r?.done == 7)
+        #expect(r?.done == 4)                              // task, link, goal on the 12th and the 13th
         #expect(r?.watched == 1 && r?.read == 0)
     }
 
@@ -83,19 +85,23 @@ import Testing
         #expect(r?.focusMinutes == 85)
     }
 
-    @Test func highlightsAreHabitsAndGoalsTickedTwiceOrMoreMostFirstAtMostTwo() {
+    @Test func highlightsAreHabitsAndGoalsDoneOnTwoDaysOrMoreMostFirstAtMostTwo() {
         let a = item(.habit, "A", sortKey: 3), b = item(.goal, "B", sortKey: 2), c = item(.habit, "C", sortKey: 1)
         let once = item(.once, "Once")
         let single = item(.habit, "Single", sortKey: 0)
         let r = make([
             tick(a, "2026-11-09"), tick(a, "2026-11-10"),                       // 2
-            tick(b, "2026-11-10", 4),                                           // 4 (+1s)
+            tick(b, "2026-11-10", 4), tick(b, "2026-11-11"), tick(b, "2026-11-11"),
+            tick(b, "2026-11-13", 2),                                           // 3 days, not 8 +1s
             tick(c, "2026-11-11"), tick(c, "2026-11-12"),                       // 2, earlier in the list
             tick(once, "2026-11-09"), tick(once, "2026-11-10"), tick(once, "2026-11-11"),  // not a habit or goal
             tick(single, "2026-11-09"),                                         // once: not a highlight
         ])
         #expect(r?.highlights.map(\.title) == ["B", "C"])
-        #expect(r?.highlights.map(\.count) == [4, 2])
+        #expect(r?.highlights.map(\.count) == [3, 2])
+        // Many +1s on one day are one day: not a highlight.
+        let busy = item(.goal, "Busy")
+        #expect(make([tick(busy, "2026-11-10", 40), tick(busy, "2026-11-10")])?.highlights.isEmpty == true)
     }
 
     @Test func oneTickIsNoHighlightAndTiesFollowTheListNotTheId() {
@@ -119,7 +125,8 @@ import Testing
         }
         let older = made("Older", at: 0, id: "FFFFFFFF-0000-0000-0000-000000000001")
         let newer = made("Newer", at: 60, id: "00000000-0000-0000-0000-000000000001")
-        #expect(make([tick(newer, "2026-11-09", 2), tick(older, "2026-11-09", 2)])?.highlights.map(\.title)
+        #expect(make([tick(newer, "2026-11-09"), tick(newer, "2026-11-10"),
+                      tick(older, "2026-11-09"), tick(older, "2026-11-10")])?.highlights.map(\.title)
                 == ["Older", "Newer"])
     }
 }

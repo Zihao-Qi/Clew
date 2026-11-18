@@ -786,6 +786,21 @@ enum Snapshot {
                        to: dir.appendingPathComponent("settings-\(pane.rawValue)-light.png"))
             }
             render(SettingsView(model: model, pane: .data), appearance: .darkAqua, to: dir.appendingPathComponent("settings-data-dark.png"))
+            // Done so far and a goal's Bars or Heatmap (SPEC 2026-11-18).
+            render(SettingsView(model: model, pane: .progress), appearance: .darkAqua,
+                   to: dir.appendingPathComponent("settings-progress-dark.png"))
+            if let book = model.goalsAndLater.first(where: { $0.item.title == "Book pages" }) {
+                for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+                    let suffix = appearance == .aqua ? "light" : "dark"
+                    model.setGoalChart(.bars)
+                    render(RootView(model: model, screen: .detail(book.id)), appearance: appearance,
+                           to: dir.appendingPathComponent("detail-goal-bars-\(suffix).png"))
+                    model.setGoalChart(.heatmap)
+                    render(RootView(model: model, screen: .detail(book.id)), appearance: appearance,
+                           to: dir.appendingPathComponent("detail-goal-heatmap-\(suffix).png"))
+                }
+                model.setGoalChart(.bars)
+            }
             print(dir.path)
             exit(0)
         } catch {
@@ -845,7 +860,20 @@ enum Snapshot {
         try clew.setSummaries(summaries)
         _ = try clew.addItem(NewItem(title: "Read papers", shape: .goal(target: 30)))
         let pages = try clew.addItem(NewItem(title: "Book pages", shape: .goal(target: 500)))
-        for _ in 0..<120 { try clew.checkIn(itemId: pages.id) }
+        // Sixty days of history (SPEC 2026-11-18, Done so far and a goal's Bars): pages
+        // most days, the habit on most days, a quiet day now and then.
+        for back in stride(from: 60, through: 1, by: -1) {
+            clock.date = now.addingTimeInterval(-Double(back) * 86_400)
+            guard back % 9 != 4 else { continue }
+            for _ in 0..<(back % 5 == 0 ? 0 : 3 + (back * 7) % 11) { try clew.checkIn(itemId: pages.id) }
+            if back % 3 != 1 { try clew.checkIn(itemId: exercise.id) }
+            if back % 4 == 0 {
+                let errand = try clew.addItem(NewItem(title: "Errand \(back)", shape: .today))
+                try clew.checkIn(itemId: errand.id)
+            }
+        }
+        clock.date = now
+        for _ in 0..<12 { try clew.checkIn(itemId: pages.id) }
         let pushups = try clew.addItem(NewItem(title: "Push-ups", shape: .goal(target: 3)))
         for _ in 0..<3 { try clew.checkIn(itemId: pushups.id) }
         try clew.checkIn(itemId: exercise.id)

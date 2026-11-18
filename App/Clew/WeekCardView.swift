@@ -20,7 +20,7 @@ enum WeekRecapText {
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
-    /// For VoiceOver: "Last week: 23 done, 3 hours, 20 minutes of focus, 4 watched, Exercise 4 times".
+    /// For VoiceOver: "Last week: 23 done, 3 hours, 20 minutes of focus, 4 watched, Exercise on 4 days".
     static func spoken(_ r: WeekRecap) -> String {
         var parts: [String] = []
         if r.done > 0 { parts.append(String(localized: "\(r.done) done")) }
@@ -30,7 +30,7 @@ enum WeekRecapText {
         }
         if let n = r.watched, n > 0 { parts.append(String(localized: "\(n) watched")) }
         if let n = r.read, n > 0 { parts.append(String(localized: "\(n) read")) }
-        for h in r.highlights { parts.append(String(localized: "\(h.title) \(h.count) times")) }
+        for h in r.highlights { parts.append((h.count == 1 ? String(localized: "\(h.title) on 1 day") : String(localized: "\(h.title) on \(h.count) days"))) }
         return String(localized: "Last week: \(parts.joined(separator: ", "))")
     }
 }
@@ -49,7 +49,7 @@ struct WeekHighlights: View {
         }
         // Read as words, not "·" and "4×" (the card replaces this with its own label).
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: highlights.map { String(localized: "\($0.title) \($0.count) times") }
+        .accessibilityLabel(Text(verbatim: highlights.map { $0.count == 1 ? String(localized: "\($0.title) on 1 day") : String(localized: "\($0.title) on \($0.count) days") }
             .joined(separator: ", ")))
     }
 }

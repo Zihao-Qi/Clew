@@ -122,6 +122,12 @@ final class FakeStore: ClewStore, @unchecked Sendable {
             state.plans.values.filter { $0.localDay >= day && $0.voidedAt == nil }
                 .sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) }
         }
+        func doneByDay(through day: LocalDay) throws -> [LocalDay: Int] {
+            let ticks = state.checkIns.values.filter { $0.localDay <= day }
+                .compactMap { c in state.items[c.itemId].map { (checkIn: c, item: $0) } }
+            return DoneCount.byDay(ticks)
+        }
+        func goals() throws -> [Item] { state.items.values.filter { $0.kind == .goal } }
         func activeDays(from: LocalDay) throws -> Set<LocalDay> {
             Set(state.checkIns.values.filter { !$0.isVoided && $0.localDay >= from }.map(\.localDay))
         }

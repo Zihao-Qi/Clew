@@ -12,13 +12,14 @@ public struct WeekRecap: Equatable, Sendable {
 
     /// The week's Monday.
     public let weekStart: LocalDay
-    /// Tick amounts on items that are not from a collection (a goal's +1 is one).
+    /// Items not from a collection, each once on each day it was done (SPEC 2026-11-18:
+    /// a goal's day counts once, however many +1s; `DoneCount`).
     public let done: Int
     public let focusMinutes: Int
     /// Distinct YouTube / X items ticked that week; nil when that list is turned off.
     public let watched: Int?
     public let read: Int?
-    /// Habits and goals ticked at least twice, most first, at most two.
+    /// Habits and goals done on at least two days, most days first, at most two.
     public let highlights: [Highlight]
 
     public static let maxHighlights = 2
@@ -38,7 +39,7 @@ public struct WeekRecap: Equatable, Sendable {
                             listsOff: Set<Source>) -> WeekRecap? {
         let end = weekStart.adding(days: 6)
         let inWeek = ticks.filter { $0.checkIn.localDay >= weekStart && $0.checkIn.localDay <= end && !$0.checkIn.isVoided }
-        let done = inWeek.filter { !collectionSources.contains($0.item.source) }.reduce(0) { $0 + $1.checkIn.amount }
+        let done = DoneCount.byDay(inWeek).values.reduce(0, +)
         func collection(_ source: Source) -> Int? {
             guard !listsOff.contains(source) else { return nil }
             return Set(inWeek.filter { $0.item.source == source && !userDeleted.contains($0.item.id) }.map(\.item.id)).count
@@ -48,11 +49,13 @@ public struct WeekRecap: Equatable, Sendable {
         guard done > 0 || (watched ?? 0) > 0 || (read ?? 0) > 0 else { return nil }
         let focusMinutes = focus.filter { $0.localDay >= weekStart && $0.localDay <= end && $0.voidedAt == nil }
             .reduce(0) { $0 + $1.minutes }
-        var counts: [UUID: (item: Item, count: Int)] = [:]
+        // Days, not +1s (SPEC 2026-11-18), as Done counts.
+        var days: [UUID: (item: Item, days: Set<LocalDay>)] = [:]
         for tick in inWeek where (tick.item.kind == .habit || tick.item.kind == .goal)
             && tick.item.deletedAt == nil && !collectionSources.contains(tick.item.source) {
-            counts[tick.item.id, default: (tick.item, 0)].count += tick.checkIn.amount
+            days[tick.item.id, default: (tick.item, [])].days.insert(tick.checkIn.localDay)
         }
+        let counts = days.mapValues { (item: $0.item, count: $0.days.count) }
         let highlights = counts.values.filter { $0.count >= 2 }
             .sorted { a, b in
                 if a.count != b.count { return a.count > b.count }

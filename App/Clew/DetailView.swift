@@ -31,6 +31,10 @@ struct DetailView: View {
                 header(details)
                 if details.isOneOff {
                     OneOffDetails(moved: model.today?.moved.contains(itemId) == true, details: details)
+                } else if details.item.kind == .goal {
+                    // Bars or Heatmap, the user's choice (SPEC 2026-11-18).
+                    GoalDaysSection(model: model, details: details)
+                    statTiles(details)
                 } else {
                     Heatmap(details: details)
                     statTiles(details)

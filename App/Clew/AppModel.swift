@@ -335,6 +335,13 @@ final class AppModel {
 
     /// Settings › Progress: last week, whatever the switch says and whether shown.
     func lastWeek() -> WeekRecap? { (try? clew?.lastWeek()) ?? nil }
+    /// Settings › Progress › Done so far (SPEC 2026-11-18).
+    func doneSoFar() -> DoneSoFar? { try? clew?.doneSoFar() }
+    func progressRange() -> ProgressRange { (try? clew?.progressRange()) ?? .all }
+    func setProgressRange(_ range: ProgressRange) { run { try $0.setProgressRange(range) } }
+    /// A goal's days as Bars or Heatmap, for all goals.
+    func goalChart() -> GoalChart { (try? clew?.goalChart()) ?? .bars }
+    func setGoalChart(_ chart: GoalChart) { run { try $0.setGoalChart(chart) } }
     func weekCardOn() -> Bool { (try? clew?.weekCardOn()) ?? true }
     func setWeekCardOn(_ on: Bool) { run { try $0.setWeekCardOn(on) } }
 
