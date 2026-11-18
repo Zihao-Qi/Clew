@@ -128,6 +128,22 @@ struct AddView: View {
     let model: AppModel
     let done: () -> Void
 
+    init(model: AppModel, done: @escaping () -> Void) {
+        self.model = model
+        self.done = done
+    }
+
+    #if DEBUG
+    /// Snapshots: Add with a kind chosen and "On a day" on or off.
+    init(model: AppModel, kind: AddKind, onADay: Bool, text: String = "", done: @escaping () -> Void) {
+        self.model = model
+        self.done = done
+        _kind = State(initialValue: kind)
+        _onADay = State(initialValue: onADay)
+        _text = State(initialValue: text)
+    }
+    #endif
+
     @State private var text = ""
     @State private var kind: AddKind = .today
     @State private var schedule = ScheduleDraft()

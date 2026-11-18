@@ -127,7 +127,7 @@ struct MonthCalendar: View {
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 14) {   // user, 2026-11-18: the month sat too close to the weekdays
             HStack {
                 Text(verbatim: monthTitle)
                     .font(.headline)

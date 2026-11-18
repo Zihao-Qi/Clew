@@ -547,10 +547,27 @@ enum Snapshot {
                        to: dir.appendingPathComponent("edit-reminder-light.png"))
             }
             if let dentist = model.today?.goalsAndLater.first(where: { $0.item.title == "Call the dentist" }) {
-                render(RootView(model: model, screen: .pickDay(dentist.id)), appearance: .aqua,
-                       to: dir.appendingPathComponent("pickday-light.png"))
-                render(RootView(model: model, screen: .detail(dentist.id)), appearance: .aqua,
-                       to: dir.appendingPathComponent("detail-waiting-light.png"))
+                for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+                    let suffix = appearance == .aqua ? "light" : "dark"
+                    render(RootView(model: model, screen: .pickDay(dentist.id)), appearance: appearance,
+                           to: dir.appendingPathComponent("pickday-\(suffix).png"))
+                    render(RootView(model: model, screen: .detail(dentist.id)), appearance: appearance,
+                           to: dir.appendingPathComponent("detail-waiting-\(suffix).png"))
+                    render(RootView(model: model, screen: .edit(dentist.item, back: .list)), appearance: appearance,
+                           to: dir.appendingPathComponent("edit-waiting-\(suffix).png"))
+                    // Add's type line for each kind, and Later with "On a day" (SPEC 2026-11-17).
+                    for (kind, name) in [(AddKind.habit, "habit"), (.goal, "goal"), (.later, "later")] {
+                        render(AddView(model: model, kind: kind, onADay: false, text: "Call the dentist") {}.frame(width: 340),
+                               appearance: appearance, to: dir.appendingPathComponent("add-\(name)-\(suffix).png"))
+                    }
+                    render(AddView(model: model, kind: .later, onADay: true, text: "Call the dentist") {}.frame(width: 340),
+                           appearance: appearance, to: dir.appendingPathComponent("add-later-day-\(suffix).png"))
+                    // The refusal line for a habit dragged down (SPEC 2026-11-17).
+                    model.notice = AppModel.message(for: StaysOnToday.habit)
+                    render(RootView(model: model, screen: .list), appearance: appearance,
+                           to: dir.appendingPathComponent("list-hint-\(suffix).png"))
+                    model.notice = nil
+                }
             }
             if let papers = model.today?.rows.first(where: { $0.item.title == "Write intro" }) {
                 render(RootView(model: model, screen: .place(papers.id, block: nil)), appearance: .aqua,
