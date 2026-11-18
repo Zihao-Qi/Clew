@@ -135,11 +135,16 @@ struct AddView: View {
 
     #if DEBUG
     /// Snapshots: Add with a kind chosen and "On a day" on or off.
-    init(model: AppModel, kind: AddKind, onADay: Bool, text: String = "", done: @escaping () -> Void) {
+    init(model: AppModel, kind: AddKind, onADay: Bool, dayOpen: Bool = false, slotOn: Bool = false,
+         text: String = "", done: @escaping () -> Void) {
         self.model = model
         self.done = done
+        var slot = SlotDraft()
+        slot.enabled = slotOn
+        _slot = State(initialValue: slot)
         _kind = State(initialValue: kind)
         _onADay = State(initialValue: onADay)
+        _dayOpen = State(initialValue: dayOpen)
         _text = State(initialValue: text)
     }
     #endif
@@ -152,6 +157,7 @@ struct AddView: View {
     /// A Later task's day (SPEC 2026-11-17).
     @State private var onADay = false
     @State private var day = Date()
+    @State private var dayOpen = false
     /// The title fetched for the pasted link, if any; it is put into the field so it
     /// can be edited, and recorded as `.fetched` only if left as fetched.
     @State private var fetchedTitle: String?
@@ -206,7 +212,7 @@ struct AddView: View {
                 SlotRow(draft: $slot)
             }
             if kind == .later {
-                DayRow(model: model, on: $onADay, date: $day)
+                DayRow(model: model, on: $onADay, date: $day, open: $dayOpen)
             }
 
             NoticeView(text: model.notice)
@@ -287,6 +293,7 @@ struct EditView: View {
     private let existingDay: LocalDay?
     @State private var onADay: Bool
     @State private var day: Date
+    @State private var dayOpen = false
 
     init(model: AppModel, item: Item, done: @escaping () -> Void) {
         self.model = model
@@ -342,7 +349,7 @@ struct EditView: View {
                 SlotRow(draft: $slot)
             }
             if canHaveDay {
-                DayRow(model: model, on: $onADay, date: $day)
+                DayRow(model: model, on: $onADay, date: $day, open: $dayOpen)
             }
             ReminderRow(enabled: $remind, time: $remindAt, today: $remindToday,
                         passed: reminderChanged && remind && remindToday && model.reminderTimePassed(remindAt))
@@ -359,6 +366,7 @@ struct EditView: View {
                 Button("Save", action: save)
                     .keyboardShortcut(.defaultAction)
             }
+            .padding(.top, 4)   // as in Add (design review)
         }
         .padding(12)
     }
@@ -431,10 +439,18 @@ struct SlotDraft: Equatable {
     var slot: TimeSlot? { enabled ? TimeSlot(hour: hour, minute: quarter * 15, minutes: minutes) : nil }
 }
 
-/// "On the timeline [8 AM] [:00] [60 min]": the block Clew places by itself each day the
-/// task is due (SPEC 2026-11-10). Moving it on the timeline changes only that day.
+/// "On the timeline", then "at [8:00 AM] for [60 min]" under it: the block Clew places by
+/// itself each day the task is due (SPEC 2026-11-10). Moving it on the timeline changes
+/// only that day. The start is one menu of quarter hours (user, 2026-11-18: the hour and
+/// the minutes were two menus), indented like the reminder's second line.
 struct SlotRow: View {
     @Binding var draft: SlotDraft
+
+    /// Quarter hours since midnight: 0 = 0:00 … 95 = 23:45.
+    private var start: Binding<Int> {
+        Binding(get: { draft.hour * 4 + draft.quarter },
+                set: { draft.hour = $0 / 4; draft.quarter = $0 % 4 })
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -442,18 +458,14 @@ struct SlotRow: View {
                 .accessibilityLabel(Text("Put it on the timeline each day it is due"))
             if draft.enabled {
                 HStack(spacing: 6) {
-                    Picker(selection: $draft.hour) {
-                        ForEach(0..<24, id: \.self) { h in Text(verbatim: Self.hourText(h)).tag(h) }
+                    Text("at")
+                    Picker(selection: start) {
+                        ForEach(0..<96, id: \.self) { q in Text(verbatim: Self.timeText(q)).tag(q) }
                     } label: { EmptyView() }
                     .labelsHidden()
                     .fixedSize()
-                    .accessibilityLabel(Text("Slot hour"))
-                    Picker(selection: $draft.quarter) {
-                        ForEach(0..<4, id: \.self) { q in Text(verbatim: String(format: ":%02d", q * 15)).tag(q) }
-                    } label: { EmptyView() }
-                    .labelsHidden()
-                    .fixedSize()
-                    .accessibilityLabel(Text("Slot minutes"))
+                    .accessibilityLabel(Text("Start time"))
+                    Text("for")
                     Picker(selection: $draft.minutes) {
                         ForEach(TimeSlot.lengths, id: \.self) { m in Text("\(m) min").tag(m) }
                     } label: { EmptyView() }
@@ -462,12 +474,15 @@ struct SlotRow: View {
                     .accessibilityLabel(Text("Slot length"))
                     Spacer()
                 }
+                .padding(.leading, 20)
             }
         }
     }
 
-    static func hourText(_ hour: Int) -> String {
-        (Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: Date()) ?? Date()).formatted(.dateTime.hour())
+    /// "8:00 AM" or "08:00", as the user's clock shows times.
+    static func timeText(_ quarter: Int) -> String {
+        let date = Calendar.current.date(bySettingHour: quarter / 4, minute: quarter % 4 * 15, second: 0, of: Date()) ?? Date()
+        return date.formatted(.dateTime.hour().minute())
     }
 }
 
