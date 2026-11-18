@@ -692,3 +692,36 @@ extension Clew {
         return result
     }
 }
+
+/// Edit's "On today's timeline" (SPEC 2026-11-18): what Save does with the task's block.
+public enum TimelineEdit: Equatable, Sendable {
+    case keep
+    /// Place the task there, as dropping it on an hour does.
+    case place(start: Date, minutes: Int)
+    /// Take this block off the timeline, as Remove block does.
+    case remove(UUID)
+
+    /// `open` is the task's block of today that has not ended (what the row showed);
+    /// `wanted` is the checked start and length, or nil when unchecked.
+    public init(open: TimeBlock?, wanted: (start: Date, minutes: Int)?) {
+        switch (open, wanted) {
+        case (nil, nil): self = .keep
+        case (let open?, nil): self = .remove(open.id)
+        case (let open?, let w?) where open.start == w.start && open.minutes == w.minutes: self = .keep
+        case (_, let w?): self = .place(start: w.start, minutes: w.minutes)
+        }
+    }
+}
+
+extension Clew {
+    /// The task's block of today that has not ended: the one Edit shows and changes.
+    public func openBlock(itemId: UUID) throws -> TimeBlock? {
+        let now = clockForQueries.now()
+        let today = currentDay()
+        return try storeForQueries.read { r in
+            try r.timeBlocks(from: today)
+                .filter { $0.itemId == itemId && $0.localDay == today && $0.removedAt == nil && $0.end > now }
+                .min { ($0.start, $0.id.uuidString) < ($1.start, $1.id.uuidString) }
+        }
+    }
+}

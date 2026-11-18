@@ -614,8 +614,6 @@ enum Snapshot {
             if let dentist = model.today?.goalsAndLater.first(where: { $0.item.title == "Call the dentist" }) {
                 for appearance in [NSAppearance.Name.aqua, .darkAqua] {
                     let suffix = appearance == .aqua ? "light" : "dark"
-                    render(RootView(model: model, screen: .pickDay(dentist.id)), appearance: appearance,
-                           to: dir.appendingPathComponent("pickday-\(suffix).png"))
                     render(RootView(model: model, screen: .detail(dentist.id)), appearance: appearance,
                            to: dir.appendingPathComponent("detail-waiting-\(suffix).png"))
                     render(RootView(model: model, screen: .edit(dentist.item, back: .list)), appearance: appearance,
@@ -637,6 +635,13 @@ enum Snapshot {
                     render(RootView(model: model, screen: .list), appearance: appearance,
                            to: dir.appendingPathComponent("list-hint-\(suffix).png"))
                     model.notice = nil
+                }
+            }
+            if let intro = model.today?.rows.first(where: { $0.item.title == "Write intro" }) {
+                // Edit's "On today's timeline" (SPEC 2026-11-18).
+                for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+                    render(RootView(model: model, screen: .edit(intro.item, back: .list)), appearance: appearance,
+                           to: dir.appendingPathComponent("edit-timeline-\(appearance == .aqua ? "light" : "dark").png"))
                 }
             }
             if let papers = model.today?.rows.first(where: { $0.item.title == "Write intro" }) {

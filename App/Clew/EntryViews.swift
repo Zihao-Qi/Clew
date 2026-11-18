@@ -293,6 +293,13 @@ struct EditView: View {
     private let existingDay: LocalDay?
     @State private var onADay: Bool
     @State private var day: Date
+    /// On today's timeline (SPEC 2026-11-18): offered for a task that is not a habit,
+    /// while the timeline is shown; `openBlock` is what it showed when Edit opened.
+    private let canPlace: Bool
+    private let openBlock: TimeBlock?
+    @State private var onTimeline: Bool
+    @State private var time: TimeOfDay
+    @State private var blockMinutes: Int
     @State private var dayOpen = false
 
     init(model: AppModel, item: Item, done: @escaping () -> Void) {
@@ -313,6 +320,15 @@ struct EditView: View {
         existingDay = model.laterDay(item.id)
         _onADay = State(initialValue: existingDay != nil)
         _day = State(initialValue: existingDay?.noon ?? Date())
+        let row = model.row(item.id)
+        canPlace = item.kind != .habit && model.timelineShown && model.timeline != nil
+            && row.map { !$0.isGoalReached } ?? false
+        let open = canPlace ? model.openBlock(item.id) : nil
+        openBlock = open
+        _onTimeline = State(initialValue: open != nil)
+        _time = State(initialValue: open.map { TimeOfDay(pickerDate: $0.start) }
+            ?? model.timeline?.nextQuarter(after: Date()) ?? TimeOfDay(hour: 9, minute: 0)!)
+        _blockMinutes = State(initialValue: open?.minutes ?? Clew.blockDefaultMinutes)
     }
 
     /// The day as it will be saved, if it differs from the one it has.
@@ -351,6 +367,9 @@ struct EditView: View {
             if canHaveDay {
                 DayRow(model: model, on: $onADay, date: $day, open: $dayOpen)
             }
+            if canPlace {
+                TodayTimelineRow(model: model, on: $onTimeline, time: $time, minutes: $blockMinutes)
+            }
             ReminderRow(enabled: $remind, time: $remindAt, today: $remindToday,
                         passed: reminderChanged && remind && remindToday && model.reminderTimePassed(remindAt))
             if model.notificationsDenied, remind {
@@ -369,6 +388,9 @@ struct EditView: View {
             .padding(.top, 4)   // as in Add (design review)
         }
         .padding(12)
+        // A day sends it to Later; today's timeline brings it to Today: one at a time.
+        .onChange(of: onADay) { if onADay { onTimeline = false } }
+        .onChange(of: onTimeline) { if onTimeline { onADay = false } }
     }
 
     private func save() {
@@ -402,6 +424,16 @@ struct EditView: View {
         }
         if dayChanged {
             guard model.setLaterDay(item.id, onADay ? LocalDay(picked: day) : nil) else { return }
+        }
+        // On today's timeline: only what changed; a day for Later already took it off.
+        if canPlace, !(canHaveDay && onADay), let timeline = model.timeline {
+            let wanted = onTimeline ? (start: timeline.start(at: time, rolloverHour: model.rolloverHour),
+                                       minutes: blockMinutes) : nil
+            switch TimelineEdit(open: openBlock, wanted: wanted) {
+            case .keep: break
+            case .place(let start, let minutes): guard model.place(item.id, at: start, minutes: minutes) else { return }
+            case .remove(let id): model.removeBlock(id)
+            }
         }
         done()
     }
@@ -439,6 +471,13 @@ struct SlotDraft: Equatable {
     var slot: TimeSlot? { enabled ? TimeSlot(hour: hour, minute: quarter * 15, minutes: minutes) : nil }
 }
 
+/// The checkbox rows of Add and Edit ("On a day", "On today's timeline", "On the
+/// timeline", "Remind me") keep one height, checked or not, so they sit evenly and a
+/// checkbox never jumps when its control appears (design review, 2026-11-18).
+enum CheckRow {
+    static let height: CGFloat = 24
+}
+
 /// "On the timeline", then "at [8:00 AM] for [60 min]" under it: the block Clew places by
 /// itself each day the task is due (SPEC 2026-11-10). Moving it on the timeline changes
 /// only that day. The start is one menu of quarter hours (user, 2026-11-18: the hour and
@@ -455,33 +494,74 @@ struct SlotRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Toggle("On the timeline", isOn: $draft.enabled)
+                .frame(minHeight: CheckRow.height)
                 .accessibilityLabel(Text("Put it on the timeline each day it is due"))
             if draft.enabled {
-                // On the text baseline, so the time's digits sit level with "at" and "for".
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text("at")
-                    // Click the hour or the minutes; the arrow keys change it (user,
-                    // 2026-11-18), the minutes by a quarter hour.
-                    TimePicker(time: start, quarterHours: true)
-                        .fixedSize()
-                        // The field reports no text baseline; its digits' baseline is 6 pt
-                        // above its bottom (measured), so they sit level with "at" and "for".
-                        .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 6 }
-                        .accessibilityLabel(Text("Start time"))
-                    Text("for").padding(.leading, 4)   // past the field's stepper (design review)
-                    Picker(selection: $draft.minutes) {
-                        ForEach(TimeSlot.lengths, id: \.self) { m in Text("\(m) min").tag(m) }
-                    } label: { EmptyView() }
-                    .labelsHidden()
-                    .fixedSize()
-                    .accessibilityLabel(Text("Slot length"))
-                    Spacer()
-                }
-                .padding(.leading, 22)   // under the checkbox's text (design review: 20 was 1.5 pt short)
+                AtForLine(time: start, minutes: $draft.minutes, lengths: TimeSlot.lengths)
+                    .padding(.leading, 22)   // under the checkbox's text (design review: 20 was 1.5 pt short)
             }
         }
     }
+}
 
+/// "at [10:15] for [30 min]": a habit's slot, Edit's "On today's timeline" and a block's
+/// Move to… read alike (user, 2026-11-18).
+struct AtForLine: View {
+    @Binding var time: TimeOfDay
+    @Binding var minutes: Int
+    let lengths: [Int]
+
+    var body: some View {
+        // On the text baseline, so the time's digits sit level with "at" and "for".
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text("at")
+            // Click the hour or the minutes; the arrow keys change it, the minutes by a
+            // quarter hour.
+            TimePicker(time: $time, quarterHours: true)
+                .fixedSize()
+                // The field reports no text baseline; its digits' baseline is 6 pt above its
+                // bottom (measured), so they sit level with "at" and "for".
+                .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 6 }
+                .accessibilityLabel(Text("Start time"))
+            Text("for").padding(.leading, 4)   // past the field's stepper (design review)
+            Picker(selection: $minutes) {
+                ForEach(lengths, id: \.self) { m in Text("\(m) min").tag(m) }
+            } label: { EmptyView() }
+            .labelsHidden()
+            .fixedSize()
+            .accessibilityLabel(Text("Length"))
+            Spacer()
+        }
+    }
+}
+
+/// Edit's "On today's timeline" (SPEC 2026-11-18): the row's right-click Put on
+/// timeline… moved here. For a task that is not a habit, while the timeline is shown.
+struct TodayTimelineRow: View {
+    let model: AppModel
+    @Binding var on: Bool
+    @Binding var time: TimeOfDay
+    @Binding var minutes: Int
+
+    /// Lengths that fit before the timeline's end (4 a.m.).
+    private var lengths: [Int] {
+        guard let day = model.timeline else { return Clew.blockLengths }
+        let room = TimelineMetrics.room(after: day.start(at: time, rolloverHour: model.rolloverHour), in: day)
+        return Clew.blockLengths.filter { $0 <= max(room, Clew.blockStepMinutes) }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle("On today's timeline", isOn: $on)
+                .frame(minHeight: CheckRow.height)
+                .accessibilityLabel(Text("Put it on today's timeline"))
+            if on {
+                AtForLine(time: $time, minutes: $minutes, lengths: lengths)
+                    .padding(.leading, 22)
+            }
+        }
+        .onChange(of: lengths) { if let last = lengths.last, minutes > last { minutes = last } }
+    }
 }
 
 /// "Remind me [18:00] [Today | Every day]": one gentle notification, today only or on
@@ -506,6 +586,7 @@ struct ReminderRow: View {
                 }
                 Spacer()
             }
+            .frame(minHeight: CheckRow.height)
             if enabled {
                 // On its own line, under the switch's label, so "Remind me" never wraps.
                 Picker(selection: $today) {
