@@ -7,6 +7,26 @@ import Foundation
 /// with no plan, it is back in Goals & Later.
 public enum ListPlace: Sendable, Equatable { case today, goalsAndLater }
 
+/// Why a row of Today's own was refused going down to Goals & Later, for the hint that
+/// replaces "That can't be done right now." (SPEC 2026-11-17).
+public enum StaysOnToday: Sendable, Equatable {
+    /// "Habits stay on Today. Change when it repeats in Edit."
+    case habit
+    /// "Done today. Undo the tick to move it."
+    case doneToday
+
+    /// The hint for `row`, or nil when there is none: a row moved from Goals & Later can
+    /// always go back, and anything else refused keeps the general line.
+    public static func reason(for row: TodayRow, moved: Bool) -> StaysOnToday? {
+        guard !moved else { return nil }
+        if row.item.kind == .habit { return .habit }
+        if row.item.kind == .once || row.item.kind == .link, row.item.state == .active, row.todayAmount > 0 {
+            return .doneToday
+        }
+        return nil
+    }
+}
+
 extension Clew {
     /// Puts the item in `list` between two neighbours of that list (either may be nil
     /// at its ends): reorders within a list, or moves across. Moving to Today is for

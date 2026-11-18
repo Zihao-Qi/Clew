@@ -360,6 +360,40 @@ enum Snapshot {
                 // A habit cannot go down: nothing changes.
                 s = seq()
                 print("A down (habit):", model.drop(s[0]!, in: s, from: 0, to: s.count - 1), "→", both())
+                // Why, in the notice line (SPEC 2026-11-17); closing the menu clears it.
+                print("  notice:", model.notice ?? "none")
+                model.menuClosed()
+                print("  after close:", model.notice ?? "none")
+                _ = try clew.addItem(NewItem(title: "D", shape: .today))
+                model.refresh()
+                let d = model.today!.rows.first { $0.item.title == "D" }!.id
+                try clew.checkIn(itemId: d)
+                model.refresh()
+                s = seq()
+                print("D down (ticked):", model.drop(d, in: s, from: s.firstIndex(of: d)!, to: s.count - 1), "→", both())
+                print("  notice:", model.notice ?? "none")
+                // Y moved up and ticked can still go back: no hint, no refusal.
+                s = seq()
+                print("Y up:", model.drop(s.last!!, in: s, from: s.count - 1, to: 0), "→", both())
+                try clew.checkIn(itemId: y)
+                model.refresh()
+                s = seq()
+                print("Y down (moved, ticked):", model.drop(y, in: s, from: s.firstIndex(of: y)!, to: s.count - 1), "→", both())
+                print("  notice:", model.notice ?? "none")
+                // A habit's block dropped in Goals & Later: off the timeline, the row stays,
+                // and the habit hint shows; a ticked task's block says nothing.
+                let a = model.today!.rows.first { $0.item.title == "A" }!.id
+                // On a quarter hour, within today (the timeline snaps to 15 minutes).
+                let hour = Calendar.current.dateInterval(of: .hour, for: Date())!.start
+                let ablock = try clew.placeOnTimeline(itemId: a, start: hour.addingTimeInterval(1800))
+                model.refresh()
+                model.putBackBelow(ablock.id, itemId: a, at: 0)
+                print("A's block below →", both(), "| notice:", model.notice ?? "none")
+                model.menuClosed()
+                let dblock = try clew.placeOnTimeline(itemId: d, start: hour.addingTimeInterval(-3600))
+                model.refresh()
+                model.putBackBelow(dblock.id, itemId: d, at: 0)
+                print("D's block below →", both(), "| notice:", model.notice ?? "none")
 
                 // A real drag can't be simulated: SwiftUI checks the actual mouse-button state,
                 // which posted events don't change. Row targeting is unit-tested in Core

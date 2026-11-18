@@ -5,6 +5,16 @@ import SwiftUI
 /// What `+ add` creates. Mirrors `NewItemShape` for the picker.
 enum AddKind: Hashable, CaseIterable {
     case today, habit, goal, later
+
+    /// The line under the choice (SPEC 2026-11-17, wording confirmed by the user).
+    var explanation: LocalizedStringKey {
+        switch self {
+        case .today: "Done once. Stays on Today until you tick it."
+        case .habit: "Comes back to Today when it repeats."
+        case .goal: "A total to reach, one +1 at a time. Lives in Goals & Later."
+        case .later: "For another day. Waits in Goals & Later until you get to it."
+        }
+    }
 }
 
 /// Editable form of a habit's schedule.
@@ -153,6 +163,12 @@ struct AddView: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             .accessibilityLabel(Text("Kind"))
+
+            // What each kind is, since it cannot be changed later (SPEC 2026-11-17).
+            Text(kind.explanation)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
             // Goals have a total only; they live in Goals & Later (SPEC 2026-11-15).
             if kind == .habit {
