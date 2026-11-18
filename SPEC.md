@@ -292,7 +292,8 @@ stopped daily use, not adding features.
       day; turning it off leaves a plain Later task; changing the date moves its day.
     - **Right-click › Later until ›** **Tomorrow**, **Next Monday** (the Monday that
       starts the next Clew week; left out when that is tomorrow), **Pick a day…** (a
-      small screen in the menu with a month calendar as wide as the menu and Save, like
+      small screen in the menu with a month calendar as wide as the menu (its outer days
+      line up with the title and Save; today keeps a thin ring) and Save, like
       "Put on timeline…"; *changed* after use, 2026-11-18: the system calendar was too
       small), and
       **No day** when it has one. Offered on the rows Edit offers it on (not on ticked
