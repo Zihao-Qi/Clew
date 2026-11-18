@@ -141,7 +141,6 @@ struct MonthCalendar: View {
                     .buttonStyle(.borderless)
                     .accessibilityLabel(Text("Next month"))
             }
-            .padding(.horizontal, 4)
             LazyVGrid(columns: columns, spacing: 2) {
                 ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, symbol in
                     Text(verbatim: symbol)
