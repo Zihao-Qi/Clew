@@ -271,6 +271,65 @@ stopped daily use, not adding features.
     line never greets the next opening or the next day. They still clear at the next
     action that succeeds, as before.
 
+- **A day for Later (user, 2026-11-17; Gemini Carbon review).** "Not today, Thursday" in
+  one step: a task can wait in Goals & Later for a day, then come to Today **for that
+  day** by itself, as if moved there by hand that morning (Distractibility delay:
+  park it with a day, so it is not forgotten).
+  - **What can have a day:** once tasks and links (not habits, goals, YouTube or X
+    items). The day is a Clew day (it starts at the rollover, 4 a.m.), from tomorrow
+    on; today or an earlier day cannot be chosen. One day at a time: choosing another
+    replaces it.
+  - **Where it is set:**
+    - **Add:** with **Later** chosen, one optional row under the line: a switch **"On a
+      day"** and a date (default tomorrow). While it is on, the line reads "Comes to
+      Today on that day." Off adds a plain Later task, as now.
+    - **Edit** of a once task or link with no tick (on Today or in Goals & Later): the
+      same row. Turning it on for a task of Today's own makes it a Later task with a
+      day; turning it off leaves a plain Later task; changing the date moves its day.
+    - **Right-click › Later until ›** **Tomorrow**, **Next Monday** (the Monday that
+      starts the next Clew week; left out when that is tomorrow), **Pick a day…** (a
+      small screen in the menu with a date and Save, like "Put on timeline…"), and
+      **No day** when it has one. Offered on the rows Edit offers it on (not on ticked
+      rows, habits or goals). Timeline blocks do not offer it. VoiceOver has the same
+      as actions: "Later until tomorrow", "Later until next Monday", "Later until a
+      day…", "No day".
+  - **Giving a day** to a task of Today's own moves it to Later (as Move to Later: off
+    Today, at Goals & Later's end, today's blocks removed). A Later task moved to Today
+    for today goes back down first (as Move to Goals & Later). A task already in Goals
+    & Later keeps its place.
+  - **While it waits:** its row in Goals & Later shows its day in quiet secondary text
+    after the title (after a link's site: "medium.com · Thu"): "Tomorrow" for the next
+    day, a weekday ("Thu") for two to six days on, otherwise the date ("Nov 27"). It can
+    be ticked there (done; it leaves the next day, as any Later task), dragged within
+    Goals & Later (its day stays), deleted or edited.
+  - **Moving it to Today early** (drag up, Move to Today, an hour on the timeline,
+    Focus) moves it for today as any Later task, and its day is dropped.
+  - **On its day** it is on Today at the end, when Clew first refreshes that day (at
+    the rollover, or on waking or opening; several arriving the same day keep the
+    order their days were set in), and counts
+    in Today's `done/total`. Nothing is announced. It can be dragged, placed on the
+    timeline, focused on and moved back down, as any row moved to Today. **If it is not
+    ticked that day** (*user*), the next day it is back in Goals & Later at its place,
+    a plain Later task with no day, as any row moved to Today for a day. The same if
+    the Mac was off or asleep all that day.
+  - **Reminders:** while it waits, its every-day reminder does not fire (*user*: a task
+    parked until Monday does not nudge before Monday). On its day it fires as on any
+    Today row; afterwards, back in Later with no day, as for any Later task. A
+    **Today** reminder set on a waiting task does fire that day (it was asked for that
+    day). Clew's scheduled notifications for the coming days count it on Today on its
+    day, and leave its reminder out on the days before.
+  - **Details** show "Comes to Today Thu, Nov 20" while it waits. The history lists a
+    day it was on Today only once that day has come, dated by that day; a day that was
+    changed or removed before it came is not listed.
+  - **Data:** no new field. A day is a `Plan` (the "moved to Today" fact) recorded now
+    for that future day, with no Today place (`todaySortKey` nil). Changing or
+    removing the day, or moving it early, voids that plan. On its day, Clew's first
+    refresh gives it a Today place at the end: the plan is voided and a new one for the
+    day inserted with a key (as a reorder does), in the order the plans were recorded.
+    Only plans recorded before their day starts are settled this way (a nil-key plan
+    made that day, as by the v11 migration, keeps using the item's own `sortKey`, as
+    now).
+
 - **Last week's card (user, 2026-11-15; Fable review).** A reminder of how the last
   week went, because looking back at what got done helps the next start (Design
   rules: celebrate what got done). Weekly only: like a game's weekly reset, a missed

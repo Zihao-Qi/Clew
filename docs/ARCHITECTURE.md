@@ -117,6 +117,15 @@ Award           id = hash(kind, itemId, milestone), kind (e.g. goal.finished),
   *Later pile* = items in state `later` (shown as Goals & Later since 2026-11-15).
   "Pick for today" set `plannedDay` **and** recorded a `Plan` fact; since 2026-11-15
   moving to Today records only the `Plan` (see "Today and Goals & Later").
+  A Later task **waiting for its day** (SPEC "A day for Later", 2026-11-17) has a
+  live `Plan` for a future day, recorded when the day was set, with `todaySortKey`
+  nil; on that day it is moved to Today like any plan. Core's `settlePlans()` (run
+  with `settleBlocks()` on refresh) gives each of today's nil-key plans recorded
+  before the day began a key at Today's end (void + insert, in `at` order). Until
+  its day, its every-day reminder is quiet (a live plan after the evaluated day);
+  NotificationPlanner passes each day's plans for the days ahead. History lists
+  plans with `localDay <= today`, dated by `localDay`, skipping plans voided before
+  their day began.
 - **"Finished" is derived, not stored:** a goal is reached when
   `sum(amount of non-voided CheckIns since the current round started) >= target`;
   a once-item when it has a non-voided CheckIn. Undoing the last tick therefore
