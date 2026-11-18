@@ -240,6 +240,56 @@ stopped daily use, not adding features.
   - VoiceOver: the label "Goals & Later" is a heading; every row has "Move to Today",
     "Move to Goals & Later" or "Move to Later" as actions, so nothing needs a drag.
 
+- **Changing a task's type (user, 2026-11-17).** A task made one way can become
+  another (for example, a Today task made by double-clicking the timeline turns out to
+  be a habit, or a habit becomes a goal with a total).
+  - **Where:** only in **Edit** (*user*: no right-click item). A **Type** choice at the
+    top: **Task · Habit · Goal** ("Task" is a once task, on Today or in Goals & Later).
+    Choosing Habit shows "Repeats" (and the time slot); choosing Goal shows the total;
+    choosing Task shows neither. Nothing changes until Save.
+  - **Not offered** for saved links, YouTube videos and X posts (they keep their link
+    and their collection), nor for a goal marked Done (it has left the lists).
+  - **Ticks are never changed.** Every earlier tick, round and focus session stays in
+    the history; only the task's definition changes (its type, its days or its total).
+  - **Where the row is afterwards.** It stays where it is **today**; from the next day
+    it lives where its new type lives:
+    - **Habit:** on Today on its days (today too, if today is one of them; if not, it
+      leaves the menu until its next day). Its place in Today is its old one.
+    - **Goal:** in Goals & Later. A row that was on Today (a Today task, or a habit due
+      today) is **moved to Today for today**, so it does not jump while you work on it;
+      the next day it is in Goals & Later at its end. A row already in Goals & Later
+      keeps its place.
+    - **Task:** a row on Today becomes a Today task (it carries over until done, as
+      any). A row in Goals & Later (moved to Today or not) becomes a Later task there,
+      at its place; a habit not on Today today goes to the end of Goals & Later.
+  - **Leaving Habit** removes its days and its time slot; the slot's blocks from now on
+    go, as when the slot is removed in Edit (today's started or ended blocks and their
+    ticks stay). **Leaving Goal** removes its total; its rounds stay in the history.
+  - **To Task, only without earlier ticks.** A task is done after one tick, so a habit
+    or goal ticked on an earlier day would be done at once. Then Task cannot be chosen,
+    and one quiet line under the choice says "Ticked before, so it can't be a task."
+    A tick today is fine: it is then done today, as any task ticked today.
+  - **Habit to Goal, with ticks so far** (*user*: let the user choose, since only they
+    know what the goal counts). When the item has ticks that would count (since its
+    current round began, if it was a goal before), one switch shows under the total:
+    **"Count the 30 ticks so far"**, on by default. On: they count toward the total
+    (30/100; if they already reach it, the goal is reached and congratulates today).
+    Off: the count starts at 0 now, as a Next round does; the ticks stay as an
+    earlier round in the history. The same switch shows for a Task with a tick today
+    becoming a Goal ("Count the 1 tick so far").
+  - **Reminders** stay as they are (they work the same in both lists).
+  - Last week's card and Settings › Progress count habit and goal ticks by the item's
+    type **now**, so changing a type can shift an earlier week's numbers (accepted).
+
+- **A habit cannot leave Today (user, 2026-11-17).** Dragging a habit (its row, or
+  its block from the timeline) down into Goals & Later is refused (it would come back
+  on its next day; a dropped block still leaves the timeline and its row stays on
+  Today, as now). Instead of "That can't be done right now." (or, for a block, no
+  word at all), the line that shows refused actions says **"Habits stay on Today on
+  their days. Change the days in Edit."** A task ticked today that is dragged down
+  says **"Done today. Undo the tick to move it."** Nothing else changes (no new menu
+  item; the hint shows only when it is tried).
+
 - **Last week's card (user, 2026-11-15; Fable review).** A reminder of how the last
   week went, because looking back at what got done helps the next start (Design
   rules: celebrate what got done). Weekly only: like a game's weekly reset, a missed
