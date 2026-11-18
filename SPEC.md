@@ -98,7 +98,8 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
     30 days / all time (goals: this round, rounds done, all-time total), and Edit /
     Delete. Once-tasks, links and videos: where it is, watch progress, a short
     history, and Open (see Decisions, 2026-11-09). No streak counts.
-11. **Your order.** Drag rows to reorder them (or Move Up / Move Down), in Today and
+11. **Your order.** Drag rows to reorder them (or, with VoiceOver, Move Up / Move Down;
+    *changed* 2026-11-18: no longer in the right-click menu), in Today and
     in Goals & Later alike. Ticking never moves a row. Sorting rules wait until
     manual order isn't enough.
 12. **Backups.** A compressed copy every day on this Mac (the last 14 days, plus 8
@@ -239,8 +240,8 @@ stopped daily use, not adding features.
   - Details say where an item is: "On Today", "In Goals & Later", "Done Nov 9".
   - VoiceOver: the label "Goals & Later" is a heading; every row has "Move to Today",
     "Move to Goals & Later" or "Move to Later" as actions, so nothing needs a drag.
-  - **Moves slide** (user, 2026-11-18): a row moved from a menu (Move to Today, Move to
-    Goals & Later, Move to Later, Later until, Move Up / Move Down) slides to its new
+  - **Moves slide** (user, 2026-11-18): a row moved from a menu or an action (Move to
+    Today, Move to Goals & Later, Move to Later, Move Up / Move Down) slides to its new
     place, across the label too, instead of jumping there (about 0.3 s). A drag lands
     where it is dropped, with no slide.
 
@@ -286,23 +287,18 @@ stopped daily use, not adding features.
   - **Where it is set:**
     - **Add:** with **Later** chosen, one optional row under the line: a checkbox **"On a
       day"** and the day as a button ("Thu, Nov 19"; default tomorrow) that opens the
-      same calendar as Pick a day right below it, on a light card; picking a day closes
+      app's own month calendar right below it, on a light card; picking a day closes
       it, and checking the box opens it (*changed* after use, 2026-11-18: a switch and the
       system date field, whose calendar was small and looked foreign). While it is on, the line reads "Comes to
       Today on that day." Off adds a plain Later task, as now.
     - **Edit** of a once task or link with no tick (on Today or in Goals & Later): the
       same row. Turning it on for a task of Today's own makes it a Later task with a
       day; turning it off leaves a plain Later task; changing the date moves its day.
-    - **Right-click › Later until ›** **Tomorrow**, **Next Monday** (the Monday that
-      starts the next Clew week; left out when that is tomorrow), **Pick a day…** (a
-      small screen in the menu with a month calendar as wide as the menu (its outer days
-      line up with the title and Save; today keeps a thin ring) and Save, like
-      "Put on timeline…"; *changed* after use, 2026-11-18: the system calendar was too
-      small), and
-      **No day** when it has one. Offered on the rows Edit offers it on (not on ticked
-      rows, habits or goals). Timeline blocks do not offer it. VoiceOver has the same
-      as actions: "Later until tomorrow", "Later until next Monday", "Later until a
-      day…", "No day".
+    - **Not in the right-click menu** (*changed* after use, 2026-11-18: *user*, the menu
+      was getting complicated; "Later until › Tomorrow / Next Monday / Pick a day… / No
+      day" and its Pick a day screen are gone). Edit is the one place, for VoiceOver too.
+      The calendar is as wide as the menu; its outer days line up with the title and
+      Save, and today keeps a thin ring.
   - **Giving a day** to a task of Today's own moves it to Later (as Move to Later: off
     Today, at Goals & Later's end, today's blocks removed). A Later task moved to Today
     for today goes back down first (as Move to Goals & Later). A task already in Goals
@@ -619,9 +615,30 @@ stopped daily use, not adding features.
     (a start-time and length picker), **Length** (15, 30, 45, 60, 90, 120 minutes;
     lengths that would pass 4 a.m. are not offered), **Add another block** (right after it, the
     same length; not offered when that would pass 4 a.m.), **Not finished**, **Remove
-    block**, **Delete**. Clicking a block opens the task's details. The row's right-click ›
-    **Put on timeline…** places it without dragging: "at [10:15] for [30 min]".
-  - **Times on the timeline** (Put on timeline…, a habit's slot; *user*, 2026-11-18):
+    block**, **Delete**. Clicking a block opens the task's details.
+  - **On today's timeline, in Edit** (*user*, 2026-11-18: the row's right-click ›
+    Put on timeline… moved here, to keep the right-click menu short). Edit of a task
+    that is not a habit (a once task, link or goal not reached, on Today or in Goals &
+    Later; not a collection's item), while the timeline is shown: a checkbox **"On
+    today's timeline"** with **"at [10:15] for [30 min]"** indented under it, as a
+    habit's slot reads (a habit keeps its own repeating "On the timeline").
+    - Opened with a block of today that has not ended: checked, at that block's start and
+      length. Otherwise unchecked, ready at the next quarter hour for 30 minutes.
+    - Save: checked, and new or changed → the task is placed there as dropping it on an
+      hour does (its earliest block that has not ended moves, or one is added; a Goals &
+      Later task is moved to Today, and a day for Later is dropped). Unchecked when it
+      was checked → that block is removed, as Remove block does. Ended blocks and their
+      ticks are not touched. Lengths that would pass 4 a.m. are not offered.
+    - "On a day" and "On today's timeline" exclude each other: checking one unchecks
+      the other (a day sends it to Later; the timeline brings it to Today).
+    - Several blocks are still made with a block's Add another block.
+  - **The row's right-click menu** (*changed* 2026-11-18): Undo, Details, Edit…, Focus,
+    then Move to Today / Move to Goals & Later / Move to Later (whichever applies), and
+    Delete. **Put on timeline…**, **Later until ›** and **Move Up / Move Down** are gone
+    from it (*user*: keep the right-click simple). Move Up / Move Down stay as VoiceOver
+    actions, so the list can be reordered without dragging.
+  - **Times on the timeline** (Edit's "On today's timeline", a block's Move to…, a
+    habit's slot; *user*, 2026-11-18):
     one time field, as Remind me has. Click the hour or the minutes, and the arrow keys
     (or the field's stepper) change that part; the minutes step a quarter hour and carry
     into the hour (8:00 ↓ is 7:45). A typed minute shows as typed, and becomes the
@@ -633,7 +650,7 @@ stopped daily use, not adding features.
     intro” · Undo" for a few seconds; Undo brings the task back with its reminder,
     without its blocks.
   - **Several blocks** are allowed (Add another block); the first comes from dragging the
-    row or Put on timeline….
+    row or Edit's "On today's timeline".
   - **A new task from the timeline** (*user*, 2026-11-13). **Double-click** an empty
     spot (or a calendar event, which takes no clicks) and a small name box opens right
     there, like Calendar's: a **30-minute block** at the quarter hour under the pointer
@@ -661,7 +678,7 @@ stopped daily use, not adding features.
       second click, so it cannot land on their buttons.
     - VoiceOver gets a "New task on the timeline" action on the timeline, which opens
       the box at the next quarter hour (the day's last one if none is left). Without
-      VoiceOver, `+ add` and then Put on timeline… does the same.
+      VoiceOver, `+ add` and then Edit's "On today's timeline" does the same.
   - **A block's end ticks the task** (*new rule*: until now only the user and a
     finished external list ticked; the focus timer still never ticks by itself). It is a
     real tick, dated the block's day: the row is done, it counts on the heatmap and in
