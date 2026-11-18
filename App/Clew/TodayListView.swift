@@ -293,38 +293,58 @@ struct TodayListView: View {
         return model.listRows.map(\.id) + (below.isEmpty ? [] : [Self.labelID] + below.map(\.id))
     }
 
+    /// One entry of the rows: a row of either list, or the "Goals & Later" label.
+    private enum ListEntry: Identifiable {
+        case row(TodayRow, index: Int, count: Int)
+        case label
+        var id: UUID {
+            switch self {
+            case .row(let row, _, _): row.id
+            case .label: TodayListView.labelID
+            }
+        }
+    }
+
+    /// A divider, then a quiet section label lined up with the circles (SPEC 2026-11-15;
+    /// *changed* after use: a line above it, label at the left).
+    private func goalsAndLaterLabel(todayIsEmpty: Bool, at index: Int, ids: [UUID]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if !todayIsEmpty {
+                Divider().padding(.horizontal, 12).padding(.top, 6).accessibilityHidden(true)
+            }
+            Text("Goals & Later")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.leading, Self.circleLeading)
+                .padding(.top, 8)
+                .padding(.bottom, 2)
+                .accessibilityAddTraits(.isHeader)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(GeometryReader { g in
+            Color.clear.preference(key: RowFrames.self,
+                                   value: [Self.labelID: g.frame(in: .named(Self.listSpace))])
+        })
+        .offset(y: offset(for: Self.labelID, at: index, in: ids))
+    }
+
     @ViewBuilder
     private func rowsStack() -> some View {
         let today = model.listRows
         let below = model.goalsAndLater
         let ids = sequence
+        // One ForEach for both lists and the label, so a row moving between them slides
+        // to its new place (user, 2026-11-18) instead of vanishing and reappearing.
+        let entries: [ListEntry] = today.enumerated().map { .row($1, index: $0, count: today.count) }
+            + (below.isEmpty ? [] : [.label]
+               + below.enumerated().map { .row($1, index: $0, count: below.count) })
         VStack(spacing: 0) {
-            ForEach(Array(today.enumerated()), id: \.element.id) { index, row in
-                listRow(row, index: index, count: today.count, ids: ids)
-            }
-            if !below.isEmpty {
-                // A divider, then a quiet section label lined up with the circles (SPEC
-                // 2026-11-15; *changed* after use: a line above it, label at the left).
-                VStack(alignment: .leading, spacing: 0) {
-                    if !today.isEmpty {
-                        Divider().padding(.horizontal, 12).padding(.top, 6).accessibilityHidden(true)
-                    }
-                    Text("Goals & Later")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(.leading, Self.circleLeading)
-                        .padding(.top, 8)
-                        .padding(.bottom, 2)
-                        .accessibilityAddTraits(.isHeader)
-                }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(GeometryReader { g in
-                        Color.clear.preference(key: RowFrames.self,
-                                               value: [Self.labelID: g.frame(in: .named(Self.listSpace))])
-                    })
-                    .offset(y: offset(for: Self.labelID, at: today.count, in: ids))
-                ForEach(Array(below.enumerated()), id: \.element.id) { index, row in
-                    listRow(row, index: index, count: below.count, ids: ids)
+            ForEach(entries) { entry in
+                switch entry {
+                case .row(let row, let index, let count):
+                    listRow(row, index: index, count: count, ids: ids)
+                case .label:
+                    goalsAndLaterLabel(todayIsEmpty: today.isEmpty, at: today.count, ids: ids)
                 }
             }
         }
@@ -872,6 +892,16 @@ struct RowView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
+            // At the row's end, lined up with the goals' counts (user, 2026-11-18).
+            if let waitingText {
+                Text(verbatim: waitingText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize()
+                    .padding(.trailing, Self.undoWidth + 4)
+                    .accessibilityLabel(Text("Comes to Today \(waitingText)"))
+            }
+
             if let target = item.progress.target {
                 // Fixed widths, so every goal's bar starts in the same column.
                 HStack(spacing: 4) {
@@ -934,9 +964,8 @@ struct RowView: View {
                 .help(url.absoluteString)
                 .accessibilityLabel(Text("Open link for \(item.title)"))
             }
-            // A saved link's site in Goals & Later, as Pick showed it (SPEC 2026-11-15),
-            // and the day it waits for (SPEC 2026-11-17): "medium.com · Thu".
-            if model.isBelow(row), let text = belowLabel {
+            // A saved link's site in Goals & Later, as Pick showed it (SPEC 2026-11-15).
+            if model.isBelow(row), let text = item.siteLabel {
                 Text(verbatim: text)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -946,11 +975,10 @@ struct RowView: View {
         }
     }
 
-    /// The site and the waiting day after a Goals & Later row's title.
-    private var belowLabel: String? {
-        let day = model.waitingDay(row).flatMap { d in model.currentDay.map { dayLabel(d, today: $0) } }
-        let parts = [item.siteLabel, day].compactMap { $0 }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    /// The day a waiting Goals & Later row comes to Today (SPEC 2026-11-17).
+    private var waitingText: String? {
+        guard model.isBelow(row) else { return nil }
+        return model.waitingDay(row).flatMap { d in model.currentDay.map { dayLabel(d, today: $0) } }
     }
 
     /// "999/999" measures 41.7 pt in the caption font; larger counts widen only their

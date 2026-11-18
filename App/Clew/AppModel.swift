@@ -615,6 +615,9 @@ final class AppModel {
 
     /// Move Up / Move Down: one place in the row's own list (they stop at its ends).
     func move(_ row: TodayRow, by step: Int) {
+        withAnimation(Self.moveAnimation) { moveOne(row, by: step) }
+    }
+    private func moveOne(_ row: TodayRow, by step: Int) {
         if isBelow(row) {
             let rows = goalsAndLater
             guard let index = rows.firstIndex(where: { $0.id == row.id }), rows.indices.contains(index + step) else { return }
@@ -631,7 +634,10 @@ final class AppModel {
         guard rows.indices.contains(target) else { return }
         drop(row.id, onto: rows[target])
     }
-    func moveToLater(_ row: TodayRow) { run { try $0.moveToLater(itemId: row.id) } }
+    /// Moves chosen from a menu slide the row to its new place (user, 2026-11-18); a
+    /// drag lands where it was dropped, so it is not animated.
+    static let moveAnimation = Animation.snappy(duration: 0.3)
+    func moveToLater(_ row: TodayRow) { withAnimation(Self.moveAnimation) { _ = run { try $0.moveToLater(itemId: row.id) } } }
 
     // MARK: A day for Later (SPEC 2026-11-17)
 
@@ -641,10 +647,12 @@ final class AppModel {
     /// The day a Goals & Later row waits for.
     func waitingDay(_ row: TodayRow) -> LocalDay? { today?.waiting[row.id] }
     @discardableResult
-    func setLaterDay(_ itemId: UUID, _ day: LocalDay?) -> Bool { run { try $0.setLaterDay(itemId: itemId, day: day) } }
+    func setLaterDay(_ itemId: UUID, _ day: LocalDay?) -> Bool {
+        withAnimation(Self.moveAnimation) { run { try $0.setLaterDay(itemId: itemId, day: day) } }
+    }
     func laterDay(_ itemId: UUID) -> LocalDay? { (try? clew?.laterDay(itemId: itemId)) ?? nil }
-    func moveToToday(_ row: TodayRow) { run { try $0.moveToToday(itemId: row.id) } }
-    func moveBack(_ row: TodayRow) { run { try $0.moveBack(itemId: row.id) } }
+    func moveToToday(_ row: TodayRow) { withAnimation(Self.moveAnimation) { _ = run { try $0.moveToToday(itemId: row.id) } } }
+    func moveBack(_ row: TodayRow) { withAnimation(Self.moveAnimation) { _ = run { try $0.moveBack(itemId: row.id) } } }
 
     /// A row dropped in the two lists shown as one (SPEC 2026-11-15): `order` is the
     /// visible rows top to bottom with nil for the "Goals & Later" label; the dragged row

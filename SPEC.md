@@ -239,6 +239,10 @@ stopped daily use, not adding features.
   - Details say where an item is: "On Today", "In Goals & Later", "Done Nov 9".
   - VoiceOver: the label "Goals & Later" is a heading; every row has "Move to Today",
     "Move to Goals & Later" or "Move to Later" as actions, so nothing needs a drag.
+  - **Moves slide** (user, 2026-11-18): a row moved from a menu (Move to Today, Move to
+    Goals & Later, Move to Later, Later until, Move Up / Move Down) slides to its new
+    place, across the label too, instead of jumping there (about 0.3 s). A drag lands
+    where it is dropped, with no slide.
 
 - **Add explains each type (user, 2026-11-17).** A task's type cannot be changed
   after it is added (*user*: changing it was weighed and not allowed, since a goal's
@@ -288,7 +292,9 @@ stopped daily use, not adding features.
       day; turning it off leaves a plain Later task; changing the date moves its day.
     - **Right-click › Later until ›** **Tomorrow**, **Next Monday** (the Monday that
       starts the next Clew week; left out when that is tomorrow), **Pick a day…** (a
-      small screen in the menu with a date and Save, like "Put on timeline…"), and
+      small screen in the menu with a month calendar as wide as the menu and Save, like
+      "Put on timeline…"; *changed* after use, 2026-11-18: the system calendar was too
+      small), and
       **No day** when it has one. Offered on the rows Edit offers it on (not on ticked
       rows, habits or goals). Timeline blocks do not offer it. VoiceOver has the same
       as actions: "Later until tomorrow", "Later until next Monday", "Later until a
@@ -298,7 +304,8 @@ stopped daily use, not adding features.
     for today goes back down first (as Move to Goals & Later). A task already in Goals
     & Later keeps its place.
   - **While it waits:** its row in Goals & Later shows its day in quiet secondary text
-    after the title (after a link's site: "medium.com · Thu"): "Tomorrow" for the next
+    at the row's end, lined up with the goals' counts (*changed* after use, 2026-11-18:
+    after the title it looked crowded; a link's site stays after the title): "Tomorrow" for the next
     day, a weekday ("Thu") for two to six days on, otherwise the date ("Nov 27"). It can
     be ticked there (done; it leaves the next day, as any Later task), dragged within
     Goals & Later (its day stays), deleted or edited.
