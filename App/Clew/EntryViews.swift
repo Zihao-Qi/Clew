@@ -457,14 +457,18 @@ struct SlotRow: View {
             Toggle("On the timeline", isOn: $draft.enabled)
                 .accessibilityLabel(Text("Put it on the timeline each day it is due"))
             if draft.enabled {
-                HStack(spacing: 6) {
+                // On the text baseline, so the time's digits sit level with "at" and "for".
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("at")
                     // Click the hour or the minutes; the arrow keys change it (user,
                     // 2026-11-18), the minutes by a quarter hour.
                     TimePicker(time: start, quarterHours: true)
                         .fixedSize()
+                        // The field reports no text baseline; its digits' baseline is 6 pt
+                        // above its bottom (measured), so they sit level with "at" and "for".
+                        .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 6 }
                         .accessibilityLabel(Text("Start time"))
-                    Text("for")
+                    Text("for").padding(.leading, 4)   // past the field's stepper (design review)
                     Picker(selection: $draft.minutes) {
                         ForEach(TimeSlot.lengths, id: \.self) { m in Text("\(m) min").tag(m) }
                     } label: { EmptyView() }
@@ -473,7 +477,7 @@ struct SlotRow: View {
                     .accessibilityLabel(Text("Slot length"))
                     Spacer()
                 }
-                .padding(.leading, 20)
+                .padding(.leading, 22)   // under the checkbox's text (design review: 20 was 1.5 pt short)
             }
         }
     }

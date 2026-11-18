@@ -748,13 +748,16 @@ struct PlaceView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title).font(.headline).lineLimit(1)
             if day != nil {
-                // "at [10:15] for [30 min]", as a habit's slot reads.
-                HStack(spacing: 6) {
+                // "at [10:15] for [30 min]", as a habit's slot reads; on the text baseline.
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("at")
                     TimePicker(time: $time, quarterHours: true)
                         .fixedSize()
+                        // The field reports no text baseline; its digits' baseline is 6 pt
+                        // above its bottom (measured), so they sit level with "at" and "for".
+                        .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 6 }
                         .accessibilityLabel(Text("Start time"))
-                    Text("for")
+                    Text("for").padding(.leading, 4)   // past the field's stepper (design review)
                     Picker(selection: $minutes) {
                         ForEach(Clew.blockLengths.filter { $0 <= max(room, Clew.blockStepMinutes) }, id: \.self) { m in
                             Text("\(m) min").tag(m)
