@@ -347,6 +347,8 @@ struct SettingsView: View {
         // Progress is read fresh when picked (a list turned off in General shows at once).
         .onChange(of: pane) { _, new in
             if new == .progress {
+                // Blocks settle first, as for the menu's card (review).
+                model.refresh()
                 activeDays = model.activeDays()
                 lastWeek = model.lastWeek()
                 doneSoFar = model.doneSoFar()

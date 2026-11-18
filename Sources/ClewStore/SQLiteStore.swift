@@ -177,6 +177,26 @@ private struct Access: StoreWriter {
         )
     }
 
+    func doneByDay(through day: LocalDay) throws -> [LocalDay: Int] {
+        let sources = DoneCount.collectionSources.map(\.rawValue).sorted()
+        let rows = try Row.fetchAll(db, sql: """
+            SELECT c.localDay AS day, COUNT(DISTINCT c.itemId) AS n
+            FROM checkIn c JOIN item i ON i.id = c.itemId
+            WHERE c.voidedAt IS NULL AND c.localDay <= ? AND i.source NOT IN (\(Self.marks(sources.count)))
+            GROUP BY c.localDay
+            """, arguments: StatementArguments([day.description] + sources))
+        var counts: [LocalDay: Int] = [:]
+        for row in rows {
+            guard let d = LocalDay(string: row["day"]) else { throw StoreError.corruptRow(table: "checkIn", column: "localDay") }
+            counts[d] = row["n"]
+        }
+        return counts
+    }
+
+    func goals() throws -> [Item] {
+        try Row.fetchAll(db, sql: "SELECT * FROM item WHERE kind = 'goal'").map(Self.item)
+    }
+
     func activeDays(from: LocalDay) throws -> Set<LocalDay> {
         let days = try String.fetchAll(
             db, sql: "SELECT DISTINCT localDay FROM checkIn WHERE voidedAt IS NULL AND localDay >= ?",

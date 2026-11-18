@@ -310,6 +310,42 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         #expect(try store.read { try $0.plans(from: day("2026-11-11")) } == [on, later])
     }
 
+    /// SPEC 2026-11-18: the store counts done days by `DoneCount`'s rule (one row a day).
+    @Test func doneByDayMatchesTheOnceADayRule() throws {
+        let store = try SQLiteStore.inMemory()
+        func make(_ kind: ItemKind, _ source: Source, deleted: Bool = false) -> Item {
+            Item(id: UUID(), kind: kind, title: "x", schedule: .daily, progress: kind == .goal ? .counter(target: 9) : .none,
+                 state: .active, sortKey: 1, source: source, createdAt: t0, updatedAt: t0, deletedAt: deleted ? t0 : nil)
+        }
+        let book = make(.goal, .user), habit = make(.habit, .user), video = make(.link, .extensionYouTube)
+        let gone = make(.once, .user, deleted: true), post = make(.link, .extensionX)
+        let oldGoal = make(.goal, .user, deleted: true)
+        var n = 0
+        func tick(_ i: Item, _ d: String, _ amount: Int = 1, voided: Bool = false) -> CheckIn {
+            n += 1
+            return CheckIn(id: UUID(), itemId: i.id, localDay: day(d), at: t0.addingTimeInterval(Double(n)), timeZoneId: "UTC",
+                           amount: amount, source: .user, voidedAt: voided ? t0.addingTimeInterval(Double(n)) : nil)
+        }
+        let ticks = [
+            tick(book, "2026-11-10", 30), tick(book, "2026-11-10"), tick(book, "2026-11-10"),   // one item, one day
+            tick(habit, "2026-11-10"), tick(video, "2026-11-10"), tick(post, "2026-11-10"),     // collections out
+            tick(gone, "2026-11-11"),                                                           // deleted: kept
+            tick(habit, "2026-11-11", voided: true),                                            // undone: out
+            tick(habit, "2026-11-12"),                                                          // on "through": in
+            tick(habit, "2026-11-13"),                                                          // after "through"
+        ]
+        try store.write { w in
+            for i in [book, habit, video, gone, post, oldGoal] { try w.insert(i) }
+            for c in ticks { try w.insert(c) }
+        }
+        let counted = try store.read { try $0.doneByDay(through: day("2026-11-12")) }
+        #expect(counted == [day("2026-11-10"): 2, day("2026-11-11"): 1, day("2026-11-12"): 1])
+        let items = Dictionary(uniqueKeysWithValues: [book, habit, video, gone, post].map { ($0.id, $0) })
+        let byRule = DoneCount.byDay(ticks.filter { $0.localDay <= day("2026-11-12") }.map { ($0, items[$0.itemId]!) })
+        #expect(counted == byRule)
+        #expect(Set(try store.read { try $0.goals() }.map(\.id)) == [book.id, oldGoal.id])   // deleted goals too
+    }
+
     @Test func ratingCanChangeAndSettingAFieldToItsOwnValueIsAllowed() throws {
         let (store, c, _) = try seeded()
         try store.writer.write { db in

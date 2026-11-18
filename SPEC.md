@@ -93,7 +93,8 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
    Settings › About (off by default, 2026-11-13), Clew also asks GitHub once a day
    whether a newer release exists (see "About and updates").
 9. **Launch at login** (`SMAppService`), toggled in a small Settings window.
-10. **Task details.** Clicking a row opens its details. Habits and goals: a 16-week heatmap (done days
+10. **Task details.** Clicking a row opens its details. Habits and goals: a 16-week heatmap
+    (*changed* 2026-11-18: goals choose Bars or Heatmap, see "A goal's days") (done days
     filled, other days a quiet gray, never red), days done this week / in the last
     30 days / all time (goals: this round, rounds done, all-time total), and Edit /
     Delete. Once-tasks, links and videos: where it is, watch progress, a short
@@ -130,8 +131,8 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
 
 v1 is done when it has been **used on 5 of 7 days for two weeks**, not when its
 tests pass. Clew records active days locally (a day with at least one tick) and
-shows them only in Settings (last week's card, 2026-11-15, shows the week's ticks, not
-active days). Until that bar is met, the next work is fixing whatever
+shows them only in Settings (last week's card, 2026-11-15, shows what got done that
+week, each item once a day since 2026-11-18, not active days). Until that bar is met, the next work is fixing whatever
 stopped daily use, not adding features.
 
 ## Decisions (2026-11-08)
@@ -415,13 +416,18 @@ stopped daily use, not adding features.
     and Last week. Not in the menu.
   - **What:** the total ("1,284 done", large) and under it "since Sep 2" (the first
     tick's day) for All, "+N in the last year" for Year, "+N in the last 30 days" for
-    30 days; a **range** choice **30 days · Year · All** (default All, remembered); the
+    30 days; a **range** choice **30 days · Year · All** (default All; Year is the last
+    365 days, 30 days the last 30, both ending today; remembered in Clew's settings, so
+    it goes with exports and backups); the
     chart: a line of the running total per day (a soft fill under it, 3 or 4 light
     gridlines labelled at the right, a few date labels under it), from the range's
     first day (All: the first tick's day) to today, its bottom the total before the
     range, so a 30-day slope fills the chart. A small ring dot marks each day a goal
-    reached its total (a goal deleted since keeps its dots, as its ticks keep counting) (the round's total: a later round's recorded total, round 1's
-    the next round's or, with none, the goal's own). The caption under the section:
+    reached its total (a goal deleted since keeps its dots, as its ticks keep counting):
+    each round's total is the total recorded when the next round began (Next round
+    keeps it), and the current round's is the goal's own (so Raise target moves its
+    dot to the day the raised total is reached). Only live ticks and rounds count; an
+    undone tick that took a round below its total takes its dot away. One dot a day. The caption under the section:
     "Each task once a day it was done. Dots: a goal reached."
   - **Hover:** a dashed guide at the day under the pointer and a small tip: "Nov 12 ·
     642 done · +9 that day" ("+0 that day" is left out on a quiet day). The line has no
@@ -431,19 +437,22 @@ stopped daily use, not adding features.
   - **Fresh** as the pane's other numbers (read when the pane opens or Settings comes
     forward). Light and dark follow the system; the line is the accent colour.
   - **VoiceOver:** the chart is one element: "Done so far: 1,284. 232 in the last 30
-    days." (the range's rise), plus the system's chart description, so its audio
-    graph can play the line.
+    days." (the range's rise; All says only the total), plus the system's chart
+    description, so its audio graph can play the line. Last week's card reads its
+    highlights as days: "Exercise on 4 days".
   - **A goal's exact numbers** go in its Details (below), not on the line.
 
 - **A goal's days: Bars or Heatmap (user, 2026-11-18).** A goal's Details show its
   counts per day one of two ways, chosen with a small **Bars · Heatmap** switch on the
-  chart; the choice is remembered for all goals (default Bars).
+  chart; the choice is remembered for all goals (default Bars; in Clew's settings, as
+  the range is).
   - **Bars:** the last 30 days, one bar a day, its height that day's +1s (all rounds;
     a day with none has no bar), a dashed line at the highest day with its number; the
     first day's date at the left, "Today" at the right. Hover a bar: "Nov 15 · +38".
     Title "Last 30 days".
   - **Heatmap:** the existing heatmap (16 weeks), unchanged. Title "Last 16 weeks".
-  - Under either: "+364 on 22 days" for what is shown (left out when 0).
+  - Under either: "+364 on 22 days" ("on 1 day") for what is shown: the 30 days, or
+    the heatmap's 16 weeks (left out when 0).
   - Habits keep the heatmap alone, with no switch (a habit counts once a day).
   - VoiceOver: the switch is a two-choice picker "Show as"; the bars read as one
     element ("Last 30 days: +364 on 22 days, most 38 on Nov 15") with the system's

@@ -162,6 +162,12 @@ enum DoneSoFarText {
     /// "Nov 12".
     static func date(_ day: LocalDay) -> String { day.noon.formatted(.dateTime.month(.abbreviated).day()) }
 
+    /// "+364 on 22 days", "+5 on 1 day".
+    static func onDays(total: Int, days: Int) -> String {
+        days == 1 ? String(localized: "+\(total.formatted()) on 1 day")
+                  : String(localized: "+\(total.formatted()) on \(days) days")
+    }
+
     /// "Done so far: 1,284. 232 in the last 30 days."
     static func spoken(total: Int, rise: Int, range: ProgressRange) -> String {
         switch range {
@@ -221,7 +227,7 @@ struct GoalDaysSection: View {
                 Heatmap(details: details)
             }
             if shown.total > 0 {
-                Text(verbatim: String(localized: "+\(shown.total.formatted()) on \(shown.daysWorked) days"))
+                Text(verbatim: DoneSoFarText.onDays(total: shown.total, days: shown.daysWorked))
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
@@ -297,7 +303,7 @@ struct GoalBars: View {
         }
         .padding(.bottom, 14)
         .accessibilityLabel(Text(verbatim: most.map {
-            String(localized: "Last 30 days: +\(days.total.formatted()) on \(days.daysWorked) days, most \($0.amount) on \(DoneSoFarText.date($0.day))")
+            String(localized: "Last 30 days: \(DoneSoFarText.onDays(total: days.total, days: days.daysWorked)), most \($0.amount) on \(DoneSoFarText.date($0.day))")
         } ?? String(localized: "Last 30 days: nothing yet")))
     }
 }

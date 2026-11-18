@@ -10,22 +10,24 @@ extension Clew {
     static let progressRangeKey = "progress.range"
     static let goalChartKey = "goalChart"
 
-    /// Everything done so far: every check-in up to today with its item (deleted items
-    /// included, `DoneCount` decides), and each goal with its rounds (a goal deleted
-    /// since keeps its dots: history is kept, as its ticks are).
+    /// Everything done so far: items done each day, counted in the store (one row a
+    /// day; review: reading every +1 of a few years was slow), and the days a goal reached
+    /// its total, from each goal's live ticks and rounds (a goal deleted since keeps its
+    /// dots: history is kept, as its ticks are).
     public func doneSoFar() throws -> DoneSoFar {
         let today = currentDay()
         let beginning = LocalDay(year: 1, month: 1, day: 1)!
         return try storeForQueries.read { r in
-            let checkIns = try r.checkIns(from: beginning, through: today)
-            var items: [UUID: Item] = [:]
-            for id in Set(checkIns.map(\.itemId)) { items[id] = try r.item(id: id) }
-            let ticks = checkIns.compactMap { c in items[c.itemId].map { (checkIn: c, item: $0) } }
-            let byItem = Dictionary(grouping: checkIns, by: \.itemId)
-            let goals = try items.values.filter { $0.kind == .goal }.map { goal in
-                (item: goal, rounds: try r.goalRounds(itemId: goal.id), checkIns: byItem[goal.id] ?? [])
+            let goals = try r.goals()
+            let ticks = Dictionary(grouping: try r.checkIns(itemIds: goals.map(\.id), from: beginning)
+                .filter { $0.localDay <= today }, by: \.itemId)
+            var reached = Set<LocalDay>()
+            for goal in goals {
+                guard let target = goal.progress.target else { continue }
+                reached.formUnion(DoneSoFar.reachedDays(target: target, rounds: try r.goalRounds(itemId: goal.id),
+                                                        checkIns: ticks[goal.id] ?? []))
             }
-            return DoneSoFar.make(ticks: ticks, goals: goals)
+            return DoneSoFar(perDay: try r.doneByDay(through: today), goalReached: reached)
         }
     }
 

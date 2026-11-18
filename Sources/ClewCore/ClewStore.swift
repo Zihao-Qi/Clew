@@ -37,6 +37,12 @@ public protocol StoreReader {
     /// Live plans for `day` and the days after it, any item, oldest first (SPEC
     /// 2026-11-17: a day for Later is a plan booked ahead).
     func plans(from day: LocalDay) throws -> [Plan]
+    /// Items done on each day through `day` (SPEC 2026-11-18, `DoneCount`'s rule, counted
+    /// in the store: one row a day, not one per +1): distinct items with a live check-in
+    /// that day, items from a collection (by the item's source) left out, deleted kept.
+    func doneByDay(through day: LocalDay) throws -> [LocalDay: Int]
+    /// Every goal, deleted ones too.
+    func goals() throws -> [Item]
     func goalRounds(itemId: UUID) throws -> [GoalRound]
     /// The highest sort key of any item, or live plan's Today key.
     func maxSortKey() throws -> Double?
