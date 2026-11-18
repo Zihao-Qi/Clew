@@ -304,23 +304,31 @@ stopped daily use, not adding features.
     Goals & Later (its day stays), deleted or edited.
   - **Moving it to Today early** (drag up, Move to Today, an hour on the timeline,
     Focus) moves it for today as any Later task, and its day is dropped.
-  - **On its day** it is on Today, after the rows that were there at the rollover
-    (several arriving the same day keep the order their days were set in), and counts
+  - **On its day** it is on Today at the end, when Clew first refreshes that day (at
+    the rollover, or on waking or opening; several arriving the same day keep the
+    order their days were set in), and counts
     in Today's `done/total`. Nothing is announced. It can be dragged, placed on the
     timeline, focused on and moved back down, as any row moved to Today. **If it is not
     ticked that day** (*user*), the next day it is back in Goals & Later at its place,
     a plain Later task with no day, as any row moved to Today for a day. The same if
     the Mac was off or asleep all that day.
-  - **Reminders:** while it waits, its reminder does not fire (*user*: a task parked
-    until Monday does not nudge before Monday). On its day it fires as on any Today
-    row; afterwards, back in Later with no day, as for any Later task.
-  - **Details** show "Comes to Today Thu, Nov 20" while it waits; a day not yet
-    reached is not in the history.
+  - **Reminders:** while it waits, its every-day reminder does not fire (*user*: a task
+    parked until Monday does not nudge before Monday). On its day it fires as on any
+    Today row; afterwards, back in Later with no day, as for any Later task. A
+    **Today** reminder set on a waiting task does fire that day (it was asked for that
+    day). Clew's scheduled notifications for the coming days count it on Today on its
+    day, and leave its reminder out on the days before.
+  - **Details** show "Comes to Today Thu, Nov 20" while it waits. The history lists a
+    day it was on Today only once that day has come, dated by that day; a day that was
+    changed or removed before it came is not listed.
   - **Data:** no new field. A day is a `Plan` (the "moved to Today" fact) recorded now
     for that future day, with no Today place (`todaySortKey` nil). Changing or
-    removing the day, or moving it early, voids that plan; a plan's day passing is
-    simply its history. On the day, a plan with no Today place puts the row after the
-    rows with one, in the order the plans were recorded.
+    removing the day, or moving it early, voids that plan. On its day, Clew's first
+    refresh gives it a Today place at the end: the plan is voided and a new one for the
+    day inserted with a key (as a reorder does), in the order the plans were recorded.
+    Only plans recorded before their day starts are settled this way (a nil-key plan
+    made that day, as by the v11 migration, keeps using the item's own `sortKey`, as
+    now).
 
 - **Last week's card (user, 2026-11-15; Fable review).** A reminder of how the last
   week went, because looking back at what got done helps the next start (Design
