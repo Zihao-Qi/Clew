@@ -368,7 +368,8 @@ struct EditView: View {
                 DayRow(model: model, on: $onADay, date: $day, open: $dayOpen)
             }
             if canPlace {
-                TodayTimelineRow(model: model, on: $onTimeline, time: $time, minutes: $blockMinutes)
+                TodayTimelineRow(model: model, on: $onTimeline, time: $time, minutes: $blockMinutes,
+                                 ownLength: openBlock?.minutes)
             }
             ReminderRow(enabled: $remind, time: $remindAt, today: $remindToday,
                         passed: reminderChanged && remind && remindToday && model.reminderTimePassed(remindAt))
@@ -422,17 +423,25 @@ struct EditView: View {
         if reminderChanged {
             guard model.setReminder(item.id, wanted, todayOnly: remindToday) else { return }
         }
-        if dayChanged {
+        // Placing on today's timeline drops a day for Later by itself; clearing the day
+        // first would lose it if placing failed (review).
+        let placing = canPlace && onTimeline
+        if dayChanged, !(placing && !onADay) {
             guard model.setLaterDay(item.id, onADay ? LocalDay(picked: day) : nil) else { return }
         }
         // On today's timeline: only what changed; a day for Later already took it off.
         if canPlace, !(canHaveDay && onADay), let timeline = model.timeline {
-            let wanted = onTimeline ? (start: timeline.start(at: time, rolloverHour: model.rolloverHour),
-                                       minutes: blockMinutes) : nil
+            // An untouched time keeps the block's own start (review: on the night clocks
+            // go back, 1:30 names two instants).
+            let start = openBlock.flatMap { time == TimeOfDay(pickerDate: $0.start) ? $0.start : nil }
+                ?? timeline.start(at: time, rolloverHour: model.rolloverHour)
+            let wanted = onTimeline ? (start: start, minutes: blockMinutes) : nil
             switch TimelineEdit(open: openBlock, wanted: wanted) {
             case .keep: break
             case .place(let start, let minutes): guard model.place(item.id, at: start, minutes: minutes) else { return }
-            case .remove(let id): model.removeBlock(id)
+            case .remove(let id):
+                // Only if it has not ended meanwhile (review: that would undo its tick).
+                if model.openBlock(item.id)?.id == id { guard model.removeBlock(id) else { return } }
             }
         }
         done()
@@ -543,12 +552,16 @@ struct TodayTimelineRow: View {
     @Binding var time: TimeOfDay
     @Binding var minutes: Int
 
-    /// Lengths that fit before the timeline's end (4 a.m.).
-    private var lengths: [Int] {
+    /// Lengths that fit before the timeline's end (4 a.m.), and the block's own length
+    /// if it was resized by dragging to one not in the menu (review: a blank menu).
+    var lengths: [Int] {
         guard let day = model.timeline else { return Clew.blockLengths }
-        let room = TimelineMetrics.room(after: day.start(at: time, rolloverHour: model.rolloverHour), in: day)
-        return Clew.blockLengths.filter { $0 <= max(room, Clew.blockStepMinutes) }
+        let room = max(TimelineMetrics.room(after: day.start(at: time, rolloverHour: model.rolloverHour), in: day),
+                       Clew.blockStepMinutes)
+        return Set(Clew.blockLengths + [ownLength].compactMap { $0 }).filter { $0 <= room }.sorted()
     }
+    /// The block's length when Edit opened.
+    var ownLength: Int?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -560,7 +573,8 @@ struct TodayTimelineRow: View {
                     .padding(.leading, 22)
             }
         }
-        .onChange(of: lengths) { if let last = lengths.last, minutes > last { minutes = last } }
+        // Near 4 a.m. the default 30 minutes may not fit (review: Save failed at 3:45).
+        .onChange(of: lengths, initial: true) { if let last = lengths.last, minutes > last { minutes = last } }
     }
 }
 

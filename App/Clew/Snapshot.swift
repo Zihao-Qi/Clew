@@ -637,8 +637,10 @@ enum Snapshot {
                     model.notice = nil
                 }
             }
-            if let intro = model.today?.rows.first(where: { $0.item.title == "Write intro" }) {
-                // Edit's "On today's timeline" (SPEC 2026-11-18).
+            if let intro = model.today?.rows.first(where: { $0.item.title == "Write intro" }),
+               let day = model.timeline {
+                // Edit's "On today's timeline" (SPEC 2026-11-18), checked: a block later today.
+                _ = model.place(intro.id, at: day.end.addingTimeInterval(-2 * 3600), minutes: 30)
                 for appearance in [NSAppearance.Name.aqua, .darkAqua] {
                     render(RootView(model: model, screen: .edit(intro.item, back: .list)), appearance: appearance,
                            to: dir.appendingPathComponent("edit-timeline-\(appearance == .aqua ? "light" : "dark").png"))

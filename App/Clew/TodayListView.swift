@@ -619,7 +619,7 @@ struct RowView: View {
     let model: AppModel
     let onEdit: () -> Void
     let onOpen: () -> Void
-    /// "Put on timeline…", when the timeline is shown.
+    /// Move Up / Move Down (VoiceOver actions) stop at the row's own list's ends.
     var canMoveUp = false
     var canMoveDown = false
     /// This row is being dragged: it gets a solid background so rows sliding under it

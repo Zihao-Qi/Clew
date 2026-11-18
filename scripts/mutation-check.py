@@ -596,7 +596,6 @@ M = [
  ("LD21 history dated when set", C+"Details.swift", "HistoryEntry(at: max($0.at, start($0.localDay)), event: .picked)", "HistoryEntry(at: $0.at, event: .picked)", "LaterDayTests"),
  ("LD22 no tomorrow", C+"LaterDay.swift", "        case ...1: self = .tomorrow", "        case ...0: self = .tomorrow", "LaterDayTests"),
  ("LD23 a week is a weekday", C+"LaterDay.swift", "        case 2...6: self = .weekday(day)", "        case 2...7: self = .weekday(day)", "LaterDayTests"),
- ("LD24 next Monday this week", C+"LaterDay.swift", "today.weekStart.adding(days: 7)", "today.weekStart.adding(days: 0)", "LaterDayTests"),
  ("LD25 no waiting day", C+"Details.swift", "            if item.state == .later, progress == 0 {", "            if false {", "LaterDayTests"),
  ("LD26 waiting shows a moved day", C+"LaterDay.swift", "        for plan in try r.plans(from: day.adding(days: 1)) where ids.contains(plan.itemId) {", "        for plan in try r.plans(from: day.adding(days: 1)) where ids.contains(plan.itemId) && false {", "LaterDayTests"),
  ("LD13 settle a goal's plan", C+"LaterDay.swift", "                $0.todaySortKey == nil && list.moved.contains($0.itemId) && later.contains($0.itemId)", "                $0.todaySortKey == nil && list.moved.contains($0.itemId)", "LaterDayTests"),

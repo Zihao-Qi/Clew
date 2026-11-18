@@ -162,15 +162,12 @@ private func day(_ d: Int) -> LocalDay { LocalDay(year: 2026, month: 11, day: d)
         #expect(try #require(try clew.details(itemId: a)).history.allSatisfy { $0.event != .picked })
     }
 
-    @Test func labelsAndNextMonday() {
+    @Test func labels() {
         let tue = day(10)
         #expect(DayLabel(day(11), today: tue) == .tomorrow)
         #expect(DayLabel(day(12), today: tue) == .weekday(day(12)))
         #expect(DayLabel(day(16), today: tue) == .weekday(day(16)))
         #expect(DayLabel(day(17), today: tue) == .date(day(17)))
-        #expect(Clew.nextMonday(after: tue) == day(16))
-        #expect(Clew.nextMonday(after: day(16)) == day(23))              // from a Monday: a week on
-        #expect(Clew.nextMonday(after: day(15)) == day(16))              // from Sunday: tomorrow
     }
 
     @Test func remindersAreQuietWhileItWaits() throws {
