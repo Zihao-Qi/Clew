@@ -376,16 +376,20 @@ stopped daily use, not adding features.
   - **What** (minimal text, numbers, never a comparison, a drop or anything missed):
     - "Last week" and ×;
     - one line: "23 done" and, when focus time was recorded, "· 3 h 20 min focus"
-      (the details page's format: "25 min", "1 h", "2 h 5 min"). **Done** is the sum
-      of the week's tick amounts on items that are not from a collection (once
-      tasks, links, habits, goals; a goal's +1 is one). "N done" is left out when 0;
+      (the details page's format: "25 min", "1 h", "2 h 5 min"). **Done** counts each
+      item that is not from a collection once on each day of the week it has a tick
+      (once tasks, links, habits, goals; *changed* 2026-11-18, *user*: a goal counts
+      once on a day however many +1s it got, so 40 pages read is 1, not 40; it was the
+      sum of tick amounts). It equals the rise of "Done so far" over that week. "N
+      done" is left out when 0;
     - when the week had any, one line for the collections: "4 watched · 2 read"
       (YouTube and X items, by the item's own source, ticked or counted finished that
       week; as on the collection page, items the user deleted are left out, items that
       left the site's list are kept). A list turned off in Settings has no number;
-    - up to two highlights: the habits and goals ticked most that week, at least twice
-      each ("Exercise 4× · Read papers 3×"; a habit counts its ticks, a goal its +1s;
-      ties keep the list's order). Titles truncate; the count never does.
+    - up to two highlights: the habits and goals done on the most days that week, at
+      least two days each ("Exercise 4× · Read papers 3×"; *changed* 2026-11-18: a goal
+      counts its days, not its +1s, as Done does; ties keep the list's order). Titles
+      truncate; the count never does.
     - **Deleted items:** done and focus count every tick and session not undone, even
       of items deleted since (history is kept); only highlights and the collection
       numbers leave deleted items out.
@@ -397,6 +401,53 @@ stopped daily use, not adding features.
     off the menu's card only.
   - VoiceOver reads the card as one element ("Last week: 23 done, 3 hours 20 minutes
     of focus, …"); × is "Close last week's card". Every number has its singular form.
+
+- **Done so far (user, 2026-11-18; design: the "Clew progress line" canvas).** A line
+  that only rises: everything got done, from the first tick (Design rules: celebrate
+  what got done; it never dips, so a quiet week costs nothing).
+  - **Counting** (*user*): each item counts **once on each day it has a tick**: a once
+    task or link the day it is ticked, a habit each day it is done, a goal on each day
+    it got any +1 (1 page or 40 pages: 1). YouTube and X items are left out (they have
+    their own pages), as in last week's card. Undone (voided) ticks never count; ticks
+    of items deleted since still count (history is kept). Days are Clew days (the
+    rollover rule). Last week's card counts the same way.
+  - **Where:** Settings › Progress, its first section, "Done so far", above Active days
+    and Last week. Not in the menu.
+  - **What:** the total ("1,284 done", large) and under it "since Sep 2" (the first
+    tick's day) for All, "+N in the last year" for Year, "+N in the last 30 days" for
+    30 days; a **range** choice **30 days · Year · All** (default All, remembered); the
+    chart: a line of the running total per day (a soft fill under it, 3 or 4 light
+    gridlines labelled at the right, a few date labels under it), from the range's
+    first day (All: the first tick's day) to today, its bottom the total before the
+    range, so a 30-day slope fills the chart. A small ring dot marks each day a goal
+    reached its total (the round's total: a later round's recorded total, round 1's
+    the next round's or, with none, the goal's own). The caption under the section:
+    "Each task once a day it was done. Dots: a goal reached."
+  - **Hover:** a dashed guide at the day under the pointer and a small tip: "Nov 12 ·
+    642 done · +9 that day" ("+0 that day" is left out on a quiet day). The line has no
+    other interaction.
+  - **Before the first tick:** no total; the chart area says "Your first tick starts
+    the line." over a dashed baseline.
+  - **Fresh** as the pane's other numbers (read when the pane opens or Settings comes
+    forward). Light and dark follow the system; the line is the accent colour.
+  - **VoiceOver:** the chart is one element: "Done so far: 1,284. 232 in the last 30
+    days." (the range's rise), plus the system's chart description, so its audio
+    graph can play the line.
+  - **A goal's exact numbers** go in its Details (below), not on the line.
+
+- **A goal's days: Bars or Heatmap (user, 2026-11-18).** A goal's Details show its
+  counts per day one of two ways, chosen with a small **Bars · Heatmap** switch on the
+  chart; the choice is remembered for all goals (default Bars).
+  - **Bars:** the last 30 days, one bar a day, its height that day's +1s (all rounds;
+    a day with none has no bar), a dashed line at the highest day with its number; the
+    first day's date at the left, "Today" at the right. Hover a bar: "Nov 15 · +38".
+    Title "Last 30 days".
+  - **Heatmap:** the existing heatmap (16 weeks), unchanged. Title "Last 16 weeks".
+  - Under either: "+364 on 22 days" for what is shown (left out when 0).
+  - Habits keep the heatmap alone, with no switch (a habit counts once a day).
+  - VoiceOver: the switch is a two-choice picker "Show as"; the bars read as one
+    element ("Last 30 days: +364 on 22 days, most 38 on Nov 15") with the system's
+    chart description.
 
 - **About and updates (user, 2026-11-13).**
   - **Opening Settings closes the menu** (the gear button and ⌘,), like any menu
