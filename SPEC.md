@@ -246,10 +246,13 @@ stopped daily use, not adding features.
   change it, add it again). So Add says what each type is: one quiet line under the
   Today · Habit · Goal · Later choice, changing with it:
   - **Today:** "Done once. Stays on Today until you tick it."
-  - **Habit:** "Comes back to Today on its days."
+  - **Habit:** "Comes back to Today when it repeats." (Not "on its days": a habit done
+    N times a week has none; it shows each day until the week's count is met.)
   - **Goal:** "A total to reach, one +1 at a time. Lives in Goals & Later."
-  - **Later:** "For another day. Waits in Goals & Later until you move it to Today."
-  The line is secondary text, no icon, and VoiceOver reads it after the choice. Edit
+  - **Later:** "For another day. Waits in Goals & Later until you get to it." (It can be
+    ticked there or moved to Today.)
+  The line is secondary text, no icon, placed right after the choice (VoiceOver reaches
+  it next; nothing is announced when the choice changes). Edit
   shows no type choice and no line. (A Today task can still go to Later by dragging
   it down or with Move to Later, as before.)
 
@@ -257,11 +260,16 @@ stopped daily use, not adding features.
   its block from the timeline) down into Goals & Later is refused (it would come back
   on its next day; a dropped block still leaves the timeline and its row stays on
   Today, as now). Instead of "That can't be done right now." (or, for a block, no
-  word at all), the line that shows refused actions says **"Habits stay on Today on
-  their days. Change the days in Edit."** A task's row ticked today that is dragged
-  down says **"Done today. Undo the tick to move it."** (Its block dragged down
-  behaves as now: the block leaves the timeline and its tick with it, so no hint.)
-  Nothing else changes (no new menu item; the hint shows only when it is tried).
+  word at all), the line that shows refused actions says **"Habits stay on Today. Change
+  when it repeats in Edit."** (ticked today or not). A once task or link of Today's own
+  (not one moved from Goals & Later, which can always go back) whose row is ticked today
+  and dragged down says **"Done today. Undo the tick to move it."** Its block dragged
+  down behaves as now (the block leaves the timeline, a block-made tick with it), so
+  no hint. Nothing else changes (no new menu item; the hint shows only when it is
+  tried).
+  - **Refusal lines clear when the menu closes** (all of them, not only these), so a
+    line never greets the next opening or the next day. They still clear at the next
+    action that succeeds, as before.
 
 - **Last week's card (user, 2026-11-15; Fable review).** A reminder of how the last
   week went, because looking back at what got done helps the next start (Design
@@ -567,8 +575,8 @@ stopped daily use, not adding features.
     - **Links:** a link pasted into the box works as in `+ add`: its page title is filled
       in, editable, and Return saves what the box shows. Copy the link first: switching
       to the browser closes the menu, and the box with it.
-    - **No choices in the box:** the kind is a today task (changing a task's kind is a
-      later feature), and the length changes by dragging the block's bottom edge.
+    - **No choices in the box:** the kind is a today task (*changed* 2026-11-17: a
+      task's kind is never changed; a habit or goal is made in `+ add`), and the length changes by dragging the block's bottom edge.
     - **Past hours are allowed:** a block that has already ended ticks at once, as when a
       row is dropped there, so the task is made done (Not finished undoes it).
     - **While the box is open** the keyboard edits the name: the Delete key does not
