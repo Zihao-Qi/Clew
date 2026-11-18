@@ -487,8 +487,9 @@ final class AppModel {
         else {
             let reason = self.row(itemId).flatMap { StaysOnToday.reason(for: $0, moved: isMoved($0)) }
             putBack(blockId, itemId: itemId, at: listRows.count)
-            // Only a habit's block says why; a task's block took its tick with it (SPEC 2026-11-17).
-            if reason == .habit { notice = Self.message(for: .habit) }
+            // Only a habit's block says why; a task's block took its tick with it (SPEC
+            // 2026-11-17). Not when putting it back failed: that line stays.
+            if reason == .habit, notice == nil { notice = Self.message(for: .habit) }
             return
         }
         let below = goalsAndLater.map(\.id).filter { $0 != itemId }
@@ -656,9 +657,13 @@ final class AppModel {
                                         after: slot > 0 ? below[slot - 1] : nil,
                                         before: slot + 1 < below.count ? below[slot + 1] : nil) }
         // Refused: say why, when it is a habit or a task done today (SPEC 2026-11-17).
-        if !placed, let row = row(dragged), !isBelow(row),
-           let reason = StaysOnToday.reason(for: row, moved: isMoved(row)) {
-            notice = Self.message(for: reason)
+        // Only in place of the general line (a failed save keeps its own), and asked of
+        // the list as it is now (the rollover may have just passed).
+        if !placed, notice == Self.message(for: ClewError.notAllowed) {
+            refresh()
+            if let row = row(dragged), !isBelow(row), let reason = StaysOnToday.reason(for: row, moved: isMoved(row)) {
+                notice = Self.message(for: reason)
+            }
         }
         return placed
     }

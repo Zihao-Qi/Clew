@@ -126,6 +126,23 @@ private func at(_ d: Int, _ h: Int, _ m: Int = 0) -> Date {
         #expect(StaysOnToday.reason(for: inPlaceRow, moved: false) == nil)
     }
 
+    /// The rows the list itself does not make today: a link of Today's own (picked from
+    /// Later before 2026-11-15), a habit asked about as moved, a tick on an earlier day.
+    @Test func whyARowStaysOnTodayForEveryKind() throws {
+        func row(_ kind: ItemKind, today: Int, progress: Int) -> TodayRow {
+            let item = Item(id: UUID(), kind: kind, title: "x", schedule: kind == .habit ? .daily : .unscheduled,
+                            progress: .none, state: .active, sortKey: 1, source: .user, createdAt: at(10, 9), updatedAt: at(10, 9))
+            return TodayRow(item: item, state: today > 0 ? .doneToday : .due, todayAmount: today,
+                            progressAmount: progress, lastTickToday: nil)
+        }
+        #expect(StaysOnToday.reason(for: row(.link, today: 1, progress: 1), moved: false) == .doneToday)
+        #expect(StaysOnToday.reason(for: row(.link, today: 0, progress: 0), moved: false) == nil)
+        #expect(StaysOnToday.reason(for: row(.habit, today: 0, progress: 0), moved: true) == nil)
+        // Ticked on an earlier day only: not "done today".
+        #expect(StaysOnToday.reason(for: row(.once, today: 0, progress: 1), moved: false) == nil)
+        #expect(StaysOnToday.reason(for: row(.once, today: 2, progress: 2), moved: false) == .doneToday)
+    }
+
     @Test func droppingAMovedRowBelowTakesItsBlocksOff() throws {
         let later = try add("later", .later)
         let block = try clew.placeOnTimeline(itemId: later, start: at(10, 11))
