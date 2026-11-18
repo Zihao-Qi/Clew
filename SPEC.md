@@ -420,7 +420,7 @@ stopped daily use, not adding features.
     gridlines labelled at the right, a few date labels under it), from the range's
     first day (All: the first tick's day) to today, its bottom the total before the
     range, so a 30-day slope fills the chart. A small ring dot marks each day a goal
-    reached its total (the round's total: a later round's recorded total, round 1's
+    reached its total (a goal deleted since keeps its dots, as its ticks keep counting) (the round's total: a later round's recorded total, round 1's
     the next round's or, with none, the goal's own). The caption under the section:
     "Each task once a day it was done. Dots: a goal reached."
   - **Hover:** a dashed guide at the day under the pointer and a small tip: "Nov 12 ·

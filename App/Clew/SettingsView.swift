@@ -23,6 +23,9 @@ struct SettingsView: View {
     @State private var recordsTime = true
     @State private var weekCardOn = true
     @State private var lastWeek: WeekRecap?
+    /// Done so far (SPEC 2026-11-18): read with the pane's other numbers.
+    @State private var doneSoFar: DoneSoFar?
+    @State private var progressRange: ProgressRange = .all
     @State private var pane: Pane?
 
     /// A plain column of sections; selected one highlighted, keyboard and VoiceOver
@@ -238,6 +241,15 @@ struct SettingsView: View {
                 }
 
                 case .progress:
+                if let doneSoFar, let today = model.currentDay {
+                    Section {
+                        DoneSoFarSection(done: doneSoFar, today: today, range: $progressRange)
+                    } footer: {
+                        Text("Each task once a day it was done. Dots: a goal reached.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 Section {
                     LabeledContent {
                         if let days = activeDays {
@@ -337,8 +349,10 @@ struct SettingsView: View {
             if new == .progress {
                 activeDays = model.activeDays()
                 lastWeek = model.lastWeek()
+                doneSoFar = model.doneSoFar()
             }
         }
+        .onChange(of: progressRange) { _, new in model.setProgressRange(new) }
         // A menu bar app shows no window at launch, so macOS must not restore this one
         // if it was open when Clew quit.
         .background(NonRestorableWindow())
@@ -389,6 +403,8 @@ struct SettingsView: View {
         // Blocks settle first, as for the menu's card.
         model.refresh()
         lastWeek = model.lastWeek()
+        doneSoFar = model.doneSoFar()
+        progressRange = model.progressRange()
     }
 
     private func setOpenAtLogin(_ on: Bool) {
