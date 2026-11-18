@@ -174,23 +174,26 @@ struct AddView: View {
             }
             .onChange(of: text) { textChanged() }
 
-            Picker(selection: $kind) {
-                Text("Today").tag(AddKind.today)
-                Text("Habit").tag(AddKind.habit)
-                Text("Goal").tag(AddKind.goal)
-                Text("Later").tag(AddKind.later)
-            } label: {
-                Text("Kind")
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .accessibilityLabel(Text("Kind"))
+            // The type line sits close under the choice it explains (design review).
+            VStack(alignment: .leading, spacing: 4) {
+                Picker(selection: $kind) {
+                    Text("Today").tag(AddKind.today)
+                    Text("Habit").tag(AddKind.habit)
+                    Text("Goal").tag(AddKind.goal)
+                    Text("Later").tag(AddKind.later)
+                } label: {
+                    Text("Kind")
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .accessibilityLabel(Text("Kind"))
 
-            // What each kind is, since it cannot be changed later (SPEC 2026-11-17).
-            Text(kind == .later && onADay ? AddKind.laterOnADay : kind.explanation)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+                // What each kind is, since it cannot be changed later (SPEC 2026-11-17).
+                Text(kind == .later && onADay ? AddKind.laterOnADay : kind.explanation)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             // Goals have a total only; they live in Goals & Later (SPEC 2026-11-15).
             if kind == .habit {
@@ -216,6 +219,7 @@ struct AddView: View {
                     .keyboardShortcut(.defaultAction)
                     .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
+            .padding(.top, 4)
         }
         .padding(12)
         .onAppear { focused = true }

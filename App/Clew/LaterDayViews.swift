@@ -128,19 +128,23 @@ struct MonthCalendar: View {
 
     var body: some View {
         VStack(spacing: 14) {   // user, 2026-11-18: the month sat too close to the weekdays
-            HStack {
+            HStack(spacing: 0) {
+                // A step below the task's name, so the two do not compete (design review).
                 Text(verbatim: monthTitle)
-                    .font(.headline)
+                    .font(.subheadline.weight(.semibold))
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
-                Button { month = MonthGrid.adding(-1, to: shown) } label: { Image(systemName: "chevron.left") }
+                // 28 pt click areas; the last arrow's glyph ends in line with Save.
+                Button { month = MonthGrid.adding(-1, to: shown) } label: { arrow("chevron.left") }
                     .buttonStyle(.borderless)
                     .disabled(shown <= MonthGrid.month(of: first))
                     .accessibilityLabel(Text("Previous month"))
-                Button { month = MonthGrid.adding(1, to: shown) } label: { Image(systemName: "chevron.right") }
+                Button { month = MonthGrid.adding(1, to: shown) } label: { arrow("chevron.right") }
                     .buttonStyle(.borderless)
                     .accessibilityLabel(Text("Next month"))
+                    .padding(.trailing, -9)
             }
+            // The outer days' circles line up with the title and Save (design review).
             LazyVGrid(columns: columns, spacing: 2) {
                 ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, symbol in
                     Text(verbatim: symbol)
@@ -153,7 +157,14 @@ struct MonthCalendar: View {
                     if let day { dayButton(day) } else { Color.clear.frame(height: 32) }
                 }
             }
+            .padding(.horizontal, -7)
         }
+    }
+
+    private func arrow(_ name: String) -> some View {
+        Image(systemName: name)
+            .frame(width: 28, height: 28)
+            .contentShape(Rectangle())
     }
 
     private func dayButton(_ day: LocalDay) -> some View {
@@ -165,6 +176,8 @@ struct MonthCalendar: View {
                 .foregroundStyle(chosen ? Color.white : allowed ? Color.primary : Color.secondary.opacity(0.5))
                 .frame(width: 32, height: 32)
                 .background(Circle().fill(chosen ? Color.accentColor : Color.clear))
+                // Today, which cannot be chosen, keeps a thin ring as a landmark.
+                .overlay(Circle().strokeBorder(Color.secondary.opacity(day == first.adding(days: -1) ? 0.6 : 0), lineWidth: 1))
                 .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
         }
