@@ -188,28 +188,50 @@ struct MonthCalendar: View {
     }
 }
 
-/// Add's and Edit's "On a day": a switch and a date, from tomorrow on.
+/// Add's and Edit's "On a day": a switch, then the day as a button that opens the
+/// same calendar as "Pick a day…" right below it (user, 2026-11-18: the system date
+/// field's calendar was small and looked foreign). Picking a day closes it.
 struct DayRow: View {
     let model: AppModel
     @Binding var on: Bool
     @Binding var date: Date
+    /// The calendar is open below the row.
+    @Binding var open: Bool
 
-    private var tomorrow: Date { (model.currentDay ?? LocalDay(picked: Date())).adding(days: 1).noon }
+    private var tomorrow: LocalDay { (model.currentDay ?? LocalDay(picked: Date())).adding(days: 1) }
+    private var day: LocalDay { max(LocalDay(picked: date), tomorrow) }
 
     var body: some View {
-        HStack(spacing: 8) {
-            Toggle(isOn: $on) { Text("On a day") }
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                .accessibilityLabel(Text("On a day"))
-            if on {
-                DatePicker(selection: $date, in: tomorrow..., displayedComponents: .date) { Text("Day") }
-                    .datePickerStyle(.field)
-                    .labelsHidden()
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Toggle(isOn: $on) { Text("On a day") }
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .accessibilityLabel(Text("On a day"))
+                if on {
+                    Button { withAnimation(.snappy(duration: 0.25)) { open.toggle() } } label: {
+                        HStack(spacing: 4) {
+                            Text(verbatim: day.noon.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))
+                            Image(systemName: open ? "chevron.up" : "chevron.down")
+                                .imageScale(.small)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                     .accessibilityLabel(Text("Day"))
+                    .accessibilityValue(Text(verbatim: day.noon.formatted(.dateTime.weekday(.wide).month(.wide).day())))
+                }
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
+            if on, open {
+                MonthCalendar(selection: Binding(get: { day }, set: { picked in
+                    date = picked.noon
+                    withAnimation(.snappy(duration: 0.25)) { open = false }
+                }), first: tomorrow)
+                .transition(.opacity)
+            }
         }
-        .onAppear { if date < tomorrow { date = tomorrow } }
+        .onAppear { if LocalDay(picked: date) < tomorrow { date = tomorrow.noon } }
+        // Switching it on opens the calendar; off closes it.
+        .onChange(of: on) { withAnimation(.snappy(duration: 0.25)) { open = on } }
     }
 }

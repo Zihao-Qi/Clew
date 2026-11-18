@@ -135,11 +135,13 @@ struct AddView: View {
 
     #if DEBUG
     /// Snapshots: Add with a kind chosen and "On a day" on or off.
-    init(model: AppModel, kind: AddKind, onADay: Bool, text: String = "", done: @escaping () -> Void) {
+    init(model: AppModel, kind: AddKind, onADay: Bool, dayOpen: Bool = false, text: String = "",
+         done: @escaping () -> Void) {
         self.model = model
         self.done = done
         _kind = State(initialValue: kind)
         _onADay = State(initialValue: onADay)
+        _dayOpen = State(initialValue: dayOpen)
         _text = State(initialValue: text)
     }
     #endif
@@ -152,6 +154,7 @@ struct AddView: View {
     /// A Later task's day (SPEC 2026-11-17).
     @State private var onADay = false
     @State private var day = Date()
+    @State private var dayOpen = false
     /// The title fetched for the pasted link, if any; it is put into the field so it
     /// can be edited, and recorded as `.fetched` only if left as fetched.
     @State private var fetchedTitle: String?
@@ -206,7 +209,7 @@ struct AddView: View {
                 SlotRow(draft: $slot)
             }
             if kind == .later {
-                DayRow(model: model, on: $onADay, date: $day)
+                DayRow(model: model, on: $onADay, date: $day, open: $dayOpen)
             }
 
             NoticeView(text: model.notice)
@@ -287,6 +290,7 @@ struct EditView: View {
     private let existingDay: LocalDay?
     @State private var onADay: Bool
     @State private var day: Date
+    @State private var dayOpen = false
 
     init(model: AppModel, item: Item, done: @escaping () -> Void) {
         self.model = model
@@ -342,7 +346,7 @@ struct EditView: View {
                 SlotRow(draft: $slot)
             }
             if canHaveDay {
-                DayRow(model: model, on: $onADay, date: $day)
+                DayRow(model: model, on: $onADay, date: $day, open: $dayOpen)
             }
             ReminderRow(enabled: $remind, time: $remindAt, today: $remindToday,
                         passed: reminderChanged && remind && remindToday && model.reminderTimePassed(remindAt))

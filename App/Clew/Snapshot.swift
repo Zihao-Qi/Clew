@@ -562,6 +562,9 @@ enum Snapshot {
                     }
                     render(AddView(model: model, kind: .later, onADay: true, text: "Call the dentist") {}.frame(width: 340),
                            appearance: appearance, to: dir.appendingPathComponent("add-later-day-\(suffix).png"))
+                    render(AddView(model: model, kind: .later, onADay: true, dayOpen: true, text: "Call the dentist") {}
+                        .frame(width: 340),
+                           appearance: appearance, to: dir.appendingPathComponent("add-later-calendar-\(suffix).png"))
                     // The refusal line for a habit dragged down (SPEC 2026-11-17).
                     model.notice = AppModel.message(for: StaysOnToday.habit)
                     render(RootView(model: model, screen: .list), appearance: appearance,
