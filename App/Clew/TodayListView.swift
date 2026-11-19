@@ -1062,8 +1062,9 @@ struct RowView: View {
     static let countWidth: CGFloat = 44
     static let undoWidth: CGFloat = 12
     /// How far −'s click area reaches past the mark: to the dots' column on the left
-    /// (4 pt), the row's end on the right (its 12 pt margin) and the row's height.
-    static let undoReach = (leading: CGFloat(4), trailing: CGFloat(12), vertical: CGFloat(8))
+    /// (4 pt), the row's end on the right (its 12 pt margin), and up and down to within
+    /// about 2 pt of a one-line row's edges.
+    static let undoReach = (leading: CGFloat(4), trailing: CGFloat(12), vertical: CGFloat(12))
 
     /// "Priority" (SPEC 2026-11-19) and how much was watched, read with the title.
     private var rowValue: Text {

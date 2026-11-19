@@ -106,13 +106,14 @@ enum Snapshot {
                 let spots: [(String, CGFloat)] = [
                     ("circle", 22), ("title", 60), ("link mark", 44 + titleWidth + 4 + 7),
                     ("blank space", 175), ("bar", 230), ("count", 290), ("minus", 322),
+                    // The right margin beside − undoes since 2026-11-19 (−'s reach).
                     ("left margin", 4), ("right margin", 336),
                 ]
                 // Near misses around − (user, 2026-11-19: they opened the details instead of
                 // undoing): its target reaches the row's end and the row's height.
                 let nearMinus: [(String, CGFloat, CGFloat)] = [
-                    ("− left edge", 318, 0), ("− right", 330, 0), ("− row end", 337, 0),
-                    ("− above", 322, 8), ("− below", 322, -8),
+                    ("− left reach", 314, 0), ("− right", 330, 0), ("− row end", 337, 0),
+                    ("− above", 322, 11), ("− below", 322, -11),
                 ]
                 for (name, x, dy) in nearMinus {
                     let before = (details, row().todayAmount)
