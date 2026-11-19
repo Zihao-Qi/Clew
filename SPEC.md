@@ -640,7 +640,10 @@ stopped daily use, not adding features.
   it opens with now a third of the way down (2 hours behind, 4 ahead; re-centred every
   time the menu opens; *user*, 2026-11-11), with a quiet line at the current time. It sits
   in its own inset card with a faint tint, its hour lines and blocks stopping short of the
-  right edge, so it reads apart from the list; the block running now stands out a little
+  right edge, so it reads apart from the list (*changed* 2026-11-19, *user*: the card is
+  engraved into the menu, a little darker than the glass, with a soft inner shadow along
+  its top and a faint light lip along its bottom, so it stays apart even when the glass
+  takes a light wallpaper's tone); the block running now stands out a little
   (a stronger tint and an accent edge); the menu grows taller
   by that much, but never past the screen (the list scrolls when it must). **Today
   only:** no tomorrow, nothing planned ahead. Nothing of Clew's own on it is red or says "missed".
