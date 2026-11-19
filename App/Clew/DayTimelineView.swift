@@ -119,6 +119,10 @@ struct DayTimelineView: View {
     @State private var sweepPress: Double?
     @State private var sweepPointerY: CGFloat?
     @State private var sweepScroll: Timer?
+    @State private var sweepStep = 0
+    /// This press was decided not to make a task (on a block or the box, or stopped by
+    /// the rollover): the rest of the drag does nothing (review).
+    @State private var sweepIgnored = false
     @GestureState private var sweeping = false
 
     /// The block a drag on empty space would make, while it is dragged.
@@ -159,13 +163,14 @@ struct DayTimelineView: View {
     /// `point` (the hours' coordinates) is on a task block or inside the open name box.
     private func isOnBlockOrBox(_ point: CGPoint, width: CGFloat, labelWidth: CGFloat) -> Bool {
         let layout = draftLayout
-        func hits(_ start: Date, _ end: Date, _ place: TimelinePlace) -> Bool {
+        func hits(_ start: Date, _ height: CGFloat, _ place: TimelinePlace) -> Bool {
             let col = columns(place, width: width, labelWidth: labelWidth)
-            return point.y >= TimelineMetrics.y(start, in: day) && point.y < TimelineMetrics.y(end, in: day)
-                && point.x >= col.x && point.x < col.x + col.width
+            let top = TimelineMetrics.y(start, in: day)
+            return point.y >= top && point.y < top + height && point.x >= col.x && point.x < col.x + col.width
         }
-        if day.blocks.contains(where: { hits($0.block.start, $0.block.end, place($0, layout)) }) { return true }
-        if let box = newTask, let at = layout?.draft, hits(box.start, box.end, at) { return true }
+        if day.blocks.contains(where: { hits($0.block.start, TimelineMetrics.y($0.block.end, in: day) - TimelineMetrics.y($0.block.start, in: day), place($0, layout)) }) { return true }
+        // The box as drawn: a 15-minute one is taller than its quarter hour (review).
+        if let box = newTask, let at = layout?.draft, hits(box.start, NewTaskDraft.boxHeight(box.minutes), at) { return true }
         return false
     }
 
@@ -176,27 +181,36 @@ struct DayTimelineView: View {
         DragGesture(minimumDistance: 4, coordinateSpace: .named(space))
             .updating($sweeping) { _, live, _ in live = true }
             .onChanged { value in
+                guard !sweepIgnored else { return }
                 if sweepPress == nil {
-                    // Pressed on a block or in the open box: not a new task.
+                    // Pressed on a block or in the open box: not a new task, for the whole drag.
                     let content = CGPoint(x: value.startLocation.x - geometry.contentLeft,
                                           y: value.startLocation.y - geometry.contentTop)
-                    guard !isOnBlockOrBox(content, width: width, labelWidth: labelWidth) else { return }
+                    guard !isOnBlockOrBox(content, width: width, labelWidth: labelWidth) else {
+                        sweepIgnored = true
+                        return
+                    }
                     sweepPress = Double(content.y / TimelineMetrics.pointsPerMinute)
                 }
                 sweepPointerY = value.location.y
                 sweepAtEdge(value.location.y)
             }
             .onEnded { _ in
-                if let draft = sweepDraft { newTask = draft }
+                if !sweepIgnored, let draft = sweepDraft { newTask = draft }
                 endSweep()
+                sweepIgnored = false
             }
     }
 
-    private func endSweep() {
+    /// Stops the drag's block and its scrolling. `rest`: the drag still held does nothing
+    /// more (the rollover); a new drag starts afresh either way.
+    private func endSweep(rest ignored: Bool = false) {
         sweepScroll?.invalidate()
         sweepScroll = nil
+        sweepStep = 0
         sweepPress = nil
         sweepPointerY = nil
+        if ignored { sweepIgnored = true }
     }
 
     /// Near the timeline's top or bottom edge while sweeping, the hours scroll by
@@ -204,14 +218,15 @@ struct DayTimelineView: View {
     private func sweepAtEdge(_ y: CGFloat) {
         let view = geometry.viewport
         let step = y < view.minY + 18 ? -1 : y > view.maxY - 18 ? 1 : 0
-        guard step != 0 else {
-            sweepScroll?.invalidate()
-            sweepScroll = nil
-            return
-        }
-        guard sweepScroll == nil else { return }
+        // Already scrolling this way; a new direction (or none) stops the old timer.
+        guard step != sweepStep || sweepScroll == nil else { return }
+        sweepScroll?.invalidate()
+        sweepScroll = nil
+        sweepStep = step
+        guard step != 0 else { return }
         let timer = Timer(timeInterval: 0.12, repeats: true) { _ in
             Task { @MainActor in
+                guard sweepScroll != nil, sweepStep == step else { return }
                 let visible = Int(TimelineMetrics.height) / TimelineMetrics.quarter
                 let top = (topQuarter ?? 0) + step
                 topQuarter = min(max(top, 0), TimelineMetrics.quarters(day) - visible)
@@ -248,9 +263,16 @@ struct DayTimelineView: View {
             if newTask == nil { centreOnNow() }
         }
         // The rollover closes the box; nothing is made.
-        .onChange(of: day.day) { newTask = nil; endSweep() }
+        .onChange(of: day.day) { newTask = nil; endSweep(rest: true) }
         // A drag the system cancelled (the menu closed): nothing is made.
-        .onChange(of: sweeping) { if !sweeping { endSweep() } }
+        .onChange(of: sweeping) {
+            if !sweeping {
+                endSweep()
+                sweepIgnored = false
+            }
+        }
+        // Leaving the list (Add, Settings) mid-drag: no timer is left running.
+        .onDisappear { endSweep() }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text("Today's timeline"))
         .accessibilityAction(named: Text("New task on the timeline"), openNewTaskAtNextQuarter)
@@ -782,7 +804,8 @@ struct SweepBlock: View {
                     .padding(.leading, 7)
                     .padding(.top, TimelineMetrics.textTop(draft.minutes))
             }
-            .frame(height: CGFloat(draft.minutes) * TimelineMetrics.pointsPerMinute - 1)
+            // The box's own height, so nothing jumps when it opens (review).
+            .frame(height: NewTaskDraft.boxHeight(draft.minutes))
             .allowsHitTesting(false)
             .accessibilityHidden(true)
     }

@@ -18,6 +18,12 @@ struct NewTaskDraft: Equatable {
         minutes = min(Clew.blockDefaultMinutes, TimelineMetrics.room(after: start, in: day))
     }
 
+    /// How tall the box (and a drag's block) is drawn: its minutes, at least 18 points so
+    /// a 15-minute one holds a line of text.
+    static func boxHeight(_ minutes: Int) -> CGFloat {
+        max(CGFloat(minutes) * TimelineMetrics.pointsPerMinute - 1, 18)
+    }
+
     /// A drag's block (SPEC 2026-11-19): its own start and length.
     init(start: Date, minutes: Int) {
         self.start = start
@@ -62,7 +68,7 @@ struct NewTaskBox: View {
                 .padding(.horizontal, 5)
                 .padding(.top, 2)
             }
-            .frame(height: max(CGFloat(draft.minutes) * TimelineMetrics.pointsPerMinute - 1, 18))
+            .frame(height: NewTaskDraft.boxHeight(draft.minutes))
             .background(OutsideClickWatcher(onOutside: cancel))
             .onChange(of: text) { textChanged() }
             // On the next turn: a box opened by a double-click elsewhere appears while the
