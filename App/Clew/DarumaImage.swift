@@ -6,17 +6,23 @@ import AppKit
 /// face narrower at the top, belly stripes leaning in).
 @MainActor
 enum DarumaImage {
-    private static var cache: [Int: NSImage] = [:]
+    /// In the menu bar: 20 pt (user, 2026-11-18: 16 looked small; 22 is the most the
+    /// bar holds). Drawn on a 16 pt grid and scaled, so the face keeps its spacing.
+    static let menuBarSize: CGFloat = 20
+    private struct Key: Hashable { let stage: Int; let size: CGFloat }
+    private static var cache: [Key: NSImage] = [:]
 
-    /// Stage 1…5 (`DarumaStage.of`).
-    static func image(stage: Int) -> NSImage {
-        if let image = cache[stage] { return image }
-        let image = NSImage(size: NSSize(width: 16, height: 16), flipped: true) { _ in
+    /// Stage 1…5 (`DarumaStage.of`); `size` 16 for a preview inside text (Settings).
+    static func image(stage: Int, size: CGFloat = menuBarSize) -> NSImage {
+        let key = Key(stage: stage, size: size)
+        if let image = cache[key] { return image }
+        let image = NSImage(size: NSSize(width: size, height: size), flipped: true) { _ in
+            NSGraphicsContext.current?.cgContext.scaleBy(x: size / 16, y: size / 16)
             draw(stage: stage)
             return true
         }
         image.isTemplate = true
-        cache[stage] = image
+        cache[key] = image
         return image
     }
 
