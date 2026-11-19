@@ -3,6 +3,7 @@ import ClewCore
 import ClewDomain
 import ClewStore
 import Foundation
+import os
 import Observation
 import SwiftUI
 
@@ -149,27 +150,43 @@ final class AppModel {
 
     func refresh() {
         guard let clew else { return }
+        // Each step timed; a slow refresh writes one line to this Mac's log, step names
+        // and milliseconds only (SPEC 2026-11-19).
+        var timings = StepTimings(now: { ProcessInfo.processInfo.systemUptime })
+        defer {
+            if let line = timings.report("refresh") {
+                Self.performanceLog.notice("\(line, privacy: .public)")
+            }
+        }
         do {
             // A block whose end passed ticks first (it writes only when something
             // changes, so the refresh its write causes does nothing more).
             _ = try? clew.settleBlocks()
             // A day for Later that has come goes to Today's end (SPEC 2026-11-17).
             _ = try? clew.settlePlans()
+            timings.mark("settle")
             let list = try clew.today()
             today = list
+            timings.mark("today")
             ratingsOn = (try? clew.ratingsEnabled()) ?? false
             watched = try clew.watchProgress(itemIds: list.rows.map(\.id))
+            timings.mark("watched")
             barStyle = (try? clew.barStyle()) ?? Clew.defaultBarStyle
             menuBarStyle = (try? clew.menuBarStyle()) ?? Clew.defaultMenuBarStyle
             do { openListShortcut = try clew.openListShortcut() } catch { }
             OpenShortcutHotkey.shared.apply(openListShortcut)
+            timings.mark("settings")
             collections = try clew.collections()
+            timings.mark("collections")
             focusOffersBreak = (try? clew.focusOffersBreak()) ?? true
             timelineShown = (try? clew.timelineShown()) ?? true
             blockAlerts = (try? clew.blockAlerts()) ?? true
             timeline = try clew.timeline()
+            timings.mark("timeline")
             lateTicks = try clew.lateTicks()
+            timings.mark("lateTicks")
             readCalendar(clew)
+            timings.mark("calendar")
             focus = try clew.focusTimer()
             if let running = focus {
                 // A break that is over simply ends; a timer whose task left Today (done
@@ -184,6 +201,7 @@ final class AppModel {
             // reaching a raised target or a next round congratulates again.
             let reached = Set((list.rows + list.goalsAndLater).filter(\.isGoalReached).map(\.id))
             dismissedCelebrations.formIntersection(reached)
+            timings.mark("focus")
         } catch {
             notice = String(localized: "Couldn't load today's list.")
         }
@@ -191,9 +209,15 @@ final class AppModel {
         scheduleFocusEnd()
         scheduleBlockEdge()
         tickWhileFocusing()
+        timings.mark("schedule")
         reconcileNotifications()
+        timings.mark("notifications")
         backUpIfNeeded()
+        timings.mark("backup")
     }
+
+    /// Slow refreshes (SPEC 2026-11-19): this Mac's own log, never sent anywhere.
+    private static let performanceLog = Logger(subsystem: "io.github.zihao-qi.clew", category: "performance")
 
     // MARK: - Backups (ARCHITECTURE §7)
 
@@ -318,8 +342,10 @@ final class AppModel {
         guard !menuSessionOpen else { return }
         menuSessionOpen = true
         weekCard = nil
+        // The one refresh of an opening, on any screen: the menu shows today as it is
+        // now (SPEC 2026-11-19). Blocks settle first, so a Sunday block that ended counts.
+        refresh()
         guard onList, let clew else { return }
-        refresh()   // blocks settle first, so a Sunday block that ended counts
         guard let card = try? clew.weekCard() else { return }
         weekCard = card
         try? clew.markWeekCardShown(card)
