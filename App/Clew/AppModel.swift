@@ -25,6 +25,8 @@ final class AppModel {
     private(set) var collections: [CollectionSummary] = []
     /// How rows draw progress (Settings › General).
     private(set) var barStyle = Clew.defaultBarStyle
+    /// Ring or Count in the menu bar (SPEC 2026-11-18).
+    private(set) var menuBarStyle = Clew.defaultMenuBarStyle
     /// The global shortcut that opens the list (Settings › General). `nil` if cleared.
     private(set) var openListShortcut: OpenShortcut? = .default
     /// Set when the database cannot be opened; the list is replaced by this message.
@@ -158,6 +160,7 @@ final class AppModel {
             ratingsOn = (try? clew.ratingsEnabled()) ?? false
             watched = try clew.watchProgress(itemIds: list.rows.map(\.id))
             barStyle = (try? clew.barStyle()) ?? Clew.defaultBarStyle
+            menuBarStyle = (try? clew.menuBarStyle()) ?? Clew.defaultMenuBarStyle
             do { openListShortcut = try clew.openListShortcut() } catch { }
             OpenShortcutHotkey.shared.apply(openListShortcut)
             collections = try clew.collections()
@@ -600,6 +603,10 @@ final class AppModel {
 
     func setBarStyle(_ style: ProgressBarStyle) {
         run { try $0.setBarStyle(style) }
+    }
+
+    func setMenuBarStyle(_ style: MenuBarStyle) {
+        run { try $0.setMenuBarStyle(style) }
     }
 
     func setOpenListShortcut(_ shortcut: OpenShortcut?) {

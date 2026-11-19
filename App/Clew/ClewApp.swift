@@ -63,7 +63,7 @@ struct ClewApp: App {
         MenuBarExtra {
             RootView(model: model)
         } label: {
-            MenuBarLabel(today: model.today, focus: model.focus, now: model.clockTick)
+            MenuBarLabel(today: model.today, focus: model.focus, now: model.clockTick, style: model.menuBarStyle)
         }
         .menuBarExtraStyle(.window)
 
@@ -75,13 +75,14 @@ struct ClewApp: App {
     }
 }
 
-/// The menu bar title: `done/total` for today (SPEC §1).
+/// The menu bar title: a ring or `done/total` for today (SPEC §1; ring 2026-11-18).
 struct MenuBarLabel: View {
     let today: TodayList?
     var focus: FocusTimer? = nil
     /// The model's one-second tick (never a TimelineView here: inside a menu bar label
     /// it redraws the status item without end).
     var now = Date()
+    var style = Clew.defaultMenuBarStyle
 
     var body: some View {
         if let focus {
@@ -92,6 +93,9 @@ struct MenuBarLabel: View {
                 .monospacedDigit()
                 .accessibilityLabel(focus.phase == .rest ? Text("Clew, break, \(left) left")
                                                          : Text("Clew, focus, \(left) left"))
+        } else if style == .ring, let today, let ring = MenuBarRing(done: today.done, total: today.total) {
+            Image(nsImage: MenuBarRingImage.image(ring))
+                .accessibilityLabel(Text("Clew, \(today.done) of \(today.total) done"))
         } else if let today, today.total > 0 {
             Text("\(Image(systemName: "checklist")) \(today.done)/\(today.total)")
                 .accessibilityLabel(Text("Clew, \(today.done) of \(today.total) done"))

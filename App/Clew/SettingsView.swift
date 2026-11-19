@@ -16,6 +16,7 @@ struct SettingsView: View {
     @State private var activeDays: ActiveDays?
     @State private var ratingDots = false
     @State private var barStyle = Clew.defaultBarStyle
+    @State private var menuBarStyle = Clew.defaultMenuBarStyle
     @State private var listsOff: Set<Source> = []
     @State private var offersBreak = true
     @State private var timelineShown = true
@@ -128,6 +129,21 @@ struct SettingsView: View {
                     }
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                }
+
+                Section {
+                    Picker("Menu bar", selection: Binding(get: { menuBarStyle }, set: { style in
+                        menuBarStyle = style
+                        model.setMenuBarStyle(style)
+                    })) {
+                        Text("Ring (\(Image(nsImage: MenuBarRingImage.image(.parts(done: 1, of: 3)))))").tag(MenuBarStyle.ring)
+                        Text("Count (\(Image(systemName: "checklist")) 1/3)").tag(MenuBarStyle.count)
+                    }
+                    .pickerStyle(.radioGroup)
+                } footer: {
+                    Text("A ring with a part for each task on Today, filled as you tick them (one smooth ring above 8), or the count done of the total. A running focus timer shows its time in either.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 Section {
@@ -397,6 +413,7 @@ struct SettingsView: View {
         backupList = model.backupList()
         ratingDots = model.ratingsOn
         barStyle = model.barStyle
+        menuBarStyle = model.menuBarStyle
         listsOff = model.collectionsOff()
         offersBreak = model.focusOffersBreak
         timelineShown = model.timelineShown
