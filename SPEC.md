@@ -644,7 +644,7 @@ stopped daily use, not adding features.
   floats just above the menu, as the foreground of what to do now and next: in light, a
   nearly opaque white sheet with a tight shadow and a faint edge; in dark, a slightly
   lighter surface than the glass with a faint light edge, brighter along the top; its
-  shadow stays below a dragged row's, so a drag still rises highest. Briefly engraved
+  shadow stays below a dragged row's in both, so a drag still rises highest. Briefly engraved
   the same day; the user preferred floating for focus and dark mode); the block running now stands out a little
   (a stronger tint and an accent edge); the menu grows taller
   by that much, but never past the screen (the list scrolls when it must). **Today

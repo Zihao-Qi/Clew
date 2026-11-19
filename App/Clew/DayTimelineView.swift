@@ -826,8 +826,11 @@ private struct FloatingCard: ViewModifier {
             // still rises highest. Drawn from a solid shape with its inside cut away, so
             // it shows only outside the card, whatever the card's own opacity.
             .background {
-                shape.fill(Color.black)
-                    .shadow(color: .black.opacity(dark ? 0.35 : 0.10), radius: 2.5, y: 1)
+                // Inset a little, so the caster's soft edge stays inside the cut-out (review:
+                // the corners showed it); dark below a dragged row's 0.18 too, the lighter
+                // surface does the lifting there.
+                shape.inset(by: 0.75).fill(Color.black)
+                    .shadow(color: .black.opacity(dark ? 0.16 : 0.10), radius: 2.5, y: 1)
                     .mask {
                         Rectangle().padding(-16)
                             .overlay(shape.blendMode(.destinationOut))
