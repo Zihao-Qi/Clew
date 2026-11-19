@@ -909,7 +909,9 @@ stopped daily use, not adding features.
   the bar holds).
 - A counted goal's undo is a small `−` beside its count, shown only after a `+1` today;
   it removes the last `+1`. It sits apart from the circle so rapid ticks can't hit it
-  (2026-11-08, v1a).
+  (2026-11-08, v1a). Its click area is larger than the mark (*changed* 2026-11-19,
+  *user*: a near miss opened the details): from the dots' column to the row's end, the
+  row's full height. While hidden, that place opens the details like the rest of the row.
 - Summary defaults: **9:00** and **21:00**, off until switched on.
 - **Opening the menu refreshes once (2026-11-19, *user*):** one refresh per opening, from
   the menu's own window becoming key, on whatever screen it opens; other windows (Settings)

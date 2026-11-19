@@ -985,11 +985,25 @@ struct RowView: View {
                     .onHover { hoveringDots = $0 }
                     // Undo is one click away (SPEC §4), and kept apart from the circle so
                     // rapid +1s cannot hit it by mistake. Its slot is kept so columns align.
-                    Button { model.undo(row) } label: { Image(systemName: "minus").imageScale(.small) }
+                    Button { model.undo(row) } label: {
+                        Image(systemName: "minus").imageScale(.small)
+                            .frame(width: Self.undoWidth)
+                            // Its click area reaches the row's end and the row's height
+                            // (user, 2026-11-19: a near miss opened the details instead);
+                            // the layout keeps the small mark's width.
+                            .padding(.leading, Self.undoReach.leading)
+                            .padding(.trailing, Self.undoReach.trailing)
+                            .padding(.vertical, Self.undoReach.vertical)
+                            .contentShape(Rectangle())
+                    }
                         .buttonStyle(.borderless)
-                        .frame(width: Self.undoWidth)
+                        .padding(.leading, -Self.undoReach.leading)
+                        .padding(.trailing, -Self.undoReach.trailing)
+                        .padding(.vertical, -Self.undoReach.vertical)
                         .opacity(row.todayAmount > 0 ? 1 : 0)
                         .disabled(row.todayAmount == 0)
+                        // Hidden: clicks there open the details, as anywhere in the row.
+                        .allowsHitTesting(row.todayAmount > 0)
                         .accessibilityHidden(row.todayAmount == 0)
                         .accessibilityLabel(Text("Remove one from \(item.title)"))
                 }
@@ -1047,6 +1061,9 @@ struct RowView: View {
     /// own row.
     static let countWidth: CGFloat = 44
     static let undoWidth: CGFloat = 12
+    /// How far −'s click area reaches past the mark: to the dots' column on the left
+    /// (4 pt), the row's end on the right (its 12 pt margin) and the row's height.
+    static let undoReach = (leading: CGFloat(4), trailing: CGFloat(12), vertical: CGFloat(8))
 
     /// "Priority" (SPEC 2026-11-19) and how much was watched, read with the title.
     private var rowValue: Text {
