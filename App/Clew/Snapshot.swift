@@ -69,16 +69,17 @@ enum Snapshot {
                 let clew = Clew(store: try SQLiteStore.inMemory(), clock: SystemClock(), zones: SystemTimeZone())
                 let goal = try clew.addItem(NewItem(title: "ML course", url: URL(string: "https://course.example"),
                                                     shape: .goal(target: 30)))
-                try clew.checkIn(itemId: goal.id)
-                try clew.checkIn(itemId: goal.id)
+                // Enough +1s for every click on − below to have one to undo.
+                for _ in 0..<8 { try clew.checkIn(itemId: goal.id) }
                 let model = AppModel(clew: clew, notify: false)
                 var opened: [URL] = []
                 model.urlOpener = { opened.append($0) }
                 var details = 0
-                @MainActor func row() -> TodayRow { model.today!.rows[0] }
+                // Goals live in Goals & Later (SPEC 2026-11-15).
+                @MainActor func row() -> TodayRow { model.row(goal.id)! }
                 // A live row: re-rendered from the model like the app's list (a fixed row
                 // value would keep rating the tick that existed when the test began).
-                let host = NSHostingView(rootView: LiveRow(model: model, onOpen: { details += 1 }).frame(width: 340))
+                let host = NSHostingView(rootView: LiveRow(model: model, onOpen: { details += 1 }, itemId: goal.id).frame(width: 340))
                 let size = host.fittingSize
                 let window = NSWindow(contentRect: NSRect(x: -10_000, y: -10_000, width: size.width, height: size.height),
                                       styleMask: [.titled], backing: .buffered, defer: false)
@@ -105,8 +106,21 @@ enum Snapshot {
                 let spots: [(String, CGFloat)] = [
                     ("circle", 22), ("title", 60), ("link mark", 44 + titleWidth + 4 + 7),
                     ("blank space", 175), ("bar", 230), ("count", 290), ("minus", 322),
+                    // The right margin beside − undoes since 2026-11-19 (−'s reach).
                     ("left margin", 4), ("right margin", 336),
                 ]
+                // Near misses around − (user, 2026-11-19: they opened the details instead of
+                // undoing): its target reaches the row's end and the row's height.
+                let nearMinus: [(String, CGFloat, CGFloat)] = [
+                    ("− left reach", 314, 0), ("− right", 330, 0), ("− row end", 337, 0),
+                    ("− above", 322, 11), ("− below", 322, -11),
+                ]
+                for (name, x, dy) in nearMinus {
+                    let before = (details, row().todayAmount)
+                    try await click(x, y: size.height / 2 + dy)
+                    print(String(format: "%-12@ x=%3.0f dy=%+2.0f → details %+d, today's +1s %+d", name as NSString, x, dy,
+                                 details - before.0, row().todayAmount - before.1)); fflush(stdout)
+                }
                 for (name, x) in spots + [("top padding", 150), ("bottom padding", 150)] {
                     let y: CGFloat = name == "top padding" ? size.height - 2 : name == "bottom padding" ? 2 : size.height / 2
                     let before = (details, row().todayAmount, opened.count)
@@ -114,6 +128,12 @@ enum Snapshot {
                     print(String(format: "%-12@ x=%3.0f → details %+d, today's +1s %+d, links opened %+d", name as NSString, x,
                                  details - before.0, row().todayAmount - before.1, opened.count - before.2)); fflush(stdout)
                 }
+                // With no +1 today, − is hidden and its place opens the details like the rest.
+                while row().todayAmount > 0 { model.undo(row()) }
+                try await Task.sleep(for: .milliseconds(300))
+                let hiddenBefore = (details, row().todayAmount)
+                try await click(330)
+                print("hidden −: x=330 → details", details - hiddenBefore.0, "| today's +1s", row().todayAmount - hiddenBefore.1)
                 // Rating dots on. A goal's +1 shows no dots, so the count stays visible
                 // while ticking (goals are rated on hover, which can't be simulated).
                 model.setRatingsEnabled(true)
@@ -165,7 +185,7 @@ enum Snapshot {
         let onOpen: () -> Void
         var itemId: UUID? = nil
         var body: some View {
-            if let row = itemId.flatMap({ id in model.today?.rows.first { $0.id == id } }) ?? model.today?.rows.first {
+            if let row = itemId.flatMap({ model.row($0) }) ?? model.today?.rows.first {
                 RowView(row: row, model: model, onEdit: {}, onOpen: onOpen)
             }
         }
