@@ -3,7 +3,7 @@ import AppKit
 /// The menu bar Daruma (SPEC 2026-11-18): five faces for how the day is going, drawn
 /// as a template image so the system tints it like the other menu bar icons. The
 /// design is Gemini Neon's, rounded by the user (a narrower base, a fuller middle, a
-/// face narrower at the top, belly stripes leaning in).
+/// face narrower at the top, belly stripes leaning in, about as tall as it is wide).
 @MainActor
 enum DarumaImage {
     /// In the menu bar: 20 pt (user, 2026-11-18: 16 looked small; 22 is the most the
@@ -55,19 +55,21 @@ enum DarumaImage {
     }
 
     private static func darumaBodyPath() -> NSBezierPath {
-        // Neon's body, rounder below (user): the sides curve in to a narrower base.
+        // Neon's body, rounder below (user); as tall as it is wide, so it reads round (user,
+        // 2026-11-18): the same outline, its top a little lower and its lower body a little
+        // shorter; the face is unchanged.
         let path = NSBezierPath()
-        path.move(to: NSPoint(x: 8.0, y: 0.30))
-        path.curve(to: NSPoint(x: 15.80, y: 8.40),
-                   controlPoint1: NSPoint(x: 13.00, y: 0.30), controlPoint2: NSPoint(x: 15.85, y: 4.20))
-        path.curve(to: NSPoint(x: 9.90, y: 15.60),
-                   controlPoint1: NSPoint(x: 15.80, y: 12.30), controlPoint2: NSPoint(x: 13.10, y: 15.50))
-        path.curve(to: NSPoint(x: 6.10, y: 15.60),
-                   controlPoint1: NSPoint(x: 8.90, y: 15.72), controlPoint2: NSPoint(x: 7.10, y: 15.72))
-        path.curve(to: NSPoint(x: 0.20, y: 8.40),
-                   controlPoint1: NSPoint(x: 2.90, y: 15.50), controlPoint2: NSPoint(x: 0.20, y: 12.30))
-        path.curve(to: NSPoint(x: 8.0, y: 0.30),
-                   controlPoint1: NSPoint(x: 0.15, y: 4.20), controlPoint2: NSPoint(x: 3.00, y: 0.30))
+        path.move(to: NSPoint(x: 8.0, y: 0.42))
+        path.curve(to: NSPoint(x: 15.80, y: 8.34),
+                   controlPoint1: NSPoint(x: 13.00, y: 0.42), controlPoint2: NSPoint(x: 15.85, y: 4.25))
+        path.curve(to: NSPoint(x: 9.90, y: 15.26),
+                   controlPoint1: NSPoint(x: 15.80, y: 12.09), controlPoint2: NSPoint(x: 13.10, y: 15.17))
+        path.curve(to: NSPoint(x: 6.10, y: 15.26),
+                   controlPoint1: NSPoint(x: 8.90, y: 15.38), controlPoint2: NSPoint(x: 7.10, y: 15.38))
+        path.curve(to: NSPoint(x: 0.20, y: 8.34),
+                   controlPoint1: NSPoint(x: 2.90, y: 15.17), controlPoint2: NSPoint(x: 0.20, y: 12.09))
+        path.curve(to: NSPoint(x: 8.0, y: 0.42),
+                   controlPoint1: NSPoint(x: 0.15, y: 4.25), controlPoint2: NSPoint(x: 3.00, y: 0.42))
         path.close()
         return path
     }
@@ -91,9 +93,9 @@ enum DarumaImage {
     private static func darumaBellyStripePaths() -> [NSBezierPath] {
         let segments: [(NSPoint, NSPoint)] = [
             // Upside down (user): the outer stripes lean in toward the base.
-            (NSPoint(x: 5.15, y: 12.90), NSPoint(x: 5.50, y: 14.30)),
-            (NSPoint(x: 8.00, y: 12.75), NSPoint(x: 8.00, y: 14.15)),
-            (NSPoint(x: 10.85, y: 12.90), NSPoint(x: 10.50, y: 14.30)),
+            (NSPoint(x: 5.18, y: 12.85), NSPoint(x: 5.49, y: 14.10)),
+            (NSPoint(x: 8.00, y: 12.75), NSPoint(x: 8.00, y: 14.00)),
+            (NSPoint(x: 10.82, y: 12.85), NSPoint(x: 10.51, y: 14.10)),
         ]
         return segments.map { start, end in
             let path = NSBezierPath()
