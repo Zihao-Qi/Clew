@@ -18,6 +18,9 @@ cask "clew" do
 
   app "Clew.app"
 
+  # Quit Clew on uninstall/upgrade; Homebrew reopens it after `brew upgrade --cask` if it was running.
+  uninstall quit: "io.github.zihao-qi.clew"
+
   # Only `brew uninstall --zap` removes your data; a plain uninstall keeps it.
   zap trash: "~/Library/Containers/io.github.zihao-qi.clew"
 end
