@@ -204,6 +204,7 @@ final class AppModel {
             timings.mark("focus")
         } catch {
             notice = String(localized: "Couldn't load today's list.")
+            timings.mark("failed")   // the step that threw, not the next one (review)
         }
         scheduleRollover()
         scheduleFocusEnd()

@@ -755,6 +755,9 @@ M = [
  ("ST6 fastest first", C+"StepTimings.swift", ".sorted { $0.milliseconds > $1.milliseconds }", ".sorted { $0.milliseconds < $1.milliseconds }", "StepTimingsTests"),
  ("ST7 no top limit", C+"StepTimings.swift", "            .prefix(top)\n", "", "StepTimingsTests"),
  ("ST8 tiny steps kept", C+"StepTimings.swift", "            .filter { $0.milliseconds >= 1 }\n", "", "StepTimingsTests"),
+ ("ST9 only big steps kept", C+"StepTimings.swift", ".filter { $0.milliseconds >= 1 }", ".filter { $0.milliseconds >= 9 }", "StepTimingsTests"),
+ ("ST10 total cut", C+"StepTimings.swift", "return \"\\(label) \\(Int(totalMilliseconds.rounded())) ms: \"", "return \"\\(label) \\(Int(totalMilliseconds)) ms: \"", "StepTimingsTests"),
+ ("ST11 step cut", C+"StepTimings.swift", ".map { \"\\($0.name) \\(Int($0.milliseconds.rounded()))\" }", ".map { \"\\($0.name) \\(Int($0.milliseconds))\" }", "StepTimingsTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0
