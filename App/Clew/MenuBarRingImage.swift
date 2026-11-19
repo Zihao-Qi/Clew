@@ -34,7 +34,8 @@ enum MenuBarRingImage {
             NSColor.black.withAlphaComponent(alpha).setStroke()
             path.stroke()
         }
-        let left: CGFloat = 0.3
+        // 0.4: at 0.3 the parts left were too faint to count (review: 1.85:1).
+        let left: CGFloat = 0.4
         switch ring {
         case .parts(let done, let total):
             if total == 1 {
