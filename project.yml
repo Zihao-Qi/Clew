@@ -32,8 +32,8 @@ targets:
         PRODUCT_NAME: Clew
         PRODUCT_MODULE_NAME: ClewApp   # avoids clashing with the ClewCore.Clew type
         SWIFT_VERSION: "6.0"
-        MARKETING_VERSION: 1.6.0
-        CURRENT_PROJECT_VERSION: 7
+        MARKETING_VERSION: 1.7.0
+        CURRENT_PROJECT_VERSION: 8
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_LSUIElement: YES   # menu bar only, no Dock icon
         INFOPLIST_KEY_CFBundleDisplayName: Clew
