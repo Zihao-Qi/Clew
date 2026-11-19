@@ -740,6 +740,13 @@ M = [
  ("MB6 parts up to 7", C+"MenuBarStyle.swift", "} else if total <= Self.maxParts {", "} else if total < Self.maxParts {", "MenuBarStyleTests"),
  ("MB7 parts always", C+"MenuBarStyle.swift", "} else if total <= Self.maxParts {", "} else if true {", "MenuBarStyleTests"),
  ("MB8 share of the left", C+"MenuBarStyle.swift", "self = .share(Double(done) / Double(total))", "self = .share(Double(total - done) / Double(total))", "MenuBarStyleTests"),
+ ("MB9 daruma with no tasks", C+"MenuBarStyle.swift", "        guard total > 0 else { return nil }\n        let done = max(0, done)\n        if done >= total { return 5 }", "        guard total >= 0 else { return nil }\n        let done = max(0, done)\n        if done >= total { return 5 }", "MenuBarStyleTests"),
+ ("MB10 both eyes one early", C+"MenuBarStyle.swift", "if done >= total { return 5 }", "if done >= total - 1 { return 5 }", "MenuBarStyleTests"),
+ ("MB11 one eye before a tick", C+"MenuBarStyle.swift", "if done == 0 { return 1 }", "if done < 0 { return 1 }", "MenuBarStyleTests"),
+ ("MB12 first tick smiles", C+"MenuBarStyle.swift", "if done == 1 { return 2 }", "if done == 1 { return 3 }", "MenuBarStyleTests"),
+ ("MB13 odd one laughs", C+"MenuBarStyle.swift", "return step * 2 <= between + 1 ? 3 : 4", "return step * 2 <= between ? 3 : 4", "MenuBarStyleTests"),
+ ("MB14 laughs too late", C+"MenuBarStyle.swift", "return step * 2 <= between + 1 ? 3 : 4", "return step * 2 <= between + 2 ? 3 : 4", "MenuBarStyleTests"),
+ ("MB15 never laughs", C+"MenuBarStyle.swift", "return step * 2 <= between + 1 ? 3 : 4", "return 3", "MenuBarStyleTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

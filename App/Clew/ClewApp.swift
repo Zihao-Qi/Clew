@@ -75,7 +75,7 @@ struct ClewApp: App {
     }
 }
 
-/// The menu bar title: a ring or `done/total` for today (SPEC §1; ring 2026-11-18).
+/// The menu bar title: a ring, a Daruma or `done/total` for today (SPEC §1; 2026-11-18).
 struct MenuBarLabel: View {
     let today: TodayList?
     var focus: FocusTimer? = nil
@@ -95,6 +95,9 @@ struct MenuBarLabel: View {
                                                          : Text("Clew, focus, \(left) left"))
         } else if style == .ring, let today, let ring = MenuBarRing(done: today.done, total: today.total) {
             Image(nsImage: MenuBarRingImage.image(ring))
+                .accessibilityLabel(Text("Clew, \(today.done) of \(today.total) done"))
+        } else if style == .daruma, let today, let stage = DarumaStage.of(done: today.done, total: today.total) {
+            Image(nsImage: DarumaImage.image(stage: stage))
                 .accessibilityLabel(Text("Clew, \(today.done) of \(today.total) done"))
         } else if let today, today.total > 0 {
             // Just the numbers (user, 2026-11-18: no icon before them).

@@ -791,6 +791,13 @@ enum Snapshot {
                         ForEach(rings, id: \.self) { Image(nsImage: MenuBarRingImage.image($0)) }
                         MenuBarLabel(today: model.today, style: .count)
                         MenuBarLabel(today: model.today, style: .ring)
+                        MenuBarLabel(today: model.today, style: .daruma)
+                    }
+                    HStack(spacing: 14) {
+                        ForEach(1...5, id: \.self) { Image(nsImage: DarumaImage.image(stage: $0)) }
+                        ForEach(1...5, id: \.self) {
+                            Image(nsImage: DarumaImage.image(stage: $0)).resizable().frame(width: 64, height: 64)
+                        }
                     }
                     HStack(spacing: 14) {
                         ForEach(rings, id: \.self) {

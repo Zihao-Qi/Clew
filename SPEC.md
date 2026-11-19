@@ -888,8 +888,17 @@ stopped daily use, not adding features.
   as they are ticked, so what is left can be counted; above 8 tasks it is one
   smooth ring that fills by the share done. Nothing ticked yet: the empty ring. All
   done: a filled circle with a ✓. No tasks: the plain icon, as before. A running
-  focus timer shows its countdown in either style. VoiceOver reads "Clew, 1 of 3
-  done" in both.
+  focus timer shows its countdown in any style. VoiceOver reads "Clew, 1 of 3
+  done" in all of them.
+- **The menu bar Daruma (2026-11-18, *user*):** a third choice, **Ring · Daruma ·
+  Count**. A Daruma doll whose face changes with the day, in five stages: (1) nothing
+  done: stern, both eyes blank; (2) the first task done: calmer, one eye painted
+  (the viewer's right, as the custom paints the doll's left first); (3) smiling and
+  (4) laughing, spread evenly over the counts between (2 done … all but one: the
+  first half smiles, the second laughs; an odd one out smiles, so 6 tasks: 2–3
+  smile, 4–5 laugh; 5 tasks: 2–3 smile, 4 laughs; 3 tasks: 2 smiles); (5) everything
+  done: both eyes painted, laughing. One colour like the other menu bar icons; drawn
+  after Gemini Neon's design, rounded by the user.
 - A counted goal's undo is a small `−` beside its count, shown only after a `+1` today;
   it removes the last `+1`. It sits apart from the circle so rapid ticks can't hit it
   (2026-11-08, v1a).
