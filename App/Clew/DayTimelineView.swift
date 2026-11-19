@@ -811,8 +811,24 @@ private struct EngravedCard: ViewModifier {
         let shape = RoundedRectangle(cornerRadius: 10)
         let dark = scheme == .dark
         content
-            .background(shape.fill(Color.black.opacity(dark ? 0.26 : 0.045)
-                .shadow(.inner(color: .black.opacity(dark ? 0.6 : 0.22), radius: 2.5, y: 1.5))))
+            .background {
+                ZStack {
+                    shape.fill(Color.black.opacity(dark ? 0.26 : 0.045))
+                    // The inner shadow along the top: a short fade from the top edge, drawn on
+                    // its own (a shadow on the faint fill faded with the fill's opacity and was
+                    // invisible in light mode; review) and without blur, so it renders the same
+                    // everywhere.
+                    VStack(spacing: 0) {
+                        LinearGradient(stops: [.init(color: .black.opacity(dark ? 0.45 : 0.16), location: 0),
+                                               .init(color: .black.opacity(dark ? 0.15 : 0.05), location: 0.45),
+                                               .init(color: .clear, location: 1)],
+                                       startPoint: .top, endPoint: .bottom)
+                            .frame(height: 7)
+                        Spacer(minLength: 0)
+                    }
+                    .clipShape(shape)
+                }
+            }
             .clipShape(shape)
             // The lip: light only along the bottom edge.
             .overlay(shape.strokeBorder(LinearGradient(colors: [.clear, .clear, .white.opacity(dark ? 0.14 : 0.9)],
