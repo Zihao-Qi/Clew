@@ -161,9 +161,10 @@ struct DayTimelineView: View {
             header
             hours
         }
-        // Its own card: a shallower fill than the list, slightly translucent, with rounded corners, inset like the list's rows.
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .textBackgroundColor).opacity(0.7)))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        // Its own card, engraved into the menu (SPEC 2026-11-19, user: the old light card
+        // could take the glass's tone on a light wallpaper): a little darker than the
+        // glass, an inner shadow along the top, a light lip along the bottom.
+        .modifier(EngravedCard())
         .padding(.horizontal, 8)
         .padding(.top, 8)
         .padding(.bottom, 4)
@@ -799,5 +800,24 @@ struct PlaceView: View {
             model.place(itemId, at: start, minutes: minutes)
         }
         if ok { onDone() }
+    }
+}
+
+/// The timeline's card, engraved into the menu (SPEC 2026-11-19).
+private struct EngravedCard: ViewModifier {
+    @Environment(\.colorScheme) private var scheme
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 10)
+        let dark = scheme == .dark
+        content
+            .background(shape.fill(Color.black.opacity(dark ? 0.26 : 0.045)
+                .shadow(.inner(color: .black.opacity(dark ? 0.6 : 0.22), radius: 2.5, y: 1.5))))
+            .clipShape(shape)
+            // The lip: light only along the bottom edge.
+            .overlay(shape.strokeBorder(LinearGradient(colors: [.clear, .clear, .white.opacity(dark ? 0.14 : 0.9)],
+                                                       startPoint: .top, endPoint: .bottom), lineWidth: 1)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true))
     }
 }
