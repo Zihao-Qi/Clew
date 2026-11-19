@@ -154,6 +154,8 @@ struct AddView: View {
     @State private var schedule = ScheduleDraft()
     @State private var target = 30
     @State private var slot = SlotDraft()
+    /// A priority (SPEC 2026-11-19): Today and Habit only.
+    @State private var priority = false
     /// A Later task's day (SPEC 2026-11-17).
     @State private var onADay = false
     @State private var day = Date()
@@ -214,6 +216,9 @@ struct AddView: View {
             if kind == .later {
                 DayRow(model: model, on: $onADay, date: $day, open: $dayOpen)
             }
+            if kind == .today || kind == .habit {
+                PriorityRow(on: $priority)
+            }
 
             NoticeView(text: model.notice)
 
@@ -267,7 +272,7 @@ struct AddView: View {
         let timeSlot = kind == .habit ? slot.slot : nil
         let laterDay = kind == .later && onADay ? LocalDay(picked: day) : nil
         if model.add(NewItem(title: parsed.title, titleOrigin: origin, url: parsed.url, shape: shape, slot: timeSlot,
-                             laterDay: laterDay)) {
+                             laterDay: laterDay, priority: (kind == .today || kind == .habit) && priority)) {
             done()
         }
     }
@@ -301,6 +306,9 @@ struct EditView: View {
     @State private var time: TimeOfDay
     @State private var blockMinutes: Int
     @State private var dayOpen = false
+    /// Priority (SPEC 2026-11-19): offered for a task on Today, a habit, or one marked.
+    private let canBePriority: Bool
+    @State private var priority: Bool
 
     init(model: AppModel, item: Item, done: @escaping () -> Void) {
         self.model = model
@@ -329,6 +337,8 @@ struct EditView: View {
         _time = State(initialValue: open.map { TimeOfDay(pickerDate: $0.start) }
             ?? model.timeline?.nextQuarter(after: Date()) ?? TimeOfDay(hour: 9, minute: 0)!)
         _blockMinutes = State(initialValue: open?.minutes ?? Clew.blockDefaultMinutes)
+        canBePriority = model.canBePriority(item)
+        _priority = State(initialValue: item.priority)
     }
 
     /// The day as it will be saved, if it differs from the one it has.
@@ -371,6 +381,9 @@ struct EditView: View {
                 TodayTimelineRow(model: model, on: $onTimeline, time: $time, minutes: $blockMinutes,
                                  ownLength: openBlock?.minutes)
             }
+            if canBePriority {
+                PriorityRow(on: $priority)
+            }
             ReminderRow(enabled: $remind, time: $remindAt, today: $remindToday,
                         passed: reminderChanged && remind && remindToday && model.reminderTimePassed(remindAt))
             if model.notificationsDenied, remind {
@@ -409,7 +422,8 @@ struct EditView: View {
             title: title, url: url,
             schedule: hasSchedule ? schedule.schedule : nil,
             target: item.kind == .goal ? target : nil,
-            slot: hasSchedule ? .set(slot.slot) : .keep
+            slot: hasSchedule ? .set(slot.slot) : .keep,
+            priority: canBePriority ? priority : nil
         )
         let wanted: TimeOfDay? = remind ? remindAt : nil
         // Today at a passed time: nothing is saved until the time or the choice changes.
@@ -457,6 +471,22 @@ extension TimeOfDay {
     init(pickerDate date: Date) {
         let c = Calendar.current.dateComponents([.hour, .minute], from: date)
         self = TimeOfDay(hour: c.hour ?? 9, minute: c.minute ?? 0) ?? TimeOfDay(hour: 9, minute: 0)!
+    }
+}
+
+/// "Priority" in Add and Edit (SPEC 2026-11-19): first on Today, marked gold.
+struct PriorityRow: View {
+    @Binding var on: Bool
+
+    var body: some View {
+        Toggle(isOn: $on) {
+            HStack(spacing: 4) {
+                Text("Priority")
+                Image(systemName: "circle").foregroundStyle(PriorityGold.color).imageScale(.small)
+                    .accessibilityHidden(true)
+            }
+        }
+        .accessibilityLabel(Text("Priority"))
     }
 }
 

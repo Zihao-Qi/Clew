@@ -75,6 +75,9 @@ public struct Item: Hashable, Sendable, Identifiable, Codable {
     public var externalRef: String?
     /// A repeating task's place on the day timeline (SPEC 2026-11-10); nil for none.
     public var slot: TimeSlot?
+    /// A priority task (SPEC 2026-11-19): first on Today, marked gold, until done or
+    /// unmarked. Shown only while the task is on Today.
+    public var priority: Bool
     public var createdAt: Date
     public var updatedAt: Date
     public var deletedAt: Date?
@@ -83,7 +86,7 @@ public struct Item: Hashable, Sendable, Identifiable, Codable {
         id: UUID, kind: ItemKind, title: String, titleOrigin: TitleOrigin = .typed, url: URL? = nil, note: String? = nil,
         parentId: UUID? = nil, schedule: Schedule, progress: ProgressSpec, state: ItemState,
         plannedDay: LocalDay? = nil, sortKey: Double, source: Source, externalRef: String? = nil,
-        slot: TimeSlot? = nil, createdAt: Date, updatedAt: Date, deletedAt: Date? = nil
+        slot: TimeSlot? = nil, priority: Bool = false, createdAt: Date, updatedAt: Date, deletedAt: Date? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -100,9 +103,38 @@ public struct Item: Hashable, Sendable, Identifiable, Codable {
         self.source = source
         self.externalRef = externalRef
         self.slot = slot
+        self.priority = priority
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.deletedAt = deletedAt
+    }
+}
+
+extension Item {
+    private enum CodingKeys: String, CodingKey {
+        case id, kind, title, titleOrigin, url, note, parentId, schedule, progress, state, plannedDay, sortKey, source,
+             externalRef, slot, priority, createdAt, updatedAt, deletedAt
+    }
+
+    /// Exports from before 2026-11-19 have no `priority`: false.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try c.decode(UUID.self, forKey: .id), kind: try c.decode(ItemKind.self, forKey: .kind),
+            title: try c.decode(String.self, forKey: .title),
+            titleOrigin: try c.decode(TitleOrigin.self, forKey: .titleOrigin),
+            url: try c.decodeIfPresent(URL.self, forKey: .url), note: try c.decodeIfPresent(String.self, forKey: .note),
+            parentId: try c.decodeIfPresent(UUID.self, forKey: .parentId),
+            schedule: try c.decode(Schedule.self, forKey: .schedule),
+            progress: try c.decode(ProgressSpec.self, forKey: .progress),
+            state: try c.decode(ItemState.self, forKey: .state),
+            plannedDay: try c.decodeIfPresent(LocalDay.self, forKey: .plannedDay),
+            sortKey: try c.decode(Double.self, forKey: .sortKey), source: try c.decode(Source.self, forKey: .source),
+            externalRef: try c.decodeIfPresent(String.self, forKey: .externalRef),
+            slot: try c.decodeIfPresent(TimeSlot.self, forKey: .slot),
+            priority: try c.decodeIfPresent(Bool.self, forKey: .priority) ?? false,
+            createdAt: try c.decode(Date.self, forKey: .createdAt), updatedAt: try c.decode(Date.self, forKey: .updatedAt),
+            deletedAt: try c.decodeIfPresent(Date.self, forKey: .deletedAt))
     }
 }
 

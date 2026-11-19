@@ -697,6 +697,20 @@ final class AppModel {
         withAnimation(Self.moveAnimation) { run { try $0.setLaterDay(itemId: itemId, day: day) } }
     }
     func laterDay(_ itemId: UUID) -> LocalDay? { (try? clew?.laterDay(itemId: itemId)) ?? nil }
+    // MARK: Priority tasks (SPEC 2026-11-19)
+
+    /// Marking or unmarking moves the row to its group, so it slides there.
+    func setPriority(_ row: TodayRow, _ on: Bool) {
+        withAnimation(Self.moveAnimation) { _ = run { try $0.setPriority(itemId: row.id, on) } }
+    }
+    /// Edit offers Priority for a task on Today, a habit, or one already marked.
+    func canBePriority(_ item: Item) -> Bool {
+        item.priority || today?.rows.contains { $0.id == item.id } == true
+            || (item.kind == .habit && item.state == .active)
+    }
+    /// The row shows the mark: a priority on Today (Goals & Later shows none).
+    func showsPriority(_ row: TodayRow) -> Bool { row.item.priority && !isBelow(row) }
+
     func moveToToday(_ row: TodayRow) { withAnimation(Self.moveAnimation) { _ = run { try $0.moveToToday(itemId: row.id) } } }
     func moveBack(_ row: TodayRow) { withAnimation(Self.moveAnimation) { _ = run { try $0.moveBack(itemId: row.id) } } }
 
@@ -821,6 +835,7 @@ final class AppModel {
         case .listTurnedOff: String(localized: "That list is turned off in Settings › General.")
         case .focusRunning: String(localized: "A focus timer is already running. Stop it first.")
         case .invalidMinutes(let max): String(localized: "Pick between 1 and \(max) minutes.")
+        case .tooManyPriorities(let max): String(localized: "Up to \(max) priorities. Finish or unmark one first.")
         }
     }
 

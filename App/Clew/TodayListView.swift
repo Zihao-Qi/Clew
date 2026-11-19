@@ -826,6 +826,10 @@ struct RowView: View {
             }
             Button("Details", action: onOpen)
             Button("Edit…", action: onEdit)
+            // Rows on Today only (SPEC 2026-11-19).
+            if !model.isBelow(row) {
+                Toggle("Priority", isOn: Binding(get: { item.priority }, set: { model.setPriority(row, $0) }))
+            }
             if timer == nil, model.focus?.phase != .focus, !row.isGoalReached {
                 Menu("Focus") {
                     ForEach(Clew.focusMinutes, id: \.self) { m in
@@ -928,7 +932,9 @@ struct RowView: View {
                 Image(systemName: row.isDone ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
                     .frame(width: TaskColumns.circleWidth)
-                    .foregroundStyle(row.isDone ? Color.accentColor : Color.secondary)
+                    // A priority's circle and ✓ are gold (SPEC 2026-11-19).
+                    .foregroundStyle(model.showsPriority(row) ? PriorityGold.color
+                                     : row.isDone ? Color.accentColor : Color.secondary)
                     .contentTransition(.symbolEffect(.replace))
             }
             .buttonStyle(.borderless)
@@ -1006,7 +1012,7 @@ struct RowView: View {
                 .truncationMode(.tail)
                 .foregroundStyle(row.isDone ? .secondary : .primary)
                 .accessibilityAddTraits(row.isDone ? .isSelected : [])
-                .accessibilityValue(watchedValue)
+                .accessibilityValue(rowValue)
                 .accessibilityAction(named: Text("Details"), onOpen)
             if let url = item.url {
                 Button { model.open(url) } label: {
@@ -1038,6 +1044,16 @@ struct RowView: View {
     /// own row.
     static let countWidth: CGFloat = 44
     static let undoWidth: CGFloat = 12
+
+    /// "Priority" (SPEC 2026-11-19) and how much was watched, read with the title.
+    private var rowValue: Text {
+        let watched = item.progress.target == nil && (model.watched[row.id] ?? 0) > 0
+        switch (model.showsPriority(row), watched) {
+        case (true, true): return Text("Priority") + Text(verbatim: ", ") + watchedValue
+        case (true, false): return Text("Priority")
+        default: return watchedValue
+        }
+    }
 
     /// "40 percent watched" for a started video, read with the title.
     private var watchedValue: Text {
