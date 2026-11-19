@@ -898,7 +898,9 @@ stopped daily use, not adding features.
   first half smiles, the second laughs; an odd one out smiles, so 6 tasks: 2–3
   smile, 4–5 laugh; 5 tasks: 2–3 smile, 4 laughs; 3 tasks: 2 smiles); (5) everything
   done: both eyes painted, laughing. One colour like the other menu bar icons; drawn
-  after Gemini Neon's design, rounded by the user.
+  after Gemini Neon's design, rounded by the user. Sizes (*user*, same day): the Daruma
+  20 pt and the ring 18 pt (16 looked small in a notch Mac's 33 pt bar; 22 is the most
+  the bar holds).
 - A counted goal's undo is a small `−` beside its count, shown only after a `+1` today;
   it removes the last `+1`. It sits apart from the circle so rapid ticks can't hit it
   (2026-11-08, v1a).

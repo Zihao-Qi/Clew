@@ -5,18 +5,23 @@ import ClewCore
 /// it for the menu bar (light, dark, highlighted), as it does the SF Symbols.
 @MainActor
 enum MenuBarRingImage {
-    /// The status bar icon size, as the checklist symbol's.
-    static let size = NSSize(width: 16, height: 16)
-    private static var cache: [MenuBarRing: NSImage] = [:]
+    /// In the menu bar: 18 pt (user, 2026-11-18: 16 looked small in a notch Mac's
+    /// 33 pt bar). Drawn on a 16 pt grid and scaled, so the parts keep their shape.
+    static let menuBarSize: CGFloat = 18
+    private struct Key: Hashable { let ring: MenuBarRing; let size: CGFloat }
+    private static var cache: [Key: NSImage] = [:]
 
-    static func image(_ ring: MenuBarRing) -> NSImage {
-        if let image = cache[ring] { return image }
-        let image = NSImage(size: size, flipped: false) { rect in
-            draw(ring, in: rect)
+    /// `size` 16 for a preview inside text (Settings).
+    static func image(_ ring: MenuBarRing, size: CGFloat = menuBarSize) -> NSImage {
+        let key = Key(ring: ring, size: size)
+        if let image = cache[key] { return image }
+        let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { _ in
+            NSGraphicsContext.current?.cgContext.scaleBy(x: size / 16, y: size / 16)
+            draw(ring, in: NSRect(x: 0, y: 0, width: 16, height: 16))
             return true
         }
         image.isTemplate = true
-        cache[ring] = image
+        cache[key] = image
         return image
     }
 

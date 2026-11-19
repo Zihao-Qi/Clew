@@ -136,8 +136,8 @@ struct SettingsView: View {
                         menuBarStyle = style
                         model.setMenuBarStyle(style)
                     })) {
-                        Text("Ring (\(Text(Image(nsImage: MenuBarRingImage.image(.parts(done: 2, of: 6)))).baselineOffset(-3.5)))").tag(MenuBarStyle.ring)
-                        Text("Daruma (\(Text(Image(nsImage: DarumaImage.image(stage: 3))).baselineOffset(-3.5)))").tag(MenuBarStyle.daruma)
+                        Text("Ring (\(Text(Image(nsImage: MenuBarRingImage.image(.parts(done: 2, of: 6), size: 16))).baselineOffset(-3.5)))").tag(MenuBarStyle.ring)
+                        Text("Daruma (\(Text(Image(nsImage: DarumaImage.image(stage: 3, size: 16))).baselineOffset(-3.5)))").tag(MenuBarStyle.daruma)
                         Text("Count (2/6)").tag(MenuBarStyle.count)
                     }
                     .pickerStyle(.radioGroup)
