@@ -137,11 +137,12 @@ struct SettingsView: View {
                         model.setMenuBarStyle(style)
                     })) {
                         Text("Ring (\(Text(Image(nsImage: MenuBarRingImage.image(.parts(done: 2, of: 6)))).baselineOffset(-3.5)))").tag(MenuBarStyle.ring)
+                        Text("Daruma (\(Text(Image(nsImage: DarumaImage.image(stage: 3))).baselineOffset(-3.5)))").tag(MenuBarStyle.daruma)
                         Text("Count (2/6)").tag(MenuBarStyle.count)
                     }
                     .pickerStyle(.radioGroup)
                 } footer: {
-                    Text("A ring with a part for each task on Today, filled as you tick them (one smooth ring above 8), or the count done of the total. A running focus timer shows its time in either.")
+                    Text("A ring with a part for each task on Today, filled as you tick them (one smooth ring above 8); a Daruma that paints one eye at your first tick, smiles, then laughs as you go on, and paints the other eye when all are done; or the count done of the total. A running focus timer shows its time in any of them.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
