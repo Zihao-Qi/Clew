@@ -488,12 +488,12 @@ final class AppModel {
     /// The timeline's name box, on Return (SPEC 2026-11-13): a today task and its block, in
     /// one step. A link's page title is kept as fetched unless it was edited.
     @discardableResult
-    func addOnTimeline(_ text: String, fetchedTitle: String?, at start: Date) -> Bool {
+    func addOnTimeline(_ text: String, fetchedTitle: String?, at start: Date, minutes: Int) -> Bool {
         let parsed = QuickEntry.parse(text)
         if blockAlerts { askForNotifications() }
         return run {
             try $0.addOnTimeline(title: parsed.title, titleOrigin: parsed.title == fetchedTitle ? .fetched : .typed,
-                                 url: parsed.url, start: start)
+                                 url: parsed.url, start: start, minutes: minutes)
         }
     }
     @discardableResult

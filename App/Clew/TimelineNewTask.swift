@@ -17,6 +17,18 @@ struct NewTaskDraft: Equatable {
         start = Clew.quarterStart(minutesIn: minutesIn, day: day)
         minutes = min(Clew.blockDefaultMinutes, TimelineMetrics.room(after: start, in: day))
     }
+
+    /// How tall the box (and a drag's block) is drawn: its minutes, at least 18 points so
+    /// a 15-minute one holds a line of text.
+    static func boxHeight(_ minutes: Int) -> CGFloat {
+        max(CGFloat(minutes) * TimelineMetrics.pointsPerMinute - 1, 18)
+    }
+
+    /// A drag's block (SPEC 2026-11-19): its own start and length.
+    init(start: Date, minutes: Int) {
+        self.start = start
+        self.minutes = minutes
+    }
 }
 
 /// A small name field shaped like the block it will make. Return saves; Esc, an empty
@@ -56,7 +68,7 @@ struct NewTaskBox: View {
                 .padding(.horizontal, 5)
                 .padding(.top, 2)
             }
-            .frame(height: max(CGFloat(draft.minutes) * TimelineMetrics.pointsPerMinute - 1, 18))
+            .frame(height: NewTaskDraft.boxHeight(draft.minutes))
             .background(OutsideClickWatcher(onOutside: cancel))
             .onChange(of: text) { textChanged() }
             // On the next turn: a box opened by a double-click elsewhere appears while the
@@ -87,7 +99,7 @@ struct NewTaskBox: View {
         fetchTask?.cancel()
         fetchTask = nil
         // Refused (a name too long): the box stays with its text, and the notice says why.
-        if model.addOnTimeline(text, fetchedTitle: fetchedTitle, at: draft.start) { close() }
+        if model.addOnTimeline(text, fetchedTitle: fetchedTitle, at: draft.start, minutes: draft.minutes) { close() }
     }
 
     private func cancel() {

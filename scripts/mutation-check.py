@@ -786,6 +786,13 @@ M = [
  ("PR26 store reads none", S+"SQLiteStore.swift", "priority: try required(row, \"priority\", table: t),", "priority: false,", "PriorityTests|PriorityCommandTests|MenuBarStyleTests|SQLiteStoreTests"),
  ("PR27 remark checks limit", C+"Clew.swift", "            guard item.priority != on else { return }\n", "", "PriorityTests|PriorityCommandTests|MenuBarStyleTests|SQLiteStoreTests"),
  ("PR28 stranger neighbour", C+"Clew.swift", "        if a == .some(nil) || b == .some(nil) { return (above, below) }\n", "", "PriorityTests|PriorityCommandTests|MenuBarStyleTests|SQLiteStoreTests"),
+ ("SW1 anchor rounds", C+"Timeline.swift", "let anchor = min(max(Int((press / step).rounded(.down)), 0), quarters - 1)", "let anchor = min(max(Int((press / step).rounded()), 0), quarters - 1)", "TimelineTests"),
+ ("SW2 pointer floors", C+"Timeline.swift", "let reach = min(max(Int((pointer / step).rounded()), 0), quarters)", "let reach = min(max(Int((pointer / step).rounded(.down)), 0), quarters)", "TimelineTests"),
+ ("SW3 up drops anchor", C+"Timeline.swift", "(first, last) = (min(reach, anchor), anchor + 1)", "(first, last) = (min(reach, anchor), anchor)", "TimelineTests"),
+ ("SW4 no minimum", C+"Timeline.swift", "(first, last) = (anchor, max(reach, anchor + 1))", "(first, last) = (anchor, reach)", "TimelineTests"),
+ ("SW5 day end unclamped", C+"Timeline.swift", "let reach = min(max(Int((pointer / step).rounded()), 0), quarters)", "let reach = max(Int((pointer / step).rounded()), 0)", "TimelineTests"),
+ ("SW6 length ignored", C+"Timeline.swift", "let length = minutes ?? min(Self.blockDefaultMinutes, Int(bounds.end.timeIntervalSince(start) / 60))", "let length = min(Self.blockDefaultMinutes, Int(bounds.end.timeIntervalSince(start) / 60))", "TimelineTests"),
+ ("SW7 length unchecked", C+"Timeline.swift", "        try Self.checkLength(length, start: start, bounds)\n        return try storeForQueries.write { w in\n            let item = try insertNewItem(", "        return try storeForQueries.write { w in\n            let item = try insertNewItem(", "TimelineTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0
