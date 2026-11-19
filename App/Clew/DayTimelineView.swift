@@ -161,10 +161,9 @@ struct DayTimelineView: View {
             header
             hours
         }
-        // Its own card, engraved into the menu (SPEC 2026-11-19, user: the old light card
-        // could take the glass's tone on a light wallpaper): a little darker than the
-        // glass, an inner shadow along the top, a light lip along the bottom.
-        .modifier(EngravedCard())
+        // Its own card, floating just above the menu (SPEC 2026-11-19, user): the
+        // foreground of what to do now and next.
+        .modifier(FloatingCard())
         .padding(.horizontal, 8)
         .padding(.top, 8)
         .padding(.bottom, 4)
@@ -803,37 +802,42 @@ struct PlaceView: View {
     }
 }
 
-/// The timeline's card, engraved into the menu (SPEC 2026-11-19).
-private struct EngravedCard: ViewModifier {
+/// The timeline's card, floating just above the menu (SPEC 2026-11-19).
+private struct FloatingCard: ViewModifier {
     @Environment(\.colorScheme) private var scheme
 
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: 10)
         let dark = scheme == .dark
+        // Light: a nearly opaque sheet, so the shadow shows only outside it. Dark: a
+        // slightly lighter surface than the glass, as macOS shows height in dark mode.
+        let fill: Color = dark ? .white.opacity(0.08) : Color(nsColor: .textBackgroundColor).opacity(0.95)
+        // A faint edge; in dark a light one, a little brighter along the top.
+        let edge = LinearGradient(colors: dark ? [.white.opacity(0.16), .white.opacity(0.05)]
+                                               : [.black.opacity(0.05), .black.opacity(0.05)],
+                                  startPoint: .top, endPoint: .bottom)
         content
-            .background {
-                ZStack {
-                    shape.fill(Color.black.opacity(dark ? 0.26 : 0.045))
-                    // The inner shadow along the top: a short fade from the top edge, drawn on
-                    // its own (a shadow on the faint fill faded with the fill's opacity and was
-                    // invisible in light mode; review) and without blur, so it renders the same
-                    // everywhere.
-                    VStack(spacing: 0) {
-                        LinearGradient(stops: [.init(color: .black.opacity(dark ? 0.45 : 0.16), location: 0),
-                                               .init(color: .black.opacity(dark ? 0.15 : 0.05), location: 0.45),
-                                               .init(color: .clear, location: 1)],
-                                       startPoint: .top, endPoint: .bottom)
-                            .frame(height: 7)
-                        Spacer(minLength: 0)
-                    }
-                    .clipShape(shape)
-                }
-            }
+            .background(shape.fill(fill))
             .clipShape(shape)
-            // The lip: light only along the bottom edge.
-            .overlay(shape.strokeBorder(LinearGradient(colors: [.clear, .clear, .white.opacity(dark ? 0.14 : 0.9)],
-                                                       startPoint: .top, endPoint: .bottom), lineWidth: 1)
+            .overlay(shape.strokeBorder(edge, lineWidth: 1)
                 .allowsHitTesting(false)
                 .accessibilityHidden(true))
+            // A tight shadow, lower than a dragged row's (0.18, radius 6, y 2) so a drag
+            // still rises highest. Drawn from a solid shape with its inside cut away, so
+            // it shows only outside the card, whatever the card's own opacity.
+            .background {
+                // Inset a little, so the caster's soft edge stays inside the cut-out (review:
+                // the corners showed it); dark below a dragged row's 0.18 too, the lighter
+                // surface does the lifting there.
+                shape.inset(by: 0.75).fill(Color.black)
+                    .shadow(color: .black.opacity(dark ? 0.16 : 0.10), radius: 2.5, y: 1)
+                    .mask {
+                        Rectangle().padding(-16)
+                            .overlay(shape.blendMode(.destinationOut))
+                            .compositingGroup()
+                    }
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
     }
 }
