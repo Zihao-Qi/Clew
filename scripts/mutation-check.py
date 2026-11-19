@@ -747,6 +747,17 @@ M = [
  ("MB13 odd one laughs", C+"MenuBarStyle.swift", "return step * 2 <= between + 1 ? 3 : 4", "return step * 2 <= between ? 3 : 4", "MenuBarStyleTests"),
  ("MB14 laughs too late", C+"MenuBarStyle.swift", "return step * 2 <= between + 1 ? 3 : 4", "return step * 2 <= between + 2 ? 3 : 4", "MenuBarStyleTests"),
  ("MB15 never laughs", C+"MenuBarStyle.swift", "return step * 2 <= between + 1 ? 3 : 4", "return 3", "MenuBarStyleTests"),
+ ("ST1 step from the start", C+"StepTimings.swift", "steps.append(Step(name: name, milliseconds: (t - last) * 1000))", "steps.append(Step(name: name, milliseconds: (t - start) * 1000))", "StepTimingsTests"),
+ ("ST2 seconds not ms", C+"StepTimings.swift", "steps.append(Step(name: name, milliseconds: (t - last) * 1000))", "steps.append(Step(name: name, milliseconds: (t - last)))", "StepTimingsTests"),
+ ("ST3 last not moved", C+"StepTimings.swift", "        last = t\n", "", "StepTimingsTests"),
+ ("ST4 threshold exclusive", C+"StepTimings.swift", "guard totalMilliseconds >= threshold else { return nil }", "guard totalMilliseconds > threshold else { return nil }", "StepTimingsTests"),
+ ("ST5 always reported", C+"StepTimings.swift", "guard totalMilliseconds >= threshold else { return nil }", "", "StepTimingsTests"),
+ ("ST6 fastest first", C+"StepTimings.swift", ".sorted { $0.milliseconds > $1.milliseconds }", ".sorted { $0.milliseconds < $1.milliseconds }", "StepTimingsTests"),
+ ("ST7 no top limit", C+"StepTimings.swift", "            .prefix(top)\n", "", "StepTimingsTests"),
+ ("ST8 tiny steps kept", C+"StepTimings.swift", "            .filter { $0.milliseconds >= 1 }\n", "", "StepTimingsTests"),
+ ("ST9 only big steps kept", C+"StepTimings.swift", ".filter { $0.milliseconds >= 1 }", ".filter { $0.milliseconds >= 9 }", "StepTimingsTests"),
+ ("ST10 total cut", C+"StepTimings.swift", "return \"\\(label) \\(Int(totalMilliseconds.rounded())) ms: \"", "return \"\\(label) \\(Int(totalMilliseconds)) ms: \"", "StepTimingsTests"),
+ ("ST11 step cut", C+"StepTimings.swift", ".map { \"\\($0.name) \\(Int($0.milliseconds.rounded()))\" }", ".map { \"\\($0.name) \\(Int($0.milliseconds))\" }", "StepTimingsTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

@@ -17,6 +17,8 @@ struct SettingsView: View {
     @State private var ratingDots = false
     @State private var barStyle = Clew.defaultBarStyle
     @State private var menuBarStyle = Clew.defaultMenuBarStyle
+    /// Settings' own window, to tell its coming to the front from the menu's.
+    @State private var ownWindow = WindowRef()
     @State private var listsOff: Set<Source> = []
     @State private var offersBreak = true
     @State private var timelineShown = true
@@ -375,9 +377,14 @@ struct SettingsView: View {
         }
         // A menu bar app shows no window at launch, so macOS must not restore this one
         // if it was open when Clew quit.
-        .background(NonRestorableWindow())
+        .background(NonRestorableWindow(ref: ownWindow))
         .onAppear(perform: reload)
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in reload() }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { note in
+            // Only its own window coming to the front: the menu's opening refreshes the
+            // menu itself (SPEC 2026-11-19; this refreshed it a second time).
+            guard let window = note.object as? NSWindow, window === ownWindow.window else { return }
+            reload()
+        }
     }
 
     private func summaryRow(_ label: Text, enabled: WritableKeyPath<SummarySettings, Bool>,
@@ -512,15 +519,28 @@ private struct RestoreSheet: View {
 /// Marks its hosting window as not restorable (works on macOS 14, unlike the macOS 15
 /// `restorationBehavior` scene modifier).
 private struct NonRestorableWindow: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView { Probe() }
+    /// Where Settings learns which window is its own.
+    let ref: WindowRef
+
+    func makeNSView(context: Context) -> NSView { Probe(ref: ref) }
     func updateNSView(_ nsView: NSView, context: Context) {}
 
     final class Probe: NSView {
+        let ref: WindowRef
+        init(ref: WindowRef) { self.ref = ref; super.init(frame: .zero) }
+        required init?(coder: NSCoder) { fatalError("not used") }
+
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             window?.isRestorable = false
+            ref.window = window
         }
     }
+}
+
+/// A weak hold on a view's window (no cycle: the window holds the view).
+final class WindowRef {
+    weak var window: NSWindow?
 }
 
 /// Settings › Calendar (SPEC "Calendar events"): turn calendar events on the timeline on

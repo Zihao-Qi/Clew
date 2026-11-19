@@ -911,6 +911,14 @@ stopped daily use, not adding features.
   it removes the last `+1`. It sits apart from the circle so rapid ticks can't hit it
   (2026-11-08, v1a).
 - Summary defaults: **9:00** and **21:00**, off until switched on.
+- **Opening the menu refreshes once (2026-11-19, *user*):** one refresh per opening, from
+  the menu's own window becoming key, on whatever screen it opens; other windows (Settings)
+  becoming key do not refresh it (it was refreshed twice per opening, once for any window).
+- **Slow refreshes are logged on this Mac (2026-11-19, *user*):** a refresh that takes
+  100 ms or more writes one line to the system log (subsystem `io.github.zihao-qi.clew`,
+  category `performance`): the total and its slowest steps, in milliseconds, by step name
+  only (never a title, note or calendar event). Nothing leaves the Mac. It is how the
+  occasional slow opening is traced to its step before anything is changed.
 
 ## Open question
 

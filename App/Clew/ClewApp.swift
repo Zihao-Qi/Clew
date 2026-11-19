@@ -157,11 +157,9 @@ struct RootView: View {
         }
         .frame(width: 340)
         // Last week's card (SPEC 2026-11-15): one opening of the menu's own window.
+        // It also refreshes the menu once per opening, on any screen (SPEC 2026-11-19:
+        // it used to refresh a second time for any window becoming key, Settings too).
         .background(MenuSessionWatcher(model: model, onList: screen == .list))
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
-            // Opening the list always shows today as it is now.
-            model.refresh()
-        }
         .onChange(of: screen) { model.notice = nil }
     }
 }

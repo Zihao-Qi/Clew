@@ -938,7 +938,9 @@ remains an option for an App Store build.
   container, Keychain items and notification permission are keyed by it.
 - **No tracking.** No analytics, no phoning home. Any future crash reporting is
   opt-in. The one exception is the update check (2026-11-13): off until the user turns
-  it on, and it sends nothing but a plain request for the latest release.
+  it on, and it sends nothing but a plain request for the latest release. Slow
+  refreshes write a line to the Mac's own system log (step names and milliseconds
+  only; SPEC 2026-11-19); nothing is sent anywhere.
 - **Localisation and accessibility from the first commit.** All UI text goes in a
   String Catalog (English first); every control has a VoiceOver label; the menu bar
   list is fully keyboard-navigable.
