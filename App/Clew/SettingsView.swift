@@ -136,8 +136,8 @@ struct SettingsView: View {
                         menuBarStyle = style
                         model.setMenuBarStyle(style)
                     })) {
-                        Text("Ring (\(Text(Image(nsImage: MenuBarRingImage.image(.parts(done: 1, of: 3)))).baselineOffset(-3.5)))").tag(MenuBarStyle.ring)
-                        Text("Count (\(Image(systemName: "checklist")) 1/3)").tag(MenuBarStyle.count)
+                        Text("Ring (\(Text(Image(nsImage: MenuBarRingImage.image(.parts(done: 2, of: 6)))).baselineOffset(-3.5)))").tag(MenuBarStyle.ring)
+                        Text("Count (2/6)").tag(MenuBarStyle.count)
                     }
                     .pickerStyle(.radioGroup)
                 } footer: {

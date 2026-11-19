@@ -2,7 +2,6 @@
   "sourceLanguage" : "en",
   "strings" : {
     "%@ %@" : {},
-    "%@ %lld/%lld" : {},
     "%@ changed its page, so Clew couldn't read it all. Nothing was removed; the extension needs an update." : {},
     "%@ done" : {},
     "%@ done · +%lld that day" : {},
@@ -119,7 +118,7 @@
     "Copy the Homebrew command" : {},
     "Couldn't check for updates." : {},
     "Couldn't load today's list." : {},
-    "Count (%@ 1/3)" : {},
+    "Count (2/6)" : {},
     "Daily" : {},
     "Data" : {},
     "Day" : {},

@@ -879,9 +879,11 @@ stopped daily use, not adding features.
 - Pasted links get their page title fetched (2026-11-08, after first use); this is
   then the app's only internet use (the v1.1 extension connection stays on this Mac;
   the update check, off by default, was added 2026-11-13).
-- The menu bar title is an icon plus `done/total`, not the word "Clew" (2026-11-08, v1a).
+- The menu bar title is an icon plus `done/total`, not the word "Clew" (2026-11-08, v1a;
+  *changed* 2026-11-18: a ring, or `done/total` alone; the icon only with nothing on Today).
 - **The menu bar ring (2026-11-18, *user*):** Settings › General › Menu bar picks
-  **Ring** (default) or **Count** (the icon plus `done/total`, as before). The ring
+  **Ring** (default) or **Count** (`done/total`, as before but without the icon in front:
+  *changed* the same day, *user*). The ring
   is a small circle split into one part per task on Today (the same `total`), filled
   as they are ticked, so what is left can be counted; above 8 tasks it is one
   smooth ring that fills by the share done. Nothing ticked yet: the empty ring. All

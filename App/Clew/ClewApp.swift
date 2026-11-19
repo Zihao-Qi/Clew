@@ -97,7 +97,9 @@ struct MenuBarLabel: View {
             Image(nsImage: MenuBarRingImage.image(ring))
                 .accessibilityLabel(Text("Clew, \(today.done) of \(today.total) done"))
         } else if let today, today.total > 0 {
-            Text("\(Image(systemName: "checklist")) \(today.done)/\(today.total)")
+            // Just the numbers (user, 2026-11-18: no icon before them).
+            Text(verbatim: "\(today.done)/\(today.total)")
+                .monospacedDigit()
                 .accessibilityLabel(Text("Clew, \(today.done) of \(today.total) done"))
         } else {
             Image(systemName: "checklist")
