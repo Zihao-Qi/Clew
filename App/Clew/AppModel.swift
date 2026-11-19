@@ -673,10 +673,19 @@ final class AppModel {
             return
         }
         let rows = listRows
-        guard let index = rows.firstIndex(where: { $0.id == row.id }) else { return }
-        let target = index + step
-        guard rows.indices.contains(target) else { return }
-        drop(row.id, onto: rows[target])
+        guard let index = rows.firstIndex(where: { $0.id == row.id }), canMove(row, by: step) else { return }
+        drop(row.id, onto: rows[index + step])
+    }
+    /// Move Up / Move Down stop at the row's own list's ends, and on Today at its group's
+    /// (priorities first, SPEC 2026-11-19).
+    func canMove(_ row: TodayRow, by step: Int) -> Bool {
+        if isBelow(row) {
+            guard let index = goalsAndLater.firstIndex(where: { $0.id == row.id }) else { return false }
+            return goalsAndLater.indices.contains(index + step)
+        }
+        let rows = listRows
+        guard let index = rows.firstIndex(where: { $0.id == row.id }), rows.indices.contains(index + step) else { return false }
+        return rows[index + step].item.priority == row.item.priority
     }
     /// Moves chosen from a menu slide the row to its new place (user, 2026-11-18); a
     /// drag lands where it was dropped, so it is not animated.

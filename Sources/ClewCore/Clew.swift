@@ -304,12 +304,13 @@ public final class Clew: Sendable {
     /// left as they are (placing refuses them).
     public static func groupNeighbours(after above: UUID?, before below: UUID?, in order: [UUID],
                                        priorities: Set<UUID>, priority: Bool) -> (after: UUID?, before: UUID?) {
+        // A neighbour not on Today is passed on as it is, so placing refuses it.
+        let a = above.map { order.firstIndex(of: $0) }, b = below.map { order.firstIndex(of: $0) }
+        if a == .some(nil) || b == .some(nil) { return (above, below) }
         let gap: Int
-        if let below {
-            guard let i = order.firstIndex(of: below) else { return (above, below) }
+        if let i = b ?? nil {
             gap = i
-        } else if let above {
-            guard let i = order.firstIndex(of: above) else { return (above, below) }
+        } else if let i = a ?? nil {
             gap = i + 1
         } else {
             gap = order.count

@@ -128,6 +128,31 @@ private func at(_ d: Int, _ h: Int, _ m: Int = 0) -> Date {
         #expect(try today() == ["p2", "p1", "n2", "n1"])
     }
 
+    @Test func placingNextToATaskNotOnTodayIsRefused() throws {
+        let a = try add("a")
+        let b = try add("b")
+        let later = try add("later", .later)
+        #expect(throws: ClewError.notAllowed) { try clew.place(itemId: b, in: .today, after: later, before: a) }
+        #expect(try today() == ["a", "b"])
+    }
+
+    @Test func editCannotMarkATaskBelowButCanUnmarkIt() throws {
+        let goal = try add("goal", .goal(target: 10))
+        #expect(throws: ClewError.notAllowed) {
+            try clew.editItem(id: goal, ItemEdit(title: "goal", url: nil, target: 10, priority: true))
+        }
+        try clew.moveToToday(itemId: goal)
+        try clew.setPriority(itemId: goal, true)
+        try clew.moveBack(itemId: goal)          // back in Goals & Later, still marked
+        #expect(marked(goal))
+        try clew.editItem(id: goal, ItemEdit(title: "goal", url: nil, target: 10, priority: false))
+        #expect(!marked(goal))
+        let a = try add("a", priority: true)
+        _ = try ["b", "c"].map { try add($0, priority: true) }
+        try clew.editItem(id: a, ItemEdit(title: "a", url: nil, priority: true))   // already marked, at the limit
+        #expect(marked(a))
+    }
+
     @Test func groupNeighboursAtTheEdges() {
         let p = (0..<2).map { _ in UUID() }, n = (0..<2).map { _ in UUID() }
         let order = p + n, pr = Set(p)
@@ -144,5 +169,8 @@ private func at(_ d: Int, _ h: Int, _ m: Int = 0) -> Date {
         #expect(g(nil, nil, true) == [p[1], nil])
         let stranger = UUID()
         #expect(g(stranger, nil, true) == [stranger, nil]) // not on Today: left for place to refuse
+        #expect(g(stranger, n[0], false) == [stranger, n[0]])
+        #expect(g(p[0], stranger, true) == [p[0], stranger])
+        #expect(g(n[0], nil, false) == [n[0], n[1]])        // after one: before the next of its group
     }
 }

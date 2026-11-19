@@ -86,7 +86,8 @@ enum MenuBarRingImage {
                 arc(from: start, to: end, i < golds ? gold : i < done ? ink : left)
             }
         case .share(let share, let golds):
-            arc(from: 0, to: 1, left)
+            // Each stretch drawn once: ink over the faint ring would darken it (review).
+            arc(from: share, to: 1, left)
             arc(from: golds, to: share, ink)
             arc(from: 0, to: golds, gold)
         case .finished:

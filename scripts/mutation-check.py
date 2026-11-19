@@ -785,6 +785,7 @@ M = [
  ("PR25 store drops mark", S+"SQLiteStore.swift", "try i.slot.map(json), i.priority,", "try i.slot.map(json), false,", "PriorityTests|PriorityCommandTests|MenuBarStyleTests|SQLiteStoreTests"),
  ("PR26 store reads none", S+"SQLiteStore.swift", "priority: try required(row, \"priority\", table: t),", "priority: false,", "PriorityTests|PriorityCommandTests|MenuBarStyleTests|SQLiteStoreTests"),
  ("PR27 remark checks limit", C+"Clew.swift", "            guard item.priority != on else { return }\n", "", "PriorityTests|PriorityCommandTests|MenuBarStyleTests|SQLiteStoreTests"),
+ ("PR28 stranger neighbour", C+"Clew.swift", "        if a == .some(nil) || b == .some(nil) { return (above, below) }\n", "", "PriorityTests|PriorityCommandTests|MenuBarStyleTests|SQLiteStoreTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

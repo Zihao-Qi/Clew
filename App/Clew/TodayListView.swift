@@ -332,7 +332,7 @@ struct TodayListView: View {
     private func listRow(_ row: TodayRow, index: Int, count: Int, ids: [UUID]) -> some View {
         RowView(row: row, model: model, onEdit: { screen = .edit(row.item, back: .list) },
                 onOpen: { screen = .detail(row.id) },
-                canMoveUp: index > 0, canMoveDown: index < count - 1,
+                canMoveUp: index > 0 && model.canMove(row, by: -1), canMoveDown: index < count - 1 && model.canMove(row, by: 1),
                 isDragged: dragging == row.id,
                 dragActive: dragging != nil || lifted != nil,
                 onHoverChange: { inside in
