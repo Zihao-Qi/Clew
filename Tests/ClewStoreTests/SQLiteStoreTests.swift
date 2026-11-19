@@ -206,6 +206,29 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         #expect(plans.count == 1 && plans[0]["todaySortKey"] as Double? == nil)
     }
 
+    /// Schema v13 (SPEC 2026-11-19): existing tasks are not priorities; the mark round-trips.
+    @Test func v13PriorityDefaultsOffAndRoundTrips() throws {
+        let queue = try DatabaseQueue()
+        try Schema.migrator.migrate(queue, upTo: "v12-one-day-reminders")
+        let id = UUID()
+        try queue.write { db in
+            try db.execute(sql: """
+                INSERT INTO item (id, kind, title, titleOrigin, schedule, progress, state, sortKey, source, createdAt, updatedAt)
+                VALUES (?, 'once', 'x', 'typed', '{"type":"unscheduled","v":1}', '{"type":"none","v":1}', 'active', 1, 'user', ?, ?)
+                """, arguments: [id.uuidString, t0, t0])
+        }
+        let store = try SQLiteStore(writer: queue)
+        var item = try #require(try store.read { try $0.item(id: id) })
+        #expect(!item.priority)
+        item.priority = true
+        try store.write { try $0.update(item) }
+        #expect(try store.read { try $0.item(id: id) }?.priority == true)
+        var fresh = sampleItem()
+        fresh.priority = true
+        try store.write { try $0.insert(fresh) }
+        #expect(try store.read { try $0.item(id: fresh.id) } == fresh)
+    }
+
     /// Schema v12 (SPEC 2026-11-15): a reminder's day round-trips; older ones are every day.
     @Test func v12RemindersKeepTheirDay() throws {
         let queue = try DatabaseQueue()

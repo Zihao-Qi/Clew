@@ -90,7 +90,7 @@ makes history trustworthy, rewards stable, and sync rules small and explicit (§
 Item            id (UUID), kind, title, titleOrigin: typed | fetched, url?, note?, parentId?,
                 schedule (JSON value type), progress (JSON value type),
                 state: active | later | paused | archived,
-                plannedDay?, sortKey, source, externalRef?,
+                plannedDay?, sortKey, source, externalRef?, slot? (v1.2), priority (2026-11-19),
                 createdAt, updatedAt, deletedAt?
 CheckIn         id, itemId, localDay, at (UTC), timeZoneId, amount (default 1),
                 rating? (1–3), ratedAt?, source, voidedAt?, voidReason?
@@ -638,6 +638,16 @@ are every source but `timeline`.
   while the timeline shows, the app leaves them out of the list's rows (they still
   count in `done/total`, which Core computes from the whole list). The setting
   `timelineShown` (default on) hides the timeline and puts every task back in the list. The table `timeBlock` (v8) has no-delete; exports carry it (older read as none).
+
+**Priority tasks (SPEC 2026-11-19).** `Item.priority: Bool`, a definition field
+(column `priority`, migration v13, `NOT NULL DEFAULT 0`; exports carry it, and older
+exports without it decode as false). `todayList` puts Today's priority rows first, each
+group in its own key order; Goals & Later ignores it. `setPriority` (and Add / Edit)
+marks a task on Today or a habit while `prioritiesOpen < 3`; a row done today adds
+nothing; unmarking always works. `place(in: .today)` maps a drop's neighbours into the
+placed row's own group (`groupNeighbours`), so keys stay ordered within each group. The
+menu bar ring takes `prioritiesDone` as its gold parts; with gold it is a coloured (not
+template) image that draws its ink from the drawing appearance.
 
 **Time slots (v1.2, SPEC 2026-11-10).** `Item.slot: TimeSlot? {hour, minute, minutes}`
 (a definition field, JSON column `slot`, migration v9; habits and goals only; `ItemEdit.slot`

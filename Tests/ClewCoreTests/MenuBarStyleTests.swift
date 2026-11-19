@@ -49,4 +49,17 @@ import Testing
         // 10 tasks: 2–5 smile, 6–9 laugh.
         #expect((0...10).map { DarumaStage.of(done: $0, total: 10)! } == [1, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5])
     }
+
+    /// SPEC 2026-11-19: done priorities are the ring's gold parts, first.
+    @Test func donePrioritiesAreGold() {
+        #expect(MenuBarRing(done: 3, total: 6, gold: 1) == .parts(done: 3, of: 6, gold: 1))
+        #expect(MenuBarRing(done: 1, total: 6, gold: 3) == .parts(done: 1, of: 6, gold: 1))   // never more than done
+        #expect(MenuBarRing(done: 2, total: 6, gold: -1) == .parts(done: 2, of: 6, gold: 0))
+        #expect(MenuBarRing(done: 4, total: 12, gold: 2) == .share(4.0 / 12, gold: 2.0 / 12))
+        #expect(MenuBarRing(done: 6, total: 6, gold: 3) == .finished)                          // all done: no gold
+        #expect(MenuBarRing(done: 3, total: 6, gold: 1)!.hasGold)
+        #expect(!MenuBarRing(done: 3, total: 6)!.hasGold)
+        #expect(MenuBarRing(done: 4, total: 12, gold: 2)!.hasGold && !MenuBarRing(done: 4, total: 12)!.hasGold)
+        #expect(!MenuBarRing.finished.hasGold)
+    }
 }

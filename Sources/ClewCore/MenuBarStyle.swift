@@ -13,26 +13,39 @@ public enum MenuBarStyle: String, Codable, Sendable, CaseIterable {
 
 /// The ring for `done` of `total` tasks on Today.
 public enum MenuBarRing: Hashable, Sendable {
-    /// One part per task, `done` of them filled (0 done: the empty ring).
-    case parts(done: Int, of: Int)
-    /// Over `maxParts` tasks: one smooth ring filled by the share done.
-    case share(Double)
-    /// Everything done: a filled circle with a ✓.
+    /// One part per task, `done` of them filled (0 done: the empty ring), the first
+    /// `gold` of those gold: done priorities, which come first (SPEC 2026-11-19).
+    case parts(done: Int, of: Int, gold: Int = 0)
+    /// Over `maxParts` tasks: one smooth ring filled by the share done, the first
+    /// `gold` of it (a share of the whole) gold.
+    case share(Double, gold: Double = 0)
+    /// Everything done: a filled circle with a ✓ (no gold).
     case finished
 
     /// Up to this many tasks the ring is split into parts.
     public static let maxParts = 8
 
-    /// nil when there is nothing on Today (the plain icon shows).
-    public init?(done: Int, total: Int) {
+    /// nil when there is nothing on Today (the plain icon shows). `gold`: priorities
+    /// done, at most `done`.
+    public init?(done: Int, total: Int, gold: Int = 0) {
         guard total > 0 else { return nil }
         let done = max(0, done)
+        let gold = min(max(0, gold), done)
         if done >= total {
             self = .finished
         } else if total <= Self.maxParts {
-            self = .parts(done: done, of: total)
+            self = .parts(done: done, of: total, gold: gold)
         } else {
-            self = .share(Double(done) / Double(total))
+            self = .share(Double(done) / Double(total), gold: Double(gold) / Double(total))
+        }
+    }
+
+    /// Some of it is gold: the image is coloured, not a template.
+    public var hasGold: Bool {
+        switch self {
+        case .parts(_, _, let gold): gold > 0
+        case .share(_, let gold): gold > 0
+        case .finished: false
         }
     }
 }

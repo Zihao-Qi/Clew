@@ -919,6 +919,35 @@ stopped daily use, not adding features.
   category `performance`): the total and its slowest steps, in milliseconds, by step name
   only (never a title, note or calendar event). Nothing leaves the Mac. It is how the
   occasional slow opening is traced to its step before anything is changed.
+- **Priority tasks (2026-11-19, *user*):** a task on Today can be marked **Priority**
+  (right-click › Priority, or the Priority switch in Add and Edit): one kind, no levels.
+  - **Up to 3** unfinished priorities on Today. Marking a fourth is refused with a short
+    hint ("Up to 3 priorities. Finish or unmark one first."); finished ones don't count,
+    so another can be marked once one is done. If a returning repeating task makes 4,
+    all 4 show; only new marks wait.
+  - **Until done.** The mark belongs to the task: a once task or link keeps it until it
+    is done (it then leaves with the day, as before); a repeating task keeps it every
+    day it is on Today, until unmarked. A goal or Later item moved to Today keeps it too;
+    in Goals & Later it shows no mark and no order. Only rows on Today can be marked.
+  - **First rows, no section.** Priority tasks are the first rows of Today, in your drag
+    order; the others follow in theirs. No header or divider. A drag stays within its
+    own group (a priority dropped among the others lands at the group's end, and the
+    other way round). Ticking still never moves a row; unmarking returns the row to its
+    place among the others.
+  - **The mark: gold (kin-iro, 金色), flat** like the other marks. An unfinished
+    priority's circle is gold; done, a gold ✓. Light mode `#B88A0E` (3.1:1 on white;
+    pure kin-iro `#C99A12` is 2.6:1, too faint for an empty circle), dark `#E6B422`.
+    VoiceOver reads "Priority" with the title.
+  - **The ring:** done priorities are its gold parts. The ring fills from the top as
+    before, done priorities first (they are Today's first rows), so the gold parts lead
+    and the other done parts follow in black or white; an unfinished priority looks like
+    any part left. Above 8 tasks, the smooth ring's first share (priorities done of all
+    tasks) is gold. All done: the filled ✓ as before, no gold. With gold in it the ring
+    is drawn in the menu bar's own colour by Clew (the system tints only one-colour
+    icons). Daruma and Count are unchanged. VoiceOver adds "Priorities done: 1".
+    (*Changed* the same day, *user*: first a gold dot in the ring's middle.)
+  - Add offers Priority for Today and Habit; Edit for a task on Today, a habit, or one
+    already marked (to unmark it).
 
 ## Open question
 

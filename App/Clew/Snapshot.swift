@@ -601,7 +601,7 @@ enum Snapshot {
             let clew = Clew(store: try SQLiteStore.inMemory(), clock: clock, zones: SystemTimeZone())
             try seed(clew, clock: clock)
             let model = AppModel(clew: clew, notify: false)
-            let editing = try clew.today().rows[2].item
+            guard let editing = try clew.today().rows.first(where: { $0.item.title == "Stretch" })?.item else { exit(1) }
             // Focus time on the task whose details are rendered (SPEC 2026-11-10).
             let today = clew.currentDay()
             try clew.addFocusTime(itemId: editing.id, day: today, minutes: 25)
@@ -783,7 +783,10 @@ enum Snapshot {
             render(MenuBarLabel(today: model.today).padding(4), appearance: .aqua, to: dir.appendingPathComponent("label.png"))
             // The menu bar ring's states (SPEC 2026-11-18): real size, then 4× to inspect.
             let rings: [MenuBarRing] = [.parts(done: 0, of: 3), .parts(done: 1, of: 3), .parts(done: 2, of: 5),
-                                        .parts(done: 5, of: 8), .share(7.0 / 12), .finished]
+                                        .parts(done: 5, of: 8), .share(7.0 / 12), .finished,
+                                        // Done priorities, gold (SPEC 2026-11-19).
+                                        .parts(done: 3, of: 6, gold: 1), .parts(done: 4, of: 6, gold: 3),
+                                        .share(7.0 / 12, gold: 2.0 / 12)]
             for appearance in [NSAppearance.Name.aqua, .darkAqua] {
                 let suffix = appearance == .aqua ? "light" : "dark"
                 render(VStack(alignment: .leading, spacing: 10) {
@@ -868,8 +871,11 @@ enum Snapshot {
         let course = try clew.addItem(NewItem(title: "ML course", url: URL(string: "https://course.example"),
                                               shape: .goal(target: 30)))
         _ = try clew.addItem(NewItem(title: "Stretch", shape: .habit(.timesPerWeek(3))))
-        _ = try clew.addItem(NewItem(title: "A very long item title that should truncate nicely in the row",
-                                     shape: .today))
+        let long = try clew.addItem(NewItem(title: "A very long item title that should truncate nicely in the row",
+                                            shape: .today))
+        // Priority tasks (SPEC 2026-11-19): Today's first rows, gold; one done, one not.
+        try clew.setPriority(itemId: job.id, true)
+        try clew.setPriority(itemId: long.id, true)
         // Some history for the details heatmap: a few days a week over ten weeks.
         let now = clock.date
         for daysAgo in stride(from: 70, through: 1, by: -1) where daysAgo % 3 != 0 && daysAgo % 7 != 5 {

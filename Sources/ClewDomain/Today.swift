@@ -140,6 +140,12 @@ public struct TodayList: Hashable, Sendable {
     public var total: Int { rows.count + tickedBelow }
     /// Everything counted is done (and there is something): "All done for today".
     public var allDone: Bool { total > 0 && done == total }
+    /// Priority tasks on Today (SPEC 2026-11-19): done today, and not yet (what the
+    /// limit of 3 counts). Goals & Later rows show no priority.
+    public var prioritiesDone: Int { rows.lazy.filter { $0.item.priority && $0.isDone }.count }
+    public var prioritiesOpen: Int { rows.lazy.filter { $0.item.priority && !$0.isDone }.count }
+    /// At most this many unfinished priorities on Today.
+    public static let maxOpenPriorities = 3
 }
 
 /// Pure: Today's list and Goals & Later (SPEC 2026-11-15). Visible rows are `.due` and
@@ -200,7 +206,10 @@ public func todayList(items: [Item], facts: [UUID: ItemFacts], on day: LocalDay,
             (a.key, a.row.item.createdAt, a.row.item.id.uuidString) < (b.key, b.row.item.createdAt, b.row.item.id.uuidString)
         }.map(\.row)
     }
-    return TodayList(day: day, rows: ordered(today), goalsAndLater: ordered(below), moved: moved)
+    // Priority tasks are Today's first rows, each group in its own order (SPEC 2026-11-19).
+    let todayRows = ordered(today)
+    let first = todayRows.filter(\.item.priority) + todayRows.filter { !$0.item.priority }
+    return TodayList(day: day, rows: first, goalsAndLater: ordered(below), moved: moved)
 }
 
 /// The clock, injected. Domain and Core never call `Date()` (AGENTS.md rule 5).

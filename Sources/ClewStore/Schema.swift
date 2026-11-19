@@ -19,7 +19,13 @@ enum Schema {
         migrator.registerMigration("v10-plan-today-key", migrate: v10)
         migrator.registerMigration("v11-goals-without-schedule", migrate: v11)
         migrator.registerMigration("v12-one-day-reminders", migrate: v12)
+        migrator.registerMigration("v13-priority", migrate: v13)
         return migrator
+    }
+
+    /// Priority tasks (SPEC 2026-11-19): a definition field; every existing task is not one.
+    private static func v13(_ db: Database) throws {
+        try db.execute(sql: "ALTER TABLE item ADD COLUMN priority INTEGER NOT NULL DEFAULT 0 CHECK (priority IN (0, 1))")
     }
 
     /// A reminder for today only (SPEC 2026-11-15): its Clew day; null is every day,

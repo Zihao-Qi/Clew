@@ -23,6 +23,8 @@ public enum ClewError: Error, Equatable, Sendable {
     case focusRunning
     /// Focus time added by hand must be 1 to `max` minutes.
     case invalidMinutes(max: Int)
+    /// Already `max` unfinished priorities on Today (SPEC 2026-11-19).
+    case tooManyPriorities(max: Int)
 }
 
 /// What the user chose in `+ add`. Each case is a valid shape, so invalid
@@ -47,15 +49,18 @@ public struct NewItem: Hashable, Sendable {
     public var slot: TimeSlot?
     /// A Later task's day (SPEC 2026-11-17, "A day for Later"); after today.
     public var laterDay: LocalDay?
+    /// A priority (SPEC 2026-11-19): Today and Habit only.
+    public var priority: Bool
 
     public init(title: String, titleOrigin: TitleOrigin = .typed, url: URL? = nil, shape: NewItemShape,
-                slot: TimeSlot? = nil, laterDay: LocalDay? = nil) {
+                slot: TimeSlot? = nil, laterDay: LocalDay? = nil, priority: Bool = false) {
         self.title = title
         self.titleOrigin = titleOrigin
         self.url = url
         self.shape = shape
         self.slot = slot
         self.laterDay = laterDay
+        self.priority = priority
     }
 }
 
@@ -75,13 +80,17 @@ public struct ItemEdit: Hashable, Sendable {
     public var target: Int?
     /// Habits only (goals have none since 2026-11-15); `.keep` leaves the slot as it is.
     public var slot: SlotEdit
+    /// Priority (SPEC 2026-11-19); nil leaves it as it is.
+    public var priority: Bool?
 
-    public init(title: String, url: URL?, schedule: Schedule? = nil, target: Int? = nil, slot: SlotEdit = .keep) {
+    public init(title: String, url: URL?, schedule: Schedule? = nil, target: Int? = nil, slot: SlotEdit = .keep,
+                priority: Bool? = nil) {
         self.title = title
         self.url = url
         self.schedule = schedule
         self.target = target
         self.slot = slot
+        self.priority = priority
     }
 }
 
@@ -199,6 +208,11 @@ public final class Clew: Sendable {
 
         // Only habits have a slot (goals lost theirs, SPEC 2026-11-15).
         guard new.slot == nil || kind == .habit else { throw ClewError.notAllowed }
+        // A priority is for Today: a task added to Today, or a habit (SPEC 2026-11-19).
+        if new.priority {
+            guard state == .active, kind == .once || kind == .habit else { throw ClewError.notAllowed }
+            try Self.checkPriorityRoom(try todayList(w, on: day))
+        }
         // Only a Later task has a day, and it is after today (SPEC 2026-11-17).
         if let laterDay = new.laterDay {
             guard state == .later, laterDay > day else { throw ClewError.notAllowed }
@@ -207,7 +221,7 @@ public final class Clew: Sendable {
             id: makeID(), kind: kind, title: title, titleOrigin: new.titleOrigin, url: url,
             schedule: schedule, progress: progress,
             state: state, plannedDay: planned, sortKey: (try w.maxSortKey() ?? 0) + 1, source: source,
-            slot: new.slot, createdAt: now, updatedAt: now
+            slot: new.slot, priority: new.priority, createdAt: now, updatedAt: now
         )
         try w.insert(item)
         if let laterDay = new.laterDay {
@@ -245,9 +259,69 @@ public final class Clew: Sendable {
                 item.slot = slot
                 try slotChanged(item, now: now, w)
             }
+            if let priority = edit.priority, priority != item.priority {
+                if priority { try canMarkPriority(item, w) }
+                item.priority = priority
+            }
             try w.update(item)
             return item
         }
+    }
+
+    /// Right-click › Priority (SPEC 2026-11-19): marks or unmarks a task. Marking is for
+    /// a task on Today (or a habit, which keeps it every day it is there) while fewer
+    /// than 3 priorities on Today are unfinished; unmarking always works.
+    public func setPriority(itemId: UUID, _ on: Bool) throws {
+        let now = clock.now()
+        try store.write { w in
+            guard var item = try w.item(id: itemId), item.deletedAt == nil else { throw ClewError.itemNotFound }
+            guard item.priority != on else { return }
+            if on { try canMarkPriority(item, w) }
+            item.priority = on
+            item.updatedAt = now
+            try w.update(item)
+        }
+    }
+
+    private func canMarkPriority(_ item: Item, _ w: any StoreWriter) throws {
+        let current = try todayList(w, on: currentDay())
+        let row = current.rows.first { $0.id == item.id }
+        guard row != nil || (item.kind == .habit && item.state == .active) else { throw ClewError.notAllowed }
+        // A task already done today adds nothing unfinished.
+        if row?.isDone == true { return }
+        try Self.checkPriorityRoom(current)
+    }
+
+    static func checkPriorityRoom(_ list: TodayList) throws {
+        guard list.prioritiesOpen < TodayList.maxOpenPriorities else {
+            throw ClewError.tooManyPriorities(max: TodayList.maxOpenPriorities)
+        }
+    }
+
+    /// Today's rows are two groups, priorities first (SPEC 2026-11-19). A row placed
+    /// into the other group lands at its own group's edge. `order`: Today's rows without
+    /// the placed one; `priority`: the placed row's group. Neighbours not on Today are
+    /// left as they are (placing refuses them).
+    public static func groupNeighbours(after above: UUID?, before below: UUID?, in order: [UUID],
+                                       priorities: Set<UUID>, priority: Bool) -> (after: UUID?, before: UUID?) {
+        // A neighbour not on Today is passed on as it is, so placing refuses it.
+        let a = above.map { order.firstIndex(of: $0) }, b = below.map { order.firstIndex(of: $0) }
+        if a == .some(nil) || b == .some(nil) { return (above, below) }
+        let gap: Int
+        if let i = b ?? nil {
+            gap = i
+        } else if let i = a ?? nil {
+            gap = i + 1
+        } else {
+            gap = order.count
+        }
+        let split = order.prefix { priorities.contains($0) }.count
+        if priority {
+            let g = min(gap, split)
+            return (g > 0 ? order[g - 1] : nil, g < split ? order[g] : nil)
+        }
+        let g = max(gap, split)
+        return (g > split ? order[g - 1] : nil, g < order.count ? order[g] : nil)
     }
 
     /// One click on `○`. Once-items and habits record at most one check-in per day,

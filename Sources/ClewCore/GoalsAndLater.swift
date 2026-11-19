@@ -83,6 +83,14 @@ extension Clew {
            row.isGoalReached {
             throw ClewError.notAllowed      // a reached goal waits for Next round or a higher target
         }
+        var (above, below) = (above, below)
+        if list == .today {
+            // Priorities stay first (SPEC 2026-11-19): only within the row's own group.
+            let order = current.rows.map(\.id).filter { $0 != itemId }
+            let priorities = Set(current.rows.filter(\.item.priority).map(\.id))
+            (above, below) = Self.groupNeighbours(after: above, before: below, in: order, priorities: priorities,
+                                                  priority: item.priority)
+        }
         let key = try newKey(in: list, after: above, before: below, excluding: itemId, day: day, now: now, w)
         switch list {
         case .today:

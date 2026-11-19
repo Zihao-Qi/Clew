@@ -385,8 +385,9 @@ private struct Access: StoreWriter {
         try db.execute(
             sql: """
                 INSERT INTO item (id, kind, title, url, note, parentId, schedule, progress, state, plannedDay,
-                                  sortKey, source, externalRef, createdAt, updatedAt, deletedAt, titleOrigin, slot)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                  sortKey, source, externalRef, createdAt, updatedAt, deletedAt, titleOrigin, slot,
+                                  priority)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
             arguments: try Self.itemArguments(item)
         )
@@ -399,7 +400,7 @@ private struct Access: StoreWriter {
             sql: """
                 UPDATE item SET id = ?, kind = ?, title = ?, url = ?, note = ?, parentId = ?, schedule = ?,
                     progress = ?, state = ?, plannedDay = ?, sortKey = ?, source = ?, externalRef = ?,
-                    createdAt = ?, updatedAt = ?, deletedAt = ?, titleOrigin = ?, slot = ?
+                    createdAt = ?, updatedAt = ?, deletedAt = ?, titleOrigin = ?, slot = ?, priority = ?
                 WHERE id = ?
                 """,
             arguments: args
@@ -468,7 +469,7 @@ private struct Access: StoreWriter {
             i.id.uuidString, i.kind.rawValue, i.title, i.url?.absoluteString, i.note, i.parentId?.uuidString,
             try json(i.schedule), try json(i.progress), i.state.rawValue, i.plannedDay?.description,
             i.sortKey, i.source.rawValue, i.externalRef, i.createdAt, i.updatedAt, i.deletedAt,
-            i.titleOrigin.rawValue, try i.slot.map(json),
+            i.titleOrigin.rawValue, try i.slot.map(json), i.priority,
         ]
     }
 
@@ -490,6 +491,7 @@ private struct Access: StoreWriter {
             source: try raw(row, "source", table: t),
             externalRef: row["externalRef"],
             slot: try (row["slot"] as String?).map { try JSONDecoder().decode(TimeSlot.self, from: Data($0.utf8)) },
+            priority: try required(row, "priority", table: t),
             createdAt: try required(row, "createdAt", table: t),
             updatedAt: try required(row, "updatedAt", table: t),
             deletedAt: row["deletedAt"]

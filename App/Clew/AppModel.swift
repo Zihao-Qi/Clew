@@ -673,10 +673,19 @@ final class AppModel {
             return
         }
         let rows = listRows
-        guard let index = rows.firstIndex(where: { $0.id == row.id }) else { return }
-        let target = index + step
-        guard rows.indices.contains(target) else { return }
-        drop(row.id, onto: rows[target])
+        guard let index = rows.firstIndex(where: { $0.id == row.id }), canMove(row, by: step) else { return }
+        drop(row.id, onto: rows[index + step])
+    }
+    /// Move Up / Move Down stop at the row's own list's ends, and on Today at its group's
+    /// (priorities first, SPEC 2026-11-19).
+    func canMove(_ row: TodayRow, by step: Int) -> Bool {
+        if isBelow(row) {
+            guard let index = goalsAndLater.firstIndex(where: { $0.id == row.id }) else { return false }
+            return goalsAndLater.indices.contains(index + step)
+        }
+        let rows = listRows
+        guard let index = rows.firstIndex(where: { $0.id == row.id }), rows.indices.contains(index + step) else { return false }
+        return rows[index + step].item.priority == row.item.priority
     }
     /// Moves chosen from a menu slide the row to its new place (user, 2026-11-18); a
     /// drag lands where it was dropped, so it is not animated.
@@ -697,6 +706,20 @@ final class AppModel {
         withAnimation(Self.moveAnimation) { run { try $0.setLaterDay(itemId: itemId, day: day) } }
     }
     func laterDay(_ itemId: UUID) -> LocalDay? { (try? clew?.laterDay(itemId: itemId)) ?? nil }
+    // MARK: Priority tasks (SPEC 2026-11-19)
+
+    /// Marking or unmarking moves the row to its group, so it slides there.
+    func setPriority(_ row: TodayRow, _ on: Bool) {
+        withAnimation(Self.moveAnimation) { _ = run { try $0.setPriority(itemId: row.id, on) } }
+    }
+    /// Edit offers Priority for a task on Today, a habit, or one already marked.
+    func canBePriority(_ item: Item) -> Bool {
+        item.priority || today?.rows.contains { $0.id == item.id } == true
+            || (item.kind == .habit && item.state == .active)
+    }
+    /// The row shows the mark: a priority on Today (Goals & Later shows none).
+    func showsPriority(_ row: TodayRow) -> Bool { row.item.priority && !isBelow(row) }
+
     func moveToToday(_ row: TodayRow) { withAnimation(Self.moveAnimation) { _ = run { try $0.moveToToday(itemId: row.id) } } }
     func moveBack(_ row: TodayRow) { withAnimation(Self.moveAnimation) { _ = run { try $0.moveBack(itemId: row.id) } } }
 
@@ -821,6 +844,7 @@ final class AppModel {
         case .listTurnedOff: String(localized: "That list is turned off in Settings › General.")
         case .focusRunning: String(localized: "A focus timer is already running. Stop it first.")
         case .invalidMinutes(let max): String(localized: "Pick between 1 and \(max) minutes.")
+        case .tooManyPriorities(let max): String(localized: "Up to \(max) priorities. Finish or unmark one first.")
         }
     }
 

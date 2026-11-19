@@ -93,9 +93,13 @@ struct MenuBarLabel: View {
                 .monospacedDigit()
                 .accessibilityLabel(focus.phase == .rest ? Text("Clew, break, \(left) left")
                                                          : Text("Clew, focus, \(left) left"))
-        } else if style == .ring, let today, let ring = MenuBarRing(done: today.done, total: today.total) {
+        } else if style == .ring, let today,
+                  let ring = MenuBarRing(done: today.done, total: today.total, gold: today.prioritiesDone) {
+            // Done priorities are the ring's gold parts (SPEC 2026-11-19).
             Image(nsImage: MenuBarRingImage.image(ring))
-                .accessibilityLabel(Text("Clew, \(today.done) of \(today.total) done"))
+                .accessibilityLabel(ring.hasGold
+                    ? Text("Clew, \(today.done) of \(today.total) done. Priorities done: \(today.prioritiesDone)")
+                    : Text("Clew, \(today.done) of \(today.total) done"))
         } else if style == .daruma, let today, let stage = DarumaStage.of(done: today.done, total: today.total) {
             Image(nsImage: DarumaImage.image(stage: stage))
                 .accessibilityLabel(Text("Clew, \(today.done) of \(today.total) done"))
