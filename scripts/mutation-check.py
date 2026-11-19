@@ -732,6 +732,14 @@ M = [
  ("PK12 list left keeps the block", C+"Peek.swift", "    public mutating func listLeft() {\n        self = PeekState()", "    public mutating func listLeft() {\n        close()", "PeekTests"),
  ("PK13 closes at once", C+"Peek.swift", "public static let closeDelay: TimeInterval = 0.2", "public static let closeDelay: TimeInterval = 0", "PeekTests"),
  ("DC9 task dated by clock again", C+"Timeline.swift", "                                         source: .user, now: now, day: today, w)", "                                         source: .user, now: now, day: currentDay().adding(days: 1), w)", "TimelineTests"),
+ ("MB1 count by default", C+"MenuBarStyle.swift", "public static let defaultMenuBarStyle = MenuBarStyle.ring", "public static let defaultMenuBarStyle = MenuBarStyle.count", "MenuBarStyleTests"),
+ ("MB2 unknown throws", C+"MenuBarStyle.swift", "return (try? JSONDecoder().decode(MenuBarStyle.self, from: Data(json.utf8))) ?? Self.defaultMenuBarStyle", "return try JSONDecoder().decode(MenuBarStyle.self, from: Data(json.utf8))", "MenuBarStyleTests"),
+ ("MB3 not saved", C+"MenuBarStyle.swift", "try storeForQueries.write { try $0.saveSetting(Self.menuBarStyleKey, json: json, updatedAt: now) }", "_ = (json, now)", "MenuBarStyleTests"),
+ ("MB4 ring with no tasks", C+"MenuBarStyle.swift", "guard total > 0 else { return nil }", "guard total >= 0 else { return nil }", "MenuBarStyleTests"),
+ ("MB5 finished one early", C+"MenuBarStyle.swift", "if done >= total {", "if done >= total - 1 {", "MenuBarStyleTests"),
+ ("MB6 parts up to 7", C+"MenuBarStyle.swift", "} else if total <= Self.maxParts {", "} else if total < Self.maxParts {", "MenuBarStyleTests"),
+ ("MB7 parts always", C+"MenuBarStyle.swift", "} else if total <= Self.maxParts {", "} else if true {", "MenuBarStyleTests"),
+ ("MB8 share of the left", C+"MenuBarStyle.swift", "self = .share(Double(done) / Double(total))", "self = .share(Double(total - done) / Double(total))", "MenuBarStyleTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

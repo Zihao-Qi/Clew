@@ -781,6 +781,25 @@ enum Snapshot {
             model.setBarStyle(Clew.defaultBarStyle)
             model.refresh()
             render(MenuBarLabel(today: model.today).padding(4), appearance: .aqua, to: dir.appendingPathComponent("label.png"))
+            // The menu bar ring's states (SPEC 2026-11-18): real size, then 4× to inspect.
+            let rings: [MenuBarRing] = [.parts(done: 0, of: 3), .parts(done: 1, of: 3), .parts(done: 2, of: 5),
+                                        .parts(done: 5, of: 8), .share(7.0 / 12), .finished]
+            for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+                let suffix = appearance == .aqua ? "light" : "dark"
+                render(VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 14) {
+                        ForEach(rings, id: \.self) { Image(nsImage: MenuBarRingImage.image($0)) }
+                        MenuBarLabel(today: model.today, style: .count)
+                        MenuBarLabel(today: model.today, style: .ring)
+                    }
+                    HStack(spacing: 14) {
+                        ForEach(rings, id: \.self) {
+                            Image(nsImage: MenuBarRingImage.image($0)).resizable().frame(width: 64, height: 64)
+                        }
+                    }
+                }
+                .padding(8), appearance: appearance, to: dir.appendingPathComponent("menubar-ring-\(suffix).png"))
+            }
             for pane in SettingsView.Pane.allCases {
                 render(SettingsView(model: model, pane: pane), appearance: .aqua,
                        to: dir.appendingPathComponent("settings-\(pane.rawValue)-light.png"))

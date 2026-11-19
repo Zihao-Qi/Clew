@@ -36,7 +36,8 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
 
 ## In scope
 
-1. **Menu bar list.** A SwiftUI `MenuBarExtra`. The title shows `done/total` for today.
+1. **Menu bar list.** A SwiftUI `MenuBarExtra`. The title shows `done/total` for today
+   (*changed* 2026-11-18, *user*: or a ring; see "The menu bar ring").
    Click it to open today's list. No main window is required. A global shortcut also
    opens the list (default **⌘.**, changeable in Settings › General). It uses a
    Carbon hotkey, so the sandbox stays on and Clew needs no Accessibility permission
@@ -879,6 +880,14 @@ stopped daily use, not adding features.
   then the app's only internet use (the v1.1 extension connection stays on this Mac;
   the update check, off by default, was added 2026-11-13).
 - The menu bar title is an icon plus `done/total`, not the word "Clew" (2026-11-08, v1a).
+- **The menu bar ring (2026-11-18, *user*):** Settings › General › Menu bar picks
+  **Ring** (default) or **Count** (the icon plus `done/total`, as before). The ring
+  is a small circle split into one part per task on Today (the same `total`), filled
+  as they are ticked, so what is left can be counted; above 8 tasks it is one
+  smooth ring that fills by the share done. Nothing ticked yet: the empty ring. All
+  done: a filled circle with a ✓. No tasks: the plain icon, as before. A running
+  focus timer shows its countdown in either style. VoiceOver reads "Clew, 1 of 3
+  done" in both.
 - A counted goal's undo is a small `−` beside its count, shown only after a `+1` today;
   it removes the last `+1`. It sits apart from the circle so rapid ticks can't hit it
   (2026-11-08, v1a).
