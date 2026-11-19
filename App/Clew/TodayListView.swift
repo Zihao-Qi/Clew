@@ -802,8 +802,11 @@ struct RowView: View {
         .contentShape(Rectangle())
         .onTapGesture(perform: onOpen)
         .onHover { hovering = $0; onHoverChange?($0) }
-        .accessibilityAction(named: Text("Move Up")) { if canMoveUp { model.move(row, by: -1) } }
-        .accessibilityAction(named: Text("Move Down")) { if canMoveDown { model.move(row, by: 1) } }
+        .accessibilityActions {
+            // Offered only where they move the row (review: no silent no-ops at an end).
+            if canMoveUp { Button("Move Up") { model.move(row, by: -1) } }
+            if canMoveDown { Button("Move Down") { model.move(row, by: 1) } }
+        }
         .accessibilityActions {
             // Nothing needs a drag (SPEC 2026-11-15); a day and a time are set in Edit.
             if model.isBelow(row) {
