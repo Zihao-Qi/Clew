@@ -391,17 +391,19 @@ extension Clew {
 
     /// A double-click on the timeline (SPEC 2026-11-13): a today task and its 30-minute
     /// block at `start` (cut at the day's end), in one write, so nothing is half made. A
-    /// block that has already ended decides at once, as a dropped row's does.
+    /// drag on the timeline (SPEC 2026-11-19) gives its own `minutes`. A block that has
+    /// already ended decides at once, as a dropped row's does.
     @discardableResult
     public func addOnTimeline(title: String, titleOrigin: TitleOrigin = .typed, url: URL? = nil,
-                              start: Date) throws -> (item: Item, block: TimeBlock) {
+                              start: Date, minutes: Int? = nil) throws -> (item: Item, block: TimeBlock) {
         // One clock read: the task's day and the block's day are the same day.
         let now = clockForQueries.now()
         let today = LocalDay(of: now, in: zonesForQueries.current(), rolloverHour: rolloverHour)
         let bounds = dayBounds(today)
         try Self.checkStart(start, bounds)
         // 15 or 30: a start on a quarter hour inside the day always leaves room for that.
-        let length = min(Self.blockDefaultMinutes, Int(bounds.end.timeIntervalSince(start) / 60))
+        let length = minutes ?? min(Self.blockDefaultMinutes, Int(bounds.end.timeIntervalSince(start) / 60))
+        try Self.checkLength(length, start: start, bounds)
         return try storeForQueries.write { w in
             let item = try insertNewItem(NewItem(title: title, titleOrigin: titleOrigin, url: url, shape: .today),
                                          source: .user, now: now, day: today, w)
@@ -649,6 +651,26 @@ extension Clew {
         let quarters = Int(day.end.timeIntervalSince(day.start) / 60) / blockStepMinutes
         let q = min(max(Int((minutes / Double(blockStepMinutes)).rounded(.down)), 0), quarters - 1)
         return day.start.addingTimeInterval(TimeInterval(q * blockStepMinutes * 60))
+    }
+
+    /// A drag on the timeline's empty space (SPEC 2026-11-19, as in Calendar): the
+    /// quarter hour pressed is always in it; the other end follows the pointer to the
+    /// nearest quarter hour, down or up. At least one quarter hour, inside the day.
+    /// Minutes are counted from the day's start.
+    public static func sweep(pressMinutes press: Double, pointerMinutes pointer: Double,
+                             day: TimelineDay) -> (start: Date, minutes: Int) {
+        let step = Double(blockStepMinutes)
+        let quarters = Int(day.end.timeIntervalSince(day.start) / 60) / blockStepMinutes
+        let anchor = min(max(Int((press / step).rounded(.down)), 0), quarters - 1)
+        let reach = min(max(Int((pointer / step).rounded()), 0), quarters)
+        let first: Int, last: Int
+        if pointer >= press {
+            (first, last) = (anchor, max(reach, anchor + 1))
+        } else {
+            (first, last) = (min(reach, anchor), anchor + 1)
+        }
+        return (day.start.addingTimeInterval(TimeInterval(first * blockStepMinutes * 60)),
+                (last - first) * blockStepMinutes)
     }
 
     /// Where a dragged block starts when its top is `minutesIn` after the day's start (the

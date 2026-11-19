@@ -10,6 +10,8 @@ struct TimelineGeometry: Equatable {
     var viewport: CGRect = .zero
     /// The top of the whole day's content (moves as it scrolls).
     var contentTop: CGFloat = 0
+    /// The content's left edge (the hours' x = 0).
+    var contentLeft: CGFloat = 0
 }
 
 enum TimelineMetrics {
@@ -112,12 +114,26 @@ struct DayTimelineView: View {
     let onOpen: (UUID) -> Void
     let onEdit: (Item) -> Void
     @Environment(\.locale) private var locale
+    /// A drag on empty space (SPEC 2026-11-19): the minute pressed, and the pointer's y in
+    /// the list's space (so the block follows the hours as they scroll under it).
+    @State private var sweepPress: Double?
+    @State private var sweepPointerY: CGFloat?
+    @State private var sweepScroll: Timer?
+    @GestureState private var sweeping = false
+
+    /// The block a drag on empty space would make, while it is dragged.
+    private var sweepDraft: NewTaskDraft? {
+        guard let press = sweepPress, let y = sweepPointerY else { return nil }
+        let pointer = Double((y - geometry.contentTop) / TimelineMetrics.pointsPerMinute)
+        let s = Clew.sweep(pressMinutes: press, pointerMinutes: pointer, day: day)
+        return NewTaskDraft(start: s.start, minutes: s.minutes)
+    }
 
     /// While the name box is open, one layout for blocks, events and the box, so the box
     /// sits in the column its block will get (SPEC 2026-11-13).
     private var draftLayout: (blocks: [UUID: TimelinePlace], events: [String: TimelinePlace], draft: TimelinePlace?)? {
-        newTask.map { Clew.timelineLayout(blocks: day.blocks, timed: model.calendarEvents?.timed ?? [],
-                                          draft: ($0.start, $0.end)) }
+        (sweepDraft ?? newTask).map { Clew.timelineLayout(blocks: day.blocks, timed: model.calendarEvents?.timed ?? [],
+                                                         draft: ($0.start, $0.end)) }
     }
 
     /// Blocks and events together: a block's column comes from the shared layout when
@@ -136,15 +152,73 @@ struct DayTimelineView: View {
     /// Opens the name box at the quarter hour `y` points into the day, unless the double-
     /// click was on a block (its own click opens details) or inside the open box.
     private func openNewTask(at point: CGPoint, width: CGFloat, labelWidth: CGFloat) {
+        guard !isOnBlockOrBox(point, width: width, labelWidth: labelWidth) else { return }
+        newTask = NewTaskDraft(minutesIn: Double(point.y / TimelineMetrics.pointsPerMinute), day: day)
+    }
+
+    /// `point` (the hours' coordinates) is on a task block or inside the open name box.
+    private func isOnBlockOrBox(_ point: CGPoint, width: CGFloat, labelWidth: CGFloat) -> Bool {
         let layout = draftLayout
         func hits(_ start: Date, _ end: Date, _ place: TimelinePlace) -> Bool {
             let col = columns(place, width: width, labelWidth: labelWidth)
             return point.y >= TimelineMetrics.y(start, in: day) && point.y < TimelineMetrics.y(end, in: day)
                 && point.x >= col.x && point.x < col.x + col.width
         }
-        if day.blocks.contains(where: { hits($0.block.start, $0.block.end, place($0, layout)) }) { return }
-        if let box = newTask, let at = layout?.draft, hits(box.start, box.end, at) { return }
-        newTask = NewTaskDraft(minutesIn: Double(point.y / TimelineMetrics.pointsPerMinute), day: day)
+        if day.blocks.contains(where: { hits($0.block.start, $0.block.end, place($0, layout)) }) { return true }
+        if let box = newTask, let at = layout?.draft, hits(box.start, box.end, at) { return true }
+        return false
+    }
+
+    /// Press on empty space (or an event) and drag down or up: a light block shows the
+    /// time it covers; letting go opens the name box on it (SPEC 2026-11-19). A block's
+    /// own drag comes first.
+    private func sweep(width: CGFloat, labelWidth: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 4, coordinateSpace: .named(space))
+            .updating($sweeping) { _, live, _ in live = true }
+            .onChanged { value in
+                if sweepPress == nil {
+                    // Pressed on a block or in the open box: not a new task.
+                    let content = CGPoint(x: value.startLocation.x - geometry.contentLeft,
+                                          y: value.startLocation.y - geometry.contentTop)
+                    guard !isOnBlockOrBox(content, width: width, labelWidth: labelWidth) else { return }
+                    sweepPress = Double(content.y / TimelineMetrics.pointsPerMinute)
+                }
+                sweepPointerY = value.location.y
+                sweepAtEdge(value.location.y)
+            }
+            .onEnded { _ in
+                if let draft = sweepDraft { newTask = draft }
+                endSweep()
+            }
+    }
+
+    private func endSweep() {
+        sweepScroll?.invalidate()
+        sweepScroll = nil
+        sweepPress = nil
+        sweepPointerY = nil
+    }
+
+    /// Near the timeline's top or bottom edge while sweeping, the hours scroll by
+    /// themselves (as when a block is dragged there).
+    private func sweepAtEdge(_ y: CGFloat) {
+        let view = geometry.viewport
+        let step = y < view.minY + 18 ? -1 : y > view.maxY - 18 ? 1 : 0
+        guard step != 0 else {
+            sweepScroll?.invalidate()
+            sweepScroll = nil
+            return
+        }
+        guard sweepScroll == nil else { return }
+        let timer = Timer(timeInterval: 0.12, repeats: true) { _ in
+            Task { @MainActor in
+                let visible = Int(TimelineMetrics.height) / TimelineMetrics.quarter
+                let top = (topQuarter ?? 0) + step
+                topQuarter = min(max(top, 0), TimelineMetrics.quarters(day) - visible)
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        sweepScroll = timer
     }
 
     /// VoiceOver's "New task on the timeline": the box at the next quarter hour (the
@@ -174,7 +248,9 @@ struct DayTimelineView: View {
             if newTask == nil { centreOnNow() }
         }
         // The rollover closes the box; nothing is made.
-        .onChange(of: day.day) { newTask = nil }
+        .onChange(of: day.day) { newTask = nil; endSweep() }
+        // A drag the system cancelled (the menu closed): nothing is made.
+        .onChange(of: sweeping) { if !sweeping { endSweep() } }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text("Today's timeline"))
         .accessibilityAction(named: Text("New task on the timeline"), openNewTaskAtNextQuarter)
@@ -256,7 +332,12 @@ struct DayTimelineView: View {
                             .frame(width: col.width)
                             .offset(x: col.x, y: TimelineMetrics.y(block.block.start, in: day))
                     }
-                    if let draft = newTask, let at = layout?.draft {
+                    if let draft = sweepDraft, let at = layout?.draft {
+                        let col = columns(at, width: width, labelWidth: labelWidth)
+                        SweepBlock(draft: draft)
+                            .frame(width: col.width)
+                            .offset(x: col.x, y: TimelineMetrics.y(draft.start, in: day))
+                    } else if let draft = newTask, let at = layout?.draft {
                         let col = columns(at, width: width, labelWidth: labelWidth)
                         NewTaskBox(model: model, draft: draft) {
                             // Only this box: a late close never takes a newer one.
@@ -287,9 +368,14 @@ struct DayTimelineView: View {
                     .gesture(SpatialTapGesture(count: 2).onEnded { value in
                         openNewTask(at: value.location, width: width, labelWidth: labelWidth)
                     })
+                    // After a block's own drag: a press on a block moves the block.
+                    .gesture(sweep(width: width, labelWidth: labelWidth))
                 }
             }
-            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(space)).minY } action: { geometry.contentTop = $0 }
+            .onGeometryChange(for: CGPoint.self) { $0.frame(in: .named(space)).origin } action: {
+                geometry.contentTop = $0.y
+                geometry.contentLeft = $0.x
+            }
         }
         .scrollPosition(id: $topQuarter, anchor: .top)
         .frame(height: TimelineMetrics.height)
@@ -680,6 +766,28 @@ struct TimelineBlockView: View {
 
 /// A calendar event: a stripe in its calendar's colour, a light fill, the title in
 /// secondary text. Read only: nothing to drag or tick (SPEC "Calendar events").
+/// The block a drag on the timeline is making (SPEC 2026-11-19): light, with its time.
+struct SweepBlock: View {
+    let draft: NewTaskDraft
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 4)
+        shape.fill(Color.accentColor.opacity(0.16))
+            .overlay(shape.strokeBorder(Color.accentColor.opacity(0.7), lineWidth: 1))
+            .overlay(alignment: .topLeading) {
+                Text(verbatim: TimelineMetrics.range(draft.start, draft.end))
+                    .font(TimelineMetrics.detailFont.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .padding(.leading, 7)
+                    .padding(.top, TimelineMetrics.textTop(draft.minutes))
+            }
+            .frame(height: CGFloat(draft.minutes) * TimelineMetrics.pointsPerMinute - 1)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+}
+
 struct TimelineEventView: View {
     let event: CalendarEvent
 

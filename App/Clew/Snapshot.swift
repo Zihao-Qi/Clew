@@ -285,6 +285,24 @@ enum Snapshot {
                 print("  draft:", probe.draft as Any, "titles:", titles(), "first responder:",
                       window.firstResponder.map { String(describing: Swift.type(of: $0)) } ?? "none")
 
+                @MainActor func drag(_ x: CGFloat, from y0: CGFloat, to y1: CGFloat) async throws {
+                    func post(_ type: NSEvent.EventType, _ y: CGFloat) {
+                        number += 1
+                        let e = NSEvent.mouseEvent(with: type, location: NSPoint(x: x, y: size.height - y), modifierFlags: [],
+                                                   timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                                                   context: nil, eventNumber: number, clickCount: 1,
+                                                   pressure: type == .leftMouseUp ? 0 : 1)!
+                        NSApp.postEvent(e, atStart: false)
+                    }
+                    post(.leftMouseDown, y0)
+                    try await Task.sleep(for: .milliseconds(50))
+                    for i in 1...6 {
+                        post(.leftMouseDragged, y0 + (y1 - y0) * CGFloat(i) / 6)
+                        try await Task.sleep(for: .milliseconds(40))
+                    }
+                    post(.leftMouseUp, y1)
+                    try await Task.sleep(for: .milliseconds(400))
+                }
                 if let block {
                     let opened = probe.opened
                     let blockY = 8 + TimelineMetrics.y(block.block.start, in: model.timeline!)
@@ -294,7 +312,56 @@ enum Snapshot {
                     try await mouse(x, blockY, clicks: 2)
                     report("a double-click on a block opens no box", probe.draft == nil)
                     probe.draft = nil
+                    let drags = probe.blockDrags
+                    try await drag(x, from: blockY, to: blockY + 60)
+                    report("a drag on a block moves the block and makes no box",
+                           probe.draft == nil && probe.blockDrags > drags)
                 }
+
+                // A drag on empty space (SPEC 2026-11-19): down, then up; the box opens on
+                // the block it showed, and Return makes a task that long.
+                @MainActor func expected(from y0: CGFloat, to y1: CGFloat) -> (start: Date, minutes: Int) {
+                    let top = CGFloat(probe.topQuarter ?? 0) * CGFloat(TimelineMetrics.quarter) * TimelineMetrics.pointsPerMinute
+                    let minutes = { (y: CGFloat) in Double((y - 8 + top) / TimelineMetrics.pointsPerMinute) }
+                    return Clew.sweep(pressMinutes: minutes(y0), pointerMinutes: minutes(y1), day: model.timeline!)
+                }
+                probe.draft = nil
+                let down = expected(from: 60, to: 157)
+                try await drag(x, from: 60, to: 157)
+                report("a drag down opens the box on its block (\(probe.draft?.minutes ?? 0) min, expected \(down.minutes))",
+                       probe.draft?.start == down.start && probe.draft?.minutes == down.minutes && down.minutes > 30)
+                try await type("Deep work")
+                try await key("\r", code: 36)
+                let deep = model.today?.rows.first { $0.item.title == "Deep work" }
+                let deepBlock = model.timeline?.blocks.first { $0.block.itemId == deep?.id }
+                report("Return makes the task with the drag's length",
+                       deepBlock?.block.start == down.start && deepBlock?.block.minutes == down.minutes)
+                let up = expected(from: 300, to: 230)
+                try await drag(x, from: 300, to: 230)
+                report("a drag up covers the pressed quarter and up to the pointer (\(probe.draft?.minutes ?? 0) min)",
+                       probe.draft?.start == up.start && probe.draft?.minutes == up.minutes && up.minutes >= 60)
+                try await key("\u{1b}", code: 53)
+                report("Esc after a drag makes nothing", probe.draft == nil && !titles().contains(""))
+                // Held at the bottom edge, the hours scroll and the block keeps growing.
+                let edgeY = 8 + TimelineMetrics.height - 6
+                let topBefore = probe.topQuarter ?? 0
+                let still = expected(from: 60, to: edgeY)
+                func post(_ type: NSEvent.EventType, _ y: CGFloat) {
+                    number += 1
+                    NSApp.postEvent(NSEvent.mouseEvent(with: type, location: NSPoint(x: x, y: size.height - y), modifierFlags: [],
+                                                       timestamp: ProcessInfo.processInfo.systemUptime,
+                                                       windowNumber: window.windowNumber, context: nil, eventNumber: number,
+                                                       clickCount: 1, pressure: type == .leftMouseUp ? 0 : 1)!, atStart: false)
+                }
+                post(.leftMouseDown, 60)
+                try await Task.sleep(for: .milliseconds(50))
+                for i in 1...6 { post(.leftMouseDragged, 60 + (edgeY - 60) * CGFloat(i) / 6); try await Task.sleep(for: .milliseconds(40)) }
+                try await Task.sleep(for: .milliseconds(1000))
+                post(.leftMouseUp, edgeY)
+                try await Task.sleep(for: .milliseconds(400))
+                report("held at the bottom edge, the hours scroll and the block grows (\(still.minutes) → \(probe.draft?.minutes ?? 0) min)",
+                       (probe.topQuarter ?? 0) > topBefore && (probe.draft?.minutes ?? 0) > still.minutes)
+                try await key("\u{1b}", code: 53)
 
                 window.makeKeyAndOrderFront(nil)
                 try await Task.sleep(for: .milliseconds(300))
@@ -318,6 +385,7 @@ enum Snapshot {
     @MainActor final class NewTaskProbe {
         var draft: NewTaskDraft?
         var opened = 0
+        var blockDrags = 0
         var topQuarter: Int?
     }
 
@@ -331,8 +399,8 @@ enum Snapshot {
             if let day = model.timeline {
                 DayTimelineView(model: model, day: day, space: "harness", geometry: $geometry, topQuarter: $top,
                                 liftedBlock: nil, hovered: .constant(nil), newTask: $newTask,
-                                onDrag: { _, _ in }, onDrop: { _ in }, onMove: { _ in },
-                                onOpen: { _ in probe.opened += 1 }, onEdit: { _ in })
+                                onDrag: { _, value in if value != nil { probe.blockDrags += 1 } }, onDrop: { _ in },
+                                onMove: { _ in }, onOpen: { _ in probe.opened += 1 }, onEdit: { _ in })
                     .coordinateSpace(name: "harness")
                     .onChange(of: newTask) { _, now in probe.draft = now }
                     .onChange(of: top, initial: true) { _, now in probe.topQuarter = now }
@@ -829,6 +897,14 @@ enum Snapshot {
                     }
                 }
                 .padding(8), appearance: appearance, to: dir.appendingPathComponent("menubar-ring-\(suffix).png"))
+            }
+            // A drag on the timeline (SPEC 2026-11-19): the block it is making.
+            if let day = model.timeline {
+                let draft = NewTaskDraft(start: day.start.addingTimeInterval(9 * 3600), minutes: 75)
+                for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+                    render(SweepBlock(draft: draft).frame(width: 300).padding(12), appearance: appearance,
+                           to: dir.appendingPathComponent("sweep-\(appearance == .aqua ? "light" : "dark").png"))
+                }
             }
             for pane in SettingsView.Pane.allCases {
                 render(SettingsView(model: model, pane: pane), appearance: .aqua,

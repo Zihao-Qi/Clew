@@ -605,11 +605,14 @@ are every source but `timeline`.
   default, and a moved block's length, cut at the day's end; only rows on today's list), `moveBlock(id:start:)`,
   `resizeBlock(id:minutes:)`, `addBlock(after:)` (same length, right after; refused if it
   would pass the day's end), `removeBlock(id:)`, `blockNotFinished(id:)`,
-  `addOnTimeline(title:titleOrigin:url:start:)` (2026-11-13, the timeline's double-click:
+  `addOnTimeline(title:titleOrigin:url:start:minutes:)` (2026-11-13, the timeline's double-click:
   in **one write**, the today task `addItem(.today)` would make and a 30-minute block at
   `start`, cut at the day's end, deciding at once if it has ended; a `start` outside
   today, e.g. after a rollover, refuses the whole command and makes nothing; the clock is
-  read once, for the task's `plannedDay` and the block's day). Moving or
+  read once, for the task's `plannedDay` and the block's day; 2026-11-19: a drag on the
+  timeline passes `minutes`, checked like any block's length, and `Clew.sweep` turns the
+  press and the pointer into that range: the pressed quarter hour plus the pointer's
+  nearest one, down or up, inside the day). Moving or
   resizing changes the end, so it voids a live `tickId`, clears `decidedAt`/`tickId`
   (keeps `coverId`) and decides at once if the new end has passed. Removing voids a live
   `tickId`. **Rounds:** a `tickId` made before the goal's current round started is

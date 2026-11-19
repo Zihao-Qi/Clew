@@ -741,6 +741,13 @@ stopped daily use, not adding features.
       row is dropped there, so the task is made done (Not finished undoes it).
     - **While the box is open** the keyboard edits the name: the Delete key does not
       delete the task under the pointer, and the timeline does not re-centre on now.
+    - **Drag to make one** (*user*, 2026-11-19, as in Calendar): press on an empty spot
+      (or a calendar event) and drag down or up; a light block shows the time it covers,
+      from the quarter hour pressed to the quarter hour nearest the pointer (at least 15
+      minutes, inside the day), in the column it will take. Near the timeline's top or
+      bottom edge the hours scroll. Letting go opens the same name box on that block, and
+      Return makes the task with that length; everything about the box is as above. A
+      plain click still does nothing; a block's own drag still moves the block.
     - Double-clicking a block opens its details, as a click does; the details ignore the
       second click, so it cannot land on their buttons.
     - VoiceOver gets a "New task on the timeline" action on the timeline, which opens

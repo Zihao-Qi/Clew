@@ -112,6 +112,36 @@ private let tuesday = LocalDay(string: "2026-11-10")!
         #expect(link.item.kind == .once && link.item.titleOrigin == .fetched && link.item.url?.host == "example.com")
     }
 
+    /// SPEC 2026-11-19: a drag on the timeline gives the block its length.
+    @Test func aDragMakesItsOwnLength() throws {
+        let made = try clew.addOnTimeline(title: "deep work", start: at(10, 10), minutes: 90)
+        #expect(made.block.start == at(10, 10) && made.block.minutes == 90)
+        let count = store.state.items.count
+        // Not whole quarter hours, none, or past the day's end (4 a.m.): nothing is made.
+        for bad in [20, 0, 24 * 60] {
+            #expect(throws: ClewError.self) { try clew.addOnTimeline(title: "x", start: at(10, 10), minutes: bad) }
+        }
+        #expect(store.state.items.count == count)
+        #expect(try clew.addOnTimeline(title: "to the end", start: at(11, 3), minutes: 60).block.minutes == 60)
+    }
+
+    @Test func aDragCoversThePressedQuarterAndFollowsThePointer() throws {
+        let day = try clew.timeline()               // 4:00 to 4:00
+        func sweep(_ press: Double, _ pointer: Double) -> [Double] {
+            let s = Clew.sweep(pressMinutes: press, pointerMinutes: pointer, day: day)
+            return [s.start.timeIntervalSince(day.start) / 60, Double(s.minutes)]
+        }
+        #expect(sweep(307, 307) == [300, 15])      // pressed inside 9:00–9:15: that quarter
+        #expect(sweep(307, 343) == [300, 45])      // down to 9:43: to the nearest quarter, 9:45
+        #expect(sweep(307, 336) == [300, 30])      // down to 9:36: 9:30
+        #expect(sweep(307, 310) == [300, 15])      // a little down: still the pressed quarter
+        #expect(sweep(307, 262) == [255, 60])      // up to 8:22: from 8:15 to the pressed quarter's end
+        #expect(sweep(307, 301) == [300, 15])      // a little up, in the same quarter
+        #expect(sweep(307, -50) == [0, 315])       // above the day: from its start
+        #expect(sweep(1430, 2000) == [1425, 15])   // the last quarter, down past the end
+        #expect(sweep(10, 1500) == [0, 1440])      // the whole day at most
+    }
+
     @Test func aRefusedNameOrStartMakesNothing() throws {
         // The box opened before 4 a.m. and Return came after the rollover: 3:30 is yesterday's now.
         for (now, start) in [(at(10, 9), at(10, 10, 5)),      // not on a quarter hour

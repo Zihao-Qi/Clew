@@ -17,6 +17,12 @@ struct NewTaskDraft: Equatable {
         start = Clew.quarterStart(minutesIn: minutesIn, day: day)
         minutes = min(Clew.blockDefaultMinutes, TimelineMetrics.room(after: start, in: day))
     }
+
+    /// A drag's block (SPEC 2026-11-19): its own start and length.
+    init(start: Date, minutes: Int) {
+        self.start = start
+        self.minutes = minutes
+    }
 }
 
 /// A small name field shaped like the block it will make. Return saves; Esc, an empty
@@ -87,7 +93,7 @@ struct NewTaskBox: View {
         fetchTask?.cancel()
         fetchTask = nil
         // Refused (a name too long): the box stays with its text, and the notice says why.
-        if model.addOnTimeline(text, fetchedTitle: fetchedTitle, at: draft.start) { close() }
+        if model.addOnTimeline(text, fetchedTitle: fetchedTitle, at: draft.start, minutes: draft.minutes) { close() }
     }
 
     private func cancel() {
