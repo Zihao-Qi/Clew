@@ -65,19 +65,28 @@ enum ShortcutSmokeTest {
         await settle()
         print("PASS: installed Carbon callback reaches the list")
 
-        // Each way to click the icon alone (user, 2026-11-20: macOS 27 found no
-        // NSStatusBarButton). Here, on this Mac's macOS, which of them open and close it.
-        for way in MenuBarExtraToggle.Way.allCases {
-            MenuBarExtraToggle.only = way
-            MenuBarExtraToggle.toggle()
-            await settle()
-            let opened = menu.isVisible
-            if opened { MenuBarExtraToggle.toggle() }
-            await settle()
-            if menu.isVisible { MenuBarExtraToggle.only = nil; MenuBarExtraToggle.closeMenu(); await settle() }
-            print("\(opened && !menu.isVisible ? "PASS" : "INFO"): \(way) alone opens \(opened), closes \(!menu.isVisible)")
+        // Settings closes the menu from inside it; the shortcut must still open it after
+        // that (macOS 27 found, 2026-11-20: a click on the button opened nothing there, so
+        // both go through the status item's expanded interface session). A session
+        // request is checked after 0.3 s and asked once more, hence the longer waits.
+        var path = "button click"
+        if #available(macOS 27.0, *), MenuBarExtraToggle.statusItem()?.expandedInterfaceDelegate != nil {
+            path = "expanded interface session"
         }
-        MenuBarExtraToggle.only = nil
+        print("INFO: this macOS opens the list by \(path); status item found: \(MenuBarExtraToggle.statusItem() != nil)")
+        MenuBarExtraToggle.toggle()
+        try? await Task.sleep(for: .milliseconds(900))
+        require(menu.isVisible, "The shortcut opens the list (\(path))")
+        MenuBarExtraToggle.closeMenu()
+        try? await Task.sleep(for: .milliseconds(400))
+        require(!menu.isVisible, "Closing from inside the menu (Settings) closes it")
+        MenuBarExtraToggle.toggle()
+        try? await Task.sleep(for: .milliseconds(900))
+        require(menu.isVisible, "After closing from inside, the shortcut opens it again")
+        MenuBarExtraToggle.toggle()
+        try? await Task.sleep(for: .milliseconds(400))
+        require(!menu.isVisible, "And the shortcut closes it")
+        print("PASS: open, close from inside, reopen and close (\(path))")
 
         let host = NSHostingView(rootView: RecorderFixture(model: model).frame(width: 400, height: 80))
         let window = NSWindow(contentRect: NSRect(x: 40, y: 100, width: 400, height: 80),

@@ -118,122 +118,109 @@ final class OpenShortcutHotkey {
     static let couldNotRegister = String(localized: "Clew couldn't register this shortcut. Another app may already be using it.")
 }
 
-/// Opens or closes the menu bar list by clicking Clew's own status item. That is
-/// in-process and needs no Accessibility permission; SwiftUI has no public API to
-/// present a `MenuBarExtra` window.
+/// Opens or closes the menu bar list through Clew's own status item, in-process (no
+/// Accessibility permission); SwiftUI has no public API to present a `MenuBarExtra` window.
+///
+/// macOS 14–26: clicking the item's button. macOS 27 (user, 2026-11-20; found on the
+/// macOS 27 Mac): the button has no target or action, and a click goes through the item's
+/// "expanded interface session" (`NSStatusItem.expandedInterfaceDelegate`, which SwiftUI
+/// sets). There the list is closed with the public `expandedInterfaceSession.cancel()`,
+/// and opened with the item's private `_requestExpandedInterfaceSession` (checked first;
+/// nothing public opens it).
 enum MenuBarExtraToggle {
+    /// What the shortcut did: `/usr/bin/log show --predicate 'subsystem == "io.github.zihao-qi.clew"'`.
+    static let log = Logger(subsystem: "io.github.zihao-qi.clew", category: "menu-bar")
+
     @MainActor
     static func toggle() {
         NSApp.activate()
-        // Activation is not always finished in this turn; click on the next one.
+        // Activation is not always finished in this turn; act on the next one.
         DispatchQueue.main.async {
-            clickStatusItem()
+            guard let item = statusItem(), usesSession(item) else {
+                clickButton()
+                return
+            }
+            if cancelSession(item) {
+                log.notice("list closed (session)")
+            } else {
+                openSession(item, retry: true)
+            }
         }
     }
 
     /// Closes the open menu now, from inside it (SPEC 2026-11-13: opening Settings closes
-    /// the menu). A synchronous click on the status item, while the menu is surely open:
-    /// `NSWindow.close()` hides it but SwiftUI still counts it open (the next click on
-    /// the menu bar then does nothing), and a deferred click could reopen a menu that
-    /// closed by itself in between.
+    /// the menu). Synchronous, while the menu is surely open: `NSWindow.close()` hides it
+    /// but SwiftUI still counts it open (the next click on the menu bar then does
+    /// nothing), and a deferred click could reopen a menu that closed by itself in between.
     @MainActor
     static func closeMenu() {
-        clickStatusItem()
+        if let item = statusItem(), usesSession(item) {
+            if cancelSession(item) { log.notice("list closed from inside (session)") }
+            return
+        }
+        clickButton()
     }
 
-    /// What the shortcut did, for `log show --predicate 'subsystem == "io.github.zihao-qi.clew"'`.
-    static let log = Logger(subsystem: "io.github.zihao-qi.clew", category: "menu-bar")
+    // MARK: macOS 27: the expanded interface session
 
-    /// Ways to click the icon, tried in order (user, 2026-11-20: on macOS 27 the first
-    /// found nothing, so the shortcut and Settings' closing did nothing).
-    enum Way: CaseIterable {
-        /// An `NSStatusBarButton` in one of this app's windows (macOS 14–26).
-        case statusBarButton
-        /// Any button in the menu bar's window.
-        case anyButton
-        /// A click sent straight to the menu bar window, in-process.
-        case click
-    }
-
-    #if DEBUG
-    /// The smoke test tries one way at a time.
-    @MainActor static var only: Way?
-    #endif
-
+    /// The item's expanded interface goes through a delegate (macOS 27 and later, when
+    /// SwiftUI set one).
     @MainActor
-    private static func clickStatusItem() {
-        // What there is to click, each time: a way may "succeed" and still open nothing.
-        log.notice("windows: \(describeWindows(), privacy: .public)")
-        for way in Way.allCases {
-            #if DEBUG
-            if let only, only != way { continue }
-            #endif
-            if attempt(way) {
-                log.notice("menu bar icon clicked: \(String(describing: way), privacy: .public)")
-                return
+    private static func usesSession(_ item: NSStatusItem) -> Bool {
+        if #available(macOS 27.0, *) { return item.expandedInterfaceDelegate != nil }
+        return false
+    }
+
+    /// Ends the open session (the list closes). False if none is open.
+    @MainActor
+    private static func cancelSession(_ item: NSStatusItem) -> Bool {
+        guard #available(macOS 27.0, *), let session = item.expandedInterfaceSession else { return false }
+        session.cancel()
+        return true
+    }
+
+    private static let requestSession = Selector(("_requestExpandedInterfaceSession"))
+
+    /// Asks the item to begin a session (the list opens). Soon after launch a request is
+    /// sometimes ignored (found on macOS 27), so it is asked once more if none began.
+    @MainActor
+    private static func openSession(_ item: NSStatusItem, retry: Bool) {
+        guard item.responds(to: requestSession) else {
+            log.error("list not opened: the status item cannot request a session on this macOS")
+            return
+        }
+        _ = item.perform(requestSession)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            if #available(macOS 27.0, *), item.expandedInterfaceSession != nil {
+                log.notice("list opened (session)")
+            } else if retry {
+                log.notice("session request ignored; asking once more")
+                openSession(item, retry: false)
+            } else {
+                log.error("list not opened: the session request was ignored twice")
             }
         }
-        log.error("menu bar icon not found")
     }
 
-    @MainActor
-    private static func attempt(_ way: Way) -> Bool {
-        switch way {
-        case .statusBarButton:
-            guard let button = statusItemButton() else { return false }
-            button.performClick(nil)
-            return true
-        case .anyButton:
-            guard let button = statusWindows().lazy.compactMap({ firstButton(in: $0.contentView) }).first else { return false }
-            button.performClick(nil)
-            return true
-        case .click:
-            guard let window = statusWindows().first, let view = window.contentView else { return false }
-            let at = view.convert(NSPoint(x: view.bounds.midX, y: view.bounds.midY), to: nil)
-            func event(_ type: NSEvent.EventType) -> NSEvent? {
-                NSEvent.mouseEvent(with: type, location: at, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
-                                   windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1,
-                                   pressure: type == .leftMouseDown ? 1 : 0)
-            }
-            guard let down = event(.leftMouseDown), let up = event(.leftMouseUp) else { return false }
-            // The up waits in the queue, so a button's tracking loop ends on it.
-            NSApp.postEvent(up, atStart: true)
-            window.sendEvent(down)
-            return true
-        }
-    }
-
-    /// This app's menu bar windows: the status bar's, never the list's own window.
-    @MainActor
-    private static func statusWindows() -> [NSWindow] {
-        NSApp.windows.filter { w in
-            let name = String(describing: type(of: w))
-            guard !name.contains("MenuBarExtra"), w.frame.height <= 60 else { return false }
-            return name.contains("StatusBar") || w.level.rawValue >= NSWindow.Level.statusBar.rawValue
-        }
-    }
+    // MARK: macOS 14–26: the button
 
     @MainActor
-    private static func firstButton(in view: NSView?) -> NSButton? {
-        guard let view else { return nil }
-        if let button = view as? NSButton { return button }
-        for sub in view.subviews {
-            if let button = firstButton(in: sub) { return button }
+    private static func clickButton() {
+        guard let button = statusItemButton() else {
+            log.error("list not opened: no menu bar button found")
+            return
         }
-        return nil
+        button.performClick(nil)
+        log.notice("menu bar button clicked")
     }
 
-    /// Each window's class, level and frame, with its views' classes a few levels down.
+    private static let statusItemOfButton = Selector(("_statusItem"))
+
+    /// Clew's status item, from its button (private `_statusItem`, checked first).
     @MainActor
-    private static func describeWindows() -> String {
-        func views(_ view: NSView?, _ depth: Int) -> String {
-            guard let view, depth < 4 else { return "" }
-            let kids = view.subviews.map { views($0, depth + 1) }.filter { !$0.isEmpty }
-            return String(describing: type(of: view)) + (kids.isEmpty ? "" : "[" + kids.joined(separator: ",") + "]")
-        }
-        return NSApp.windows.map { w in
-            "\(type(of: w)) level=\(w.level.rawValue) frame=\(NSStringFromRect(w.frame)) visible=\(w.isVisible) views=\(views(w.contentView, 0))"
-        }.joined(separator: " | ")
+    static func statusItem() -> NSStatusItem? {
+        guard let button = statusItemButton(), button.responds(to: statusItemOfButton) else { return nil }
+        return button.perform(statusItemOfButton)?.takeUnretainedValue() as? NSStatusItem
     }
 
     @MainActor
