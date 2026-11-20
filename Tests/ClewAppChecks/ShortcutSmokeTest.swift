@@ -65,6 +65,20 @@ enum ShortcutSmokeTest {
         await settle()
         print("PASS: installed Carbon callback reaches the list")
 
+        // Each way to click the icon alone (user, 2026-11-20: macOS 27 found no
+        // NSStatusBarButton). Here, on this Mac's macOS, which of them open and close it.
+        for way in MenuBarExtraToggle.Way.allCases {
+            MenuBarExtraToggle.only = way
+            MenuBarExtraToggle.toggle()
+            await settle()
+            let opened = menu.isVisible
+            if opened { MenuBarExtraToggle.toggle() }
+            await settle()
+            if menu.isVisible { MenuBarExtraToggle.only = nil; MenuBarExtraToggle.closeMenu(); await settle() }
+            print("\(opened && !menu.isVisible ? "PASS" : "INFO"): \(way) alone opens \(opened), closes \(!menu.isVisible)")
+        }
+        MenuBarExtraToggle.only = nil
+
         let host = NSHostingView(rootView: RecorderFixture(model: model).frame(width: 400, height: 80))
         let window = NSWindow(contentRect: NSRect(x: 40, y: 100, width: 400, height: 80),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)

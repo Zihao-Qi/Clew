@@ -41,7 +41,9 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
    Click it to open today's list. No main window is required. A global shortcut also
    opens the list (default **⌘.**, changeable in Settings › General). It uses a
    Carbon hotkey, so the sandbox stays on and Clew needs no Accessibility permission
-   (2026-11-11).
+   (2026-11-11). It opens the list by clicking Clew's own menu bar icon in-process; on
+   macOS 27 the usual way found nothing (user, 2026-11-20), so it tries other ways and
+   logs what it finds (subsystem `io.github.zihao-qi.clew`, category `menu-bar`).
 2. **Item kinds.**
    - *Once*: done on a chosen day; if not done, it quietly moves to tomorrow.
      Saved links in the Later pile behave the same once picked for a day
