@@ -70,7 +70,7 @@ enum ShortcutSmokeTest {
         // both go through the status item's expanded interface session). A session
         // request is checked after 0.3 s and asked once more, hence the longer waits.
         var path = "button click"
-        if #available(macOS 27.0, *), MenuBarExtraToggle.statusItem()?.expandedInterfaceDelegate != nil {
+        if let item = MenuBarExtraToggle.statusItem(), MenuBarExtraToggle.usesSession(item) {
             path = "expanded interface session"
         }
         print("INFO: this macOS opens the list by \(path); status item found: \(MenuBarExtraToggle.statusItem() != nil)")

@@ -163,19 +163,31 @@ enum MenuBarExtraToggle {
 
     // MARK: macOS 27: the expanded interface session
 
+    // The macOS 27 names are called by selector, checked first: CI's SDK may be older
+    // than 27, where they would not compile (they are public from the macOS 27 SDK on).
+    private static let delegateSelector = Selector(("expandedInterfaceDelegate"))
+    private static let sessionSelector = Selector(("expandedInterfaceSession"))
+    private static let cancelSelector = Selector(("cancel"))
+
     /// The item's expanded interface goes through a delegate (macOS 27 and later, when
     /// SwiftUI set one).
     @MainActor
-    private static func usesSession(_ item: NSStatusItem) -> Bool {
-        if #available(macOS 27.0, *) { return item.expandedInterfaceDelegate != nil }
-        return false
+    static func usesSession(_ item: NSStatusItem) -> Bool {
+        item.responds(to: delegateSelector) && item.perform(delegateSelector)?.takeUnretainedValue() != nil
+    }
+
+    /// The open session, if any.
+    @MainActor
+    private static func session(_ item: NSStatusItem) -> NSObject? {
+        guard item.responds(to: sessionSelector) else { return nil }
+        return item.perform(sessionSelector)?.takeUnretainedValue() as? NSObject
     }
 
     /// Ends the open session (the list closes). False if none is open.
     @MainActor
     private static func cancelSession(_ item: NSStatusItem) -> Bool {
-        guard #available(macOS 27.0, *), let session = item.expandedInterfaceSession else { return false }
-        session.cancel()
+        guard let session = session(item), session.responds(to: cancelSelector) else { return false }
+        _ = session.perform(cancelSelector)
         return true
     }
 
@@ -191,7 +203,7 @@ enum MenuBarExtraToggle {
         }
         _ = item.perform(requestSession)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            if #available(macOS 27.0, *), item.expandedInterfaceSession != nil {
+            if session(item) != nil {
                 log.notice("list opened (session)")
             } else if retry {
                 log.notice("session request ignored; asking once more")
