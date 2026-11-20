@@ -41,7 +41,8 @@ enum ShortcutSmokeTest {
         require(NSApp.windows.contains { button(in: $0.contentView) != nil }, "Public view walk finds the real status button")
         let before = Set(NSApp.windows.filter(\.isVisible).map(ObjectIdentifier.init))
         MenuBarExtraToggle.toggle()
-        await settle()
+        // Long enough for macOS 27's one repeated request (0.3 s) soon after launch.
+        try? await Task.sleep(for: .milliseconds(900))
         guard let menu = NSApp.windows.first(where: { $0.isVisible && !before.contains(ObjectIdentifier($0)) }) else {
             fail("Shortcut opens the actual MenuBarExtra window")
         }
@@ -87,6 +88,14 @@ enum ShortcutSmokeTest {
         try? await Task.sleep(for: .milliseconds(400))
         require(!menu.isVisible, "And the shortcut closes it")
         print("PASS: open, close from inside, reopen and close (\(path))")
+        // Closed again within the open request's 0.3 s check: it stays closed (review:
+        // the check reopened it on macOS 27).
+        MenuBarExtraToggle.toggle()
+        try? await Task.sleep(for: .milliseconds(100))
+        MenuBarExtraToggle.closeMenu()
+        try? await Task.sleep(for: .milliseconds(800))
+        require(!menu.isVisible, "A list closed right after opening stays closed")
+        print("PASS: closed right after opening, it stays closed (\(path))")
 
         let host = NSHostingView(rootView: RecorderFixture(model: model).frame(width: 400, height: 80))
         let window = NSWindow(contentRect: NSRect(x: 40, y: 100, width: 400, height: 80),

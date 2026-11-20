@@ -136,6 +136,7 @@ enum MenuBarExtraToggle {
         NSApp.activate()
         // Activation is not always finished in this turn; act on the next one.
         DispatchQueue.main.async {
+            generation += 1
             guard let item = statusItem(), usesSession(item) else {
                 clickButton()
                 return
@@ -143,7 +144,7 @@ enum MenuBarExtraToggle {
             if cancelSession(item) {
                 log.notice("list closed (session)")
             } else {
-                openSession(item, retry: true)
+                openSession(item, retry: true, generation: generation)
             }
         }
     }
@@ -154,6 +155,7 @@ enum MenuBarExtraToggle {
     /// nothing), and a deferred click could reopen a menu that closed by itself in between.
     @MainActor
     static func closeMenu() {
+        generation += 1
         if let item = statusItem(), usesSession(item) {
             if cancelSession(item) { log.notice("list closed from inside (session)") }
             return
@@ -193,24 +195,41 @@ enum MenuBarExtraToggle {
 
     private static let requestSession = Selector(("_requestExpandedInterfaceSession"))
 
+    /// Each toggle and close: a request's later check gives up once another came (review:
+    /// it must never reopen a list closed in between).
+    @MainActor private static var generation = 0
+
     /// Asks the item to begin a session (the list opens). Soon after launch a request is
-    /// sometimes ignored (found on macOS 27), so it is asked once more if none began.
+    /// sometimes ignored (found on macOS 27), so it is asked once more if none began
+    /// within 0.3 s.
     @MainActor
-    private static func openSession(_ item: NSStatusItem, retry: Bool) {
+    private static func openSession(_ item: NSStatusItem, retry: Bool, generation asked: Int) {
         guard item.responds(to: requestSession) else {
             log.error("list not opened: the status item cannot request a session on this macOS")
             return
         }
         _ = item.perform(requestSession)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            if session(item) != nil {
-                log.notice("list opened (session)")
-            } else if retry {
-                log.notice("session request ignored; asking once more")
-                openSession(item, retry: false)
-            } else {
-                log.error("list not opened: the session request was ignored twice")
+        watch(item, retry: retry, generation: asked, checksLeft: 6)
+    }
+
+    /// Looks for the session at once, then every 50 ms: once seen, the list opened, so
+    /// a later close (Esc, a click away) is never mistaken for an ignored request.
+    @MainActor
+    private static func watch(_ item: NSStatusItem, retry: Bool, generation asked: Int, checksLeft: Int) {
+        if session(item) != nil {
+            log.notice("list opened (session)")
+            return
+        }
+        guard asked == generation else { return }      // another press or close came since
+        if checksLeft > 0 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                watch(item, retry: retry, generation: asked, checksLeft: checksLeft - 1)
             }
+        } else if retry {
+            log.notice("session request ignored; asking once more")
+            openSession(item, retry: false, generation: asked)
+        } else {
+            log.error("list not opened: the session request was ignored twice")
         }
     }
 
