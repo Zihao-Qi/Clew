@@ -443,7 +443,8 @@ struct TodayListView: View {
                                 onDrag: blockDrag, onDrop: blockDropped,
                                 onMove: { block in screen = .place(block.block.itemId, block: block.id) },
                                 onOpen: { screen = .detail($0) },
-                                onEdit: { item in screen = .edit(item, back: .list) })
+                                onEdit: { item in screen = .edit(item, back: .list) },
+                                onOpenEvent: { screen = .event($0) })
             }
             ForEach(model.lateTicks) { late in
                 LateTickLine(late: late, today: model.today?.day, model: model)
@@ -508,6 +509,24 @@ struct TodayListView: View {
                     Spacer(minLength: 4)
                     Button("Undo") { model.undoDelete() }
                         .accessibilityLabel(Text("Undo deleting \(deleted.title)"))
+                }
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .buttonStyle(.borderless)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 6)
+            }
+            if let last = model.lastEventChange {
+                // An event changed in Calendar can be put back for a few seconds (SPEC 2026-11-19).
+                let title = last.change.event.title
+                HStack(spacing: 8) {
+                    Group {
+                        if last.change.kind == .moved { Text("Moved “\(title)”") } else { Text("Changed “\(title)”") }
+                    }
+                    .lineLimit(1).truncationMode(.middle)
+                    Spacer(minLength: 4)
+                    Button("Undo") { model.undoEventChange() }
+                        .accessibilityLabel(Text("Undo the change to \(title)"))
                 }
                 .font(.callout)
                 .foregroundStyle(.secondary)

@@ -477,6 +477,80 @@ final class AppModel {
     func hiddenCalendars() -> Set<String> { (try? clew?.hiddenCalendars()) ?? [] }
     func setCalendar(_ id: String, hidden: Bool) { run { try $0.setCalendar(id, hidden: hidden) } }
 
+    // MARK: - Editing an event (SPEC 2026-11-19)
+
+    /// A change to an event, before or after it is saved.
+    struct EventChange: Equatable {
+        enum Kind: Equatable { case moved, changed }
+        let event: CalendarEvent
+        let title: String
+        let start: Date
+        let end: Date
+        let kind: Kind
+    }
+
+    /// A drag on a repeating event, waiting at its new place for "This event only / All
+    /// future events".
+    private(set) var pendingEventChange: EventChange?
+    /// The change saved last, for a few seconds: "Moved “Standup” · Undo". `event` is the
+    /// event as it is now; `title`, `start`, `end` what Undo puts back.
+    private(set) var lastEventChange: (change: EventChange, span: EventSpan)?
+    @ObservationIgnored private var lastEventChangeTask: Task<Void, Never>?
+
+    /// A drag's change: saved at once, or for a repeating event held for the question.
+    func proposeEventChange(_ change: EventChange) {
+        guard change.start != change.event.start || change.end != change.event.end else { return }
+        if change.event.repeats {
+            pendingEventChange = change
+        } else {
+            changeEvent(change, span: .thisEvent)
+        }
+    }
+
+    func answerPendingEventChange(_ span: EventSpan?) {
+        guard let change = pendingEventChange else { return }
+        pendingEventChange = nil
+        if let span { changeEvent(change, span: span) }
+    }
+
+    /// Saves `change` in Calendar and offers Undo. False if Calendar refused it.
+    @discardableResult
+    func changeEvent(_ change: EventChange, span: EventSpan) -> Bool {
+        guard let source = calendarSource,
+              let id = source.change(change.event, title: change.title, start: change.start, end: change.end, span: span)
+        else {
+            notice = String(localized: "Calendar didn't take the change. The event may have changed elsewhere.")
+            refresh()
+            return false
+        }
+        let now = CalendarEvent(id: id, calendarId: change.event.calendarId, title: change.title, start: change.start,
+                                end: change.end, isAllDay: false, color: change.event.color, canEdit: true,
+                                repeats: change.event.repeats)
+        let undo = EventChange(event: now, title: change.event.title, start: change.event.start,
+                               end: change.event.end, kind: change.kind)
+        lastEventChange = (undo, span)
+        lastEventChangeTask?.cancel()
+        lastEventChangeTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(6))
+            guard !Task.isCancelled, self?.lastEventChange?.change.event.id == id else { return }
+            self?.lastEventChange = nil
+        }
+        refresh()
+        return true
+    }
+
+    /// Puts back the event's title and times, with the same choice for a repeating one.
+    func undoEventChange() {
+        guard let last = lastEventChange else { return }
+        lastEventChange = nil
+        lastEventChangeTask?.cancel()
+        if calendarSource?.change(last.change.event, title: last.change.title, start: last.change.start,
+                                  end: last.change.end, span: last.span) == nil {
+            notice = String(localized: "Calendar didn't take the change. The event may have changed elsewhere.")
+        }
+        refresh()
+    }
+
     // MARK: - Day timeline (SPEC 2026-11-10)
 
     /// A row dropped on an hour, or "Put on timeline…".

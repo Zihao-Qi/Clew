@@ -90,3 +90,63 @@ private func event(_ id: String, _ start: Date, _ end: Date, calendar: String = 
         #expect(store.state.settings.keys.sorted() == ["calendarPromptClosed", "calendarShown", "calendarsHidden"])
     }
 }
+
+/// SPEC 2026-11-19, "Editing an event".
+@Suite struct EventEditTests {
+    let store = FakeStore()
+    let clock = TestClock(at(10, 9))
+    var clew: Clew { Clew(store: store, clock: clock, zones: FixedZone("America/New_York")) }
+
+    private func editable(_ id: String, _ start: Date, _ end: Date) -> CalendarEvent {
+        CalendarEvent(id: id, calendarId: "work", title: id, start: start, end: end, isAllDay: false,
+                      color: [0, 0.5, 1], canEdit: true, repeats: true)
+    }
+
+    @Test func onlyAnEventInsideTheDayCanBeChangedThere() throws {
+        let day = try clew.timeline()
+        let layout = Clew.timelineEvents([
+            editable("inside", at(10, 9), at(10, 10)),
+            editable("early", at(10, 2), at(10, 5)),                    // began before 4 a.m.
+            editable("late", at(11, 3), at(11, 5)),                     // runs past 4 a.m.
+            editable("edges", at(10, 4), at(11, 4)),                    // exactly the day
+            event("readOnly", at(10, 11), at(10, 12)),
+        ], day: day, hidden: [])
+        let canEdit = Dictionary(uniqueKeysWithValues: layout.timed.map { ($0.id, $0.canEdit) })
+        #expect(canEdit == ["inside": true, "early": false, "late": false, "edges": true, "readOnly": false])
+        #expect(layout.timed.allSatisfy { $0.id == "readOnly" ? !$0.repeats : $0.repeats })
+    }
+
+    @Test func aMoveIsWholeQuarterHoursKeepingTheLengthInsideTheDay() throws {
+        let day = try clew.timeline()
+        let e = editable("call", at(10, 9, 5), at(10, 9, 55))          // 50 minutes, off the grid
+        #expect(Clew.movedEvent(e, by: 7, day: day) == (at(10, 9, 5), at(10, 9, 55)))
+        #expect(Clew.movedEvent(e, by: 8, day: day) == (at(10, 9, 20), at(10, 10, 10)))
+        #expect(Clew.movedEvent(e, by: -38, day: day) == (at(10, 8, 20), at(10, 9, 10)))
+        // Kept inside 4 a.m. to 4 a.m.
+        #expect(Clew.movedEvent(e, by: -600, day: day) == (at(10, 4), at(10, 4, 50)))
+        #expect(Clew.movedEvent(e, by: 2000, day: day) == (at(11, 3, 10), at(11, 4)))
+    }
+
+    @Test func theBottomEdgeMovesTheEndByQuarterHours() throws {
+        let day = try clew.timeline()
+        let e = editable("call", at(10, 9), at(10, 9, 50))
+        #expect(Clew.resizedEnd(e, by: 7, day: day) == at(10, 9, 50))
+        #expect(Clew.resizedEnd(e, by: 8, day: day) == at(10, 10, 5))
+        #expect(Clew.resizedEnd(e, by: -30, day: day) == at(10, 9, 20))
+        // At least 15 minutes.
+        #expect(Clew.resizedEnd(e, by: -300, day: day) == at(10, 9, 15))
+        // At most the day's end.
+        #expect(Clew.resizedEnd(e, by: 3000, day: day) == at(11, 4))
+        // A 10-minute event never grows by being made shorter.
+        let short = editable("short", at(10, 9), at(10, 9, 10))
+        #expect(Clew.resizedEnd(short, by: -15, day: day) == at(10, 9, 10))
+        #expect(Clew.resizedEnd(short, by: 15, day: day) == at(10, 9, 25))
+    }
+
+    @Test func thePageRefusesAnEmptyTitleOrAnEndNotAfterTheStart() {
+        #expect(Clew.eventEditProblem(title: "Call", start: at(10, 9), end: at(10, 9, 1)) == nil)
+        #expect(Clew.eventEditProblem(title: " \n", start: at(10, 9), end: at(10, 10)) == .noTitle)
+        #expect(Clew.eventEditProblem(title: "Call", start: at(10, 9), end: at(10, 9)) == .endsBeforeStart)
+        #expect(Clew.eventEditProblem(title: "Call", start: at(10, 9), end: at(10, 8)) == .endsBeforeStart)
+    }
+}

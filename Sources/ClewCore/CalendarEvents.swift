@@ -13,9 +13,15 @@ public struct CalendarEvent: Hashable, Sendable, Identifiable {
     public let isAllDay: Bool
     /// The calendar's colour as 0–1 red, green, blue.
     public let color: [Double]
+    /// The user may change it from Clew (SPEC 2026-11-19, "Editing an event"): its calendar
+    /// allows changes and it is not someone else's invitation. On the timeline, also only
+    /// when it lies inside the day.
+    public let canEdit: Bool
+    /// Part of a repeating series: a change asks "This event only / All future events".
+    public let repeats: Bool
 
     public init(id: String, calendarId: String, title: String, start: Date, end: Date, isAllDay: Bool,
-                color: [Double]) {
+                color: [Double], canEdit: Bool = false, repeats: Bool = false) {
         self.id = id
         self.calendarId = calendarId
         self.title = title
@@ -23,6 +29,8 @@ public struct CalendarEvent: Hashable, Sendable, Identifiable {
         self.end = end
         self.isAllDay = isAllDay
         self.color = color
+        self.canEdit = canEdit
+        self.repeats = repeats
     }
 }
 
@@ -77,8 +85,10 @@ extension Clew {
         let allDay = shown.filter(\.isAllDay).sorted { ($0.title, $0.id) < ($1.title, $1.id) }
         let timed = shown.filter { !$0.isAllDay && $0.end > $0.start }
             .map { e in
+                // One reaching past the day's edges shows cut, so it is not changed here.
                 CalendarEvent(id: e.id, calendarId: e.calendarId, title: e.title, start: max(e.start, day.start),
-                              end: min(e.end, day.end), isAllDay: false, color: e.color)
+                              end: min(e.end, day.end), isAllDay: false, color: e.color,
+                              canEdit: e.canEdit && e.start >= day.start && e.end <= day.end, repeats: e.repeats)
             }
             .sorted { ($0.start, $0.end, $0.id) < ($1.start, $1.end, $1.id) }
         let layout = timelineLayout(blocks: day.blocks, timed: timed)
@@ -110,6 +120,35 @@ extension Clew {
             }
         }
         return result
+    }
+
+    // MARK: Editing an event (SPEC 2026-11-19)
+
+    /// An event dragged by `minutes`: moved by whole quarter hours, its length kept, inside
+    /// the day.
+    public static func movedEvent(_ event: CalendarEvent, by minutes: Double, day: TimelineDay)
+        -> (start: Date, end: Date) {
+        let length = event.end.timeIntervalSince(event.start)
+        let wanted = event.start.addingTimeInterval(TimeInterval(snapMinutes(minutes) * 60))
+        let start = min(max(wanted, day.start), day.end.addingTimeInterval(-length))
+        return (start, start.addingTimeInterval(length))
+    }
+
+    /// An event's bottom edge dragged by `minutes`: its end moved by quarter hours, at
+    /// least 15 minutes after its start (or its own length, if shorter), at most the day's end.
+    public static func resizedEnd(_ event: CalendarEvent, by minutes: Double, day: TimelineDay) -> Date {
+        let shortest = min(event.end, event.start.addingTimeInterval(TimeInterval(blockStepMinutes * 60)))
+        let wanted = event.end.addingTimeInterval(TimeInterval(snapMinutes(minutes) * 60))
+        return min(max(wanted, shortest), day.end)
+    }
+
+    /// What the event page refuses: an empty title, or an end not after the start.
+    public enum EventEditProblem: Equatable, Sendable { case noTitle, endsBeforeStart }
+
+    public static func eventEditProblem(title: String, start: Date, end: Date) -> EventEditProblem? {
+        if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return .noTitle }
+        if end <= start { return .endsBeforeStart }
+        return nil
     }
 
     // MARK: Settings › Calendar
