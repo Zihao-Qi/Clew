@@ -41,7 +41,8 @@ enum ShortcutSmokeTest {
         require(NSApp.windows.contains { button(in: $0.contentView) != nil }, "Public view walk finds the real status button")
         let before = Set(NSApp.windows.filter(\.isVisible).map(ObjectIdentifier.init))
         MenuBarExtraToggle.toggle()
-        await settle()
+        // Long enough for macOS 27's one repeated request (0.3 s) soon after launch.
+        try? await Task.sleep(for: .milliseconds(900))
         guard let menu = NSApp.windows.first(where: { $0.isVisible && !before.contains(ObjectIdentifier($0)) }) else {
             fail("Shortcut opens the actual MenuBarExtra window")
         }
@@ -64,6 +65,37 @@ enum ShortcutSmokeTest {
         MenuBarExtraToggle.toggle()
         await settle()
         print("PASS: installed Carbon callback reaches the list")
+
+        // Settings closes the menu from inside it; the shortcut must still open it after
+        // that (macOS 27 found, 2026-11-20: a click on the button opened nothing there, so
+        // both go through the status item's expanded interface session). A session
+        // request is checked after 0.3 s and asked once more, hence the longer waits.
+        var path = "button click"
+        if let item = MenuBarExtraToggle.statusItem(), MenuBarExtraToggle.usesSession(item) {
+            path = "expanded interface session"
+        }
+        print("INFO: this macOS opens the list by \(path); status item found: \(MenuBarExtraToggle.statusItem() != nil)")
+        MenuBarExtraToggle.toggle()
+        try? await Task.sleep(for: .milliseconds(900))
+        require(menu.isVisible, "The shortcut opens the list (\(path))")
+        MenuBarExtraToggle.closeMenu()
+        try? await Task.sleep(for: .milliseconds(400))
+        require(!menu.isVisible, "Closing from inside the menu (Settings) closes it")
+        MenuBarExtraToggle.toggle()
+        try? await Task.sleep(for: .milliseconds(900))
+        require(menu.isVisible, "After closing from inside, the shortcut opens it again")
+        MenuBarExtraToggle.toggle()
+        try? await Task.sleep(for: .milliseconds(400))
+        require(!menu.isVisible, "And the shortcut closes it")
+        print("PASS: open, close from inside, reopen and close (\(path))")
+        // Closed again within the open request's 0.3 s check: it stays closed (review:
+        // the check reopened it on macOS 27).
+        MenuBarExtraToggle.toggle()
+        try? await Task.sleep(for: .milliseconds(100))
+        MenuBarExtraToggle.closeMenu()
+        try? await Task.sleep(for: .milliseconds(800))
+        require(!menu.isVisible, "A list closed right after opening stays closed")
+        print("PASS: closed right after opening, it stays closed (\(path))")
 
         let host = NSHostingView(rootView: RecorderFixture(model: model).frame(width: 400, height: 80))
         let window = NSWindow(contentRect: NSRect(x: 40, y: 100, width: 400, height: 80),

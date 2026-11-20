@@ -3,6 +3,7 @@ import Carbon.HIToolbox
 import ClewCore
 import Foundation
 import Observation
+import os
 
 /// Registers the global shortcut that opens today's list. Carbon hotkeys work in the
 /// sandbox and need no Accessibility permission (SPEC Tech; decided 2026-11-11).
@@ -23,6 +24,7 @@ final class OpenShortcutHotkey {
     /// Stored as a static C function pointer so InstallEventHandler keeps a valid
     /// thunk for the process lifetime (an inline closure is not guaranteed to last).
     private static let eventHandler: EventHandlerUPP = { _, _, _ in
+        MenuBarExtraToggle.log.notice("open shortcut pressed")
         DispatchQueue.main.async { MenuBarExtraToggle.toggle() }
         return noErr
     }
@@ -116,33 +118,140 @@ final class OpenShortcutHotkey {
     static let couldNotRegister = String(localized: "Clew couldn't register this shortcut. Another app may already be using it.")
 }
 
-/// Opens or closes the menu bar list by clicking Clew's own status item. That is
-/// in-process and needs no Accessibility permission; SwiftUI has no public API to
-/// present a `MenuBarExtra` window.
+/// Opens or closes the menu bar list through Clew's own status item, in-process (no
+/// Accessibility permission); SwiftUI has no public API to present a `MenuBarExtra` window.
+///
+/// macOS 14–26: clicking the item's button. macOS 27 (user, 2026-11-20; found on the
+/// macOS 27 Mac): the button has no target or action, and a click goes through the item's
+/// "expanded interface session" (`NSStatusItem.expandedInterfaceDelegate`, which SwiftUI
+/// sets). There the list is closed with the public `expandedInterfaceSession.cancel()`,
+/// and opened with the item's private `_requestExpandedInterfaceSession` (checked first;
+/// nothing public opens it).
 enum MenuBarExtraToggle {
+    /// What the shortcut did: `/usr/bin/log show --predicate 'subsystem == "io.github.zihao-qi.clew"'`.
+    static let log = Logger(subsystem: "io.github.zihao-qi.clew", category: "menu-bar")
+
     @MainActor
     static func toggle() {
         NSApp.activate()
-        // Activation is not always finished in this turn; click on the next one.
+        // Activation is not always finished in this turn; act on the next one.
         DispatchQueue.main.async {
-            clickStatusItem()
+            generation += 1
+            guard let item = statusItem(), usesSession(item) else {
+                clickButton()
+                return
+            }
+            if cancelSession(item) {
+                log.notice("list closed (session)")
+            } else {
+                openSession(item, retry: true, generation: generation)
+            }
         }
     }
 
     /// Closes the open menu now, from inside it (SPEC 2026-11-13: opening Settings closes
-    /// the menu). A synchronous click on the status item, while the menu is surely open:
-    /// `NSWindow.close()` hides it but SwiftUI still counts it open (the next click on
-    /// the menu bar then does nothing), and a deferred click could reopen a menu that
-    /// closed by itself in between.
+    /// the menu). Synchronous, while the menu is surely open: `NSWindow.close()` hides it
+    /// but SwiftUI still counts it open (the next click on the menu bar then does
+    /// nothing), and a deferred click could reopen a menu that closed by itself in between.
     @MainActor
     static func closeMenu() {
-        clickStatusItem()
+        generation += 1
+        if let item = statusItem(), usesSession(item) {
+            if cancelSession(item) { log.notice("list closed from inside (session)") }
+            return
+        }
+        clickButton()
     }
 
+    // MARK: macOS 27: the expanded interface session
+
+    // The macOS 27 names are called by selector, checked first: CI's SDK may be older
+    // than 27, where they would not compile (they are public from the macOS 27 SDK on).
+    private static let delegateSelector = Selector(("expandedInterfaceDelegate"))
+    private static let sessionSelector = Selector(("expandedInterfaceSession"))
+    private static let cancelSelector = Selector(("cancel"))
+
+    /// The item's expanded interface goes through a delegate (macOS 27 and later, when
+    /// SwiftUI set one).
     @MainActor
-    private static func clickStatusItem() {
-        guard let button = statusItemButton() else { return }
+    static func usesSession(_ item: NSStatusItem) -> Bool {
+        item.responds(to: delegateSelector) && item.perform(delegateSelector)?.takeUnretainedValue() != nil
+    }
+
+    /// The open session, if any.
+    @MainActor
+    private static func session(_ item: NSStatusItem) -> NSObject? {
+        guard item.responds(to: sessionSelector) else { return nil }
+        return item.perform(sessionSelector)?.takeUnretainedValue() as? NSObject
+    }
+
+    /// Ends the open session (the list closes). False if none is open.
+    @MainActor
+    private static func cancelSession(_ item: NSStatusItem) -> Bool {
+        guard let session = session(item), session.responds(to: cancelSelector) else { return false }
+        _ = session.perform(cancelSelector)
+        return true
+    }
+
+    private static let requestSession = Selector(("_requestExpandedInterfaceSession"))
+
+    /// Each toggle and close: a request's later check gives up once another came (review:
+    /// it must never reopen a list closed in between).
+    @MainActor private static var generation = 0
+
+    /// Asks the item to begin a session (the list opens). Soon after launch a request is
+    /// sometimes ignored (found on macOS 27), so it is asked once more if none began
+    /// within 0.3 s.
+    @MainActor
+    private static func openSession(_ item: NSStatusItem, retry: Bool, generation asked: Int) {
+        guard item.responds(to: requestSession) else {
+            log.error("list not opened: the status item cannot request a session on this macOS")
+            return
+        }
+        _ = item.perform(requestSession)
+        watch(item, retry: retry, generation: asked, checksLeft: 6)
+    }
+
+    /// Looks for the session at once, then every 50 ms: once seen, the list opened, so
+    /// a later close (Esc, a click away) is never mistaken for an ignored request.
+    @MainActor
+    private static func watch(_ item: NSStatusItem, retry: Bool, generation asked: Int, checksLeft: Int) {
+        if session(item) != nil {
+            log.notice("list opened (session)")
+            return
+        }
+        guard asked == generation else { return }      // another press or close came since
+        if checksLeft > 0 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                watch(item, retry: retry, generation: asked, checksLeft: checksLeft - 1)
+            }
+        } else if retry {
+            log.notice("session request ignored; asking once more")
+            openSession(item, retry: false, generation: asked)
+        } else {
+            log.error("list not opened: the session request was ignored twice")
+        }
+    }
+
+    // MARK: macOS 14–26: the button
+
+    @MainActor
+    private static func clickButton() {
+        guard let button = statusItemButton() else {
+            log.error("list not opened: no menu bar button found")
+            return
+        }
         button.performClick(nil)
+        log.notice("menu bar button clicked")
+    }
+
+    private static let statusItemOfButton = Selector(("_statusItem"))
+
+    /// Clew's status item, from its button (private `_statusItem`, checked first).
+    @MainActor
+    static func statusItem() -> NSStatusItem? {
+        guard let button = statusItemButton(), button.responds(to: statusItemOfButton) else { return nil }
+        return button.perform(statusItemOfButton)?.takeUnretainedValue() as? NSStatusItem
     }
 
     @MainActor
