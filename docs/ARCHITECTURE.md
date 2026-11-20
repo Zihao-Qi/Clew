@@ -683,8 +683,8 @@ went back to the list); exports from before read `origin` as `hand`.
 **Calendar events (v1.2, step 2).** Read live through EventKit in the app
 (`EventKitCalendar`, behind `CalendarReading` so the snapshot uses made-up events), never
 stored: no table, no export. Full access is requested only from "Show your calendar"
-(macOS 14 has no read-only access; `NSCalendarsFullAccessUsageDescription` says Clew only
-reads); the sandbox entitlement is `com.apple.security.personal-information.calendars`.
+(macOS 14 has no read-only access; `NSCalendarsFullAccessUsageDescription` says Clew
+changes an event only when the user edits it on the timeline); the sandbox entitlement is `com.apple.security.personal-information.calendars`.
 Declined invitations are skipped by the adapter; `EKEventStoreChanged` refreshes. Core's
 `Clew.timelineEvents(_:day:hidden:)` (pure, tested) drops hidden calendars and events
 outside Clew's day, keeps all-day ones apart, cuts timed ones to the day, and lays out
@@ -692,6 +692,20 @@ blocks and events together (`blockPlaces`, `eventPlaces`; `timelineLayout`, whic
 the double-click's open name box as a draft block, 2026-11-13). Settings: `calendarShown`
 (default off), `calendarPromptClosed`, `calendarsHidden` (only unticked ids, so new
 calendars show).
+
+**Editing an event (2026-11-19, step 3).** The adapter marks `CalendarEvent.canEdit`
+(calendar `allowsContentModifications`, and not an invitation whose organizer is someone
+else) and `repeats` (`hasRecurrenceRules`); `timelineEvents` keeps `canEdit` only for an
+event wholly inside Clew's day. `CalendarReading.change(_:title:start:end:span:)` finds the
+occurrence by its id (`calendarItemIdentifier@startEpoch`) and saves it with
+`.thisEvent` or `.futureEvents`, returning the id afterwards (a "future" change may start a
+new series), or nil (then `store.reset()`). Nothing about events is stored in Clew:
+`AppModel` holds the drag's waiting change (`pendingEventChange`, for a repeating event's
+question) and the last change for Undo (`lastEventChange`, a few seconds) in memory only.
+Core's `Clew.movedEvent`, `Clew.resizedEnd` and `Clew.eventEditProblem` (pure, tested) do
+the quarter-hour snapping, the day's limits and the page's checks. On the timeline, an
+editable event is in `isOnBlockOrBox`, so double-clicks and sweeps leave it to its own
+click (its page, `Screen.event`) and drags.
 
 **Site order (2026-11-10).** Every collection keeps the order its site shows in the
 setting `listOrder.<source>`, and its page lists what is left in that order (items

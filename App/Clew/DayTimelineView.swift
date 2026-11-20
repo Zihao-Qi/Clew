@@ -113,6 +113,8 @@ struct DayTimelineView: View {
     let onMove: (TimelineBlock) -> Void
     let onOpen: (UUID) -> Void
     let onEdit: (Item) -> Void
+    /// A click on an event the user may change: its page (SPEC 2026-11-19).
+    let onOpenEvent: (CalendarEvent) -> Void
     @Environment(\.locale) private var locale
     /// A drag on empty space (SPEC 2026-11-19): the minute pressed, and the pointer's y in
     /// the list's space (so the block follows the hours as they scroll under it).
@@ -124,6 +126,51 @@ struct DayTimelineView: View {
     /// the rollover): the rest of the drag does nothing (review).
     @State private var sweepIgnored = false
     @GestureState private var sweeping = false
+    /// An event's drag or its bottom edge's (SPEC 2026-11-19): the y pressed, in the
+    /// day's content, and the pointer's y in the list's space (so it follows the scroll).
+    private struct EventDrag: Equatable {
+        let id: String
+        let resize: Bool
+        let pressY: CGFloat
+        var pointerY: CGFloat
+    }
+    @State private var eventDrag: EventDrag?
+
+    /// Where an event shows: as dragged, as waiting for the repeat question, or as it is.
+    private func shown(_ event: CalendarEvent) -> (start: Date, end: Date) {
+        if let d = eventDrag, d.id == event.id {
+            let minutes = Double((d.pointerY - geometry.contentTop - d.pressY) / TimelineMetrics.pointsPerMinute)
+            return d.resize ? (event.start, Clew.resizedEnd(event, by: minutes, day: day))
+                            : Clew.movedEvent(event, by: minutes, day: day)
+        }
+        if let p = model.pendingEventChange, p.event.id == event.id { return (p.start, p.end) }
+        return (event.start, event.end)
+    }
+
+    /// An event's drag (nil: cancelled). A new drag answers a waiting one with Cancel.
+    private func eventDragged(_ event: CalendarEvent, resize: Bool, _ value: DragGesture.Value?) {
+        guard let value else {
+            if eventDrag?.id == event.id { eventDrag = nil; stopEdgeScroll() }
+            return
+        }
+        if eventDrag?.id != event.id || eventDrag?.resize != resize {
+            model.answerPendingEventChange(nil)
+            eventDrag = EventDrag(id: event.id, resize: resize, pressY: value.startLocation.y - geometry.contentTop,
+                                  pointerY: value.location.y)
+        }
+        eventDrag?.pointerY = value.location.y
+        scrollAtEdge(value.location.y)
+    }
+
+    /// Let go: saved, or for a repeating event held for the question.
+    private func eventDropped(_ event: CalendarEvent, resize: Bool) {
+        guard let d = eventDrag, d.id == event.id else { return }
+        let at = shown(event)
+        eventDrag = nil
+        stopEdgeScroll()
+        model.proposeEventChange(.init(event: event, title: event.title, start: at.start, end: at.end,
+                                       kind: resize ? .changed : .moved))
+    }
 
     /// The block a drag on empty space would make, while it is dragged.
     private var sweepDraft: NewTaskDraft? {
@@ -160,7 +207,8 @@ struct DayTimelineView: View {
         newTask = NewTaskDraft(minutesIn: Double(point.y / TimelineMetrics.pointsPerMinute), day: day)
     }
 
-    /// `point` (the hours' coordinates) is on a task block or inside the open name box.
+    /// `point` (the hours' coordinates) is on a task block, an event the user may change,
+    /// or inside the open name box.
     private func isOnBlockOrBox(_ point: CGPoint, width: CGFloat, labelWidth: CGFloat) -> Bool {
         let layout = draftLayout
         func hits(_ start: Date, _ height: CGFloat, _ place: TimelinePlace) -> Bool {
@@ -169,6 +217,12 @@ struct DayTimelineView: View {
             return point.y >= top && point.y < top + height && point.x >= col.x && point.x < col.x + col.width
         }
         if day.blocks.contains(where: { hits($0.block.start, TimelineMetrics.y($0.block.end, in: day) - TimelineMetrics.y($0.block.start, in: day), place($0, layout)) }) { return true }
+        // An event the user may change takes its own clicks and drags (SPEC 2026-11-19).
+        for event in model.calendarEvents?.timed ?? [] where event.canEdit {
+            let at = shown(event)
+            let place = layout?.events[event.id] ?? model.calendarEvents?.eventPlaces[event.id] ?? TimelinePlace(lane: 0, lanes: 1)
+            if hits(at.start, TimelineEventView.height(at.start, at.end), place) { return true }
+        }
         // The box as drawn: a 15-minute one is taller than its quarter hour (review).
         if let box = newTask, let at = layout?.draft, hits(box.start, NewTaskDraft.boxHeight(box.minutes), at) { return true }
         return false
@@ -193,7 +247,7 @@ struct DayTimelineView: View {
                     sweepPress = Double(content.y / TimelineMetrics.pointsPerMinute)
                 }
                 sweepPointerY = value.location.y
-                sweepAtEdge(value.location.y)
+                scrollAtEdge(value.location.y)
             }
             .onEnded { _ in
                 if !sweepIgnored, let draft = sweepDraft { newTask = draft }
@@ -205,17 +259,21 @@ struct DayTimelineView: View {
     /// Stops the drag's block and its scrolling. `rest`: the drag still held does nothing
     /// more (the rollover); a new drag starts afresh either way.
     private func endSweep(rest ignored: Bool = false) {
-        sweepScroll?.invalidate()
-        sweepScroll = nil
-        sweepStep = 0
+        stopEdgeScroll()
         sweepPress = nil
         sweepPointerY = nil
         if ignored { sweepIgnored = true }
     }
 
-    /// Near the timeline's top or bottom edge while sweeping, the hours scroll by
-    /// themselves (as when a block is dragged there).
-    private func sweepAtEdge(_ y: CGFloat) {
+    private func stopEdgeScroll() {
+        sweepScroll?.invalidate()
+        sweepScroll = nil
+        sweepStep = 0
+    }
+
+    /// Near the timeline's top or bottom edge while sweeping or dragging an event, the
+    /// hours scroll by themselves (as when a block is dragged there).
+    private func scrollAtEdge(_ y: CGFloat) {
         let view = geometry.viewport
         let step = y < view.minY + 18 ? -1 : y > view.maxY - 18 ? 1 : 0
         // Already scrolling this way; a new direction (or none) stops the old timer.
@@ -249,6 +307,8 @@ struct DayTimelineView: View {
         VStack(spacing: 0) {
             header
             hours
+            // Below the hours, so nothing in them moves when it shows.
+            repeatQuestion
         }
         // Its own card, floating just above the menu (SPEC 2026-11-19, user): the
         // foreground of what to do now and next.
@@ -262,8 +322,17 @@ struct DayTimelineView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
             if newTask == nil { centreOnNow() }
         }
-        // The rollover closes the box; nothing is made.
-        .onChange(of: day.day) { newTask = nil; endSweep(rest: true) }
+        // The rollover closes the box; nothing is made. A waiting event goes back.
+        .onChange(of: day.day) {
+            newTask = nil
+            endSweep(rest: true)
+            eventDrag = nil
+            model.answerPendingEventChange(nil)
+        }
+        // The menu closing puts a waiting event back.
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in
+            model.answerPendingEventChange(nil)
+        }
         // A drag the system cancelled (the menu closed): nothing is made.
         .onChange(of: sweeping) {
             if !sweeping {
@@ -271,8 +340,13 @@ struct DayTimelineView: View {
                 sweepIgnored = false
             }
         }
-        // Leaving the list (Add, Settings) mid-drag: no timer is left running.
-        .onDisappear { endSweep() }
+        // Leaving the list (Add, Settings) mid-drag: no timer is left running, and a
+        // waiting event goes back.
+        .onDisappear {
+            endSweep()
+            eventDrag = nil
+            model.answerPendingEventChange(nil)
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text("Today's timeline"))
         .accessibilityAction(named: Text("New task on the timeline"), openNewTaskAtNextQuarter)
@@ -280,6 +354,36 @@ struct DayTimelineView: View {
 
     /// Above the hours: "Show your calendar" until it is on (or closed), a note when macOS
     /// does not allow it, and today's all-day events as one thin line.
+    /// A repeating event dragged: Calendar's question, before anything is saved.
+    @ViewBuilder
+    private var repeatQuestion: some View {
+        if let pending = model.pendingEventChange {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("“\(pending.event.title)” is a repeating event.").lineLimit(1).truncationMode(.middle)
+                HStack(spacing: 12) {
+                    // The answers in the accent colour, so they read as buttons.
+                    Group {
+                        Button("This event only") { model.answerPendingEventChange(.thisEvent) }
+                            .keyboardShortcut(.defaultAction)
+                            .accessibilityLabel(Text("Change this event only"))
+                        Button("All future events") { model.answerPendingEventChange(.futureEvents) }
+                            .accessibilityLabel(Text("Change this and all future events"))
+                    }
+                    .foregroundStyle(Color.accentColor)
+                    Spacer()
+                    Button("Cancel") { model.answerPendingEventChange(nil) }
+                        .keyboardShortcut(.cancelAction)
+                        .accessibilityLabel(Text("Cancel the change"))
+                }
+            }
+            .font(TimelineMetrics.detailFont)
+            .foregroundStyle(.secondary)
+            .buttonStyle(.borderless)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+        }
+    }
+
     @ViewBuilder
     private var header: some View {
         if !model.calendarShown, !model.calendarPromptClosed {
@@ -339,10 +443,15 @@ struct DayTimelineView: View {
                     ForEach(model.calendarEvents?.timed ?? []) { event in
                         let col = columns(layout?.events[event.id] ?? model.calendarEvents?.eventPlaces[event.id]
                                           ?? TimelinePlace(lane: 0, lanes: 1), width: width, labelWidth: labelWidth)
-                        TimelineEventView(event: event)
-                            .frame(width: col.width,
-                                   height: max(CGFloat(event.end.timeIntervalSince(event.start) / 60) * TimelineMetrics.pointsPerMinute - 1, 6))
-                            .offset(x: col.x, y: TimelineMetrics.y(event.start, in: day))
+                        let at = shown(event)
+                        TimelineEventView(event: event, start: at.start, end: at.end, space: space,
+                                          // One waiting for the question takes nothing more.
+                                          editable: event.canEdit && model.pendingEventChange?.event.id != event.id,
+                                          onOpen: { onOpenEvent(event) },
+                                          onDrag: { eventDragged(event, resize: $0, $1) },
+                                          onDrop: { eventDropped(event, resize: $0) })
+                            .frame(width: col.width, height: TimelineEventView.height(at.start, at.end))
+                            .offset(x: col.x, y: TimelineMetrics.y(at.start, in: day))
                     }
                     ForEach(day.blocks) { block in
                         let col = columns(place(block, layout), width: width, labelWidth: labelWidth)
@@ -690,7 +799,7 @@ struct TimelineBlockView: View {
 
     /// The bottom-edge resize cursor, as a window's bottom edge shows it (the one SwiftUI's
     /// pointer style gave before; `resizeUpDown` has a bar between the arrows).
-    private static var resizeCursor: NSCursor {
+    static var resizeCursor: NSCursor {
         if #available(macOS 15.0, *) { NSCursor.frameResize(position: .bottom, directions: .all) } else { .resizeUpDown }
     }
 
@@ -786,8 +895,6 @@ struct TimelineBlockView: View {
     }
 }
 
-/// A calendar event: a stripe in its calendar's colour, a light fill, the title in
-/// secondary text. Read only: nothing to drag or tick (SPEC "Calendar events").
 /// The block a drag on the timeline is making (SPEC 2026-11-19): light, with its time.
 struct SweepBlock: View {
     let draft: NewTaskDraft
@@ -811,15 +918,94 @@ struct SweepBlock: View {
     }
 }
 
+/// A calendar event: a stripe in its calendar's colour, a light fill, the title in
+/// secondary text (SPEC "Calendar events"). Never ticked. One the user may change
+/// (SPEC 2026-11-19): click for its page, drag to move, drag the bottom edge for its end.
 struct TimelineEventView: View {
     let event: CalendarEvent
+    /// Where it shows now (moved while dragged, or waiting for the repeat question).
+    let start: Date
+    let end: Date
+    let space: String
+    let editable: Bool
+    let onOpen: () -> Void
+    /// A drag (true: the bottom edge's), nil when cancelled; and its letting go.
+    let onDrag: (Bool, DragGesture.Value?) -> Void
+    let onDrop: (Bool) -> Void
 
-    private var range: String { TimelineMetrics.range(event.start, event.end) }
-    private var minutes: Double { event.end.timeIntervalSince(event.start) / 60 }
+    @GestureState private var moving = false
+    @GestureState private var resizing = false
+    @State private var onEdge = false
+
+    static func height(_ start: Date, _ end: Date) -> CGFloat {
+        max(CGFloat(end.timeIntervalSince(start) / 60) * TimelineMetrics.pointsPerMinute - 1, 6)
+    }
+
+    private var range: String { TimelineMetrics.range(start, end) }
+    private var minutes: Double { end.timeIntervalSince(start) / 60 }
 
     var body: some View {
+        if editable {
+            card
+                .overlay(alignment: .bottom) { grip.alignmentGuide(.bottom) { $0[.bottom] - 4 } }
+                .contentShape(Rectangle())
+                .onTapGesture(perform: onOpen)
+                .gesture(drag(resize: false, $moving))
+                .onChange(of: moving) { _, live in if !live { onDrag(false, nil) } }
+                .accessibilityAction(named: Text("Edit event"), onOpen)
+        } else {
+            card
+        }
+    }
+
+    /// The bottom edge's grip, as a block's: 12 points, reaching 4 below the event.
+    private var grip: some View {
+        Color.clear
+            .frame(height: 12)
+            .overlay {
+                if onEdge || resizing {
+                    Capsule().fill(EventColor.of(event).opacity(0.8)).frame(width: 24, height: 3)
+                }
+            }
+            .contentShape(Rectangle())
+            .onContinuousHover { phase in
+                switch phase {
+                case .active:
+                    onEdge = true
+                    TimelineBlockView.resizeCursor.set()
+                case .ended:
+                    onEdge = false
+                    if !resizing { NSCursor.arrow.set() }
+                }
+            }
+            .onChange(of: resizing) { _, live in
+                guard !live else { return }
+                onDrag(true, nil)
+                if !onEdge { NSCursor.arrow.set() }
+            }
+            .onDisappear { if onEdge || resizing { onEdge = false; NSCursor.arrow.set() } }
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in
+                if onEdge { onEdge = false; NSCursor.arrow.set() }
+            }
+            .gesture(drag(resize: true, $resizing))
+    }
+
+    private func drag(resize: Bool, _ state: GestureState<Bool>) -> some Gesture {
+        DragGesture(minimumDistance: resize ? 2 : 3, coordinateSpace: .named(space))
+            .updating(state) { _, live, _ in live = true }
+            .onChanged { value in
+                if resize { TimelineBlockView.resizeCursor.set() }
+                onDrag(resize, value)
+            }
+            .onEnded { value in
+                onDrag(resize, value)
+                onDrop(resize)
+            }
+    }
+
+    private var card: some View {
         let color = EventColor.of(event)
-        RoundedRectangle(cornerRadius: 4)
+        return RoundedRectangle(cornerRadius: 4)
             .fill(color.opacity(0.12))
             .overlay(alignment: .leading) { Rectangle().fill(color).frame(width: 3) }
             .overlay {

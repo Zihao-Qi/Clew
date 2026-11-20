@@ -47,6 +47,11 @@ struct ClewApp: App {
             Snapshot.startTimeFieldTest()
             return
         }
+        if ProcessInfo.processInfo.environment["CLEW_EVENT_TEST"] != nil {
+            _model = State(initialValue: AppModel(clew: nil, notify: false))
+            Snapshot.startEventTest()
+            return
+        }
         if ProcessInfo.processInfo.environment["CLEW_NEWTASK_TEST"] != nil {
             _model = State(initialValue: AppModel(clew: nil, notify: false))
             Snapshot.startNewTaskTest()
@@ -124,6 +129,8 @@ enum Screen: Equatable {
     case edit(Item, back: Back)
     /// "Put on timeline…" (block nil) or a block's "Move to…" (SPEC 2026-11-10).
     case place(UUID, block: UUID?)
+    /// A calendar event's page: title, start, end (SPEC 2026-11-19).
+    case event(CalendarEvent)
 
     enum Back: Equatable { case list, detail }
 }
@@ -156,6 +163,8 @@ struct RootView: View {
                     EditView(model: model, item: item) { screen = back == .detail ? .detail(item.id) : .list }
                 case .place(let itemId, let block):
                     PlaceView(model: model, itemId: itemId, blockId: block) { screen = .list }
+                case .event(let event):
+                    EventEditView(model: model, event: event) { screen = .list }
                 }
             }
         }

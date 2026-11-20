@@ -382,11 +382,155 @@ enum Snapshot {
         }
     }
 
+    /// `CLEW_EVENT_TEST=1`: editing calendar events on the timeline (SPEC 2026-11-19) with
+    /// real mouse and key events, against made-up events (never the user's calendar).
+    static func startEventTest() {
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1))
+            do {
+                let clew = Clew(store: try SQLiteStore.inMemory(), clock: SystemClock(), zones: SystemTimeZone())
+                try clew.closeCalendarPrompt()
+                try clew.setCalendarShown(true)
+                let model = AppModel(clew: clew, notify: false)
+                model.refresh()
+                guard let day = model.timeline else { print("no timeline"); exit(1) }
+                let now = day.start.addingTimeInterval((Date().timeIntervalSince(day.start) / 900).rounded(.down) * 900)
+                let fake = FakeCalendar(now: now, shared: true)
+                model.calendarSource = fake
+                model.refresh()
+                let probe = NewTaskProbe()
+                let host = NSHostingView(rootView: NewTaskHarness(model: model, probe: probe).frame(width: 360))
+                let size = host.fittingSize
+                let window = NSWindow(contentRect: NSRect(x: -10_000, y: -10_000, width: size.width, height: size.height + 60),
+                                      styleMask: [.titled], backing: .buffered, defer: false)
+                window.contentView = host
+                window.makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
+                try await Task.sleep(for: .milliseconds(800))
+                var number = 0
+                let height = window.contentView!.frame.height
+                func post(_ type: NSEvent.EventType, _ x: CGFloat, _ y: CGFloat, clicks: Int = 1) {
+                    number += 1
+                    NSApp.postEvent(NSEvent.mouseEvent(with: type, location: NSPoint(x: x, y: height - y), modifierFlags: [],
+                                                       timestamp: ProcessInfo.processInfo.systemUptime,
+                                                       windowNumber: window.windowNumber, context: nil, eventNumber: number,
+                                                       clickCount: clicks,
+                                                       pressure: type == .leftMouseUp ? 0 : 1)!, atStart: false)
+                }
+                @MainActor func click(_ x: CGFloat, _ y: CGFloat, clicks: Int = 1) async throws {
+                    for n in 1...clicks {
+                        post(.leftMouseDown, x, y, clicks: n)
+                        try await Task.sleep(for: .milliseconds(30))
+                        post(.leftMouseUp, x, y, clicks: n)
+                        try await Task.sleep(for: .milliseconds(60))
+                    }
+                    try await Task.sleep(for: .milliseconds(400))
+                }
+                @MainActor func drag(_ x: CGFloat, from y0: CGFloat, to y1: CGFloat) async throws {
+                    post(.leftMouseDown, x, y0)
+                    try await Task.sleep(for: .milliseconds(50))
+                    for i in 1...6 {
+                        post(.leftMouseDragged, x, y0 + (y1 - y0) * CGFloat(i) / 6)
+                        try await Task.sleep(for: .milliseconds(40))
+                    }
+                    post(.leftMouseUp, x, y1)
+                    try await Task.sleep(for: .milliseconds(400))
+                }
+                @MainActor func key(_ chars: String, code: UInt16) async throws {
+                    for type in [NSEvent.EventType.keyDown, .keyUp] {
+                        NSApp.postEvent(NSEvent.keyEvent(with: type, location: .zero, modifierFlags: [],
+                                                         timestamp: ProcessInfo.processInfo.systemUptime,
+                                                         windowNumber: window.windowNumber, context: nil, characters: chars,
+                                                         charactersIgnoringModifiers: chars, isARepeat: false, keyCode: code)!,
+                                        atStart: false)
+                    }
+                    try await Task.sleep(for: .milliseconds(300))
+                }
+                @MainActor func report(_ name: String, _ ok: Bool) { print(ok ? "PASS" : "FAIL", name); fflush(stdout) }
+                /// An event's top in the window, by its id, as it is now.
+                @MainActor func top(_ id: String) -> CGFloat {
+                    let e = fake.timed.first { $0.id == id }!
+                    return probe.geometry.contentTop + TimelineMetrics.y(e.start, in: day)
+                }
+                @MainActor func event(_ id: String) -> CalendarEvent { fake.timed.first { $0.id == id }! }
+                let x: CGFloat = 200
+                let call = event("call"), standup = event("standup")
+                print("window up", size, "contentTop", probe.geometry.contentTop, "call top", top("call")); fflush(stdout)
+
+                // Click: its page.
+                try await click(x, top("call") + 10)
+                report("a click on an event you may change opens its page", probe.eventsOpened == 1)
+                try await click(x, top("call") + 10, clicks: 2)
+                report("a double-click on it makes no task", probe.draft == nil)
+
+                // Drag: moved by whole quarter hours, saved at once.
+                try await drag(x, from: top("call") + 10, to: top("call") + 10 + 31)
+                let moved = fake.changes.last
+                report("a drag moves it by quarter hours, its length kept (\(moved.map { $0.start.timeIntervalSince(call.start) / 60 } ?? -1) min)",
+                       moved?.id == "call" && moved?.start == call.start.addingTimeInterval(1800)
+                       && moved?.end == call.end.addingTimeInterval(1800) && moved?.span == .thisEvent)
+                report("a drag on it makes no task", probe.draft == nil)
+                report("Undo is offered: Moved", model.lastEventChange?.change.kind == .moved)
+                model.undoEventChange()
+                report("Undo puts it back", event("call").start == call.start && event("call").end == call.end)
+
+                // Its bottom edge: the end only.
+                let callBottom = top("call") + TimelineEventView.height(call.start, call.end) - 1
+                let before = fake.changes.count
+                try await drag(x, from: callBottom, to: callBottom + 30)
+                let resized = fake.changes.count > before ? fake.changes.last : nil
+                report("its bottom edge changes the end by quarter hours",
+                       resized?.start == call.start && resized?.end == call.end.addingTimeInterval(1800))
+                report("Undo is offered: Changed", model.lastEventChange?.change.kind == .changed)
+                model.undoEventChange()
+
+                // A repeating one waits for the question.
+                var count = fake.changes.count
+                try await drag(x, from: top("standup") + 3, to: top("standup") + 3 + 15)
+                report("a repeating event waits: nothing saved yet",
+                       fake.changes.count == count && model.pendingEventChange?.start == standup.start.addingTimeInterval(900))
+                try await key("\r", code: 36)
+                report("Return answers This event only",
+                       fake.changes.count == count + 1 && fake.changes.last?.span == .thisEvent
+                       && fake.changes.last?.start == standup.start.addingTimeInterval(900) && model.pendingEventChange == nil)
+                model.undoEventChange()
+                count = fake.changes.count
+                try await drag(x, from: top("standup") + 3, to: top("standup") + 3 + 15)
+                var waited = model.pendingEventChange != nil
+                try await key("\u{1b}", code: 53)
+                report("Esc puts it back", waited && fake.changes.count == count && model.pendingEventChange == nil)
+                try await drag(x, from: top("standup") + 3, to: top("standup") + 3 + 15)
+                waited = model.pendingEventChange != nil
+                let other = NSWindow(contentRect: NSRect(x: -10_000, y: -8_000, width: 50, height: 50),
+                                     styleMask: [.titled], backing: .buffered, defer: false)
+                other.makeKeyAndOrderFront(nil)
+                try await Task.sleep(for: .milliseconds(400))
+                report("the window losing the keyboard puts it back",
+                       waited && fake.changes.count == count && model.pendingEventChange == nil)
+                window.makeKeyAndOrderFront(nil)
+                try await Task.sleep(for: .milliseconds(400))
+
+                // Someone else's event: as before, a double-click there makes a task.
+                let opened = probe.eventsOpened
+                try await click(x, top("shared") + 10)
+                report("a click on a read-only event opens nothing", probe.eventsOpened == opened)
+                try await click(x, top("shared") + 10, clicks: 2)
+                report("a double-click on a read-only event opens the name box", probe.draft != nil)
+                exit(0)
+            } catch {
+                print("event test failed:", error)
+                exit(1)
+            }
+        }
+    }
+
     @MainActor final class NewTaskProbe {
         var draft: NewTaskDraft?
         var opened = 0
         var blockDrags = 0
+        var eventsOpened = 0
         var topQuarter: Int?
+        var geometry = TimelineGeometry()
     }
 
     private struct NewTaskHarness: View {
@@ -400,10 +544,12 @@ enum Snapshot {
                 DayTimelineView(model: model, day: day, space: "harness", geometry: $geometry, topQuarter: $top,
                                 liftedBlock: nil, hovered: .constant(nil), newTask: $newTask,
                                 onDrag: { _, value in if value != nil { probe.blockDrags += 1 } }, onDrop: { _ in },
-                                onMove: { _ in }, onOpen: { _ in probe.opened += 1 }, onEdit: { _ in })
+                                onMove: { _ in }, onOpen: { _ in probe.opened += 1 }, onEdit: { _ in },
+                                onOpenEvent: { _ in probe.eventsOpened += 1 })
                     .coordinateSpace(name: "harness")
                     .onChange(of: newTask) { _, now in probe.draft = now }
                     .onChange(of: top, initial: true) { _, now in probe.topQuarter = now }
+                    .onChange(of: geometry, initial: true) { _, now in probe.geometry = now }
             }
         }
     }
@@ -780,6 +926,27 @@ enum Snapshot {
                 render(RootView(model: model, screen: .place(papers.id, block: nil)), appearance: .aqua,
                        to: dir.appendingPathComponent("place-light.png"))
             }
+            // Editing an event (SPEC 2026-11-19): its page, a repeating one's question, and
+            // after a drag the question below the hours with the last change's Undo.
+            if let call = model.calendarEvents?.timed.first(where: { $0.id == "call" }),
+               let standup = model.calendarEvents?.timed.first(where: { $0.id == "standup" }) {
+                for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+                    let suffix = appearance == .aqua ? "light" : "dark"
+                    render(RootView(model: model, screen: .event(call)), appearance: appearance,
+                           to: dir.appendingPathComponent("event-\(suffix).png"))
+                    render(EventEditView(model: model, event: standup, onDone: {}, startAsking: true).frame(width: 340),
+                           appearance: appearance, to: dir.appendingPathComponent("event-repeats-\(suffix).png"))
+                    model.changeEvent(.init(event: call, title: call.title, start: call.start.addingTimeInterval(900),
+                                            end: call.end.addingTimeInterval(900), kind: .moved), span: .thisEvent)
+                    model.proposeEventChange(.init(event: standup, title: standup.title,
+                                                   start: standup.start.addingTimeInterval(1800),
+                                                   end: standup.end.addingTimeInterval(1800), kind: .moved))
+                    render(RootView(model: model, screen: .list), appearance: appearance,
+                           to: dir.appendingPathComponent("event-waiting-\(suffix).png"))
+                    model.answerPendingEventChange(nil)
+                    model.undoEventChange()
+                }
+            }
             for (name, screen) in [("list", Screen.list), ("add", .add),
                                    ("edit", .edit(editing, back: .list)), ("detail", .detail(editing.id)),
                                    ("collection", .collection(.extensionYouTube)),
@@ -830,7 +997,7 @@ enum Snapshot {
                     render(DayTimelineView(model: model, day: day, space: "snapshot", geometry: .constant(TimelineGeometry()),
                                            topQuarter: .constant(top), liftedBlock: nil, hovered: .constant(nil),
                                            newTask: .constant(draft), onDrag: { _, _ in }, onDrop: { _ in },
-                                           onMove: { _ in }, onOpen: { _ in }, onEdit: { _ in })
+                                           onMove: { _ in }, onOpen: { _ in }, onEdit: { _ in }, onOpenEvent: { _ in })
                                .frame(width: 360), appearance: appearance,
                            to: dir.appendingPathComponent("newtask-\(appearance == .aqua ? "light" : "dark").png"))
                 }
@@ -937,7 +1104,25 @@ enum Snapshot {
     /// Made-up calendar events around now, for the snapshot only.
     @MainActor final class FakeCalendar: CalendarReading {
         let now: Date
-        init(now: Date) { self.now = now }
+        /// Standup repeats; both it and the call may be changed. A shared one may not.
+        var timed: [CalendarEvent]
+        /// Every change asked for, for the click tests.
+        var changes: [(id: String, title: String, start: Date, end: Date, span: EventSpan)] = []
+        init(now: Date, shared: Bool = false) {
+            self.now = now
+            timed = [CalendarEvent(id: "standup", calendarId: "work", title: "Standup", start: now.addingTimeInterval(-3600),
+                                   end: now.addingTimeInterval(-2700), isAllDay: false, color: [0.2, 0.6, 0.3],
+                                   canEdit: true, repeats: true),
+                     CalendarEvent(id: "call", calendarId: "home", title: "Call with Sam", start: now.addingTimeInterval(1800),
+                                   end: now.addingTimeInterval(4500), isAllDay: false, color: [0.9, 0.5, 0.1],
+                                   canEdit: true)]
+            // Someone else's invitation: read only, as before (the event test only).
+            if shared {
+                timed.append(CalendarEvent(id: "shared", calendarId: "work", title: "Team lunch",
+                                           start: now.addingTimeInterval(5400), end: now.addingTimeInterval(7200),
+                                           isAllDay: false, color: [0.2, 0.6, 0.3]))
+            }
+        }
         var access: CalendarAccess { .granted }
         func requestAccess() async -> Bool { true }
         func calendars() -> [CalendarInfo] {
@@ -945,14 +1130,18 @@ enum Snapshot {
              CalendarInfo(id: "home", title: "Home", source: "iCloud", color: [0.9, 0.5, 0.1])]
         }
         func events(from start: Date, to end: Date) -> [CalendarEvent] {
-            [CalendarEvent(id: "standup", calendarId: "work", title: "Standup", start: now.addingTimeInterval(-3600),
-                           end: now.addingTimeInterval(-2700), isAllDay: false, color: [0.2, 0.6, 0.3]),
-             CalendarEvent(id: "call", calendarId: "home", title: "Call with Sam", start: now.addingTimeInterval(1800),
-                           end: now.addingTimeInterval(4500), isAllDay: false, color: [0.9, 0.5, 0.1]),
-             CalendarEvent(id: "trip", calendarId: "home", title: "Mum's birthday", start: start, end: end,
-                           isAllDay: true, color: [0.9, 0.5, 0.1])]
+            timed + [CalendarEvent(id: "trip", calendarId: "home", title: "Mum's birthday", start: start, end: end,
+                                   isAllDay: true, color: [0.9, 0.5, 0.1])]
         }
         func observe(_ onChange: @escaping @MainActor () -> Void) {}
+        func change(_ event: CalendarEvent, title: String, start: Date, end: Date, span: EventSpan) -> String? {
+            guard let i = timed.firstIndex(where: { $0.id == event.id }), timed[i].canEdit else { return nil }
+            let e = timed[i]
+            timed[i] = CalendarEvent(id: e.id, calendarId: e.calendarId, title: title, start: start, end: end,
+                                     isAllDay: false, color: e.color, canEdit: true, repeats: e.repeats)
+            changes.append((e.id, title, start, end, span))
+            return e.id
+        }
     }
 
     /// A clock the snapshot can move into the past to seed history.

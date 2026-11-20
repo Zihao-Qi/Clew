@@ -90,7 +90,8 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
    load of that page (and its redirects), no cookies, nothing else sent. While a
    browser is paired (v1.1), Clew also listens on this Mac only (`127.0.0.1`) for
    its extension. With calendar access (v1.2), Clew reads today's events from macOS
-   Calendar on this Mac; it never stores or writes them. Only if turned on in
+   Calendar on this Mac; it never stores them, and changes one only when you edit it
+   on the timeline (2026-11-19). Only if turned on in
    Settings › About (off by default, 2026-11-13), Clew also asks GitHub once a day
    whether a newer release exists (see "About and updates").
 9. **Launch at login** (`SMAppService`), toggled in a small Settings window.
@@ -719,7 +720,7 @@ stopped daily use, not adding features.
   - **Several blocks** are allowed (Add another block); the first comes from dragging the
     row or Edit's "On today's timeline".
   - **A new task from the timeline** (*user*, 2026-11-13). **Double-click** an empty
-    spot (or a calendar event, which takes no clicks) and a small name box opens right
+    spot (or a calendar event Clew cannot change, which takes no clicks) and a small name box opens right
     there, like Calendar's: a **30-minute block** at the quarter hour under the pointer
     (cut at 4 a.m.), in the column the block will take (beside an event it overlaps), so
     nothing jumps on Return. It scrolls with the hours. Type a name and press **Return**:
@@ -742,7 +743,7 @@ stopped daily use, not adding features.
     - **While the box is open** the keyboard edits the name: the Delete key does not
       delete the task under the pointer, and the timeline does not re-centre on now.
     - **Drag to make one** (*user*, 2026-11-19, as in Calendar): press on an empty spot
-      (or a calendar event) and drag down or up; a light block shows the time it covers,
+      (or a calendar event Clew cannot change) and drag down or up; a light block shows the time it covers,
       from the quarter hour pressed to the quarter hour nearest the pointer (at least 15
       minutes, inside the day), in the column it will take. Near the timeline's top or
       bottom edge the hours scroll. Letting go opens the same name box on that block, and
@@ -851,23 +852,46 @@ stopped daily use, not adding features.
     Raise target / Done; its block stays on the timeline, done. The row stays in the list
     (after Next round or Raise target too, so nothing moves under the pointer) until it
     is placed again, and cannot be placed while the goal is reached.
-  - **Calendar events (step 2)** show on the timeline as **read-only** blocks (*user*,
+  - **Calendar events (step 2)** show on the timeline as blocks (read only until step 3) (*user*,
     2026-11-11: a thin stripe in the calendar's colour, a very light fill, the title in
     secondary text; they sit side by side with overlapping task blocks): title and time,
-    nothing to click, never ticked, never counted,
+    nothing to click (except an event you may change, step 3), never ticked, never counted,
     never alerted by Clew (Calendar has its own alerts). All-day events sit as a thin
     line at the top. Declined events are hidden. Clew reads **every calendar in macOS
     Calendar** (Google, iCloud, Exchange too, once added in System Settings › Internet
     Accounts); Settings › Calendar lists them with checkboxes, and Clew remembers only
-    the ones unticked, so a new calendar shows by default. Clew **never writes to a
-    calendar**, and events are read live: never saved, exported or sent anywhere.
+    the ones unticked, so a new calendar shows by default. Events are read live: never
+    saved, exported or sent anywhere. Clew writes to a calendar only when you change an
+    event on the timeline (below).
     Access is asked only when "Show your calendar" on the timeline (or in Settings) is
     clicked; without it the timeline works with tasks alone. "Show your calendar" sits at
     the top of the timeline card until used or closed with ×; Settings › Calendar turns
     events on or off and lists the calendars by account. If macOS does not allow access,
     the timeline and Settings say so, with a way to the privacy settings.
+  - **Editing an event** (*user*, 2026-11-19, as in Calendar; *changed*: until now
+    events were read only). An event you may change (its calendar allows changes, and it
+    is not an invitation from someone else) takes clicks and drags on the timeline;
+    there is no setting. Others (an invitation, a subscribed or Birthdays calendar, one
+    that reaches past the timeline's 4 a.m. edges) stay read only, as above.
+    - **Click** opens a small page: its title, when it starts and when it ends (any
+      minute, on today's timeline), Cancel and Save. A title cannot be empty, and the end
+      must come after the start.
+    - **Drag** it to move it, by whole quarter hours (its length kept, inside the day).
+      **Drag its bottom edge** to change its end, by quarter hours (at least 15 minutes,
+      or its own length if shorter). Near the timeline's top or bottom edge the hours
+      scroll, as when making a task.
+    - **A repeating event** asks, as Calendar does, before anything is saved: **This
+      event only** or **All future events** (or Cancel). After a drag the event waits at
+      its new place with the question just below the hours (so nothing in them moves); Esc, Cancel, the menu closing and
+      the rollover put it back.
+    - Each change shows "Moved “Standup” · Undo" (or "Changed …") for a few seconds;
+      Undo puts back its title and times, with the same choice for a repeating one.
+    - A task cannot be made by double-clicking or dragging on such an event: make it
+      beside it, or elsewhere, and drag its block there (*user*, 2026-11-19).
+    - If Calendar refuses (the event was changed or deleted elsewhere), nothing changes
+      and a notice says so.
   - **Steps:** (1) the timeline with task blocks, ticks and start alerts; (2) calendar
-    events.
+    events; (3) editing events.
 - Weeks start on **Monday**; "N× per week" items reset then.
 - A counted goal's step is always **+1** per click.
 - The rating row is offered **every time**, and is always skippable.
@@ -974,4 +998,6 @@ signing step. App Sandbox stays **on**: Clew needs no Accessibility permission. 
 day timeline's events (v1.2) need the sandbox's Calendars entitlement
 (`com.apple.security.personal-information.calendars`), an
 `NSCalendarsFullAccessUsageDescription`, and full access: macOS 14 offers only full or
-write-only access, no read-only, so the prompt text says Clew only reads.
+write-only access, no read-only. The prompt text says Clew shows the events and
+changes one only when you edit it on the timeline (2026-11-19; it said "only reads"
+before editing came).

@@ -793,6 +793,18 @@ M = [
  ("SW5 day end unclamped", C+"Timeline.swift", "let reach = min(max(Int((pointer / step).rounded()), 0), quarters)", "let reach = max(Int((pointer / step).rounded()), 0)", "TimelineTests"),
  ("SW6 length ignored", C+"Timeline.swift", "let length = minutes ?? min(Self.blockDefaultMinutes, Int(bounds.end.timeIntervalSince(start) / 60))", "let length = min(Self.blockDefaultMinutes, Int(bounds.end.timeIntervalSince(start) / 60))", "TimelineTests"),
  ("SW7 length unchecked", C+"Timeline.swift", "        try Self.checkLength(length, start: start, bounds)\n        return try storeForQueries.write { w in\n            let item = try insertNewItem(", "        return try storeForQueries.write { w in\n            let item = try insertNewItem(", "TimelineTests"),
+ ("EV1 clipped stays editable", C+"CalendarEvents.swift", "canEdit: e.canEdit && e.start >= day.start && e.end <= day.end, repeats: e.repeats)", "canEdit: e.canEdit, repeats: e.repeats)", "EventEditTests"),
+ ("EV2 start edge open", C+"CalendarEvents.swift", "canEdit: e.canEdit && e.start >= day.start && e.end <= day.end, repeats: e.repeats)", "canEdit: e.canEdit && e.start > day.start && e.end <= day.end, repeats: e.repeats)", "EventEditTests"),
+ ("EV3 repeats dropped", C+"CalendarEvents.swift", "canEdit: e.canEdit && e.start >= day.start && e.end <= day.end, repeats: e.repeats)", "canEdit: e.canEdit && e.start >= day.start && e.end <= day.end, repeats: false)", "EventEditTests"),
+ ("EV4 move unsnapped", C+"CalendarEvents.swift", "let wanted = event.start.addingTimeInterval(TimeInterval(snapMinutes(minutes) * 60))", "let wanted = event.start.addingTimeInterval(minutes * 60)", "EventEditTests"),
+ ("EV5 move no floor", C+"CalendarEvents.swift", "let start = min(max(wanted, day.start), day.end.addingTimeInterval(-length))", "let start = min(wanted, day.end.addingTimeInterval(-length))", "EventEditTests"),
+ ("EV6 move no ceiling", C+"CalendarEvents.swift", "let start = min(max(wanted, day.start), day.end.addingTimeInterval(-length))", "let start = max(wanted, day.start)", "EventEditTests"),
+ ("EV7 resize unsnapped", C+"CalendarEvents.swift", "let wanted = event.end.addingTimeInterval(TimeInterval(snapMinutes(minutes) * 60))", "let wanted = event.end.addingTimeInterval(minutes * 60)", "EventEditTests"),
+ ("EV8 resize no minimum", C+"CalendarEvents.swift", "return min(max(wanted, shortest), day.end)", "return min(max(wanted, event.start), day.end)", "EventEditTests"),
+ ("EV9 short grows", C+"CalendarEvents.swift", "let shortest = min(event.end, event.start.addingTimeInterval(TimeInterval(blockStepMinutes * 60)))", "let shortest = event.start.addingTimeInterval(TimeInterval(blockStepMinutes * 60))", "EventEditTests"),
+ ("EV10 resize past day", C+"CalendarEvents.swift", "return min(max(wanted, shortest), day.end)", "return max(wanted, shortest)", "EventEditTests"),
+ ("EV11 blank title ok", C+"CalendarEvents.swift", "if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return .noTitle }", "if title.isEmpty { return .noTitle }", "EventEditTests"),
+ ("EV12 equal end ok", C+"CalendarEvents.swift", "if end <= start { return .endsBeforeStart }", "if end < start { return .endsBeforeStart }", "EventEditTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0
