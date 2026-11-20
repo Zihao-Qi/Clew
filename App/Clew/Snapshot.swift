@@ -516,6 +516,32 @@ enum Snapshot {
                 report("a click on a read-only event opens nothing", probe.eventsOpened == opened)
                 try await click(x, top("shared") + 10, clicks: 2)
                 report("a double-click on a read-only event opens the name box", probe.draft != nil)
+
+                // The page (review): a title ending in a space, untouched, is no change; on a
+                // repeating event, Return with the title focused answers "This event only".
+                if let i = fake.timed.firstIndex(where: { $0.id == "standup" }) {
+                    let e = fake.timed[i]
+                    fake.timed[i] = CalendarEvent(id: e.id, calendarId: e.calendarId, title: "Standup ", start: e.start,
+                                                  end: e.end, isAllDay: false, color: e.color, canEdit: true, repeats: true)
+                }
+                model.refresh()
+                let page = model.calendarEvents!.timed.first { $0.id == "standup" }!
+                window.contentView = NSHostingView(rootView: RootView(model: model, screen: .event(page)))
+                try await Task.sleep(for: .milliseconds(900))
+                let n = fake.changes.count
+                // Twice: had it counted as a change, the second Return would answer the question.
+                try await key("\r", code: 36)
+                try await key("\r", code: 36)
+                report("Save with nothing changed writes nothing (title ends in a space)", fake.changes.count == n)
+                window.contentView = NSHostingView(rootView: RootView(model: model, screen: .event(page)))
+                try await Task.sleep(for: .milliseconds(900))
+                try await key("x", code: 7)
+                try await key("\r", code: 36)
+                report("Save on a repeating event asks first", fake.changes.count == n)
+                try await key("\r", code: 36)
+                report("then Return answers This event only (title \(fake.changes.last?.title ?? "-"))",
+                       fake.changes.count == n + 1 && fake.changes.last?.span == .thisEvent
+                       && fake.changes.last?.title.hasSuffix("x") == true)
                 exit(0)
             } catch {
                 print("event test failed:", error)

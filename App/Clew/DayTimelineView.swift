@@ -952,6 +952,8 @@ struct TimelineEventView: View {
                 .onTapGesture(perform: onOpen)
                 .gesture(drag(resize: false, $moving))
                 .onChange(of: moving) { _, live in if !live { onDrag(false, nil) } }
+                // Gone mid-drag (changed elsewhere): nothing of the drag stays (review).
+                .onDisappear { if moving || resizing { onDrag(resizing, nil) } }
                 .accessibilityAction(named: Text("Edit event"), onOpen)
         } else {
             card

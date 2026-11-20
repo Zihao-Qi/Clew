@@ -74,8 +74,9 @@ final class EventKitCalendar: CalendarReading {
     /// Its calendar allows changes, and it is not someone else's invitation (SPEC 2026-11-19).
     private static func canEdit(_ e: EKEvent) -> Bool {
         guard e.calendar.allowsContentModifications else { return false }
-        guard e.hasAttendees, let organizer = e.organizer else { return true }
-        return organizer.isCurrentUser
+        // Someone else organizes it, even with the guest list hidden (review).
+        if let organizer = e.organizer, !organizer.isCurrentUser { return false }
+        return true
     }
 
     func change(_ event: CalendarEvent, title: String, start: Date, end: Date, span: EventSpan) -> String? {

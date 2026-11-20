@@ -44,6 +44,9 @@ struct EventEditView: View {
         return Clew.eventEditProblem(title: title, start: start, end: end)
     }
     private var trimmed: String { title.trimmingCharacters(in: .whitespacesAndNewlines) }
+    /// The title to save: the event's own, exactly, if it was not touched (review: a
+    /// trailing space must not count as a change).
+    private var newTitle: String { title == event.title ? event.title : trimmed }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -52,7 +55,8 @@ struct EventEditView: View {
                 TextField("Title", text: $title)
                     .textFieldStyle(.roundedBorder)
                     .focused($titleFocused)
-                    .onSubmit(save)
+                    // While asking, Return in the field answers "This event only" (review).
+                    .onSubmit { asking ? commit(.thisEvent) : save() }
                     .accessibilityLabel(Text("Event title"))
             }
             if day != nil {
@@ -74,7 +78,7 @@ struct EventEditView: View {
                 Text("It ends before it starts.").font(.callout).foregroundStyle(.secondary)
             }
             if asking {
-                Text("“\(trimmed)” is a repeating event.")
+                Text("“\(newTitle)” is a repeating event.")
                     .font(.callout).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                 HStack {
                     Button("Cancel") { asking = false }
@@ -120,19 +124,25 @@ struct EventEditView: View {
         title = event.title
         startTime = TimeOfDay(pickerDate: event.start)
         endTime = TimeOfDay(pickerDate: event.end)
-        titleFocused = true
+        // A turn later, as the name box does: set at once, the focus is ignored.
+        DispatchQueue.main.async { titleFocused = true }
         asking = startAsking
     }
 
     private func save() {
         guard problem == nil, let start, let end else { return }
-        guard trimmed != event.title || start != event.start || end != event.end else { return onDone() }
-        if event.repeats { asking = true } else { commit(.thisEvent) }
+        guard newTitle != event.title || start != event.start || end != event.end else { return onDone() }
+        if event.repeats {
+            asking = true
+            titleFocused = false
+        } else {
+            commit(.thisEvent)
+        }
     }
 
     private func commit(_ span: EventSpan) {
         guard problem == nil, let start, let end else { return }
-        let change = AppModel.EventChange(event: event, title: trimmed, start: start, end: end, kind: .changed)
+        let change = AppModel.EventChange(event: event, title: newTitle, start: start, end: end, kind: .changed)
         if model.changeEvent(change, span: span) { onDone() }
     }
 }
