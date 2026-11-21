@@ -130,6 +130,14 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
 - **Daruma goals and badges.** Paint one eye when a counted goal starts and the
   second when it's finished. Levels come from lifetime totals.
 - Opt-in AI coach: recap, Later suggestions, quick start (see docs/AGENT.md).
+- **Steps in a task (user, 2026-11-21; not now).** A once task can have a few steps
+  ("Prepare the talk": make slides, write speech notes, practice), ticked one by one,
+  and the task's steps can fold under its row. Ideas to settle before building: the
+  task counts once in done/total and its bar fills by steps done (2/3); it is done
+  when its last step is; one level only; habits and goals have none. A folded row
+  shows its next step after its title, so folding hides nothing that matters now
+  (*user*, 2026-11-21: "Prepare the talk - speech notes", no "next:"). A step can go
+  on the timeline, and its block reads the same way (*user*, 2026-11-21).
 - Sync with Dayflow (its local JSON API: `GET /api/day`, `PATCH /api/tasks/:id`).
 - iPhone, iCloud sync, Obsidian export.
 
