@@ -1008,7 +1008,8 @@ stopped daily use, not adding features.
     no wait for a second click. Unfolded, its steps are listed under it, indented, each
     with its own circle; **done steps first**, in the order they were done, then the rest
     in your order (*changed* for steps only: ticking moves a step; rows still never move
-    on a tick). Each task remembers on this Mac whether it is unfolded (a setting of this
+    on a tick). A step ticked out of order moves up once the pointer leaves it, so no
+    other step slides under the pointer (*user*, 2026-11-21). Each task remembers on this Mac whether it is unfolded (a setting of this
     Mac, not part of the task). Dragging the task's row carries its steps.
   - **Clicks on any row** (*changed*: a click opened the details): a click unfolds or
     folds a task with steps and does nothing on other rows; **a double-click opens the
