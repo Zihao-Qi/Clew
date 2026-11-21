@@ -706,7 +706,8 @@ stopped daily use, not adding features.
     - "On a day" and "On today's timeline" exclude each other: checking one unchecks
       the other (a day sends it to Later; the timeline brings it to Today).
     - Several blocks are still made with a block's Add another block.
-  - **The row's right-click menu** (*changed* 2026-11-18): Undo, Details, Edit…, Focus,
+  - **The row's right-click menu** (*changed* 2026-11-18): Undo, Details, Edit…, Add Step…
+    (one-off tasks, 2026-11-21), Focus,
     then Move to Today / Move to Goals & Later / Move to Later (whichever applies), and
     Delete. **Put on timeline…**, **Later until ›** and **Move Up / Move Down** are gone
     from it (*user*: keep the right-click simple). Move Up / Move Down stay as VoiceOver
@@ -989,49 +990,75 @@ stopped daily use, not adding features.
   - Add offers Priority for Today and Habit; Edit for a task on Today, a habit, or one
     already marked (to unmark it).
 
-- **Steps in a task (2026-11-21, *user*).** A once task can be split into a few steps
-  ("Prepare the talk": Make slides, Speech notes, Practice), ticked one by one (SPEC's
-  "chunk big goals" for a task with an end). One level only. Habits, goals, links and a
-  collection's items have no steps.
-  - **Adding:** right-click a task › **Add Step…**, or in its details. Add has no steps.
-    Add Step… unfolds the task with an empty step line after its steps; Return adds the
-    step and opens the next line; Esc, or Return on an empty line, closes it. The details
-    list the steps with their circles: add, tick, rename and delete them there.
+- **Steps in a task (2026-11-21, *user*; Gemini Neon review).** A one-off task (a once
+  task or a link) can be split into a few steps ("Prepare the talk": Make slides, Speech
+  notes, Practice), ticked one by one (SPEC's "chunk big goals" for a task with an end).
+  One level only. Habits, goals and a collection's items have no steps.
+  - **Adding:** right-click a task › **Add Step…** (after Edit…; also a VoiceOver action;
+    not offered on a done task), or in its details. Add has no steps. Add Step… unfolds
+    the task with an empty step line after its steps; Return adds the step and opens the
+    next line; Esc, Return on an empty line, a click elsewhere, the menu closing, leaving
+    the list and the rollover close it (a typed step not yet added is dropped). The
+    details list the steps with their circles: add, tick, rename and delete them there.
+    Deleting a step never ticks or unticks the task; deleting the last one makes it a
+    plain task again.
   - **Folded and unfolded:** a task with steps shows only its own row, folded, with a
     small arrow after its title (and after its link mark, if any): pointing right when
     folded, down when unfolded. **A click on the row unfolds or folds it**, at once, with
     no wait for a second click. Unfolded, its steps are listed under it, indented, each
     with its own circle; **done steps first**, in the order they were done, then the rest
-    in your order. Each task remembers whether it is unfolded. VoiceOver gets **Unfold** /
-    **Fold** actions.
+    in your order (*changed* for steps only: ticking moves a step; rows still never move
+    on a tick). Each task remembers on this Mac whether it is unfolded (a setting of this
+    Mac, not part of the task). Dragging the task's row carries its steps.
   - **Clicks on any row** (*changed*: a click opened the details): a click unfolds or
     folds a task with steps and does nothing on other rows; **a double-click opens the
-    details** (a task with steps unfolds on the first click and stays so); right-click ›
-    Details as before. The circle, the link mark and a goal's `−` keep their own clicks.
-    The faint hover highlight is shown only on rows a click does something to. Collection
-    rows (YouTube, X) and timeline blocks keep their single click.
+    details** and leaves the task folded or unfolded as it was (the first click's change
+    is undone); right-click › Details as before. On a step's row a click does nothing and
+    a double-click opens its task's details. The circle, the link mark and a goal's `−`
+    keep their own clicks. The faint hover highlight is shown only on rows a click does
+    something to. Collection rows (YouTube, X) and timeline blocks keep their single click.
   - **The row's look:** as a counted goal's. The task's bar fills by steps done (1 of 3:
     a third; Settings › General › Progress bars applies) and its count reads "1/3" where
-    a goal's count is. The circle stays plain until the task is done.
-  - **Ticking:** a step's circle ticks that step. Ticking the last step finishes the
-    task. **The task's own circle finishes it at once**, steps and all. Unticking the task
-    puts its steps back the way they were before that tick (also when the tick came from
-    its last step: that step is open again). Unticking a step of a done task unticks the
-    task too.
-  - **Counting:** the task counts once in the menu bar's done/total, the ring and the
-    Daruma, in the day's summaries and last week's card; its steps never count there.
+    a goal's count is, until the task is done (then the row is a done once task's, rating
+    dots included). The circle stays plain until the task is done. A waiting day ("Thu")
+    and a running focus timer show as on any task, the count beside them. Its timeline
+    block shows the count as a goal's block does.
+  - **Ticking:** a step's circle ticks that step. Ticking the last open step finishes the
+    task. **The task's own circle finishes it at once**, steps and all (a reminder's Done,
+    a focus timer's Done and the end of the task's own block are the task's tick too).
+    **Unticking the task** (its circle, Undo, Not finished) puts its steps back the way
+    they were before that tick; when the tick came from its last step, that step is open
+    again. **Unticking a step of a done task** unticks the task the same way, and that step
+    is open. While the task is done, all its steps show done.
+  - **Counting:** only the task's own tick counts: once in the menu bar's done/total, the
+    ring (and its gold part for a priority), the Daruma, "All done for today", the day's
+    summaries, last week's card and Done so far. Step ticks never count there. A step tick
+    alone still makes a day active (Done means used: a day with at least one tick).
+    Moving to Later and Edit's "no tick" rules mean the task's own tick: a task with done
+    steps can still move to Later.
   - **Order:** drag a step to reorder it among the open steps of its own task (never out
     of it, onto another task, or into the list); VoiceOver gets Move Up / Move Down. The
     right-click menu gets no move items.
-  - **On the timeline:** drag a step from the unfolded list onto an hour. Its block reads
-    "Prepare the talk - Speech notes" and works as a task's block does: it leaves the
-    list while on the timeline, its end ticks that step, and dragging it back returns it
-    to its task. Dragging the task's own row places the whole task, as now, and its end
-    finishes the task at once.
+  - **A step's own right-click:** Delete (also the Delete key under the pointer), with
+    "Deleted “Practice” · Undo" as for a task. Rename is in the details.
+  - **On the timeline:** drag a step from the unfolded list onto an hour (VoiceOver: a
+    "Put on timeline" action on the step, at the next quarter hour for 30 minutes). A step
+    of a Goals & Later task moves its task to Today first, as a row does. Its block reads
+    "Prepare the talk - Speech notes" and follows a task block's rules for the step: it
+    leaves the list while on the timeline; its end ticks the step (the last open step
+    finishes the task); Not finished, moving its end and Remove block untick the step
+    (and its task, as above); it skips when the step or its task is already done. Dropped
+    anywhere on the list it returns to its task. Its right-click: Done / Undo (the step),
+    Move to…, Length, Add another block, Not finished, Remove block, Delete (the step).
+    Focus stays the task's: a step's block offers none. Dragging the task's own row places
+    the whole task, as now; a task and its steps can be on the timeline together.
   - **The task carries its steps:** moving to Later or to Today, a day for Later, the
     rollover, Delete and its Undo, export and restore keep the steps and their ticks.
-    Reminders, Priority and Focus stay the task's own; a reminder's Done finishes the
-    task at once. A step is never on Today or in Goals & Later by itself.
+    Reminders, Priority and Focus stay the task's own. A step is never on Today or in
+    Goals & Later by itself.
+  - **VoiceOver:** the task reads "Prepare the talk, 1 of 3 steps, folded" (or
+    "unfolded"), with Unfold / Fold actions; a step reads its title and "step of Prepare
+    the talk".
   - **Steps:** (1) steps in the list and the details, with the new clicks; (2) steps on
     the timeline.
 
