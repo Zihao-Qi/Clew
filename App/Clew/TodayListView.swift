@@ -45,6 +45,14 @@ struct TodayListView: View {
     @State private var blockGrab: CGFloat = 0
     /// The task under the pointer (a row or a block): the Delete key deletes it.
     @State private var hoveredItem: UUID?
+    /// The step under the pointer, in an unfolded task: the Delete key deletes it.
+    @State private var hoveredStep: UUID?
+    /// The task whose Add Step… line is open (SPEC 2026-11-21). It lives with the list:
+    /// leaving the list closes it.
+    @State private var addingStep: UUID?
+    /// A click folds or unfolds at once; the double-click's second click puts the fold
+    /// back the way it was before the first (SPEC 2026-11-21).
+    @State private var foldClicks = FoldClicks()
     /// The timeline's name box (SPEC 2026-11-13). It lives with the list: leaving the list
     /// (Add, Later, Settings, details) drops it.
     @State private var newTask: NewTaskDraft?
@@ -312,7 +320,17 @@ struct TodayListView: View {
     private var liftedCard: some View {
         if let lifted, let row = model.row(lifted.itemId) {
             ZStack(alignment: .topLeading) {
-                RowView(row: row, model: model, onEdit: {}, onOpen: {}, isDragged: true)
+                VStack(alignment: .leading, spacing: 0) {
+                    RowView(row: row, model: model, onEdit: {}, onOpen: {}, isDragged: true,
+                            steps: model.steps(of: row.id), unfolded: model.isUnfolded(row.id))
+                    // A task's steps go with it (SPEC 2026-11-21).
+                    if let steps = model.steps(of: row.id), model.isUnfolded(row.id), lifted.blockId == nil {
+                        StepsList(model: model, row: row, steps: steps, adding: false, onAddClose: {}, onOpen: {},
+                                  hoveredStep: .constant(nil))
+                            .padding(.bottom, 2)
+                            .background(Color(nsColor: .windowBackgroundColor))
+                    }
+                }
                     .frame(width: lifted.frame.width, alignment: .leading)
                     .opacity(lifted.overTimeline ? 0 : 1)
                 LiftedBlockCard(title: lifted.title, start: lifted.start, minutes: lifted.minutes)
@@ -328,16 +346,59 @@ struct TodayListView: View {
         }
     }
 
-    /// One row of either list; Move Up / Move Down stop at its own list's ends.
+    /// A click on a row: a task with steps unfolds or folds, at once (SPEC 2026-11-21).
+    private func clicked(_ row: TodayRow) {
+        guard model.steps(of: row.id) != nil else { return }
+        let next = foldClicks.click(row.id, unfolded: model.isUnfolded(row.id), at: Date(),
+                                    interval: NSEvent.doubleClickInterval)
+        withAnimation(.easeOut(duration: 0.15)) { model.setUnfolded(row.id, next) }
+    }
+
+    /// A double-click opens the details and leaves the task folded or unfolded as it was.
+    private func doubleClicked(_ row: TodayRow) {
+        if let back = foldClicks.doubleClick(row.id, at: Date(), interval: NSEvent.doubleClickInterval) {
+            model.setUnfolded(row.id, back)
+        }
+        screen = .detail(row.id)
+    }
+
+    /// Add Step…: unfold the task with an empty step line after its steps.
+    private func startAddingStep(_ row: TodayRow) {
+        startAddingStep(row.id)
+    }
+
+    private func startAddingStep(_ id: UUID) {
+        guard let row = model.row(id) else { return }
+        model.setUnfolded(row.id, true)
+        addingStep = row.id
+    }
+
+    /// One row of either list; Move Up / Move Down stop at its own list's ends. An
+    /// unfolded task's steps are listed under it, inside its row, so they move with it.
     private func listRow(_ row: TodayRow, index: Int, count: Int, ids: [UUID]) -> some View {
-        RowView(row: row, model: model, onEdit: { screen = .edit(row.item, back: .list) },
-                onOpen: { screen = .detail(row.id) },
-                canMoveUp: index > 0 && model.canMove(row, by: -1), canMoveDown: index < count - 1 && model.canMove(row, by: 1),
-                isDragged: dragging == row.id,
-                dragActive: dragging != nil || lifted != nil,
-                onHoverChange: { inside in
-                    if inside { hoveredItem = row.id } else if hoveredItem == row.id { hoveredItem = nil }
-                })
+        let steps = model.steps(of: row.id)
+        let adding = addingStep == row.id
+        return VStack(alignment: .leading, spacing: 0) {
+            RowView(row: row, model: model, onEdit: { screen = .edit(row.item, back: .list) },
+                    onOpen: { screen = .detail(row.id) },
+                    canMoveUp: index > 0 && model.canMove(row, by: -1), canMoveDown: index < count - 1 && model.canMove(row, by: 1),
+                    isDragged: dragging == row.id,
+                    dragActive: dragging != nil || lifted != nil,
+                    onHoverChange: { inside in
+                        if inside { hoveredItem = row.id } else if hoveredItem == row.id { hoveredItem = nil }
+                    },
+                    steps: steps,
+                    unfolded: model.isUnfolded(row.id),
+                    onClick: { clicked(row) },
+                    onDoubleClick: { doubleClicked(row) },
+                    onAddStep: { startAddingStep(row) })
+            if (steps != nil && model.isUnfolded(row.id)) || adding {
+                StepsList(model: model, row: row, steps: steps ?? TaskSteps(taskId: row.id, entries: []),
+                          adding: adding, onAddClose: { if addingStep == row.id { addingStep = nil } },
+                          onOpen: { screen = .detail(row.id) }, hoveredStep: $hoveredStep)
+                    .padding(.bottom, 2)
+            }
+        }
             .background(GeometryReader { g in
                 Color.clear.preference(key: RowFrames.self,
                                        value: [row.id: g.frame(in: .named(Self.listSpace))])
@@ -591,13 +652,20 @@ struct TodayListView: View {
             // like the menu's Delete (user, 2026-11-10); Undo shows for a few seconds.
             Button("Delete") {
                 // The deleted task's view goes without an "exit" hover, so forget it here.
-                if let id = hoveredItem { hoveredItem = nil; model.delete(id) }
+                if let id = hoveredStep, let entry = model.steps.values.lazy.flatMap(\.entries).first(where: { $0.id == id }) {
+                    hoveredStep = nil
+                    model.deleteStep(entry.step)
+                } else if let id = hoveredItem {
+                    hoveredItem = nil
+                    model.delete(id)
+                }
             }
                 .keyboardShortcut(.delete, modifiers: [])
                 .opacity(0)
                 .frame(width: 0, height: 0)
                 // While the name box is open, the keyboard edits the name.
-                .disabled(hoveredItem == nil || dragging != nil || lifted != nil || newTask != nil)
+                .disabled((hoveredItem == nil && hoveredStep == nil) || dragging != nil || lifted != nil || newTask != nil
+                          || addingStep != nil)
                 .accessibilityHidden(true)
         }
         // One space for the timeline and the rows, so a row can be dragged onto an hour.
@@ -613,6 +681,13 @@ struct TodayListView: View {
         }
         .onChange(of: dragging != nil || lifted != nil) { _, active in PeekController.shared.dragChanged(active) }
         .onChange(of: model.collections) { _, lists in PeekController.shared.collectionsChanged(lists) }
+        .onAppear {
+            #if DEBUG
+            DebugFrames.addStep = { startAddingStep($0) }
+            #endif
+        }
+        // The rollover closes Add Step…'s line (SPEC 2026-11-21).
+        .onChange(of: model.today?.day) { addingStep = nil }
         .onDisappear {
             // Leaving the list mid-drag (⌘N, ⌘,) ends the drag and its timers (review).
             endDrag()
@@ -725,6 +800,16 @@ struct RowView: View {
     var dragActive = false
     /// Tells the list which task is under the pointer (the Delete key's target).
     var onHoverChange: ((Bool) -> Void)? = nil
+    /// The task's steps (SPEC 2026-11-21), nil when it has none.
+    var steps: TaskSteps? = nil
+    var unfolded = false
+    /// A click (a task with steps folds or unfolds) and a double-click (the details).
+    var onClick: () -> Void = {}
+    var onDoubleClick: () -> Void = {}
+    var onAddStep: () -> Void = {}
+
+    /// A task with steps that is not done shows them as a goal shows its count.
+    private var openSteps: TaskSteps? { row.isDone ? nil : steps }
 
     @State private var hovering = false
     @State private var hoveringDots = false
@@ -757,6 +842,7 @@ struct RowView: View {
         if let target = item.progress.target, target > 0 {
             return Double(min(row.progressAmount, target)) / Double(target)
         }
+        if let openSteps { return openSteps.fraction }
         if let watched = model.watched[row.id], watched > 0 { return watched }
         return nil
     }
@@ -809,17 +895,21 @@ struct RowView: View {
                         .overlay(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.12)))
                 } else {
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.primary.opacity(hovering && !dragActive ? 0.06 : 0))
+                        // Only on rows a click does something to (SPEC 2026-11-21).
+                        .fill(Color.primary.opacity(hovering && !dragActive && steps != nil ? 0.06 : 0))
                 }
             }
             .padding(.horizontal, 6)
         }
         // A little clear space between rows, so two filled rows don't run together.
         .padding(.vertical, 2)
-        // The whole row, margins included, opens the details; the circle, link mark,
-        // − and celebration buttons are buttons and keep their own clicks.
+        // The whole row, margins included: a click folds or unfolds a task with steps and a
+        // double-click opens the details (SPEC 2026-11-21); the circle, link mark, − and
+        // celebration buttons are buttons and keep their own clicks. The click is not held
+        // back to wait for a second one.
         .contentShape(Rectangle())
-        .onTapGesture(perform: onOpen)
+        .onTapGesture(count: 2, perform: onDoubleClick)
+        .simultaneousGesture(TapGesture().onEnded(onClick))
         .onHover { hovering = $0; onHoverChange?($0) }
         .accessibilityActions {
             // Offered only where they move the row (review: no silent no-ops at an end).
@@ -836,6 +926,12 @@ struct RowView: View {
                 Button("Move to Later") { model.moveToLater(row) }
             }
         }
+        .accessibilityActions {
+            if steps != nil {
+                if unfolded { Button("Fold", action: onClick) } else { Button("Unfold", action: onClick) }
+            }
+            if model.canAddStep(row) { Button("Add Step…", action: onAddStep) }
+        }
         // Kept short (user, 2026-11-18): a time on the timeline and a day for Later are
         // set in Edit; Move Up / Move Down stay for VoiceOver above.
         .contextMenu {
@@ -848,6 +944,7 @@ struct RowView: View {
             }
             Button("Details", action: onOpen)
             Button("Edit…", action: onEdit)
+            if model.canAddStep(row) { Button("Add Step…", action: onAddStep) }
             // Rows on Today only (SPEC 2026-11-19).
             if !model.isBelow(row) {
                 Toggle("Priority", isOn: Binding(get: { item.priority }, set: { model.setPriority(row, $0) }))
@@ -962,6 +1059,7 @@ struct RowView: View {
             .buttonStyle(.borderless)
             .disabled(row.isGoalReached)
             .accessibilityLabel(tapLabel)
+            .debugFrame("circle:\(row.id)")
 
             HStack(spacing: 8) {
                 titleView
@@ -983,7 +1081,18 @@ struct RowView: View {
                     .accessibilityLabel(Text("Comes to Today \(waitingText)"))
             }
 
-            if let target = item.progress.target {
+            if let openSteps {
+                // "1/3" where a goal's count is (SPEC 2026-11-21), the same columns.
+                HStack(spacing: 4) {
+                    Text(verbatim: "\(openSteps.done)/\(openSteps.total)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(minWidth: Self.countWidth, alignment: .trailing)
+                        .frame(minWidth: RatingDots.width, alignment: .trailing)
+                        .accessibilityHidden(true)
+                    Color.clear.frame(width: Self.undoWidth, height: 1)
+                }
+            } else if let target = item.progress.target {
                 // Fixed widths, so every goal's bar starts in the same column.
                 HStack(spacing: 4) {
                     // Hovering the bar and count shows the rating dots in their place;
@@ -1059,6 +1168,14 @@ struct RowView: View {
                 .help(url.absoluteString)
                 .accessibilityLabel(Text("Open link for \(item.title)"))
             }
+            if steps != nil {
+                // A task with steps: pointing right when folded, down when unfolded.
+                Image(systemName: unfolded ? "chevron.down" : "chevron.right")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 10)
+                    .accessibilityHidden(true)
+            }
             // A saved link's site in Goals & Later, as Pick showed it (SPEC 2026-11-15).
             if model.isBelow(row), let text = item.siteLabel {
                 Text(verbatim: text)
@@ -1087,6 +1204,12 @@ struct RowView: View {
 
     /// "Priority" (SPEC 2026-11-19) and how much was watched, read with the title.
     private var rowValue: Text {
+        if let steps {
+            let fold = unfolded ? Text("unfolded") : Text("folded")
+            let count = Text("\(steps.done) of \(steps.total) steps")
+            let base = model.showsPriority(row) ? Text("Priority") + Text(verbatim: ", ") + count : count
+            return base + Text(verbatim: ", ") + fold
+        }
         let watched = item.progress.target == nil && (model.watched[row.id] ?? 0) > 0
         switch (model.showsPriority(row), watched) {
         case (true, true): return Text("Priority") + Text(verbatim: ", ") + watchedValue

@@ -1061,7 +1061,7 @@ stopped daily use, not adding features.
     "unfolded"), with Unfold / Fold actions; a step reads its title and "step of Prepare
     the talk".
   - **Steps:** (1) steps in the list and the details, with the new clicks; (2) steps on
-    the timeline.
+    the timeline, and a task block's count.
 
 ## Open question
 

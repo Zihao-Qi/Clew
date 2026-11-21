@@ -431,6 +431,62 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         }
     }
 
+    @Test func stepsAreDefinitionsAndTheirTicksAreFacts() throws {
+        // SPEC 2026-11-21: steps round-trip, keep their task and are tombstoned; step
+        // ticks are never deleted or changed in substance and are voided once.
+        let store = try SQLiteStore.inMemory()
+        let task = sampleItem(.once), other = sampleItem(.once)
+        var step = Step(id: UUID(), taskId: task.id, title: "slides", sortKey: 1, createdAt: t0, updatedAt: t0)
+        let c = sampleCheckIn(task)
+        let tick = StepTick(id: UUID(), stepId: step.id, taskId: task.id, localDay: day("2026-11-11"), at: t0,
+                            source: .user, finishedCheckInId: c.id)
+        try store.write { w in try w.insert(task); try w.insert(other); try w.save(step); try w.insert(c); try w.insert(tick) }
+        #expect(try store.read { try $0.steps(taskIds: [task.id]) } == [step])
+        #expect(try store.read { try $0.stepTicks(taskIds: [task.id]) } == [tick])
+        step.title = "Slides"; step.sortKey = 2; step.updatedAt = t0 + 60
+        try store.write { try $0.save(step) }
+        #expect(try store.read { try $0.step(id: step.id) } == step)
+        #expect(throws: DatabaseError.self) {
+            try store.writer.write { try $0.execute(sql: "UPDATE step SET taskId = ? WHERE id = ?",
+                                                    arguments: [other.id.uuidString, step.id.uuidString]) }
+        }
+        #expect(throws: DatabaseError.self) { try store.writer.write { try $0.execute(sql: "DELETE FROM step") } }
+        #expect(throws: DatabaseError.self) { try store.writer.write { try $0.execute(sql: "DELETE FROM stepTick") } }
+        for assignment in ["at = '2030-01-01 00:00:00.000'", "finishedCheckInId = NULL", "stepId = 'x'", "localDay = '2026-11-12'"] {
+            #expect(throws: DatabaseError.self) {
+                try store.writer.write { try $0.execute(sql: "UPDATE stepTick SET \(assignment) WHERE id = ?",
+                                                        arguments: [tick.id.uuidString]) }
+            }
+        }
+        try store.write { try $0.voidStepTick(id: tick.id, at: t0 + 120) }
+        #expect(throws: DatabaseError.self) { try store.write { try $0.voidStepTick(id: tick.id, at: t0 + 180) } }
+        #expect(try store.read { try $0.stepTicks(taskIds: [task.id]) }.isEmpty)
+        step.deletedAt = t0 + 200
+        try store.write { try $0.save(step) }
+        #expect(try store.read { try $0.steps(taskIds: [task.id]) }.isEmpty)
+        let all = try store.read { try $0.allRecords() }
+        #expect(all.steps.map(\.id) == [step.id] && all.stepTicks.map(\.id) == [tick.id])
+    }
+
+    @Test func aStandingStepTickMakesADayActive() throws {
+        // SPEC 2026-11-21: a step tick alone makes a day active, but one that finished its
+        // task stands only while that check-in does.
+        let store = try SQLiteStore.inMemory()
+        let task = sampleItem(.once)
+        let step = Step(id: UUID(), taskId: task.id, title: "a", sortKey: 1, createdAt: t0, updatedAt: t0)
+        let c = sampleCheckIn(task, "2026-11-12")
+        try store.write { w in
+            try w.insert(task); try w.save(step); try w.insert(c)
+            try w.insert(StepTick(id: UUID(), stepId: step.id, taskId: task.id, localDay: day("2026-11-11"), at: t0, source: .user))
+            try w.insert(StepTick(id: UUID(), stepId: step.id, taskId: task.id, localDay: day("2026-11-13"), at: t0,
+                                  source: .user, finishedCheckInId: c.id))
+        }
+        #expect(try store.read { try $0.activeDays(from: day("2026-11-01")) }
+                == [day("2026-11-11"), day("2026-11-12"), day("2026-11-13")])
+        try store.write { try $0.voidCheckIn(id: c.id, at: t0 + 1, reason: "undo") }
+        #expect(try store.read { try $0.activeDays(from: day("2026-11-01")) } == [day("2026-11-11")])
+    }
+
     @Test func exportsFromBeforeFocusSessionsStillOpen() throws {
         let json = #"{"items":[],"checkIns":[],"plans":[],"goalRounds":[]}"#
         #expect(try JSONDecoder().decode(ExportRecords.self, from: Data(json.utf8)).focusSessions.isEmpty)

@@ -31,6 +31,8 @@ final class FakeStore: ClewStore, @unchecked Sendable {
         var watchProgress: [UUID: WatchProgress] = [:]
         var focusSessions: [UUID: FocusSession] = [:]
         var timeBlocks: [UUID: TimeBlock] = [:]
+        var steps: [UUID: Step] = [:]
+        var stepTicks: [UUID: StepTick] = [:]
     }
 
     enum FactViolation: Error { case revoid, duplicate, missingItem, outOfRange }
@@ -129,7 +131,12 @@ final class FakeStore: ClewStore, @unchecked Sendable {
         }
         func goals() throws -> [Item] { state.items.values.filter { $0.kind == .goal } }
         func activeDays(from: LocalDay) throws -> Set<LocalDay> {
-            Set(state.checkIns.values.filter { !$0.isVoided && $0.localDay >= from }.map(\.localDay))
+            let standing = state.stepTicks.values.filter { t in
+                t.voidedAt == nil && t.localDay >= from
+                    && (t.finishedCheckInId.map { state.checkIns[$0]?.isVoided == false } ?? true)
+            }
+            return Set(state.checkIns.values.filter { !$0.isVoided && $0.localDay >= from }.map(\.localDay))
+                .union(standing.map(\.localDay))
         }
         func allRecords() throws -> ExportRecords {
             ExportRecords(
@@ -142,7 +149,9 @@ final class FakeStore: ClewStore, @unchecked Sendable {
                 laterReviews: state.laterReviews.values.sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) },
                 watchProgress: state.watchProgress.values.sorted { $0.itemId.uuidString < $1.itemId.uuidString },
                 focusSessions: state.focusSessions.values.sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) },
-                timeBlocks: state.timeBlocks.values.sorted { ($0.placedAt, $0.id.uuidString) < ($1.placedAt, $1.id.uuidString) }
+                timeBlocks: state.timeBlocks.values.sorted { ($0.placedAt, $0.id.uuidString) < ($1.placedAt, $1.id.uuidString) },
+                steps: state.steps.values.sorted { ($0.createdAt, $0.id.uuidString) < ($1.createdAt, $1.id.uuidString) },
+                stepTicks: state.stepTicks.values.sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) }
             )
         }
         func reminders() throws -> [Reminder] {
@@ -181,6 +190,36 @@ final class FakeStore: ClewStore, @unchecked Sendable {
                 .sorted { ($0.start, $0.id.uuidString) < ($1.start, $1.id.uuidString) }
         }
         func timeBlock(id: UUID) throws -> TimeBlock? { state.timeBlocks[id] }
+        func steps(taskIds: [UUID]) throws -> [Step] {
+            let ids = Set(taskIds)
+            return state.steps.values.filter { ids.contains($0.taskId) && $0.deletedAt == nil }
+                .sorted { ($0.sortKey, $0.createdAt, $0.id.uuidString) < ($1.sortKey, $1.createdAt, $1.id.uuidString) }
+        }
+        func step(id: UUID) throws -> Step? { state.steps[id] }
+        func stepTicks(taskIds: [UUID]) throws -> [StepTick] {
+            let ids = Set(taskIds)
+            return state.stepTicks.values.filter { ids.contains($0.taskId) && $0.voidedAt == nil }
+                .sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) }
+        }
+        func save(_ step: Step) throws {
+            guard state.items[step.taskId] != nil else { throw FactViolation.missingItem }
+            // As the trigger: a step keeps its task.
+            if let old = state.steps[step.id], old.taskId != step.taskId || old.createdAt != step.createdAt {
+                throw FactViolation.outOfRange
+            }
+            state.steps[step.id] = step
+        }
+        func insert(_ tick: StepTick) throws {
+            guard state.stepTicks[tick.id] == nil else { throw FactViolation.duplicate }
+            guard state.steps[tick.stepId] != nil, state.items[tick.taskId] != nil else { throw FactViolation.missingItem }
+            state.stepTicks[tick.id] = tick
+        }
+        func voidStepTick(id: UUID, at: Date) throws {
+            guard var t = state.stepTicks[id] else { return }
+            guard t.voidedAt == nil else { throw FactViolation.revoid }
+            t.voidedAt = at
+            state.stepTicks[id] = t
+        }
         func save(_ block: TimeBlock) throws {
             guard state.items[block.itemId] != nil else { throw FactViolation.missingItem }
             // As the table's CHECK: whole quarter hours, 15 minutes to a long (DST) day.
