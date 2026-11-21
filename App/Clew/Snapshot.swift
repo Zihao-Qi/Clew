@@ -1263,7 +1263,7 @@ enum Snapshot {
         clock.date = now
     }
 
-    private static func render(_ view: some View, appearance: NSAppearance.Name, to file: URL) {
+    static func render(_ view: some View, appearance: NSAppearance.Name, to file: URL) {
         let host = NSHostingView(rootView: view.background(Color(nsColor: .windowBackgroundColor)))
         host.appearance = NSAppearance(named: appearance)
         let size = host.fittingSize

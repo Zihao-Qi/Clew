@@ -74,9 +74,10 @@ An iPhone app later reuses Domain, Core and Store unchanged; only the UI target 
 The core split: **what you intend** is mutable; **what happened** is append-only.
 
 - **Definitions** (edited freely, soft-deleted): `Item`, `Reminder`, `Settings`,
-  `TimeBlock` (v1.2).
+  `TimeBlock` (v1.2), `Step` (2026-11-21).
 - **Facts** (inserted, never updated in substance; corrected by voiding):
-  `CheckIn`, `Plan`, `GoalRound`, `LaterReview`, `DayReflection` (v1.2), `Award` (v1.3). (`WatchProgress` is
+  `CheckIn`, `Plan`, `GoalRound`, `LaterReview`, `DayReflection` (v1.2), `Award` (v1.3),
+  `StepTick` (2026-11-21). (`WatchProgress` is
   latest-state; see §4.2.)
 
 Everything the UI shows (today's list, the `4/6`, progress bars, levels, recaps)
@@ -106,6 +107,9 @@ WatchProgress   itemId (PK), fraction (0–1), observedAt, source   (v1.1) ← l
 FocusSession    id, itemId, localDay, at, minutes (1–720), kind: timer | manual, voidedAt?   (v1.2) ← a fact
 TimeBlock       id, itemId, localDay, start, minutes, placedAt, updatedAt, decidedAt?, tickId?,
                 coverId?, removedAt?   (v1.2) ← a definition: the day timeline (§6)
+Step            id, taskId, title, sortKey, createdAt, updatedAt, deletedAt?   (2026-11-21) ← a definition:
+                  a step of a once task or link; keeps its task (trigger)
+StepTick        id, stepId, taskId, localDay, at, source, finishedCheckInId?, voidedAt?   (2026-11-21) ← a fact
 ChangeLog       seq (monotonic), entity, entityId, op, at, source  (v1.1) ← for Gateway "changes since" and sync
 DayReflection   localDay (PK), valence (-1…1), bestItemId?, at, updatedAt  (v1.2)
 Award           id = hash(kind, itemId, milestone), kind (e.g. goal.finished),
@@ -149,6 +153,19 @@ Award           id = hash(kind, itemId, milestone), kind (e.g. goal.finished),
 - **Fields mutated after insert are named, with their merge policy** (see §8):
   `rating` (last writer wins by `ratedAt`), and `voidedAt`/`voidReason`
   (monotonic: once voided, stays voided).
+- **Steps in a task (SPEC 2026-11-21).** Steps live in their own tables, not as child
+  items, so nothing that lists, counts or notifies about items ever sees one; step ticks
+  are not `CheckIn`s, so done/total, the ring, summaries, last week's card and Done so far
+  count only the task's own tick. What a task's steps show is derived
+  (`TaskSteps.make`): while the task has a live check-in every step shows done; otherwise
+  a step is done when it has a live tick that stands. A tick made by the last open step
+  also makes the task's check-in in the same write and records it as
+  `finishedCheckInId`; it stands only while that check-in does. So unticking the task,
+  by any path (the circle, Undo, a block's Not finished), puts the steps back as they
+  were with nothing to repair, and that step is open again. Unticking a step of a done
+  task voids the task's live check-ins and that step's ticks. Active days include
+  standing step ticks. Which tasks are unfolded is a per-Mac `UserDefaults` value, not
+  part of the task (it would bump `updatedAt` and lose to other devices' edits, §8).
 - **Watch progress is latest-state, not a fact stream.** It arrives with each
   Watch Later scan (`ExternalEntry.progress`, 0–1, rounded to 0.01; out of range is
   ignored, the video still imported). `WatchProgress` keeps one row per item, the
@@ -838,6 +855,8 @@ was false, because some fact fields change after insert.)
 | GoalRound | union by `id`; void is monotonic; the current round is the latest non-voided `startedAt` |
 | LaterReview | union by `id`; void is monotonic |
 | DayReflection | one row per `localDay`; last writer wins by `updatedAt` |
+| Step | row-level last writer wins by `updatedAt`; its task never changes; tombstones |
+| StepTick | union by `id`; void is monotonic |
 | Item, Reminder, Settings | **row-level** last writer wins by `updatedAt` (every definition table has `updatedAt` + `deletedAt`). Field-level merge, if two devices editing different fields of one item ever matters, uses CKSyncEngine's server-record conflict callback with stored system fields; decided in v2 |
 | `Award.voidedAt` | monotonic |
 | WatchProgress | newest `observedAt` wins |

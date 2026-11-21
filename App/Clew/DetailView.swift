@@ -30,6 +30,9 @@ struct DetailView: View {
             if let details = model.details(for: itemId) {
                 header(details)
                 if details.isOneOff {
+                    if Clew.canHaveSteps(details.item) {
+                        DetailSteps(model: model, task: details.item)
+                    }
                     OneOffDetails(moved: model.today?.moved.contains(itemId) == true, details: details)
                 } else if details.item.kind == .goal {
                     // Bars or Heatmap, the user's choice (SPEC 2026-11-18).
@@ -409,5 +412,129 @@ struct FocusSection: View {
         c.day = day.day
         guard let date = Calendar.current.date(from: c) else { return day.description }
         return date.formatted(.dateTime.month(.abbreviated).day())
+    }
+}
+
+/// A task's steps on its details (SPEC 2026-11-21): tick, rename and delete them, and add
+/// one (not on a done task). Shown when it has steps or can take one. Nothing here takes
+/// the keyboard until clicked, so typing on the page never renames a step by accident.
+struct DetailSteps: View {
+    let model: AppModel
+    let task: Item
+
+    @State private var adding = false
+    @State private var newStep = ""
+    @FocusState private var addFocused: Bool
+
+    private var steps: [TaskSteps.Entry] { model.allSteps(of: task.id) }
+    private var canAdd: Bool { model.row(task.id).map(model.canAddStep) ?? false }
+
+    var body: some View {
+        if !steps.isEmpty || canAdd {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Steps")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .accessibilityAddTraits(.isHeader)
+                ForEach(steps) { entry in
+                    DetailStepRow(model: model, entry: entry)
+                }
+                if canAdd {
+                    if adding {
+                        HStack(spacing: 6) {
+                            Image(systemName: "circle")
+                                .foregroundStyle(.tertiary)
+                                .accessibilityHidden(true)
+                            TextField(text: $newStep) { Text("New step") }
+                                .textFieldStyle(.plain)
+                                .focused($addFocused)
+                                .debugFrame("detailNew:\(task.id)")
+                                .onSubmit(add)
+                                .onExitCommand { adding = false; newStep = "" }
+                                .accessibilityLabel(Text("New step of \(task.title)"))
+                        }
+                        .onAppear { DispatchQueue.main.async { addFocused = true } }
+                    } else {
+                        Button { adding = true } label: { Label("Add Step", systemImage: "plus") }
+                            .buttonStyle(.borderless)
+                            .debugFrame("detailAdd:\(task.id)")
+                            .accessibilityLabel(Text("Add a step to \(task.title)"))
+                    }
+                }
+                // A refused name (too long) says why here too (review).
+                NoticeView(text: model.notice).padding(.horizontal, -12)
+            }
+            // The task got done (its last step, its circle): the line goes and drops its text (review).
+            .onChange(of: canAdd) { _, now in if !now { adding = false; newStep = "" } }
+        }
+    }
+
+    /// Return adds the step and keeps the line for another; Return on an empty line closes it.
+    private func add() {
+        guard !newStep.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            adding = false
+            return
+        }
+        if model.addStep(to: task.id, title: newStep) {
+            newStep = ""
+            DispatchQueue.main.async { addFocused = true }
+        }
+    }
+}
+
+/// One step on the details: its circle, its title (click to rename in place), and Delete.
+private struct DetailStepRow: View {
+    let model: AppModel
+    let entry: TaskSteps.Entry
+
+    @State private var editing = false
+    @State private var title = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Button { model.tapStep(entry) } label: {
+                Image(systemName: entry.isDone ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(entry.isDone ? Color.accentColor : Color.secondary)
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel(entry.isDone ? Text("Undo \(entry.step.title)") : Text("Mark \(entry.step.title) done"))
+            if editing {
+                TextField(text: $title) { Text(verbatim: entry.step.title) }
+                    .textFieldStyle(.plain)
+                    .focused($focused)
+                    .onSubmit(rename)
+                    .onExitCommand { editing = false }
+                    .onChange(of: focused) { _, now in if !now { rename() } }
+                    .onAppear { DispatchQueue.main.async { focused = true } }
+                    .accessibilityLabel(Text("Name of the step \(entry.step.title)"))
+            } else {
+                Text(entry.step.title)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .foregroundStyle(entry.isDone ? .secondary : .primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture { title = entry.step.title; editing = true }
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityHint(Text("Rename"))
+                    .accessibilityAction { title = entry.step.title; editing = true }
+            }
+            Button { model.deleteStep(entry.step) } label: {
+                Image(systemName: "xmark").imageScale(.small).foregroundStyle(.secondary)
+            }
+            .buttonStyle(.borderless)
+            .help(Text("Delete"))
+            .accessibilityLabel(Text("Delete \(entry.step.title)"))
+        }
+    }
+
+    /// An empty name goes back to the step's own; a refused one (too long) stays open
+    /// with its text, and the notice says why.
+    private func rename() {
+        guard editing else { return }
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != entry.step.title else { editing = false; return }
+        if model.renameStep(entry.step.id, trimmed) { editing = false }
     }
 }

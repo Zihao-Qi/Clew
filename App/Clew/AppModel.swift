@@ -176,6 +176,8 @@ final class AppModel {
             do { openListShortcut = try clew.openListShortcut() } catch { }
             OpenShortcutHotkey.shared.apply(openListShortcut)
             timings.mark("settings")
+            steps = try clew.steps(taskIds: (list.rows + list.goalsAndLater).map(\.id))
+            timings.mark("steps")
             collections = try clew.collections()
             timings.mark("collections")
             focusOffersBreak = (try? clew.focusOffersBreak()) ?? true
@@ -832,14 +834,19 @@ final class AppModel {
         return placed
     }
     /// The task deleted last, for a few seconds: "Deleted “…” · Undo" (SPEC 2026-11-10).
-    private(set) var lastDeleted: (id: UUID, title: String)?
+    private(set) var lastDeleted: (id: UUID, title: String, isStep: Bool)?
     @ObservationIgnored private var lastDeletedTask: Task<Void, Never>?
 
     func delete(_ id: UUID) {
         let title = (try? clew?.item(id: id))??.title
         guard run({ try $0.deleteItem(itemId: id) }) else { return }
         guard let title else { return }
-        lastDeleted = (id, title)
+        showDeleted(id, title, isStep: false)
+    }
+
+    /// "Deleted “…” · Undo" for a few seconds, for a task or a step.
+    private func showDeleted(_ id: UUID, _ title: String, isStep: Bool) {
+        lastDeleted = (id, title, isStep)
         lastDeletedTask?.cancel()
         lastDeletedTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(6))
@@ -851,7 +858,64 @@ final class AppModel {
     func undoDelete() {
         guard let deleted = lastDeleted else { return }
         lastDeleted = nil
-        run { try $0.undeleteItem(itemId: deleted.id) }
+        if deleted.isStep {
+            run { try $0.undeleteStep(id: deleted.id) }
+        } else {
+            run { try $0.undeleteItem(itemId: deleted.id) }
+        }
+    }
+
+    // MARK: - Steps in a task (SPEC 2026-11-21)
+
+    /// The steps of the tasks on the list (tasks without steps are missing).
+    private(set) var steps: [UUID: TaskSteps] = [:]
+    func steps(of id: UUID) -> TaskSteps? { steps[id].flatMap { $0.isEmpty ? nil : $0 } }
+    /// A task's steps for its details, also once it has left the list (the rollover).
+    func allSteps(of id: UUID) -> [TaskSteps.Entry] {
+        steps[id]?.entries ?? ((try? clew?.steps(taskId: id))?.entries ?? [])
+    }
+
+    /// Which tasks are unfolded: a setting of this Mac, not part of the task (SPEC).
+    private(set) var unfolded: Set<UUID> = AppModel.loadUnfolded()
+    private static let unfoldedKey = "unfoldedTasks"
+    /// Where folds are kept; the debug harnesses use their own, never the app's.
+    static var foldDefaults = UserDefaults.standard
+    private static func loadUnfolded() -> Set<UUID> {
+        Set((foldDefaults.stringArray(forKey: unfoldedKey) ?? []).compactMap(UUID.init(uuidString:)))
+    }
+    func isUnfolded(_ id: UUID) -> Bool { unfolded.contains(id) }
+    func setUnfolded(_ id: UUID, _ on: Bool) {
+        guard on != unfolded.contains(id) else { return }
+        if on { unfolded.insert(id) } else { unfolded.remove(id) }
+        Self.foldDefaults.set(unfolded.map(\.uuidString).sorted(), forKey: Self.unfoldedKey)
+    }
+
+    func canAddStep(_ row: TodayRow) -> Bool { Clew.canHaveSteps(row.item) && !row.isDone && row.progressAmount == 0 }
+
+    @discardableResult
+    func addStep(to taskId: UUID, title: String) -> Bool { run { try $0.addStep(taskId: taskId, title: title) } }
+    @discardableResult
+    func renameStep(_ id: UUID, _ title: String) -> Bool { run { try $0.renameStep(id: id, title: title) } }
+    func moveStep(_ id: UUID, toOpenIndex index: Int) { run { try $0.moveStep(id: id, toOpenIndex: index) } }
+
+    func deleteStep(_ step: Step) {
+        guard run({ try $0.deleteStep(id: step.id) }) else { return }
+        showDeleted(step.id, step.title, isStep: true)
+    }
+
+    /// A step's circle: tick it, or untick it (on a done task that unticks the task too).
+    func tapStep(_ entry: TaskSteps.Entry) {
+        if entry.isDone {
+            run { try $0.untickStep(id: entry.step.id) }
+            if ratingPrompt?.itemId == entry.step.taskId { ratingPrompt = nil }
+        } else {
+            var finished: CheckIn?
+            guard run({ finished = try $0.tickStep(id: entry.step.id) }) else { return }
+            // The last step finished the task: as its own tick does.
+            if finished != nil, let row = row(entry.step.taskId), Clew.hintsRatingAfterTick(row.item) {
+                offerRating(itemId: row.id)
+            }
+        }
     }
     func nextRound(_ row: TodayRow) { run { try $0.startNextRound(itemId: row.id) } }
     func dismissCelebration(_ row: TodayRow) { dismissedCelebrations.insert(row.id) }

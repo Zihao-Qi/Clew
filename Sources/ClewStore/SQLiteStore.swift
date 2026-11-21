@@ -52,7 +52,7 @@ public final class SQLiteStore: ClewStore {
         let observation = DatabaseRegionObservation(tracking: Table("item"), Table("checkIn"), Table("plan"), Table("goalRound"),
                                                      Table("reminder"), Table("settings"), Table("laterReview"),
                                                      Table("watchProgress"), Table("focusSession"),
-                                                     Table("timeBlock"))
+                                                     Table("timeBlock"), Table("step"), Table("stepTick"))
         let cancellable = observation.start(in: writer, onError: { _ in }, onChange: { _ in onChange() })
         return Observation(cancellable)
     }
@@ -198,9 +198,16 @@ private struct Access: StoreWriter {
     }
 
     func activeDays(from: LocalDay) throws -> Set<LocalDay> {
+        // A step tick alone makes a day active too (SPEC 2026-11-21), while it stands: a
+        // tick that finished its task stands only while that check-in does.
         let days = try String.fetchAll(
-            db, sql: "SELECT DISTINCT localDay FROM checkIn WHERE voidedAt IS NULL AND localDay >= ?",
-            arguments: [from.description]
+            db, sql: """
+                SELECT localDay FROM checkIn WHERE voidedAt IS NULL AND localDay >= ?
+                UNION
+                SELECT s.localDay FROM stepTick s LEFT JOIN checkIn c ON c.id = s.finishedCheckInId
+                WHERE s.voidedAt IS NULL AND s.localDay >= ? AND (s.finishedCheckInId IS NULL OR c.voidedAt IS NULL)
+                """,
+            arguments: [from.description, from.description]
         )
         return Set(try days.map { text in
             guard let day = LocalDay(string: text) else { throw StoreError.corruptRow(table: "checkIn", column: "localDay") }
@@ -223,7 +230,9 @@ private struct Access: StoreWriter {
             laterReviews: try Row.fetchAll(db, sql: "SELECT * FROM laterReview ORDER BY at, id").map(Self.laterReview),
             watchProgress: try Row.fetchAll(db, sql: "SELECT * FROM watchProgress ORDER BY itemId").map(Self.watchProgress),
             focusSessions: try Row.fetchAll(db, sql: "SELECT * FROM focusSession ORDER BY at, id").map(Self.focusSession),
-            timeBlocks: try Row.fetchAll(db, sql: "SELECT * FROM timeBlock ORDER BY placedAt, id").map(Self.timeBlock)
+            timeBlocks: try Row.fetchAll(db, sql: "SELECT * FROM timeBlock ORDER BY placedAt, id").map(Self.timeBlock),
+            steps: try Row.fetchAll(db, sql: "SELECT * FROM step ORDER BY createdAt, id").map(Self.step),
+            stepTicks: try Row.fetchAll(db, sql: "SELECT * FROM stepTick ORDER BY at, id").map(Self.stepTick)
         )
     }
 
@@ -311,6 +320,55 @@ private struct Access: StoreWriter {
                         b.updatedAt, b.decidedAt, b.tickId?.uuidString, b.coverId?.uuidString, b.removedAt,
                         b.origin.rawValue, b.touchedAt, b.askedAt, b.releasedAt]
         )
+    }
+
+    func steps(taskIds: [UUID]) throws -> [Step] {
+        guard !taskIds.isEmpty else { return [] }
+        return try Row.fetchAll(
+            db, sql: "SELECT * FROM step WHERE deletedAt IS NULL AND taskId IN (\(Self.marks(taskIds.count))) ORDER BY sortKey, createdAt, id",
+            arguments: StatementArguments(taskIds.map(\.uuidString))
+        ).map(Self.step)
+    }
+
+    func step(id: UUID) throws -> Step? {
+        try Row.fetchOne(db, sql: "SELECT * FROM step WHERE id = ?", arguments: [id.uuidString]).map(Self.step)
+    }
+
+    func stepTicks(taskIds: [UUID]) throws -> [StepTick] {
+        guard !taskIds.isEmpty else { return [] }
+        return try Row.fetchAll(
+            db, sql: "SELECT * FROM stepTick WHERE voidedAt IS NULL AND taskId IN (\(Self.marks(taskIds.count))) ORDER BY at, id",
+            arguments: StatementArguments(taskIds.map(\.uuidString))
+        ).map(Self.stepTick)
+    }
+
+    func save(_ s: Step) throws {
+        try db.execute(
+            sql: """
+                INSERT INTO step (id, taskId, title, sortKey, createdAt, updatedAt, deletedAt)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET taskId = excluded.taskId, createdAt = excluded.createdAt,
+                    title = excluded.title, sortKey = excluded.sortKey,
+                    updatedAt = excluded.updatedAt, deletedAt = excluded.deletedAt
+                """,
+            arguments: [s.id.uuidString, s.taskId.uuidString, s.title, s.sortKey, s.createdAt, s.updatedAt, s.deletedAt]
+        )
+    }
+
+    func insert(_ t: StepTick) throws {
+        try db.execute(
+            sql: """
+                INSERT INTO stepTick (id, stepId, taskId, localDay, at, source, finishedCheckInId, voidedAt)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+            arguments: [t.id.uuidString, t.stepId.uuidString, t.taskId.uuidString, t.localDay.description, t.at,
+                        t.source.rawValue, t.finishedCheckInId?.uuidString, t.voidedAt]
+        )
+    }
+
+    func voidStepTick(id: UUID, at: Date) throws {
+        // The trigger rejects re-voiding.
+        try db.execute(sql: "UPDATE stepTick SET voidedAt = ? WHERE id = ?", arguments: [at, id.uuidString])
     }
 
     func voidFocusSession(id: UUID, at: Date) throws {
@@ -571,6 +629,33 @@ private struct Access: StoreWriter {
             touchedAt: row["touchedAt"],
             askedAt: row["askedAt"],
             releasedAt: row["releasedAt"]
+        )
+    }
+
+    private static func step(_ row: Row) throws -> Step {
+        let t = "step"
+        return Step(
+            id: try uuid(row, "id", table: t),
+            taskId: try uuid(row, "taskId", table: t),
+            title: try required(row, "title", table: t),
+            sortKey: try required(row, "sortKey", table: t),
+            createdAt: try required(row, "createdAt", table: t),
+            updatedAt: try required(row, "updatedAt", table: t),
+            deletedAt: row["deletedAt"]
+        )
+    }
+
+    private static func stepTick(_ row: Row) throws -> StepTick {
+        let t = "stepTick"
+        return StepTick(
+            id: try uuid(row, "id", table: t),
+            stepId: try uuid(row, "stepId", table: t),
+            taskId: try uuid(row, "taskId", table: t),
+            localDay: try day(row, "localDay", table: t),
+            at: try required(row, "at", table: t),
+            source: try raw(row, "source", table: t),
+            finishedCheckInId: try optionalUUID(row, "finishedCheckInId", table: t),
+            voidedAt: row["voidedAt"]
         )
     }
 

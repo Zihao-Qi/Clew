@@ -20,7 +20,58 @@ enum Schema {
         migrator.registerMigration("v11-goals-without-schedule", migrate: v11)
         migrator.registerMigration("v12-one-day-reminders", migrate: v12)
         migrator.registerMigration("v13-priority", migrate: v13)
+        migrator.registerMigration("v14-steps", migrate: v14)
         return migrator
+    }
+
+    /// Steps in a task (SPEC 2026-11-21): steps are definitions (tombstoned, never
+    /// deleted; a step keeps its task); their ticks are facts (voided, never deleted or
+    /// changed in substance), kept apart from check-ins so they never count as done.
+    private static func v14(_ db: Database) throws {
+        try db.execute(sql: """
+            CREATE TABLE step (
+                id         TEXT PRIMARY KEY NOT NULL,
+                taskId     TEXT NOT NULL REFERENCES item(id),
+                title      TEXT NOT NULL,
+                sortKey    REAL NOT NULL,
+                createdAt  DATETIME NOT NULL,
+                updatedAt  DATETIME NOT NULL,
+                deletedAt  DATETIME
+            );
+            CREATE INDEX step_task ON step(taskId);
+
+            CREATE TRIGGER step_no_delete BEFORE DELETE ON step
+            BEGIN SELECT RAISE(ABORT, 'steps are removed with a tombstone, never deleted'); END;
+
+            CREATE TRIGGER step_fixed BEFORE UPDATE ON step
+            WHEN NEW.id IS NOT OLD.id OR NEW.taskId IS NOT OLD.taskId OR NEW.createdAt IS NOT OLD.createdAt
+            BEGIN SELECT RAISE(ABORT, 'a step keeps its task'); END;
+
+            CREATE TABLE stepTick (
+                id                 TEXT PRIMARY KEY NOT NULL,
+                stepId             TEXT NOT NULL REFERENCES step(id),
+                taskId             TEXT NOT NULL REFERENCES item(id),
+                localDay           TEXT NOT NULL,
+                at                 DATETIME NOT NULL,
+                source             TEXT NOT NULL,
+                finishedCheckInId  TEXT REFERENCES checkIn(id),
+                voidedAt           DATETIME
+            );
+            CREATE INDEX stepTick_task ON stepTick(taskId);
+
+            CREATE TRIGGER stepTick_no_delete BEFORE DELETE ON stepTick
+            BEGIN SELECT RAISE(ABORT, 'facts are never deleted'); END;
+
+            CREATE TRIGGER stepTick_substance_immutable BEFORE UPDATE ON stepTick
+            WHEN NEW.id IS NOT OLD.id OR NEW.stepId IS NOT OLD.stepId OR NEW.taskId IS NOT OLD.taskId
+              OR NEW.localDay IS NOT OLD.localDay OR NEW.at IS NOT OLD.at OR NEW.source IS NOT OLD.source
+              OR NEW.finishedCheckInId IS NOT OLD.finishedCheckInId
+            BEGIN SELECT RAISE(ABORT, 'fact substance is immutable'); END;
+
+            CREATE TRIGGER stepTick_void_monotonic BEFORE UPDATE ON stepTick
+            WHEN OLD.voidedAt IS NOT NULL AND NEW.voidedAt IS NOT OLD.voidedAt
+            BEGIN SELECT RAISE(ABORT, 'voids are monotonic'); END;
+            """)
     }
 
     /// Priority tasks (SPEC 2026-11-19): a definition field; every existing task is not one.
