@@ -450,6 +450,9 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
             try store.writer.write { try $0.execute(sql: "UPDATE step SET taskId = ? WHERE id = ?",
                                                     arguments: [other.id.uuidString, step.id.uuidString]) }
         }
+        let moved = Step(id: step.id, taskId: other.id, title: step.title, sortKey: step.sortKey, createdAt: step.createdAt,
+                         updatedAt: t0 + 90)
+        #expect(throws: DatabaseError.self) { try store.write { try $0.save(moved) } }
         #expect(throws: DatabaseError.self) { try store.writer.write { try $0.execute(sql: "DELETE FROM step") } }
         #expect(throws: DatabaseError.self) { try store.writer.write { try $0.execute(sql: "DELETE FROM stepTick") } }
         for assignment in ["at = '2030-01-01 00:00:00.000'", "finishedCheckInId = NULL", "stepId = 'x'", "localDay = '2026-11-12'"] {

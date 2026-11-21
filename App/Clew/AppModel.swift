@@ -870,12 +870,16 @@ final class AppModel {
     /// The steps of the tasks on the list (tasks without steps are missing).
     private(set) var steps: [UUID: TaskSteps] = [:]
     func steps(of id: UUID) -> TaskSteps? { steps[id].flatMap { $0.isEmpty ? nil : $0 } }
+    /// A task's steps for its details, also once it has left the list (the rollover).
+    func allSteps(of id: UUID) -> [TaskSteps.Entry] {
+        steps[id]?.entries ?? ((try? clew?.steps(taskId: id))?.entries ?? [])
+    }
 
     /// Which tasks are unfolded: a setting of this Mac, not part of the task (SPEC).
     private(set) var unfolded: Set<UUID> = AppModel.loadUnfolded()
     private static let unfoldedKey = "unfoldedTasks"
     /// Where folds are kept; the debug harnesses use their own, never the app's.
-    nonisolated(unsafe) static var foldDefaults = UserDefaults.standard
+    static var foldDefaults = UserDefaults.standard
     private static func loadUnfolded() -> Set<UUID> {
         Set((foldDefaults.stringArray(forKey: unfoldedKey) ?? []).compactMap(UUID.init(uuidString:)))
     }

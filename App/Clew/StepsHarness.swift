@@ -96,8 +96,15 @@ extension Snapshot {
                 print("talk row y:", row.y, "milk row y:", milkRow.y, "double-click interval:", NSEvent.doubleClickInterval,
                       "host:", host.frame, "raw:", DebugFrames.frames["circle:\(talk)"] as Any, "key:", window.isKeyWindow)
 
+                // The off-screen window sometimes drops the first click after it opens: one
+                // on empty space below the list first.
+                try await mouse(NSPoint(x: 200, y: 20))
+                try await waitForDoubleClickToPass()
                 try await mouse(row, settle: 100)
-                report("a click unfolds a task with steps at once (100 ms)", model.isUnfolded(talk) && probe.opened.isEmpty)
+                let atOnce = model.isUnfolded(talk)
+                try await Task.sleep(for: .milliseconds(600))
+                print("  after 100 ms:", atOnce, "after 700 ms:", model.isUnfolded(talk), "row:", row)
+                report("a click unfolds a task with steps at once (100 ms)", atOnce && probe.opened.isEmpty)
                 try await waitForDoubleClickToPass()
                 try await mouse(row)
                 report("a second click folds it", !model.isUnfolded(talk))
@@ -172,6 +179,47 @@ extension Snapshot {
                 try await Task.sleep(for: .milliseconds(300))
                 report("Esc closes it and drops what was typed",
                        frame("newStep:\(talk)") == nil && !shown().contains("dropped"))
+                // Details: Esc closes the step line before it leaves the page (review).
+                var backs = 0
+                let detailHost = NSHostingView(rootView: DetailView(model: model, itemId: talk, onEdit: { _ in },
+                                                                    onBack: { backs += 1 })
+                    .frame(width: 340, height: 600, alignment: .top))
+                let detailWindow = NSWindow(contentRect: NSRect(x: -10_000, y: -9_000, width: 340, height: 600),
+                                            styleMask: [.titled], backing: .buffered, defer: false)
+                detailWindow.contentView = detailHost
+                detailWindow.makeKeyAndOrderFront(nil)
+                try await Task.sleep(for: .milliseconds(Int(NSEvent.doubleClickInterval * 1000) + 400))
+                @MainActor func detailClick(_ key: String) async throws {
+                    guard let r = DebugFrames.frames[key] else { report("found \(key)", false); return }
+                    let p = NSPoint(x: r.midX, y: detailWindow.frame.height - r.midY)
+                    for (i, type) in [NSEvent.EventType.leftMouseDown, .leftMouseUp].enumerated() {
+                        number += 1
+                        NSApp.postEvent(NSEvent.mouseEvent(with: type, location: p, modifierFlags: [],
+                                                           timestamp: ProcessInfo.processInfo.systemUptime + Double(i) * 0.03,
+                                                           windowNumber: detailWindow.windowNumber, context: nil,
+                                                           eventNumber: number, clickCount: 1,
+                                                           pressure: type == .leftMouseDown ? 1 : 0)!, atStart: false)
+                    }
+                    try await Task.sleep(for: .milliseconds(400))
+                }
+                @MainActor func detailKey(_ chars: String, code: UInt16) async throws {
+                    for type in [NSEvent.EventType.keyDown, .keyUp] {
+                        NSApp.postEvent(NSEvent.keyEvent(with: type, location: .zero, modifierFlags: [],
+                                                         timestamp: ProcessInfo.processInfo.systemUptime,
+                                                         windowNumber: detailWindow.windowNumber, context: nil,
+                                                         characters: chars, charactersIgnoringModifiers: chars,
+                                                         isARepeat: false, keyCode: code)!, atStart: false)
+                    }
+                    try await Task.sleep(for: .milliseconds(300))
+                }
+                report("Details open with no step line", DebugFrames.frames["detailNew:\(talk)"] == nil && backs == 0)
+                try await detailClick("detailAdd:\(talk)")
+                report("Add Step opens the line", DebugFrames.frames["detailNew:\(talk)"] != nil)
+                try await detailKey("\u{1b}", code: 53)
+                report("Esc closes the line and stays on the page",
+                       DebugFrames.frames["detailNew:\(talk)"] == nil && backs == 0)
+                try await detailKey("\u{1b}", code: 53)
+                report("then Esc goes back", backs == 1)
                 _ = steps
                 exit(failures == 0 ? 0 : 1)
             } catch {

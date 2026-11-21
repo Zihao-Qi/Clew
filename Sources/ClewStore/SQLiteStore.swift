@@ -347,7 +347,8 @@ private struct Access: StoreWriter {
             sql: """
                 INSERT INTO step (id, taskId, title, sortKey, createdAt, updatedAt, deletedAt)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(id) DO UPDATE SET title = excluded.title, sortKey = excluded.sortKey,
+                ON CONFLICT(id) DO UPDATE SET taskId = excluded.taskId, createdAt = excluded.createdAt,
+                    title = excluded.title, sortKey = excluded.sortKey,
                     updatedAt = excluded.updatedAt, deletedAt = excluded.deletedAt
                 """,
             arguments: [s.id.uuidString, s.taskId.uuidString, s.title, s.sortKey, s.createdAt, s.updatedAt, s.deletedAt]

@@ -426,7 +426,7 @@ struct DetailSteps: View {
     @State private var newStep = ""
     @FocusState private var addFocused: Bool
 
-    private var steps: [TaskSteps.Entry] { model.steps[task.id]?.entries ?? [] }
+    private var steps: [TaskSteps.Entry] { model.allSteps(of: task.id) }
     private var canAdd: Bool { model.row(task.id).map(model.canAddStep) ?? false }
 
     var body: some View {
@@ -448,6 +448,7 @@ struct DetailSteps: View {
                             TextField(text: $newStep) { Text("New step") }
                                 .textFieldStyle(.plain)
                                 .focused($addFocused)
+                                .debugFrame("detailNew:\(task.id)")
                                 .onSubmit(add)
                                 .onExitCommand { adding = false; newStep = "" }
                                 .accessibilityLabel(Text("New step of \(task.title)"))
@@ -456,10 +457,15 @@ struct DetailSteps: View {
                     } else {
                         Button { adding = true } label: { Label("Add Step", systemImage: "plus") }
                             .buttonStyle(.borderless)
+                            .debugFrame("detailAdd:\(task.id)")
                             .accessibilityLabel(Text("Add a step to \(task.title)"))
                     }
                 }
+                // A refused name (too long) says why here too (review).
+                NoticeView(text: model.notice).padding(.horizontal, -12)
             }
+            // The task got done (its last step, its circle): the line goes and drops its text (review).
+            .onChange(of: canAdd) { _, now in if !now { adding = false; newStep = "" } }
         }
     }
 
@@ -523,12 +529,12 @@ private struct DetailStepRow: View {
         }
     }
 
-    /// An empty or refused name goes back to the step's own.
+    /// An empty name goes back to the step's own; a refused one (too long) stays open
+    /// with its text, and the notice says why.
     private func rename() {
         guard editing else { return }
-        editing = false
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, trimmed != entry.step.title else { return }
-        model.renameStep(entry.step.id, trimmed)
+        guard !trimmed.isEmpty, trimmed != entry.step.title else { editing = false; return }
+        if model.renameStep(entry.step.id, trimmed) { editing = false }
     }
 }

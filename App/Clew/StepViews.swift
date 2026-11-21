@@ -25,6 +25,8 @@ struct StepsList: View {
     @State private var dragSlot: Int?
     @State private var frames: [UUID: CGRect] = [:]
     @State private var dragFrames: [CGRect] = []
+    /// Cleared by itself when a step drag ends or is cancelled (the menu closing, Esc).
+    @GestureState private var dragLive = false
 
     private var space: String { "steps-\(row.id.uuidString)" }
 
@@ -50,6 +52,20 @@ struct StepsList: View {
         }
         .coordinateSpace(name: space)
         .onPreferenceChange(StepFrames.self) { frames = $0 }
+        .onChange(of: dragLive) { _, live in
+            // A cancelled drag leaves nothing behind (review).
+            if !live, dragging != nil { dragging = nil; dragTranslation = 0; dragSlot = nil }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in
+            // The menu closing: no step stays held or hovered (review).
+            held = nil
+            if let h = hoveredStep, steps.entries.contains(where: { $0.id == h }) { hoveredStep = nil }
+        }
+        .onDisappear {
+            // Folded without the pointer leaving (VoiceOver's Fold): the Delete key must
+            // not reach a step that is no longer shown (review).
+            if let h = hoveredStep, steps.entries.contains(where: { $0.id == h }) { hoveredStep = nil }
+        }
         .onChange(of: steps) { _, now in
             // A step that is gone (deleted elsewhere) is no longer held.
             if let held, !now.entries.contains(where: { $0.id == held.step }) { self.held = nil }
@@ -58,7 +74,8 @@ struct StepsList: View {
 
     private func tap(_ entry: TaskSteps.Entry) {
         // Held only under the pointer: ticked another way (VoiceOver), it moves at once.
-        if hoveredStep == entry.id { held = (steps.entries.map(\.id), entry.id) }
+        // The order as drawn now, so a second tick under the pointer keeps it too (review).
+        if hoveredStep == entry.id { held = (shown.map(\.id), entry.id) }
         model.tapStep(entry)
     }
 
@@ -71,6 +88,7 @@ struct StepsList: View {
 
     private func reorder(_ entry: TaskSteps.Entry) -> some Gesture {
         DragGesture(minimumDistance: 3, coordinateSpace: .named(space))
+            .updating($dragLive) { _, live, _ in live = true }
             .onChanged { value in
                 // Done steps stay where they are; the drag still belongs to the step, never
                 // to its task's row.

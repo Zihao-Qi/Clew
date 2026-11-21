@@ -53,6 +53,9 @@ struct TodayListView: View {
     /// A click folds or unfolds at once; the double-click's second click puts the fold
     /// back the way it was before the first (SPEC 2026-11-21).
     @State private var foldClicks = FoldClicks()
+    /// One task row's height, steps left out: a block coming down from the timeline
+    /// becomes one row, whatever the first task holds.
+    @State private var rowHeight: CGFloat = 34
     /// The timeline's name box (SPEC 2026-11-13). It lives with the list: leaving the list
     /// (Add, Later, Settings, details) drops it.
     @State private var newTask: NewTaskDraft?
@@ -91,7 +94,8 @@ struct TodayListView: View {
     /// A row's place and size for a card over the list: like the first row, at `y`.
     private func rowFrame(centeredAt y: CGFloat) -> CGRect {
         let sample = dragFrames.first ?? rowFrames.values.first ?? CGRect(x: 0, y: 0, width: 340, height: 34)
-        return CGRect(x: sample.minX, y: y - sample.height / 2, width: sample.width, height: sample.height)
+        // A task's own row: an unfolded first task's frame holds its steps too (review).
+        return CGRect(x: sample.minX, y: y - rowHeight / 2, width: sample.width, height: rowHeight)
     }
 
     /// Near the timeline's top or bottom edge while dragging, it scrolls by itself.
@@ -123,7 +127,7 @@ struct TodayListView: View {
     private func offset(for id: UUID, at index: Int, in ids: [UUID]) -> CGFloat {
         // A block coming down from the timeline opens a gap where it would land.
         if let lifted, lifted.blockId != nil, let slot = lifted.slot {
-            let height = Double(dragFrames.first?.height ?? 34)
+            let height = Double(rowHeight)
             return CGFloat(Clew.insertShift(index: index, slot: slot, height: height))
         }
         guard let dragging, let from = ids.firstIndex(of: dragging) else { return 0 }
@@ -392,6 +396,7 @@ struct TodayListView: View {
                     onClick: { clicked(row) },
                     onDoubleClick: { doubleClicked(row) },
                     onAddStep: { startAddingStep(row) })
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { if steps == nil { rowHeight = $0 } }
             if (steps != nil && model.isUnfolded(row.id)) || adding {
                 StepsList(model: model, row: row, steps: steps ?? TaskSteps(taskId: row.id, entries: []),
                           adding: adding, onAddClose: { if addingStep == row.id { addingStep = nil } },
@@ -487,7 +492,7 @@ struct TodayListView: View {
     /// The extra room a block held over the list takes: one row while it is there.
     private var incomingGap: CGFloat {
         guard let lifted, lifted.blockId != nil, !lifted.overTimeline, lifted.slot != nil else { return 0 }
-        return dragFrames.first?.height ?? 34
+        return rowHeight
     }
 
     var body: some View {
@@ -1077,7 +1082,8 @@ struct RowView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize()
-                    .padding(.trailing, Self.undoWidth + 4)
+                    // Lined up with goals' counts; beside a task's own count, just a gap (review).
+                    .padding(.trailing, openSteps == nil ? Self.undoWidth + 4 : 0)
                     .accessibilityLabel(Text("Comes to Today \(waitingText)"))
             }
 

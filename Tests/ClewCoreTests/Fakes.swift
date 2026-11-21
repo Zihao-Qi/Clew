@@ -212,6 +212,8 @@ final class FakeStore: ClewStore, @unchecked Sendable {
         func insert(_ tick: StepTick) throws {
             guard state.stepTicks[tick.id] == nil else { throw FactViolation.duplicate }
             guard state.steps[tick.stepId] != nil, state.items[tick.taskId] != nil else { throw FactViolation.missingItem }
+            // As the foreign key on finishedCheckInId.
+            if let c = tick.finishedCheckInId, state.checkIns[c] == nil { throw FactViolation.missingItem }
             state.stepTicks[tick.id] = tick
         }
         func voidStepTick(id: UUID, at: Date) throws {
