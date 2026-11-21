@@ -99,7 +99,9 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
    Settings › About (off by default, 2026-11-13), Clew also asks GitHub once a day
    whether a newer release exists (see "About and updates").
 9. **Launch at login** (`SMAppService`), toggled in a small Settings window.
-10. **Task details.** Clicking a row opens its details. Habits and goals: a 16-week heatmap
+10. **Task details.** Double-clicking a row opens its details (*changed* 2026-11-21,
+    *user*: a click unfolds a task with steps; see "Steps in a task"); so does
+    right-click › Details. Habits and goals: a 16-week heatmap
     (*changed* 2026-11-18: goals choose Bars or Heatmap, see "A goal's days") (done days
     filled, other days a quiet gray, never red), days done this week / in the last
     30 days / all time (goals: this round, rounds done, all-time total), and Edit /
@@ -130,14 +132,6 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
 - **Daruma goals and badges.** Paint one eye when a counted goal starts and the
   second when it's finished. Levels come from lifetime totals.
 - Opt-in AI coach: recap, Later suggestions, quick start (see docs/AGENT.md).
-- **Steps in a task (user, 2026-11-21; not now).** A once task can have a few steps
-  ("Prepare the talk": make slides, write speech notes, practice), ticked one by one,
-  and the task's steps can fold under its row. Ideas to settle before building: the
-  task counts once in done/total and its bar fills by steps done (2/3); it is done
-  when its last step is; one level only; habits and goals have none. A folded row
-  shows its next step after its title, so folding hides nothing that matters now
-  (*user*, 2026-11-21: "Prepare the talk - speech notes", no "next:"). A step can go
-  on the timeline, and its block reads the same way (*user*, 2026-11-21).
 - Sync with Dayflow (its local JSON API: `GET /api/day`, `PATCH /api/tasks/:id`).
 - iPhone, iCloud sync, Obsidian export.
 
@@ -914,7 +908,8 @@ stopped daily use, not adding features.
   with the picker); untouched = not saved, edited,
   moved to Later or kept for 42 days. Rating dots are built off by default, as a
   Settings switch (2026-11-09).
-- Clicking a row opens its details; the link mark, not the title, opens a link.
+- Clicking a row opens its details; the link mark, not the title, opens a link
+  (*changed* 2026-11-21: double-clicking; see "Steps in a task").
   Goal bars align in one column. Rows can be dragged to reorder (2026-11-08, after use).
 - Reminders fire on every day the item is on Today until done, once per day; "Later"
   moves a once-item or link to the Later pile (*changed* 2026-11-15: fires in either
@@ -954,7 +949,7 @@ stopped daily use, not adding features.
   it removes the last `+1`. It sits apart from the circle so rapid ticks can't hit it
   (2026-11-08, v1a). Its click area is larger than the mark (*changed* 2026-11-19,
   *user*: a near miss opened the details): from the dots' column to the row's end, nearly
-  the row's height. While hidden, that place opens the details like the rest of the row.
+  the row's height. While hidden, that place acts like the rest of the row.
 - Summary defaults: **9:00** and **21:00**, off until switched on.
 - **Opening the menu refreshes once (2026-11-19, *user*):** one refresh per opening, from
   the menu's own window becoming key, on whatever screen it opens; other windows (Settings)
@@ -993,6 +988,52 @@ stopped daily use, not adding features.
     (*Changed* the same day, *user*: first a gold dot in the ring's middle.)
   - Add offers Priority for Today and Habit; Edit for a task on Today, a habit, or one
     already marked (to unmark it).
+
+- **Steps in a task (2026-11-21, *user*).** A once task can be split into a few steps
+  ("Prepare the talk": Make slides, Speech notes, Practice), ticked one by one (SPEC's
+  "chunk big goals" for a task with an end). One level only. Habits, goals, links and a
+  collection's items have no steps.
+  - **Adding:** right-click a task › **Add Step…**, or in its details. Add has no steps.
+    Add Step… unfolds the task with an empty step line after its steps; Return adds the
+    step and opens the next line; Esc, or Return on an empty line, closes it. The details
+    list the steps with their circles: add, tick, rename and delete them there.
+  - **Folded and unfolded:** a task with steps shows only its own row, folded, with a
+    small arrow after its title (and after its link mark, if any): pointing right when
+    folded, down when unfolded. **A click on the row unfolds or folds it**, at once, with
+    no wait for a second click. Unfolded, its steps are listed under it, indented, each
+    with its own circle; **done steps first**, in the order they were done, then the rest
+    in your order. Each task remembers whether it is unfolded. VoiceOver gets **Unfold** /
+    **Fold** actions.
+  - **Clicks on any row** (*changed*: a click opened the details): a click unfolds or
+    folds a task with steps and does nothing on other rows; **a double-click opens the
+    details** (a task with steps unfolds on the first click and stays so); right-click ›
+    Details as before. The circle, the link mark and a goal's `−` keep their own clicks.
+    The faint hover highlight is shown only on rows a click does something to. Collection
+    rows (YouTube, X) and timeline blocks keep their single click.
+  - **The row's look:** as a counted goal's. The task's bar fills by steps done (1 of 3:
+    a third; Settings › General › Progress bars applies) and its count reads "1/3" where
+    a goal's count is. The circle stays plain until the task is done.
+  - **Ticking:** a step's circle ticks that step. Ticking the last step finishes the
+    task. **The task's own circle finishes it at once**, steps and all. Unticking the task
+    puts its steps back the way they were before that tick (also when the tick came from
+    its last step: that step is open again). Unticking a step of a done task unticks the
+    task too.
+  - **Counting:** the task counts once in the menu bar's done/total, the ring and the
+    Daruma, in the day's summaries and last week's card; its steps never count there.
+  - **Order:** drag a step to reorder it among the open steps of its own task (never out
+    of it, onto another task, or into the list); VoiceOver gets Move Up / Move Down. The
+    right-click menu gets no move items.
+  - **On the timeline:** drag a step from the unfolded list onto an hour. Its block reads
+    "Prepare the talk - Speech notes" and works as a task's block does: it leaves the
+    list while on the timeline, its end ticks that step, and dragging it back returns it
+    to its task. Dragging the task's own row places the whole task, as now, and its end
+    finishes the task at once.
+  - **The task carries its steps:** moving to Later or to Today, a day for Later, the
+    rollover, Delete and its Undo, export and restore keep the steps and their ticks.
+    Reminders, Priority and Focus stay the task's own; a reminder's Done finishes the
+    task at once. A step is never on Today or in Goals & Later by itself.
+  - **Steps:** (1) steps in the list and the details, with the new clicks; (2) steps on
+    the timeline.
 
 ## Open question
 
