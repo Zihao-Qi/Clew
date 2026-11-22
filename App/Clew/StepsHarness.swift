@@ -74,7 +74,8 @@ extension Snapshot {
                         w.makeKeyAndOrderFront(nil)
                         try await Task.sleep(for: .milliseconds(200))
                     }
-                    lostFront = true
+                    // Only another app in front counts; a window that won't take key is a real failure.
+                    if !NSApp.isActive { lostFront = true }
                 }
                 @MainActor func mouse(_ p: NSPoint, clicks: Int = 1, settle: Int = 120) async throws {
                     try await focus(window)
