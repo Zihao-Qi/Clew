@@ -260,7 +260,8 @@ Settings › AI, edits any, adds their own and deletes any.
   rejected. The rows shown are fixed for that opening of the menu (no refill); an
   answer applies only if the note still exists unchanged (equal to what was shown),
   otherwise the row just leaves. The section shows only while ready, and goes at once
-  if ready is lost.
+  if ready is lost. When it goes (no rows left, or ready lost), a card with only this
+  section closes; it is never left empty.
 - **Kept** on this Mac in Application Support, in its own file, apart from Clew's
   data: not facts, not in exports or backups. **Forget everything** clears all
   notes, the events and the suggested step ids. Besides Clew deleting its own notes,

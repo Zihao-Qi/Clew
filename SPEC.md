@@ -1209,18 +1209,20 @@ stopped daily use, not adding features.
     element followed by its buttons "True: <line>" and "Not really: <line>".
   - **The card for this alone:** unanswered notes bring the card even in a week with
     nothing done, watched or read; it then shows "Last week", × and only this section
-    (no focus line, which never brings the card alone). Answering its last row closes
-    such a card, as × does; it is never left empty.
+    (no focus line, which never brings the card alone).
+  - **When the section goes** (its last row leaves, answered or stale, or ready is
+    lost): a card with last week's lines stays without it; a card with only this
+    section closes, as × does. A card is never left empty.
   - **Fixed for the opening:** the rows are chosen when the card appears and stay for
     that opening; answering one does not bring a fourth. An answer applies only if the
     note still exists unchanged since it was shown (Clew may have changed or deleted
     it meanwhile, or the person in Settings); otherwise the row just leaves. Losing
-    ready (Use AI off, signing out, …) removes the section at once.
+    ready (Use AI off, signing out, …) removes the section at once (see above).
   - **True** confirms the note: it stays, marked confirmed, and Clew never changes or
     deletes it afterwards (Settings › AI shows "<about> · You confirmed" instead of
     its "based on"; its place in the list does not change). **Not really** deletes the
     note. Either way the row leaves the
-    card at once; when none are left the section goes (the card stays). Both are
+    card at once; when none are left the section goes (see above). Both are
     recorded as activity for the next request, with the note's line. Editing a
     confirmed note in Settings makes it yours, as any edit does.
   - **Not answered** notes stay as they are and may show again next week. Settings ›
