@@ -1,3 +1,4 @@
+import ClewAgent
 import ClewAI
 import SwiftUI
 
@@ -5,11 +6,82 @@ import SwiftUI
 /// and each job's switch with what it sends.
 struct AISettings: View {
     let ai: AIModel
+    @State private var editing: NoteDraft?
+    @State private var forgetting = false
 
     var body: some View {
-        switch ai.phase {
-        case .signedOut, .signingIn: signedOut
-        case .signedIn: signedIn
+        Group {
+            switch ai.phase {
+            case .signedOut, .signingIn: signedOut
+            case .signedIn: signedIn
+            }
+            // Under Use AI while ready; in any other state, while any notes are kept (SPEC "Memory").
+            if ai.isReady || !ai.memory.notes.isEmpty { notes }
+        }
+        .sheet(item: $editing) { draft in
+            NoteEditor(draft: draft) { about, says in
+                if let id = draft.noteId { ai.memory.edit(id, about: about, says: says) } else { ai.memory.add(about: about, says: says) }
+                editing = nil
+            } cancel: { editing = nil }
+        }
+        .alert("Forget everything Clew knows?", isPresented: $forgetting) {
+            Button("Forget", role: .destructive) { ai.forgetEverything() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This deletes all notes and what Clew has recorded. It can't be undone.")
+        }
+    }
+
+    private var notes: some View {
+        Section {
+            if ai.memory.notes.isEmpty {
+                Text("No notes yet. Clew adds them as it learns how you work, and you can add your own.")
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(ai.memory.shown) { note in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(verbatim: note.says)
+                        Group {
+                            if note.from == .you {
+                                if note.about.isEmpty { Text("Your note") } else { Text("\(note.about) · Your note") }
+                            } else if note.about.isEmpty {
+                                Text(verbatim: note.basedOn ?? "")
+                            } else {
+                                Text(verbatim: "\(note.about) · \(note.basedOn ?? "")")
+                            }
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button { editing = NoteDraft(note) } label: { Image(systemName: "pencil") }
+                        .help(Text("Edit"))
+                        .accessibilityLabel(Text("Edit note \(note.says)"))
+                    Button { ai.memory.delete(note.id) } label: { Image(systemName: "trash") }
+                        .help(Text("Delete"))
+                        .accessibilityLabel(Text("Delete note \(note.says)"))
+                }
+                .buttonStyle(.borderless)
+            }
+            HStack {
+                Button("Add note") { editing = NoteDraft(nil) }
+                    .disabled(ai.memory.isFull)
+                    .accessibilityLabel(Text("Add a note"))
+                if ai.memory.isFull {
+                    Text("Clew keeps up to 40 notes.").font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Forget everything") { forgetting = true }
+                    .disabled(ai.memory.notes.isEmpty && !ai.isReady)
+                    .accessibilityLabel(Text("Forget everything Clew knows"))
+            }
+        } header: {
+            Text("What Clew knows")
+        } footer: {
+            Text("Clew never changes a note you added or edited.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -40,7 +112,7 @@ struct AISettings: View {
                     Text(message).font(.callout).foregroundStyle(.secondary)
                 }
             } footer: {
-                Text("Clew can suggest small steps for a task, using your ChatGPT plan. Nothing is sent until you sign in and ask. Clew works fully without it.")
+                Text("Clew can suggest small steps for a task and keep notes on how you work, using your ChatGPT plan. Nothing is sent until you sign in and ask. Clew works fully without it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -102,14 +174,16 @@ struct AISettings: View {
                             Text("Using ChatGPT plan").font(.caption).foregroundStyle(.secondary)
                         }
                     }
-                    Toggle(isOn: Binding(get: { ai.suggestStepsOn }, set: { ai.suggestStepsOn = $0 })) {
+                    Toggle(isOn: Binding(get: { ai.useAI }, set: { ai.useAI = $0 })) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Suggest steps")
-                            Text("Sends the task's title, its note and its steps to OpenAI, using your ChatGPT plan.")
+                            Text("Use AI")
+                            Text("Clew suggests steps and keeps notes on how you work, using your ChatGPT plan.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    .disabled(ai.signingOut)
+                    .accessibilityLabel(Text("Use AI"))
                 }
             }
             if let message = ai.message {
@@ -117,5 +191,56 @@ struct AISettings: View {
             }
         }
         .task { await ai.refreshModels() }
+    }
+}
+
+/// A note being added (no id) or edited.
+struct NoteDraft: Identifiable {
+    let id = UUID()
+    let noteId: UUID?
+    var about: String
+    var says: String
+    init(_ note: Note?) {
+        noteId = note?.id
+        about = note?.about ?? ""
+        says = note?.says ?? ""
+    }
+}
+
+/// Edit and Add (SPEC "Memory"): About and Note, capped at 30 and 100 characters.
+struct NoteEditor: View {
+    @State var draft: NoteDraft
+    let save: (String, String) -> Void
+    let cancel: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(draft.noteId == nil ? "Add note" : "Edit note").font(.headline)
+            Form {
+                TextField("About", text: $draft.about, prompt: Text("Writing"))
+                    .onChange(of: draft.about) { _, v in if v.count > Memory.aboutLongest { draft.about = String(v.prefix(Memory.aboutLongest)) } }
+                    .accessibilityLabel(Text("About"))
+                TextField("Note", text: $draft.says, prompt: Text("Goes better before noon"))
+                    .onChange(of: draft.says) { _, v in
+                        let line = v.replacingOccurrences(of: "\n", with: " ")
+                        if line.count > Memory.saysLongest || line != v { draft.says = String(line.prefix(Memory.saysLongest)) }
+                    }
+                    .accessibilityLabel(Text("Note"))
+            }
+            HStack {
+                Spacer()
+                Button("Cancel", action: cancel)
+                    .keyboardShortcut(.cancelAction)
+                    .accessibilityLabel(Text("Cancel"))
+                Button("Save") {
+                    save(draft.about.trimmingCharacters(in: .whitespaces), draft.says.trimmingCharacters(in: .whitespaces))
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(draft.says.trimmingCharacters(in: .whitespaces).isEmpty)
+                .accessibilityLabel(Text("Save note"))
+            }
+        }
+        .padding(20)
+        .frame(width: 360)
     }
 }

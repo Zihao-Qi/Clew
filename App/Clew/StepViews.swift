@@ -277,7 +277,7 @@ struct NewStepLine: View {
             .padding(.leading, StepMetrics.leading)
             .padding(.trailing, 12)
             .padding(.vertical, 3)
-            SuggestionList(ask: ask, leading: StepMetrics.leading) { model.addStep(to: taskId, title: $0) }
+            SuggestionList(ask: ask, leading: StepMetrics.leading) { model.addSuggestedStep(to: taskId, title: $0) }
         }
         // Esc anywhere in the line, the suggestions' buttons too (review).
         .onExitCommand { ask.cancel(); close() }

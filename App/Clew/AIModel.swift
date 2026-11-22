@@ -32,13 +32,14 @@ final class AIModel {
         get { access(keyPath: \.model); return prefs.string(forKey: Key.model).flatMap { m in models.isEmpty || models.contains { $0.slug == m } ? m : nil } ?? models.first?.slug }
         set { withMutation(keyPath: \.model) { prefs.set(newValue, forKey: Key.model) } }
     }
-    var suggestStepsOn: Bool {
-        get { access(keyPath: \.suggestStepsOn); return prefs.bool(forKey: Key.suggestSteps) }
-        set { withMutation(keyPath: \.suggestStepsOn) { prefs.set(newValue, forKey: Key.suggestSteps) } }
+    /// The one toggle (*user* 2026-11-22): on means every AI job and memory.
+    var useAI: Bool {
+        get { access(keyPath: \.useAI); return prefs.bool(forKey: Key.useAI) }
+        set { withMutation(keyPath: \.useAI) { prefs.set(newValue, forKey: Key.useAI) }; readyChanged() }
     }
     var notEligible: Bool {
         get { access(keyPath: \.notEligible); return prefs.bool(forKey: Key.notEligible) }
-        set { withMutation(keyPath: \.notEligible) { prefs.set(newValue, forKey: Key.notEligible) } }
+        set { withMutation(keyPath: \.notEligible) { prefs.set(newValue, forKey: Key.notEligible) }; readyChanged() }
     }
     /// OpenAI's rule: the first time, "You're using your ChatGPT plan" until Got it.
     var planNoteSeen: Bool {
@@ -46,18 +47,25 @@ final class AIModel {
         set { withMutation(keyPath: \.planNoteSeen) { prefs.set(newValue, forKey: Key.gotIt) } }
     }
 
-    /// Suggest steps can be asked: signed in with the plan's permission, the switch on.
-    var canSuggestSteps: Bool {
-        phase == .signedIn && hasPlanPermission && !notEligible && suggestStepsOn && model != nil
-    }
+    /// Ready (docs/AGENT.md §7): signed in with the plan's permission, eligible, Use AI
+    /// on. Jobs run and activity is recorded only while ready.
+    var isReady: Bool { phase == .signedIn && hasPlanPermission && !notEligible && useAI }
+
+    var canSuggestSteps: Bool { isReady && model != nil }
 
     enum Key {
         static let clientId = "ai.clientId", hostId = "ai.hostId", model = "ai.model"
-        static let suggestSteps = "ai.suggestSteps", gotIt = "ai.planNoteSeen", notEligible = "ai.notEligible"
+        /// Kept from AI-1's Suggest steps switch, so the setting carries over.
+        static let useAI = "ai.suggestSteps", gotIt = "ai.planNoteSeen", notEligible = "ai.notEligible"
         static let noSchema = "ai.noSchemaModels", ended = "ai.ended"
     }
 
     @ObservationIgnored let prefs: UserDefaults
+    /// Clew's notes about the person and what happened (§7).
+    let memory: MemoryBook
+    /// Bumped whenever ready is lost or everything is forgotten: a running request's note
+    /// change is then dropped.
+    @ObservationIgnored private var jobGeneration = 0
     @ObservationIgnored private let store: SessionStore
     @ObservationIgnored private let transport: HTTPTransport
     @ObservationIgnored private let account: ChatGPTAccount
@@ -67,8 +75,9 @@ final class AIModel {
     @ObservationIgnored private let log = Logger(subsystem: "io.github.zihao-qi.clew", category: "ai")
 
     init(prefs: UserDefaults = .standard, store: SessionStore = KeychainSession(),
-         transport: HTTPTransport = URLSessionTransport()) {
+         transport: HTTPTransport = URLSessionTransport(), memory: MemoryBook = MemoryBook(url: MemoryBook.defaultURL())) {
         self.prefs = prefs
+        self.memory = memory
         self.store = store
         self.transport = transport
         account = ChatGPTAccount(store: store, transport: transport, now: { Date() })
@@ -87,6 +96,14 @@ final class AIModel {
         phase = session == nil ? (phase == .signingIn ? .signingIn : .signedOut) : .signedIn
         email = session?.email
         hasPlanPermission = session?.hasPlanPermission ?? false
+        readyChanged()
+    }
+
+    /// Losing ready in any way stops the record and clears it; the notes stay (§7).
+    private func readyChanged() {
+        guard !isReady else { return }
+        jobGeneration += 1
+        memory.clearActivity()
     }
 
     // MARK: Sign in
@@ -167,7 +184,7 @@ final class AIModel {
         try store.save(session)
         let first = previous == nil
         if first || previous?.account != id.subject {
-            suggestStepsOn = true   // signing in turns Suggest steps on
+            useAI = true   // signing in turns Use AI on
             notEligible = false
         }
         ended = false
@@ -198,12 +215,14 @@ final class AIModel {
     func signOut() {
         guard !signingOut else { return }
         signingOut = true
+        useAI = false   // signing out turns Use AI off (§8)
         Task {
             defer { signingOut = false }
             let session = try? store.load()
             var confirmed = true
             if let session { confirmed = await revoke(session) }
             try? store.clear()
+            useAI = false   // again, in case it was turned on while revoking (review)
             revocationUnconfirmed = !confirmed
             models = []
             message = nil
@@ -223,17 +242,66 @@ final class AIModel {
 
     // MARK: Jobs
 
-    /// Suggest steps for a task (SPEC "Suggest steps"). Nothing is kept.
+    /// Suggest steps for a task (SPEC "Suggest steps"), with the notes and recent
+    /// activity (SPEC "Memory"). Suggestions are never kept; a note change may be.
     func suggestSteps(_ input: SuggestSteps.Input) async -> Result<[String], JobFailure> {
         guard canSuggestSteps, let model else { return .failure(JobFailure(provider: .notSignedIn)) }
         let log = self.log
-        let result = await Agent.run(SuggestSteps(), input: input, model: model, provider: provider) { record in
+        let mine = jobGeneration
+        let context = MemoryContext(notes: memory.notes, events: memory.activity.newestFirst)
+        let run = await Agent.run(SuggestSteps(), input: input, memory: context, model: model,
+                                  provider: provider) { record in
             #if DEBUG
-            log.debug("job=\(record.job, privacy: .public) model=\(record.model, privacy: .public) bytes=\(record.inputBytes) seconds=\(record.seconds, format: .fixed(precision: 1)) outcome=\(record.outcome, privacy: .public) request=\(record.requestId ?? "-", privacy: .public)")
+            log.debug("job=\(record.job, privacy: .public) model=\(record.model, privacy: .public) bytes=\(record.inputBytes) seconds=\(record.seconds, format: .fixed(precision: 1)) outcome=\(record.outcome, privacy: .public) note=\(record.note ?? "-", privacy: .public) request=\(record.requestId ?? "-", privacy: .public)")
             #endif
         }
-        if case .failure(let failure) = result { handle(failure.provider) }
-        return result
+        if case .failure(let failure) = run.result { handle(failure.provider) }
+        remember(run, generation: mine)
+        return run.result
+    }
+
+    /// Keeps what a run left for memory, unless ready was lost or everything forgotten
+    /// while it ran (§7): its events count as sent, its note change is checked against
+    /// the notes as they are now.
+    private func remember<Output>(_ run: JobRun<Output>, generation: Int) {
+        guard generation == jobGeneration, isReady else { return }
+        memory.sent(run.sentEvents)
+        guard case .success(let proposed?) = run.note else { return }
+        switch Memory.apply(proposed, to: memory.notes, now: Date()) {
+        case .success(let notes): memory.replace(notes)
+        case .failure(let failure):
+            #if DEBUG
+            log.debug("note dropped: \(failure.rawValue, privacy: .public)")
+            #endif
+            _ = failure
+        }
+    }
+
+    // MARK: Memory
+
+    /// Records what the person did, only while ready; text only if they typed it (§7).
+    func record(_ kind: ActivityEvent.Kind, task: String, typed: Bool, step: String? = nil, value: Int? = nil,
+                tick: UUID? = nil) {
+        guard isReady else { return }
+        memory.record(ActivityEvent.make(kind, at: Date(), calendar: .current, task: task, typed: typed,
+                                         step: step, value: value, tick: tick))
+    }
+
+    func untick(_ tick: UUID?) {
+        guard let tick else { return }
+        memory.untick(tick)
+    }
+
+    /// A step added from a suggestion, remembered only to notice its deletion later.
+    func suggested(_ step: UUID) {
+        guard isReady else { return }
+        memory.suggested(step)
+    }
+
+    /// Forget everything: notes, events, suggested step ids, and a running request's note.
+    func forgetEverything() {
+        jobGeneration += 1
+        memory.forget()
     }
 
     /// A failure that changes the sign-in's state.
@@ -242,7 +310,7 @@ final class AIModel {
         case .signInEnded?:
             ended = true
             prefs.set(true, forKey: Key.ended)
-            suggestStepsOn = false
+            useAI = false
             readSession()
         case .notEligible?:
             notEligible = true

@@ -43,7 +43,9 @@ public actor ChatGPTAccount {
     /// Refreshes now, whatever the expiry: to confirm whether OpenAI ended the sign-in
     /// (`subscription_sharing_invalid_user`, a 401). Throws `signInEnded` if it did.
     public func confirm() async throws {
-        _ = try await refresh(from: try session())
+        let next = try await refresh(from: try session())
+        // A refresh may narrow the grant: then AI is no longer ready (review, AI-M).
+        guard next.hasPlanPermission else { throw ProviderError.noPlanPermission }
     }
 
     private func refresh(from current: ChatGPTSession) async throws -> ChatGPTSession {
