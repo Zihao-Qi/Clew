@@ -172,6 +172,7 @@ address or any page's content.
 | **Evening line** | the 21:00 summary | one line ≤ 120 characters naming something done | AI-2 |
 | **Fits today** | Goals & Later | ≤ 3 items with a free slot on today's timeline and a reason ≤ 80 | AI-3 |
 | *every job* | its own place | may also return one note (§7) | AI-M |
+| What Clew noticed | last week's card | no request: shows Clew's unanswered notes, True / Not really (§7) | AI-N |
 | Reader | later | §11 | later |
 
 Zero-tick days keep the hand-written lines (shipped), never a model's.
@@ -185,8 +186,9 @@ Settings › AI, edits any, adds their own and deletes any.
 
 - **A note** has a fixed id (a UUID), *about* (≤ 30 characters: "Writing"), *says*
   (one line, ≤ 100: "Goes better before noon"), *from* (Clew or you), *based on*
-  (Clew's notes only, ≤ 100: "5 of 6 writing tasks ticked before 12"), and when it
-  was made and last changed. At most 40 notes.
+  (Clew's notes only, ≤ 100: "5 of 6 writing tasks ticked before 12"), when it was
+  made and last changed, and for Clew's notes when the person confirmed it (AI-N).
+  At most 40 notes.
 - **Ready** means signed in, plan permission granted, not "not eligible", and Use
   AI on. Jobs run and activity is recorded only while ready. Losing it in any way
   (Use AI off, signing out, which also turns Use AI off, OpenAI ending the sign-in,
@@ -197,7 +199,8 @@ Settings › AI, edits any, adds their own and deletes any.
   date): the person ticks a task or a step (imports' own ticks, such as a Watch Later
   scan, are not recorded); a rating (1–5); focus time ended (minutes); a step added
   from a suggestion; suggestions dismissed (how many); a step added from a suggestion
-  deleted later. An event names its task's title, and a step event its step's name,
+  deleted later; a note confirmed or rejected in "What Clew noticed" (its line, no
+  task). An event names its task's title, and a step event its step's name,
   only for a task whose title the person typed. For a task with a fetched or imported
   title it carries no text at all, only `"link": true` (§4: text the person did not
   type never shapes anything kept). A step the person added with + or Add all on a
@@ -224,7 +227,8 @@ Settings › AI, edits any, adds their own and deletes any.
 - **Instructions** every job adds: notes are what Clew knows about the person, to be
   used; a note change is optional and rare, a short pattern in how this person works,
   drawn from the activity; never a judgement, a diagnosis, a comparison with anyone or
-  advice; only notes from Clew may change or be deleted.
+  advice; only notes from Clew that are not confirmed may change or be deleted; a note
+  the person rejected (`noteRejected`) is not written again.
 - **Checked** (Swift, §5; a pure function in ClewAgent over the notes as they are
   when the answer arrives, not as they were sent). Add: `id` must be null; `about`,
   `says` and `based_on` trimmed, each 1 character up to its cap, with no line break
@@ -232,19 +236,36 @@ Settings › AI, edits any, adds their own and deletes any.
   note is kept); `says` not the same as another note's (ignoring case and spaces);
   only below 40 notes. Change: the same text rules, a change is not compared with
   itself, and its `id` must map to a note that still exists, is from Clew, and has not
-  changed since the request was sent. Delete: the same `id` rule; its text fields are
+  changed since the request was sent, and is not confirmed (AI-N). Delete: the same
+  `id` rule; its text fields are
   ignored. A change that fails is dropped, the debug log gets its code, and the job's
   own output is still shown. The two are judged apart: a valid note change is kept
   even when the job's own output fails (§5.5 then shows the job's plain failure).
 - **Yours are yours:** a note the person added or edited is *from you*. Clew never
   changes or deletes it; it only reads it. Editing one of Clew's notes makes it yours
-  and clears its *based on*. The person's text is not checked.
+  and clears its *based on* and *confirmed*. The person's text is not checked.
 - **Shown at once** (*user*): a new or changed note appears in the list straight
-  away, with no question and nothing else in the menu.
+  away, with no question; in the menu only through "What Clew noticed" below.
+- **What Clew noticed** (AI-N, *user* 2026-11-22): once a week, last week's card
+  (SPEC) shows up to 3 of Clew's notes the person has not answered, each with
+  **True** and **Not really**, so the notes help the person understand themselves
+  and the answers make them better. No request is made; it only shows notes. **True**
+  marks the note *confirmed* (a date): it stays Clew's, and from then on Clew never
+  changes or deletes it, as for the person's own notes. **Not really** deletes it.
+  Confirming does not change the note's *changed* date. Both are recorded as
+  activity: kind `noteConfirmed` or `noteRejected`, the weekday and time, and the
+  note's line under the key `"note"` (no `task`, no `link`: a note is never made from
+  untrusted text), so the next answer knows. Notes are sent with `"confirmed": true`
+  when confirmed, and the instructions say not to write again a note the person
+  rejected. The rows shown are fixed for that opening of the menu (no refill); an
+  answer applies only if the note still exists unchanged (equal to what was shown),
+  otherwise the row just leaves. The section shows only while ready, and goes at once
+  if ready is lost. When it goes (no rows left, or ready lost), a card with only this
+  section closes; it is never left empty.
 - **Kept** on this Mac in Application Support, in its own file, apart from Clew's
   data: not facts, not in exports or backups. **Forget everything** clears all
   notes, the events and the suggested step ids. Besides Clew deleting its own notes,
-  only the person's Delete and Forget everything remove notes.
+  only the person's Delete, Not really (AI-N) and Forget everything remove notes.
 
 ## 8. Settings › AI
 
@@ -320,6 +341,9 @@ first jobs have earned their place.
   and addable by the person, shown at once, made inside the next job's answer, seen in
   Settings › AI (§7–8); one **Use AI** toggle replaces per-job switches; the toggle does
   not list what is sent; the person keeps choosing the model.
+- **2026-11-22 (*user*)**: the evening line (AI-2) is not built for now; next is
+  "What Clew noticed" (AI-N, §7): Clew's unanswered notes in last week's card with
+  True / Not really, no request.
 - Superseded 2026-11-22: the bundled `clew-agent` helper, Codex OAuth reuse, the
   monthly token cap (the plan's own limits apply), the Gateway's `AgentOutput` records
   for AI-1 (Suggest steps keeps nothing; memory notes have their own file, §7).

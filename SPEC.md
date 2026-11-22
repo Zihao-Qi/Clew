@@ -384,7 +384,9 @@ stopped daily use, not adding features.
     reads it as ordinary rows.
   - **Only when something shows:** the card (and the Settings section) exist only
     when done, watched or read is above 0 after the rules below; otherwise there is
-    no card at all, not an empty one (focus time alone does not bring it).
+    no card at all, not an empty one (focus time alone does not bring it). The menu's
+    card also comes for Clew's unanswered notes (*added* 2026-11-22, see "What Clew
+    noticed"); the Settings section does not.
   - **What** (minimal text, numbers, never a comparison, a drop or anything missed):
     - "Last week" and ×;
     - one line: "23 done" and, when focus time was recorded, "· 3 h 20 min focus"
@@ -411,8 +413,9 @@ stopped daily use, not adding features.
     day, or a "Not finished" changes them, and can bring or remove the card.
   - **Off switch:** Settings › General › "Last week's card" (default on); it turns
     off the menu's card only.
-  - VoiceOver reads the card as one element ("Last week: 23 done, 3 hours 20 minutes
-    of focus, …"); × is "Close last week's card". Every number has its singular form.
+  - VoiceOver reads the card's lines as one element ("Last week: 23 done, 3 hours 20
+    minutes of focus, …"); × is "Close last week's card". "What Clew noticed" adds its
+    own elements after these (see there). Every number has its singular form.
 
 - **Done so far (user, 2026-11-18; design: the "Clew progress line" canvas).** A line
   that only rises: everything got done, from the first tick (Design rules: celebrate
@@ -1160,13 +1163,13 @@ stopped daily use, not adding features.
     changes a note you added or edited."
   - **Edit and Add** open a small sheet: **About** and **Note** fields, capped at 30
     and 100 characters, with **Cancel** and **Save** (Save needs a note line). Saving
-    makes the note yours and drops its "based on". Your text is never checked or
-    changed.
+    makes the note yours and drops its "based on" (and its confirmation, see "What
+    Clew noticed"). Your text is never checked or changed.
   - **How notes are made** (after each job, *user*): only while ready, Clew records
     on this Mac what happens, with the weekday and time of day (never a date): the
     person ticks a task or a step (not imports' own ticks), a rating, focus time
     ended, a step added from a suggestion, suggestions dismissed, a suggested step
-    deleted later. Titles and step names are included only for a task whose title the
+    deleted later, a note confirmed or rejected (its line; see "What Clew noticed"). Titles and step names are included only for a task whose title the
     person typed; a step they added with + or Add all counts as theirs. An event for
     a task with a fetched or imported title carries no text, only that it is a link.
     Unticking drops that tick's unsent events; a new rating replaces an unsent one. At
@@ -1175,14 +1178,14 @@ stopped daily use, not adding features.
     When the answer completes, its events count as sent, even if nothing in it passes;
     a cancel, a timeout or a failed request keeps them. A task with a fetched or
     imported title sends no events and keeps no note from that answer. No extra request
-    is made. A new or changed note appears in the list at once, with nothing in the
-    menu.
+    is made. A new or changed note appears in the list at once; the menu shows notes
+    only in last week's card (see "What Clew noticed").
   - **Checked before keeping** (Clew's notes only), against the notes as they are when
     the answer arrives: about, line and based on each 1 to their cap with no line
     break; no banned words in any of them (none allowed by any title); the line not the
     same as another note's (ignoring case and spaces); adding only below 40; a note
-    changed or deleted must still exist, be Clew's, and be unchanged since the request
-    was sent. A bad or missing note part, or a failing change, is dropped silently and
+    changed or deleted must still exist, be Clew's and not confirmed, and be unchanged
+    since the request was sent. A bad or missing note part, or a failing change, is dropped silently and
     the job's own result still shows; a valid note change is kept even when the
     suggestions fail.
   - **Kept** in its own file on this Mac, apart from Clew's data: not in exports or
@@ -1190,8 +1193,43 @@ stopped daily use, not adding features.
     out, OpenAI ending the sign-in, "not eligible", permission gone) stops the
     recording, clears what was recorded and drops the note change of a request still
     running; the notes stay. Forget everything also drops a running request's note
-    change. Besides Clew deleting its own, only Delete and Forget
+    change. Besides Clew deleting its own, only Delete, Not really and Forget
     everything remove notes.
+
+- **What Clew noticed (AI-N, 2026-11-22, *user*).** Once a week, Clew shows what it
+  noticed, so the notes help the person understand themselves, and their answers make
+  the notes better (docs/AGENT.md §7). Choosing only, no typing.
+  - **Where and when:** in last week's card (see "Last week's card"), under its lines,
+    with the card's own rules (once a week, the menu's top, × and the off switch).
+    Only while Use AI is ready. A heading "Clew noticed", then up to 3 of Clew's notes
+    not yet answered (not confirmed), newest change first: the note's line, and its
+    about in secondary text, with **True** and **Not really**. VoiceOver: the card's
+    summary element first (as before; "Last week" alone for a card with only this
+    section), then ×, then the heading "Clew noticed", then each row's text as one
+    element followed by its buttons "True: <line>" and "Not really: <line>".
+  - **The card for this alone:** unanswered notes bring the card even in a week with
+    nothing done, watched or read; it then shows "Last week", × and only this section
+    (no focus line, which never brings the card alone).
+  - **When the section goes** (its last row leaves, answered or stale, or ready is
+    lost): a card with last week's lines stays without it; a card with only this
+    section closes, as × does. A card is never left empty.
+  - **Fixed for the opening:** the rows are chosen when the card appears and stay for
+    that opening; answering one does not bring a fourth. An answer applies only if the
+    note still exists unchanged since it was shown (Clew may have changed or deleted
+    it meanwhile, or the person in Settings); otherwise the row just leaves. Losing
+    ready (Use AI off, signing out, …) removes the section at once (see above).
+  - **True** confirms the note: it stays, marked confirmed, and Clew never changes or
+    deletes it afterwards (Settings › AI shows "<about> · You confirmed" instead of
+    its "based on"; its place in the list does not change). **Not really** deletes the
+    note. Either way the row leaves the
+    card at once; when none are left the section goes (see above). Both are
+    recorded as activity for the next request, with the note's line. Editing a
+    confirmed note in Settings makes it yours, as any edit does.
+  - **Not answered** notes stay as they are and may show again next week. Settings ›
+    Progress's "Last week" section does not show them (Settings › AI lists every
+    note).
+  - No request is made to show them; nothing is sent when answering (the answer goes
+    with the next job's request).
 
 ## Open question
 
