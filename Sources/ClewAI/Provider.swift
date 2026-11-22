@@ -63,7 +63,7 @@ public enum ProviderError: Error, Equatable, Sendable {
 }
 
 /// One model service (docs/AGENT.md §2). The ChatGPT plan first; others behind the same
-/// protocol later (§10). Cancelling the consuming task cancels the request.
+/// protocol later (§11). Cancelling the consuming task cancels the request.
 public protocol Provider: Sendable {
     func stream(_ request: ModelRequest) -> AsyncThrowingStream<ProviderEvent, Error>
 }

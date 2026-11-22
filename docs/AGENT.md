@@ -1,7 +1,7 @@
 # Clew AI
 
 Status: **design v2**, 2026-11-22. Replaces the 2026-11-08 plan (a bundled TypeScript
-helper on pi-agent-core); see §11 for what changed and why. Builds on
+helper on pi-agent-core); see §12 for what changed and why. Builds on
 [ARCHITECTURE.md](ARCHITECTURE.md). Not a chat and not a coding agent: small, optional
 help that suggests, and you choose.
 
@@ -11,10 +11,12 @@ help that suggests, and you choose.
    only adds a button or a line. Off by default.
 2. **It never changes your data.** A job returns a suggestion; only your tap writes
    (Add, Add all). Swift enforces this: jobs have no access to the store's writer.
+   Its only kept writes are its own notes (§7), never facts.
 3. **No conversation** (*user* 2026-11-22). Clew may show the person something short
    it wrote, but the person never types to it: no chat, no text box. At most the
    person chooses among a few options Clew offers, so using it stays easy and
-   relaxed. A job's input is built by Clew from what is already there.
+   relaxed. Writing a note in Settings is the person's own record, not a message to
+   Clew. A job's input is built by Clew from what is already there.
 4. **A friend, not a coach with a whistle.** Brief, encouraging, never pushy. Never
    compares you to anyone. No streaks, no guilt, no "you missed".
 5. **Say less.** Short items, one line at most. Never paragraphs.
@@ -143,7 +145,9 @@ address or any page's content.
 
 ## 5. Validation (Swift, before anything is shown)
 
-1. The output decodes into the job's type; unknown fields are refused.
+1. The output decodes into the job's type; unknown fields are refused. The `note`
+   field is decoded and checked on its own: it never fails the job, and a failing job
+   does not drop a valid note change (§7).
 2. Length and count caps per job.
 3. Every item id exists and is in the job's allowed set.
 4. **Banned content**, as phrases so ordinary work words pass ("Check the failed
@@ -167,52 +171,124 @@ address or any page's content.
 | **Suggest steps** | Add Step… and Details' Steps (SPEC "Suggest steps") | asks for 3–5 to-do items of 2–5 words, the first a 2-minute start; keeps up to 5 that pass (1–80 characters, no repeats) | AI-1 |
 | **Evening line** | the 21:00 summary | one line ≤ 120 characters naming something done | AI-2 |
 | **Fits today** | Goals & Later | ≤ 3 items with a free slot on today's timeline and a reason ≤ 80 | AI-3 |
-| Reader, memory | later | §10 | later |
+| *every job* | its own place | may also return one note (§7) | AI-M |
+| Reader | later | §11 | later |
 
 Zero-tick days keep the hand-written lines (shipped), never a model's.
 
-## 7. Settings › AI
+## 7. Memory (AI-M, *user* 2026-11-22)
 
-Nothing is sent until the person signs in; signing in turns Suggest steps on, and each
-job has its own switch. **Continue with ChatGPT** (then the account's email, **Sign
-out**, **Manage usage**), the model with "Using ChatGPT plan", and the switches. Each
-says plainly what is sent ("Sends the task's title, its note and its steps to OpenAI,
-using your ChatGPT plan."). Non-secret settings (issued app id, host id, email,
-account id, model, switches, "Got it") are this Mac's preferences, not Clew's data, so
-they are not exported or backed up; the tokens are in the Keychain. The full text is
-in SPEC "Suggest steps".
+Clew keeps **notes** about the person, so every job's answer fits them better and the
+person can understand themselves a little better. There is nothing else: no
+preferences, no style settings, no categories (*user*). The person sees every note in
+Settings › AI, edits any, adds their own and deletes any.
 
-## 8. Debug log and evals
+- **A note** has a fixed id (a UUID), *about* (≤ 30 characters: "Writing"), *says*
+  (one line, ≤ 100: "Goes better before noon"), *from* (Clew or you), *based on*
+  (Clew's notes only, ≤ 100: "5 of 6 writing tasks ticked before 12"), and when it
+  was made and last changed. At most 40 notes.
+- **Ready** means signed in, plan permission granted, not "not eligible", and Use
+  AI on. Jobs run and activity is recorded only while ready. Losing it in any way
+  (Use AI off, signing out, which also turns Use AI off, OpenAI ending the sign-in,
+  "not eligible", permission gone) clears what was recorded and drops the note change
+  of any request still running; the notes stay. **Forget everything** drops it too.
+  ✨ and every job's button appear only while ready.
+- **Activity events**, each with the weekday and the time of day (`HH:mm`, never a
+  date): the person ticks a task or a step (imports' own ticks, such as a Watch Later
+  scan, are not recorded); a rating (1–5); focus time ended (minutes); a step added
+  from a suggestion; suggestions dismissed (how many); a step added from a suggestion
+  deleted later. An event names its task's title, and a step event its step's name,
+  only for a task whose title the person typed. For a task with a fetched or imported
+  title it carries no text at all, only `"link": true` (§4: text the person did not
+  type never shapes anything kept). A step the person added with + or Add all on a
+  typed task counts as theirs, like the task itself (rule 2: only their tap writes);
+  on a task with a fetched or imported title, its events carry no text, as above.
+  Clew remembers which step ids came from suggestions (up to 200, cleared with the
+  activity), only to notice when such a step is deleted. Unticking drops that tick's events (tick and rating) if not yet sent, and
+  a new rating replaces an unsent one for the same tick. At most the 20 newest unsent
+  events are kept; older ones are dropped. The calendar and the timeline wait for the
+  jobs that need them.
+- **Made after each job** (*user*): every job's request carries all notes (with
+  short ids `n1`…`n40` for this request only, mapped back by Swift) and the kept
+  events, newest first. Every answer has a `note` field beside its own output: `null`,
+  or one change `{"action": "add" | "change" | "delete", "id": string | null, "about":
+  string, "says": string, "based_on": string}`, every field required as OpenAI's
+  strict mode needs. `note` is decoded on its own: a missing or malformed `note` (an
+  unknown action or field, a wrong type) drops only the note (code `noteSchema`),
+  and the job's own output is judged as usual. No extra request. When an answer
+  **completes** (`response.completed`), the events it carried count as sent, even if
+  nothing in it passes; a cancel, a timeout or a failed request keeps them for the
+  next job. A job whose input carries an untrusted field sends no events (they wait)
+  and its note change is ignored. A long gap is fine: a note is about the person,
+  not one task.
+- **Instructions** every job adds: notes are what Clew knows about the person, to be
+  used; a note change is optional and rare, a short pattern in how this person works,
+  drawn from the activity; never a judgement, a diagnosis, a comparison with anyone or
+  advice; only notes from Clew may change or be deleted.
+- **Checked** (Swift, §5; a pure function in ClewAgent over the notes as they are
+  when the answer arrives, not as they were sent). Add: `id` must be null; `about`,
+  `says` and `based_on` trimmed, each 1 character up to its cap, with no line break
+  (refused, not joined); no banned phrase in any of them (no title allows any, since a
+  note is kept); `says` not the same as another note's (ignoring case and spaces);
+  only below 40 notes. Change: the same text rules, a change is not compared with
+  itself, and its `id` must map to a note that still exists, is from Clew, and has not
+  changed since the request was sent. Delete: the same `id` rule; its text fields are
+  ignored. A change that fails is dropped, the debug log gets its code, and the job's
+  own output is still shown. The two are judged apart: a valid note change is kept
+  even when the job's own output fails (§5.5 then shows the job's plain failure).
+- **Yours are yours:** a note the person added or edited is *from you*. Clew never
+  changes or deletes it; it only reads it. Editing one of Clew's notes makes it yours
+  and clears its *based on*. The person's text is not checked.
+- **Shown at once** (*user*): a new or changed note appears in the list straight
+  away, with no question and nothing else in the menu.
+- **Kept** on this Mac in Application Support, in its own file, apart from Clew's
+  data: not facts, not in exports or backups. **Forget everything** clears all
+  notes, the events and the suggested step ids. Besides Clew deleting its own notes,
+  only the person's Delete and Forget everything remove notes.
+
+## 8. Settings › AI
+
+Nothing is sent until the person signs in. **One toggle, Use AI** (*user* 2026-11-22):
+on turns on every job and memory, off turns them all off; there are no per-job
+switches. Signing in turns it on. **Continue with ChatGPT** (then the account's email,
+**Sign out**, **Manage usage**), the model with "Using ChatGPT plan" (the person
+chooses it, *user*), **Use AI**, and **What Clew knows**: the notes, each with
+**Edit** and **Delete**, then **Add note** and **Forget everything**; it is shown
+whenever Clew is ready (§7) and, in any other state, while any notes are kept.
+Signing out turns Use AI off. The toggle says
+generally what it does, not each field sent (*user*). Non-secret settings (issued app
+id, host id, email, account id, model, the toggle, "Got it") are this Mac's
+preferences, not Clew's data, so they are not exported or backed up; the tokens are
+in the Keychain. The full text is in SPEC "Suggest steps" and "Memory".
+
+## 9. Debug log and evals
 
 - A debug build keeps a local log of each job: name, input size, model, time, outcome,
-  the failure code and OpenAI's request id. Never tokens, codes, ID token hints or any
+  the failure code, the note change's kind or its failure code, and OpenAI's request id. Never tokens, codes, ID token hints or any
   text sent or received. It is how prompts are tuned.
 - **Evals**: fixed inputs with expected *properties* (Suggest steps: 3–5 items, under
   the caps, the first short, none repeating an existing step, no banned words), run
   against the live model on request and against recorded answers in CI. Each must fail
   against a deliberately broken prompt or validator (AGENTS.md rule 1).
 
-## 9. Privacy
+## 10. Privacy
 
-- Off by default; nothing is sent until the person signs in (which turns Suggest steps
-  on; it has its own switch) and asks for suggestions.
-- Each job sends only the input it declares (§6), and Settings › AI says what that
-  is. A job that reads more (the calendar, past check-ins, goals, memory; §10) says
-  so in its own switch's line.
+- Off by default; nothing is sent until the person signs in (which turns Use AI on)
+  and a job runs (for now, only when they ask for suggestions).
+- Each job sends only the input it declares (§6) plus the notes and activity (§7).
+  Settings › AI says in general what AI does, not each field (*user* 2026-11-22);
+  SPEC and this file list them exactly.
 - Measuring helpfulness, if ever, from local behaviour only (suggestions added); no
   tracking (AGENTS.md rule 8).
 
-## 10. For later
+## 11. For later
 
 **Decided 2026-11-22 (*user*), each to be designed before it is built:**
 
 - **What jobs may read:** the calendar, past check-ins and ticks, goals, and the
-  memory below, as each job needs. Each job declares what it reads (§9).
-- **Memory, a main direction.** Clew keeps notes about the person across jobs, so its
-  feedback, plans and steps fit them better, and so the person can understand
-  themselves better. The notes are the agent's own, kept apart from the person's data
-  (rule 2 still holds: it never changes their tasks, ticks or goals). To design: what
-  a note is, how one is made, and how the person sees, corrects and deletes each note.
+  memory (§7), as each job needs. Each job declares what it reads (§10).
+- **Memory, a main direction:** designed in §7 (AI-M). Later: the calendar and
+  timeline as activity, and a daily pass if notes come too rarely.
 - **Emotional support:** maybe, not decided. If ever, within §1.4 and the support
   nudge's limits below.
 - **Other providers:** yes, behind ClewAI's `Provider` (§2): Apple's on-device model,
@@ -223,10 +299,10 @@ in SPEC "Suggest steps".
 The evening question (a pleasantness slider and "Which one felt best?", facts the
 person owns), the support nudge after a run of very unpleasant evenings (hard-coded,
 at most every 14 days), the Reader (one link's summary, kept apart from the person's
-data) and memory notes with a daily "dream". Each comes back as its own job when the
+data) and a daily "dream" pass for notes. Each comes back as its own job when the
 first jobs have earned their place.
 
-## 11. Decisions
+## 12. Decisions
 
 - **2026-11-22 (*user*)**: the person's ChatGPT plan through Sign in with ChatGPT, in
   Swift, replaces the bundled pi-agent-core helper: the spike passed in the sandbox,
@@ -236,10 +312,14 @@ first jobs have earned their place.
 - **2026-11-22**: the first job is Suggest steps (SPEC).
 - **2026-11-22 (*user*)**: no typing to Clew, at most choosing among options (§1.3);
   jobs may read the calendar, check-ins, goals and memory; memory is a main direction;
-  other providers will follow; emotional support is undecided (§10).
+  other providers will follow; emotional support is undecided (§11).
 - **2026-11-22**: the debug spike (`CLEW_CHATGPT_SPIKE`) was deleted when AI-1's real
   sign-in landed. Debug checks: `CLEW_AI_CHECK=1` (the app's AI with recorded answers)
   and `CLEW_AI_RENDER=1` (Settings › AI and the suggestions, light and dark).
+- **2026-11-22 (*user*)**: memory as notes only (no preferences, no kinds), editable
+  and addable by the person, shown at once, made inside the next job's answer, seen in
+  Settings › AI (§7–8); one **Use AI** toggle replaces per-job switches; the toggle does
+  not list what is sent; the person keeps choosing the model.
 - Superseded 2026-11-22: the bundled `clew-agent` helper, Codex OAuth reuse, the
-  monthly token cap (the plan's own limits apply), `AgentOutput` records (Suggest
-  steps keeps nothing).
+  monthly token cap (the plan's own limits apply), the Gateway's `AgentOutput` records
+  for AI-1 (Suggest steps keeps nothing; memory notes have their own file, §7).

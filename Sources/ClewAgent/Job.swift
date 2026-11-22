@@ -35,7 +35,7 @@ public struct JobFailure: Error, Equatable, Sendable {
     }
 }
 
-/// What the debug log keeps of one run (§8): never text sent or received, never a token.
+/// What the debug log keeps of one run (§9): never text sent or received, never a token.
 public struct JobRecord: Sendable, Equatable {
     public var job: String
     public var model: String
