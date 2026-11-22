@@ -1147,8 +1147,8 @@ stopped daily use, not adding features.
   - **A note:** what it is about (≤ 30 characters, like "Writing"), one line (≤ 100,
     "Goes better before noon"), from Clew or from you, and for Clew's notes what it is
     based on (≤ 100, "5 of 6 writing tasks ticked before 12"). At most 40.
-  - **Settings › AI › What Clew knows** (under Use AI; also while signed out, if any
-    notes are kept): one row per note, newest change first: the line, and in
+  - **Settings › AI › What Clew knows** (under Use AI while ready: signed in, plan
+    permission, eligible, Use AI on; in any other state, while any notes are kept): one row per note, newest change first: the line, and in
     secondary text "Writing · 5 of 6 writing tasks ticked before 12" (Clew's) or
     "Writing · Your note" (yours), with **Edit** ("Edit note <line>") and **Delete**
     ("Delete note <line>"), which deletes at once. Then **Add note** (disabled at 40,
@@ -1161,30 +1161,34 @@ stopped daily use, not adding features.
     and 100 characters, with **Cancel** and **Save** (Save needs a note line). Saving
     makes the note yours and drops its "based on". Your text is never checked or
     changed.
-  - **How notes are made** (after each job, *user*): only while signed in with plan
-    permission, eligible, and Use AI on, Clew records on this Mac what happens, with
-    the weekday and time of day (never a date): a task or step ticked, a rating, focus
-    time ended, a step added from a suggestion, suggestions dismissed, a suggested
-    step deleted later. Titles and step names are included only when the person typed
-    them: a fetched or imported title is recorded only as a link, a suggested step
-    only as "suggested". Unticking drops that tick's event if not yet sent. At most the
-    20 newest unsent events are kept. Each job's request sends all notes and these
-    events; its answer may add one note, or change or delete one of Clew's own. When
-    the answer completes, its events count as sent; a cancel, a timeout or a failure
-    keeps them. A task with a fetched or imported title sends no events and keeps no
-    note from that answer. No extra request is made. A new or changed note appears in
-    the list at once, with nothing in the menu.
+  - **How notes are made** (after each job, *user*): only while ready, Clew records
+    on this Mac what happens, with the weekday and time of day (never a date): the
+    person ticks a task or a step (not imports' own ticks), a rating, focus time
+    ended, a step added from a suggestion, suggestions dismissed, a suggested step
+    deleted later. Titles and step names are included only for a task whose title the
+    person typed; a step they added with + or Add all counts as theirs. An event for
+    a task with a fetched or imported title carries no text, only that it is a link.
+    Unticking drops that tick's unsent events; a new rating replaces an unsent one. At
+    most the 20 newest unsent events are kept. Each job's request sends all notes and
+    these events; its answer may add one note, or change or delete one of Clew's own.
+    When the answer completes, its events count as sent, even if nothing in it passes;
+    a cancel, a timeout or a failed request keeps them. A task with a fetched or
+    imported title sends no events and keeps no note from that answer. No extra request
+    is made. A new or changed note appears in the list at once, with nothing in the
+    menu.
   - **Checked before keeping** (Clew's notes only), against the notes as they are when
-    the answer arrives: about, line and based on each 1 to their cap; no banned words
-    in any of them (none allowed by any title); the line not the same as another note's
-    (ignoring case and spaces); adding only below 40; a note changed or deleted must
-    still exist, be Clew's, and be unchanged since the request was sent. A failing
-    change is dropped silently and the job's own result still shows. Signing out, Use AI
-    off or Forget everything while a request runs drops its note change.
+    the answer arrives: about, line and based on each 1 to their cap with no line
+    break; no banned words in any of them (none allowed by any title); the line not the
+    same as another note's (ignoring case and spaces); adding only below 40; a note
+    changed or deleted must still exist, be Clew's, and be unchanged since the request
+    was sent. A bad or missing note part, or a failing change, is dropped silently and
+    the job's own result still shows.
   - **Kept** in its own file on this Mac, apart from Clew's data: not in exports or
-    backups. Signing out turns Use AI off. Use AI off, signing out, OpenAI ending the
-    sign-in and "not eligible" stop the recording and clear what was recorded; the
-    notes stay. Only Delete and Forget everything remove them.
+    backups. Signing out turns Use AI off. Losing ready in any way (Use AI off, signing
+    out, OpenAI ending the sign-in, "not eligible", permission gone) stops the
+    recording, clears what was recorded and drops the note change of a request still
+    running; the notes stay. Besides Clew deleting its own, only Delete and Forget
+    everything remove notes.
 
 ## Open question
 

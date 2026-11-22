@@ -145,7 +145,8 @@ address or any page's content.
 
 ## 5. Validation (Swift, before anything is shown)
 
-1. The output decodes into the job's type; unknown fields are refused.
+1. The output decodes into the job's type; unknown fields are refused. The `note`
+   field is decoded on its own and never fails the job (§7).
 2. Length and count caps per job.
 3. Every item id exists and is in the job's allowed set.
 4. **Banned content**, as phrases so ordinary work words pass ("Check the failed
@@ -185,46 +186,53 @@ Settings › AI, edits any, adds their own and deletes any.
   (one line, ≤ 100: "Goes better before noon"), *from* (Clew or you), *based on*
   (Clew's notes only, ≤ 100: "5 of 6 writing tasks ticked before 12"), and when it
   was made and last changed. At most 40 notes.
-- **Recording** happens only while the person is signed in, has granted plan
-  permission, is not "not eligible", and Use AI is on. Signing out, OpenAI ending the
-  sign-in, "not eligible" and Use AI off each stop it and clear what was recorded;
-  the notes stay.
+- **Ready** means signed in, plan permission granted, not "not eligible", and Use
+  AI on. Jobs run and activity is recorded only while ready. Losing it in any way
+  (Use AI off, signing out, which also turns Use AI off, OpenAI ending the sign-in,
+  "not eligible", permission gone) clears what was recorded and drops the note change
+  of any request still running; the notes stay.
 - **Activity events**, each with the weekday and the time of day (`HH:mm`, never a
-  date): a task ticked; a step ticked; a rating (1–5); focus time ended (minutes); a
-  step added from a suggestion; suggestions dismissed (how many); a step added from a
-  suggestion deleted later. Each names its task's title, and a step event its step's
-  name, **only if the person typed that text**: a fetched or imported task title is
-  sent as `"link": true` with no title, and a step that came from a suggestion is
-  sent as `"suggested": true` with no name (§4: text the person did not type never
-  shapes anything kept). Clew remembers which step ids came from suggestions (up to
-  200, cleared with the activity). Unticking drops that tick's event if it is not yet
-  sent. At most the 20 newest unsent events are kept; older ones are dropped. The
-  calendar and the timeline wait for the jobs that need them.
+  date): the person ticks a task or a step (imports' own ticks, such as a Watch Later
+  scan, are not recorded); a rating (1–5); focus time ended (minutes); a step added
+  from a suggestion; suggestions dismissed (how many); a step added from a suggestion
+  deleted later. An event names its task's title, and a step event its step's name,
+  only for a task whose title the person typed. For a task with a fetched or imported
+  title it carries no text at all, only `"link": true` (§4: text the person did not
+  type never shapes anything kept). A step the person added with + or Add all on a
+  typed task counts as theirs, like the task itself (rule 2: only their tap writes);
+  on a link task it is never sent as activity. Clew remembers which step ids came
+  from suggestions (up to 200, cleared with the activity), only to record the last
+  two kinds. Unticking drops that tick's events (tick and rating) if not yet sent, and
+  a new rating replaces an unsent one for the same tick. At most the 20 newest unsent
+  events are kept; older ones are dropped. The calendar and the timeline wait for the
+  jobs that need them.
 - **Made after each job** (*user*): every job's request carries all notes (with
   short ids `n1`…`n40` for this request only, mapped back by Swift) and the kept
   events, newest first. Every answer has a `note` field beside its own output: `null`,
-  or one change `{"action": "add" | "change" | "delete", "id": string | null, "about",
-  "says", "based_on"}`, every field required as OpenAI's strict mode needs (`id`
-  null for add; `about`, `says`, `based_on` ignored for delete). No extra request.
-  When an answer **completes** (`response.completed`), the events it carried are done
-  with, whether or not its note or its own output passes; a cancel, a timeout or any
-  failure keeps them for the next job. A job whose input carries an untrusted field
-  sends no events (they wait) and its note change is ignored. A long gap is fine: a
-  note is about the person, not one task.
+  or one change `{"action": "add" | "change" | "delete", "id": string | null, "about":
+  string, "says": string, "based_on": string}`, every field required as OpenAI's
+  strict mode needs. `note` is decoded on its own: a missing or malformed `note` (an
+  unknown action or field, a wrong type) drops only the note (code `noteSchema`),
+  and the job's own output is judged as usual. No extra request. When an answer
+  **completes** (`response.completed`), the events it carried count as sent, even if
+  nothing in it passes; a cancel, a timeout or a failed request keeps them for the
+  next job. A job whose input carries an untrusted field sends no events (they wait)
+  and its note change is ignored. A long gap is fine: a note is about the person,
+  not one task.
 - **Instructions** every job adds: notes are what Clew knows about the person, to be
   used; a note change is optional and rare, a short pattern in how this person works,
   drawn from the activity; never a judgement, a diagnosis, a comparison with anyone or
   advice; only notes from Clew may change or be deleted.
 - **Checked** (Swift, §5; a pure function in ClewAgent over the notes as they are
-  when the answer arrives, not as they were sent): for add and change, `about`,
-  `says` and `based_on` trimmed and each 1 character up to its cap; no banned phrase
-  in any of them (no title allows any, since a note is kept); `says` not the same as
-  another note's (ignoring case and spaces; a change is not compared with itself);
-  add only below 40. For change and delete: the id maps to a note that still exists,
-  is from Clew, and has not changed since the request was sent. A note change that
-  fails is dropped, the debug log gets its code, and the job's own output is still
-  shown. Signing out, Use AI off or Forget everything while a request runs drops its
-  note change.
+  when the answer arrives, not as they were sent). Add: `id` must be null; `about`,
+  `says` and `based_on` trimmed, each 1 character up to its cap, with no line break
+  (refused, not joined); no banned phrase in any of them (no title allows any, since a
+  note is kept); `says` not the same as another note's (ignoring case and spaces);
+  only below 40 notes. Change: the same text rules, a change is not compared with
+  itself, and its `id` must map to a note that still exists, is from Clew, and has not
+  changed since the request was sent. Delete: the same `id` rule; its text fields are
+  ignored. A change that fails is dropped, the debug log gets its code, and the job's
+  own output is still shown.
 - **Yours are yours:** a note the person added or edited is *from you*. Clew never
   changes or deletes it; it only reads it. Editing one of Clew's notes makes it yours
   and clears its *based on*. The person's text is not checked.
@@ -232,8 +240,8 @@ Settings › AI, edits any, adds their own and deletes any.
   away, with no question and nothing else in the menu.
 - **Kept** on this Mac in Application Support, in its own file, apart from Clew's
   data: not facts, not in exports or backups. **Forget everything** clears all
-  notes, the events and the suggested step ids. Only Delete and Forget everything
-  remove notes.
+  notes, the events and the suggested step ids. Besides Clew deleting its own notes,
+  only the person's Delete and Forget everything remove notes.
 
 ## 8. Settings › AI
 
@@ -242,8 +250,9 @@ on turns on every job and memory, off turns them all off; there are no per-job
 switches. Signing in turns it on. **Continue with ChatGPT** (then the account's email,
 **Sign out**, **Manage usage**), the model with "Using ChatGPT plan" (the person
 chooses it, *user*), **Use AI**, and **What Clew knows**: the notes, each with
-**Edit** and **Delete**, then **Add note** and **Forget everything** (shown signed out
-too while any notes are kept). Signing out turns Use AI off. The toggle says
+**Edit** and **Delete**, then **Add note** and **Forget everything**; it is shown
+whenever Clew is ready (§7) and, in any other state, while any notes are kept.
+Signing out turns Use AI off. The toggle says
 generally what it does, not each field sent (*user*). Non-secret settings (issued app
 id, host id, email, account id, model, the toggle, "Got it") are this Mac's
 preferences, not Clew's data, so they are not exported or backed up; the tokens are
