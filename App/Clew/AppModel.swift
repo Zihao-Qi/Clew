@@ -414,7 +414,8 @@ final class AppModel {
             if Clew.hintsRatingAfterTick(row.item) { offerRating(itemId: row.id) }
         } else {
             let last = row.lastTickToday?.id
-            if run({ try $0.undoToday(itemId: row.id) }) { ai?.untick(last) }
+            var undone: CheckIn?
+            if run({ undone = try $0.undoToday(itemId: row.id) }), undone != nil { ai?.untick(last) }
             if ratingPrompt?.itemId == row.id { ratingPrompt = nil }
         }
     }
@@ -773,7 +774,8 @@ final class AppModel {
 
     func undo(_ row: TodayRow) {
         let last = row.lastTickToday?.id
-        if run({ try $0.undoToday(itemId: row.id) }) { ai?.untick(last) }
+        var undone: CheckIn?
+        if run({ undone = try $0.undoToday(itemId: row.id) }), undone != nil { ai?.untick(last) }
         if ratingPrompt?.itemId == row.id { ratingPrompt = nil }
     }
 
