@@ -39,7 +39,8 @@ import Testing
             == ["Open the slides", "Write the opening", "Time it", "Practise once", "Rest"])
         #expect(kept(["  Spaces around  "]) == ["Spaces around"])
         // To-do items: no final period, but an ellipsis stays.
-        #expect(kept(["Set a budget.", "Ask Sam…", "Wait..."]) == ["Set a budget", "Ask Sam…", "Wait..."])
+        #expect(kept(["Set a budget.", "Ask Sam…", "Wait...", "订机票。"]) == ["Set a budget", "Ask Sam…", "Wait...", "订机票"])
+        #expect(refused(#"{"steps":["1.","."," 2. "]}"#) == [.empty, .none])
         #expect(kept(["10 minutes of notes"]) == ["10 minutes of notes"])   // a number is not a list marker
         #expect(kept(["1.5 hours of reading", "-10% on the slides"]) == ["1.5 hours of reading", "-10% on the slides"])
     }

@@ -125,7 +125,9 @@ streamed answer in 3.0 s. No helper process, no JavaScript.
   and `invalid_client` are bugs (debug log, plain failure).
 - **OpenAI's interface rules**: a **Continue with ChatGPT** button; the first time the
   person signs in, "You're using your ChatGPT plan" with **Got it**; "Using ChatGPT
-  plan" beside the model choice (not under suggestions in the menu, *user* 2026-11-22); **Manage usage** links to
+  plan" near the model selector (OpenAI: "near the composer or model selector"; Clew
+  has no composer, so Settings › AI beside the model; not under suggestions, *user*
+  2026-11-22); **Manage usage** links to
   chatgpt.com/settings/usage; "ChatGPT usage limit reached" when it is.
 - It is a **preview** at OpenAI: details may change. Everything above sits in ClewAI,
   so a change stays there.
