@@ -52,6 +52,11 @@ struct ClewApp: App {
             Snapshot.startEventTest()
             return
         }
+        if ProcessInfo.processInfo.environment["CLEW_EVENTKIT_UNDO_TEST"] != nil {
+            _model = State(initialValue: AppModel(clew: nil, notify: false))
+            Snapshot.startEventUndoCheck()
+            return
+        }
         if ProcessInfo.processInfo.environment["CLEW_STEPS_RENDER"] != nil {
             Snapshot.renderStepsAndExit()
         }

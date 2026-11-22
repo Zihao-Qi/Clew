@@ -32,6 +32,10 @@ enum EventSpan { case thisEvent, futureEvents }
 final class EventKitCalendar: CalendarReading {
     private let store = EKEventStore()
     private var observer: NSObjectProtocol?
+    #if DEBUG
+    /// The live check (CLEW_EVENTKIT_UNDO_TEST) sets up and removes its own calendar here.
+    var storeForCheck: EKEventStore { store }
+    #endif
 
     var access: CalendarAccess {
         switch EKEventStore.authorizationStatus(for: .event) {
@@ -85,13 +89,23 @@ final class EventKitCalendar: CalendarReading {
         e.title = title
         e.startDate = start
         e.endDate = end
+        let series = e.calendarItemIdentifier
+        let calendarId = e.calendar.calendarIdentifier
         do {
             try store.save(e, span: span == .futureEvents ? .futureEvents : .thisEvent, commit: true)
         } catch {
             store.reset()           // the refused change is not kept in memory either
             return nil
         }
-        return Self.id(e, start: e.startDate)
+        // Read back as saved: "All future events" splits the series, and the changed
+        // occurrence may now belong to a new one, so the handle's id can be stale (Undo
+        // then found nothing). The same calendar, times and title; its old series first.
+        let saved = store.events(matching: store.predicateForEvents(withStart: start.addingTimeInterval(-1),
+                                                                    end: end.addingTimeInterval(1), calendars: nil))
+            .filter { $0.calendar.calendarIdentifier == calendarId && $0.startDate == start && $0.endDate == end
+                      && ($0.title ?? "") == title }
+            .sorted { a, _ in a.calendarItemIdentifier == series }
+        return saved.first.map { Self.id($0, start: start) } ?? Self.id(e, start: e.startDate)
     }
 
     /// The occurrence `event` was read from, by its series and its start.

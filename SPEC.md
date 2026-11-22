@@ -893,6 +893,11 @@ stopped daily use, not adding features.
       the rollover put it back.
     - Each change shows "Moved “Standup” · Undo" (or "Changed …") for a few seconds;
       Undo puts back its title and times, with the same choice for a repeating one.
+      After "All future events" Calendar splits the series in two; Clew reads the changed
+      event back as saved, so Undo finds it in the new series (2026-11-21; checked live on
+      an On My Mac calendar, where the split keeps the event's handle current anyway; an
+      iCloud or Google calendar is not checked). Undo leaves the series split, with the
+      old times: the events are as before.
     - A task cannot be made by double-clicking or dragging on such an event: make it
       beside it, or elsewhere, and drag its block there (*user*, 2026-11-19).
     - If Calendar refuses (the event was changed or deleted elsewhere), nothing changes
