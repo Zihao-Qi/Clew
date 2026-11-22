@@ -298,6 +298,14 @@ final class AIModel {
         memory.suggested(step)
     }
 
+    /// An answer in "What Clew noticed" (AI-N): only while ready, and only if the note is
+    /// still exactly as shown. True confirms it, Not really deletes it; both are recorded.
+    func answer(_ shown: Note, true yes: Bool) {
+        guard isReady, memory.notes.first(where: { $0.id == shown.id }) == shown else { return }
+        if yes { memory.confirm(shown.id) } else { memory.delete(shown.id) }
+        memory.record(ActivityEvent.answered(shown, true: yes, at: Date(), calendar: .current))
+    }
+
     /// Forget everything: notes, events, suggested step ids, and a running request's note.
     func forgetEverything() {
         jobGeneration += 1

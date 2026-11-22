@@ -223,4 +223,47 @@ import Testing
         let added = Memory.added(about: String(repeating: "a", count: 40), says: "Likes a streak", now: t0)
         #expect(added.from == .you && added.about.count == 30 && added.says == "Likes a streak")
     }
+
+    // MARK: What Clew noticed (AI-N)
+
+    @Test func noticedShowsClewsUnansweredNotesNewestFirst() {
+        func at(_ n: Note, _ minutes: Double) -> Note { var n = n; n.changed = t0.addingTimeInterval(minutes * 60); return n }
+        var confirmed = at(clew("Confirmed"), 9)
+        confirmed.confirmed = t0
+        let mine = at(yours("Mine"), 8)
+        let notes = [at(clew("Old"), 1), confirmed, mine, at(clew("Newest"), 7), at(clew("Middle"), 4), at(clew("Second"), 6)]
+        #expect(Memory.noticed(notes).map(\.says) == ["Newest", "Second", "Middle"])
+        #expect(Memory.noticed([mine, confirmed]).isEmpty)
+    }
+
+    @Test func aConfirmedNoteIsNeverChangedByClewAndAnEditClearsIt() throws {
+        var note = clew("Goes better before noon")
+        note.confirmed = t0
+        let sent = ["n1": note]
+        #expect(Memory.apply(ProposedNote(change: change(.change, "n1"), sent: sent), to: [note], now: t0) == .failure(.noteTarget))
+        #expect(Memory.apply(ProposedNote(change: change(.delete, "n1"), sent: sent), to: [note], now: t0) == .failure(.noteTarget))
+        let edited = Memory.edited(note, about: "Writing", says: "Before 10", now: t0)
+        #expect(edited.confirmed == nil && edited.from == .you)
+    }
+
+    @Test func confirmedNotesAreSentAsConfirmed() async throws {
+        var yes = clew("Goes better before noon")
+        yes.confirmed = t0
+        let provider = Scripted(events: [.text(#"{"steps":["Open it"],"note":null}"#), .done])
+        _ = await Agent.run(SuggestSteps(), input: input, memory: MemoryContext(notes: [yes, clew("Other")], events: []),
+                            model: "m", provider: provider)
+        let sent = try #require(JSONSerialization.jsonObject(with: Data(provider.calls.requests[0].input.utf8)) as? [String: Any])
+        let notes = try #require((sent["memory"] as? [String: Any])?["notes"] as? [[String: Any]])
+        #expect(notes[0]["confirmed"] as? Bool == true && notes[1]["confirmed"] == nil)
+        #expect(Memory.instructions.contains("confirmed") && Memory.instructions.contains("noteRejected"))
+    }
+
+    @Test func anAnswerIsRecordedWithTheNotesLineOnly() {
+        let note = clew("Goes better before noon")
+        let yes = ActivityEvent.answered(note, true: true, at: t0, calendar: utc)
+        let no = ActivityEvent.answered(note, true: false, at: t0, calendar: utc)
+        #expect(yes.kind == .noteConfirmed && no.kind == .noteRejected)
+        #expect(Set(sentJSON(yes).keys) == ["kind", "weekday", "time", "note"])
+        #expect(sentJSON(no)["note"] as? String == "Goes better before noon" && sentJSON(no)["kind"] as? String == "noteRejected")
+    }
 }

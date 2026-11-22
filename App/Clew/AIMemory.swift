@@ -50,6 +50,13 @@ final class MemoryBook {
         save()
     }
 
+    /// True in "What Clew noticed": stays Clew's, and Clew never changes it again.
+    func confirm(_ id: UUID) {
+        guard let i = notes.firstIndex(where: { $0.id == id }) else { return }
+        notes[i].confirmed = Date()
+        save()
+    }
+
     func delete(_ id: UUID) {
         notes.removeAll { $0.id == id }
         save()

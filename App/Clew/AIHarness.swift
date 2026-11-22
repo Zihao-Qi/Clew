@@ -194,6 +194,51 @@ extension Snapshot {
                 let off = testAI(MemorySession.signedIn(plan: false), RecordedAI(), "noplan")
                 model.useAI(off)
                 report("no ✨ without the plan permission", !model.canSuggestSteps(talk))
+
+                // What Clew noticed (SPEC, AI-N): in last week's card, True / Not really.
+                @MainActor func noticing() throws -> (AppModel, AIModel) {
+                    let c = Clew(store: try SQLiteStore.inMemory(), clock: SystemClock(), zones: SystemTimeZone())
+                    let m = AppModel(clew: c, notify: false)
+                    let a = testAI(MemorySession.signedIn(), RecordedAI(), "noticed")
+                    m.useAI(a)
+                    a.memory.add(about: "Mornings", says: "Mine")
+                    for (i, says) in ["Oldest", "Older", "Newer", "Newest"].enumerated() {
+                        if case .success(let notes) = Memory.apply(ProposedNote(change: NoteChange(
+                            action: .add, id: nil, about: "Work", says: says, basedOn: "seen"), sent: [:]),
+                            to: a.memory.notes, now: Date().addingTimeInterval(Double(i))) { a.memory.replace(notes) }
+                    }
+                    return (m, a)
+                }
+                let (week, noting) = try noticing()
+                week.menuOpened(onList: true)
+                report("a card with only Clew's three newest unanswered notes",
+                       week.showsWeekCard && week.weekCard == nil
+                       && week.noticedShown.map(\.says) == ["Newest", "Newer", "Older"])
+                week.answerNoticed(week.noticedShown[0], true: true)
+                report("True confirms it, keeps it, records it, and the row leaves",
+                       noting.memory.notes.first { $0.says == "Newest" }?.confirmed != nil
+                       && noting.memory.activity.newestFirst.first?.kind == .noteConfirmed
+                       && noting.memory.activity.newestFirst.first?.note == "Newest"
+                       && week.noticedShown.map(\.says) == ["Newer", "Older"])
+                week.answerNoticed(week.noticedShown[0], true: false)
+                report("Not really deletes it and records it",
+                       !noting.memory.notes.contains { $0.says == "Newer" }
+                       && noting.memory.activity.newestFirst.first?.kind == .noteRejected
+                       && week.noticedShown.map(\.says) == ["Older"])
+                let older = week.noticedShown[0]
+                noting.memory.edit(older.id, about: "Work", says: "Older, edited")
+                week.answerNoticed(older, true: false)
+                report("an answer to a note changed meanwhile does nothing; no refill; the empty card closes",
+                       noting.memory.notes.contains { $0.says == "Older, edited" } && !week.showsWeekCard
+                       && noting.memory.activity.events.count == 2)
+                week.menuClosed()
+                week.menuOpened(onList: true)
+                report("once a week", !week.showsWeekCard)
+                let (lost, losing) = try noticing()
+                lost.menuOpened(onList: true)
+                let had = lost.showsWeekCard
+                losing.useAI = false
+                report("losing ready removes the section and the notes-only card", had && !lost.showsWeekCard)
             } catch {
                 report("setup: \(error)", false)
             }
@@ -252,6 +297,21 @@ extension Snapshot {
                            to: dir.appendingPathComponent("ai-settings-notes-\(look).png"))
                     render(NoteEditor(draft: NoteDraft(known.memory.shown.first), save: { _, _ in }, cancel: {}),
                            appearance: appearance, to: dir.appendingPathComponent("ai-note-editor-\(look).png"))
+                }
+                // What Clew noticed in last week's card, with and without last week's lines.
+                known.memory.confirm(known.memory.notes.first { $0.says == "Goes better before noon" }!.id)
+                let notes = [Note(id: UUID(), about: "Writing", says: "Goes better before noon", from: .clew, made: Date(), changed: Date()),
+                             Note(id: UUID(), about: "Steps", says: "Usually keeps three suggested steps, and adds the rest later by hand",
+                                  from: .clew, made: Date(), changed: Date())]
+                let recap = WeekRecap(weekStart: LocalDay(string: "2026-11-16")!, done: 23, focusMinutes: 200, watched: 4,
+                                      read: nil, highlights: [])
+                for (look, appearance) in looks {
+                    render(WeekCardView(recap: nil, noticed: notes, onClose: {}).frame(width: 340), appearance: appearance,
+                           to: dir.appendingPathComponent("ai-noticed-notes-only-\(look).png"))
+                    render(WeekCardView(recap: recap, noticed: notes, onClose: {}).frame(width: 340), appearance: appearance,
+                           to: dir.appendingPathComponent("ai-noticed-card-\(look).png"))
+                    render(AISettings(ai: known).formStyleGrouped().frame(width: 550), appearance: appearance,
+                           to: dir.appendingPathComponent("ai-settings-confirmed-\(look).png"))
                 }
                 let ai = testAI(MemorySession.signedIn(), RecordedAI(), "render-line")
                 await ai.refreshModels()

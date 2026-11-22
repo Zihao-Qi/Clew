@@ -16,19 +16,30 @@ extension Clew {
     /// The card for the menu: last week's recap, unless the switch is off or the card
     /// was already shown this week. Reads the clock once.
     public func weekCard() throws -> WeekRecap? {
+        try weekCardDue()?.recap
+    }
+
+    /// Whether the menu's card may show this opening (the switch on, not yet shown this
+    /// week): last week's Monday, and its recap when anything shows. A nil recap still
+    /// lets the app show Clew's unanswered notes alone (SPEC "What Clew noticed").
+    public func weekCardDue() throws -> (lastWeek: LocalDay, recap: WeekRecap?)? {
         let today = currentDay()
         guard try weekCardOn() else { return nil }
         let shown = try storeForQueries.read { try $0.setting(Self.weekCardShownKey) }
         // Equality, not "on or after": a clock set back never hides another week's card.
         if shown == "\"\(today.weekStart.description)\"" { return nil }
-        return try recap(today: today)
+        return (today.weekStart.adding(days: -7), try recap(today: today))
     }
 
     /// The card was shown: not again in the week it was shown in (the week after the
     /// recap's).
     public func markWeekCardShown(_ recap: WeekRecap) throws {
+        try markWeekCardShown(lastWeek: recap.weekStart)
+    }
+
+    public func markWeekCardShown(lastWeek: LocalDay) throws {
         let now = clockForQueries.now()
-        let week = recap.weekStart.adding(days: 7).description
+        let week = lastWeek.adding(days: 7).description
         try storeForQueries.write { try $0.saveSetting(Self.weekCardShownKey, json: "\"\(week)\"", updatedAt: now) }
     }
 

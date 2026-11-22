@@ -45,6 +45,8 @@ struct AISettings: View {
                         Group {
                             if note.from == .you {
                                 if note.about.isEmpty { Text("Your note") } else { Text("\(note.about) · Your note") }
+                            } else if note.confirmed != nil {
+                                if note.about.isEmpty { Text("You confirmed") } else { Text("\(note.about) · You confirmed") }
                             } else if note.about.isEmpty {
                                 Text(verbatim: note.basedOn ?? "")
                             } else {

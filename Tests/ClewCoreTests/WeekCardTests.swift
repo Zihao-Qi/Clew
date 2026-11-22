@@ -54,6 +54,20 @@ private func local(_ d: Int, _ h: Int, _ m: Int = 0) -> Date {
         #expect(try clew.weekCard()?.weekStart == LocalDay(string: "2026-11-02")!)
     }
 
+    /// SPEC "What Clew noticed": a week with nothing done is still due, without a recap,
+    /// so Clew's notes may bring the card alone; shown or off, it is not due.
+    @Test func aWeekWithNothingDoneIsStillDueWithoutARecap() throws {
+        clock.set(local(16, 9))
+        let due = try #require(try clew.weekCardDue())
+        #expect(due.lastWeek == LocalDay(string: "2026-11-09")! && due.recap == nil)
+        try clew.markWeekCardShown(lastWeek: due.lastWeek)
+        #expect(try clew.weekCardDue() == nil)
+        clock.set(local(23, 9))
+        #expect(try clew.weekCardDue()?.lastWeek == LocalDay(string: "2026-11-16")!)
+        try clew.setWeekCardOn(false)
+        #expect(try clew.weekCardDue() == nil)
+    }
+
     @Test func theSwitchTurnsOffOnlyTheMenuCard() throws {
         let id = try clew.addItem(NewItem(title: "write", shape: .today)).id
         _ = try clew.checkIn(itemId: id)

@@ -72,7 +72,7 @@ struct TodayListView: View {
     /// and the footer.
     private var rowsLimit: CGFloat {
         let screen = NSScreen.main?.visibleFrame.height ?? 800
-        let card = model.weekCard == nil ? 0 : weekCardHeight
+        let card = model.showsWeekCard ? weekCardHeight : 0
         return max(160, screen - card - (showsTimeline ? TimelineMetrics.height : 0) - 170)
     }
 
@@ -564,8 +564,9 @@ struct TodayListView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Last week's card (SPEC 2026-11-15): the very top, above the timeline.
-            if let recap = model.weekCard {
-                WeekCardView(recap: recap) { model.dropWeekCard() }
+            if model.showsWeekCard {
+                WeekCardView(recap: model.weekCard, noticed: model.noticedShown,
+                             answer: { model.answerNoticed($0, true: $1) }) { model.dropWeekCard() }
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { weekCardHeight = $0 }
             }
             if showsTimeline, let day = model.timeline {

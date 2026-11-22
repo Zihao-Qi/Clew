@@ -1,3 +1,4 @@
+import ClewAgent
 import ClewDomain
 import SwiftUI
 
@@ -55,42 +56,90 @@ struct WeekHighlights: View {
 }
 
 /// Last week's card at the very top of the menu: shown once a week, for one opening.
+/// With AI ready, "What Clew noticed" below its lines (SPEC, AI-N); a card may hold
+/// only that section when last week has nothing to show.
 struct WeekCardView: View {
-    let recap: WeekRecap
+    let recap: WeekRecap?
+    var noticed: [Note] = []
+    var answer: (Note, Bool) -> Void = { _, _ in }
     let onClose: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Last week")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                if let main = WeekRecapText.main(recap) {
-                    Text(verbatim: main).monospacedDigit()
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Last week")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    if let recap {
+                        if let main = WeekRecapText.main(recap) {
+                            Text(verbatim: main).monospacedDigit()
+                        }
+                        if let lists = WeekRecapText.collections(recap) {
+                            Text(verbatim: lists).monospacedDigit()
+                        }
+                        if !recap.highlights.isEmpty {
+                            WeekHighlights(highlights: recap.highlights)
+                        }
+                    }
                 }
-                if let lists = WeekRecapText.collections(recap) {
-                    Text(verbatim: lists).monospacedDigit()
+                .font(.callout)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(recap.map { Text(verbatim: WeekRecapText.spoken($0)) } ?? Text("Last week"))
+                Button(action: onClose) {
+                    Image(systemName: "xmark").imageScale(.small)
                 }
-                if !recap.highlights.isEmpty {
-                    WeekHighlights(highlights: recap.highlights)
-                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .help(Text("Close last week's card"))
+                .accessibilityLabel(Text("Close last week's card"))
             }
-            .font(.callout)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(Text(verbatim: WeekRecapText.spoken(recap)))
-            Button(action: onClose) {
-                Image(systemName: "xmark").imageScale(.small)
+            if !noticed.isEmpty {
+                NoticedSection(notes: noticed, answer: answer)
             }
-            .buttonStyle(.borderless)
-            .foregroundStyle(.secondary)
-            .help(Text("Close last week's card"))
-            .accessibilityLabel(Text("Close last week's card"))
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05)))
         .padding(.horizontal, 8)
         .padding(.top, 8)
+    }
+}
+
+/// "Clew noticed": up to 3 of Clew's notes, each with True and Not really. Choosing only.
+struct NoticedSection: View {
+    let notes: [Note]
+    let answer: (Note, Bool) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("Clew noticed")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .accessibilityAddTraits(.isHeader)
+            ForEach(notes) { note in
+                VStack(alignment: .leading, spacing: 3) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(verbatim: note.says)
+                            .font(.callout)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if !note.about.isEmpty {
+                            Text(verbatim: note.about).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                    HStack(spacing: 12) {
+                        Button("True") { answer(note, true) }
+                            .accessibilityLabel(Text("True: \(note.says)"))
+                        Button("Not really") { answer(note, false) }
+                            .accessibilityLabel(Text("Not really: \(note.says)"))
+                    }
+                    .buttonStyle(.borderless)
+                    .font(.caption)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
     }
 }
