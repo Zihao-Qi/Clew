@@ -146,7 +146,8 @@ address or any page's content.
 ## 5. Validation (Swift, before anything is shown)
 
 1. The output decodes into the job's type; unknown fields are refused. The `note`
-   field is decoded on its own and never fails the job (§7).
+   field is decoded and checked on its own: it never fails the job, and a failing job
+   does not drop a valid note change (§7).
 2. Length and count caps per job.
 3. Every item id exists and is in the job's allowed set.
 4. **Banned content**, as phrases so ordinary work words pass ("Check the failed
@@ -190,7 +191,8 @@ Settings › AI, edits any, adds their own and deletes any.
   AI on. Jobs run and activity is recorded only while ready. Losing it in any way
   (Use AI off, signing out, which also turns Use AI off, OpenAI ending the sign-in,
   "not eligible", permission gone) clears what was recorded and drops the note change
-  of any request still running; the notes stay.
+  of any request still running; the notes stay. **Forget everything** drops it too.
+  ✨ and every job's button appear only while ready.
 - **Activity events**, each with the weekday and the time of day (`HH:mm`, never a
   date): the person ticks a task or a step (imports' own ticks, such as a Watch Later
   scan, are not recorded); a rating (1–5); focus time ended (minutes); a step added
@@ -200,9 +202,9 @@ Settings › AI, edits any, adds their own and deletes any.
   title it carries no text at all, only `"link": true` (§4: text the person did not
   type never shapes anything kept). A step the person added with + or Add all on a
   typed task counts as theirs, like the task itself (rule 2: only their tap writes);
-  on a link task it is never sent as activity. Clew remembers which step ids came
-  from suggestions (up to 200, cleared with the activity), only to record the last
-  two kinds. Unticking drops that tick's events (tick and rating) if not yet sent, and
+  on a task with a fetched or imported title, its events carry no text, as above.
+  Clew remembers which step ids came from suggestions (up to 200, cleared with the
+  activity), only to notice when such a step is deleted. Unticking drops that tick's events (tick and rating) if not yet sent, and
   a new rating replaces an unsent one for the same tick. At most the 20 newest unsent
   events are kept; older ones are dropped. The calendar and the timeline wait for the
   jobs that need them.
@@ -232,7 +234,8 @@ Settings › AI, edits any, adds their own and deletes any.
   itself, and its `id` must map to a note that still exists, is from Clew, and has not
   changed since the request was sent. Delete: the same `id` rule; its text fields are
   ignored. A change that fails is dropped, the debug log gets its code, and the job's
-  own output is still shown.
+  own output is still shown. The two are judged apart: a valid note change is kept
+  even when the job's own output fails (§5.5 then shows the job's plain failure).
 - **Yours are yours:** a note the person added or edited is *from you*. Clew never
   changes or deletes it; it only reads it. Editing one of Clew's notes makes it yours
   and clears its *based on*. The person's text is not checked.

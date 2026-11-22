@@ -1097,7 +1097,8 @@ stopped daily use, not adding features.
     again to use AI." with **Sign in again**. A sign-out OpenAI could not confirm: "Clew
     couldn't confirm the sign-out with OpenAI. To be sure, disconnect Clew in ChatGPT's
     settings." All of this text, OpenAI's included, is in the String Catalog.
-  - **Where:** only while signed in, Use AI on, and a step can be added (a one-off
+  - **Where:** only while ready (signed in with plan permission, eligible, Use AI on;
+    see "Memory") and a step can be added (a one-off
     task, not done). In Add Step…'s line, a small ✨ button at its right end ("Suggest
     steps" to VoiceOver); in the details, **Suggest Steps** beside **Add Step**. A
     "Suggest steps" VoiceOver action on the task's row opens Add Step…'s line and asks.
@@ -1182,12 +1183,14 @@ stopped daily use, not adding features.
     same as another note's (ignoring case and spaces); adding only below 40; a note
     changed or deleted must still exist, be Clew's, and be unchanged since the request
     was sent. A bad or missing note part, or a failing change, is dropped silently and
-    the job's own result still shows.
+    the job's own result still shows; a valid note change is kept even when the
+    suggestions fail.
   - **Kept** in its own file on this Mac, apart from Clew's data: not in exports or
     backups. Signing out turns Use AI off. Losing ready in any way (Use AI off, signing
     out, OpenAI ending the sign-in, "not eligible", permission gone) stops the
     recording, clears what was recorded and drops the note change of a request still
-    running; the notes stay. Besides Clew deleting its own, only Delete and Forget
+    running; the notes stay. Forget everything also drops a running request's note
+    change. Besides Clew deleting its own, only Delete and Forget
     everything remove notes.
 
 ## Open question
