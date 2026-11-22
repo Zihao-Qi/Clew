@@ -17,6 +17,8 @@ enum ChatGPTSpike {
     static let api = "https://api.openai.com/v1"
     static let redirect = "http://127.0.0.1:1455/auth/callback"
     @MainActor static let defaults = UserDefaults(suiteName: "clew-chatgpt-spike")!
+    /// No cache, no cookies (review).
+    static let session = URLSession(configuration: .ephemeral)
 
     static func start() {
         Task { @MainActor in
@@ -91,12 +93,12 @@ enum ChatGPTSpike {
         exchange.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         exchange.httpBody = form(["grant_type": "authorization_code", "client_id": clientId, "code": code,
                                   "code_verifier": verifier, "redirect_uri": redirect, "resource": api])
-        let (tokenData, tokenResponse) = try await URLSession.shared.data(for: exchange)
+        let (tokenData, tokenResponse) = try await session.data(for: exchange)
         guard (tokenResponse as? HTTPURLResponse)?.statusCode == 200,
               let tokens = try JSONSerialization.jsonObject(with: tokenData) as? [String: Any],
               let access = tokens["access_token"] as? String else {
-            throw Failure("token exchange: HTTP \((tokenResponse as? HTTPURLResponse)?.statusCode ?? 0) "
-                          + (String(data: tokenData, encoding: .utf8)?.prefix(200).description ?? ""))
+            // Only the status: the body may hold tokens (review).
+            throw Failure("token exchange: HTTP \((tokenResponse as? HTTPURLResponse)?.statusCode ?? 0)")
         }
         let scopes = (tokens["scope"] as? String ?? "").split(separator: " ").map(String.init)
         print(scopes.contains("chatgpt.tokens.use.direct") ? "PASS" : "FAIL", "plan permission granted; scopes:",
@@ -106,7 +108,7 @@ enum ChatGPTSpike {
         // The models this plan can use.
         var models = URLRequest(url: URL(string: api + "/models")!)
         models.setValue("Bearer \(access)", forHTTPHeaderField: "Authorization")
-        let (modelData, modelResponse) = try await URLSession.shared.data(for: models)
+        let (modelData, modelResponse) = try await session.data(for: models)
         let listed = ((try? JSONSerialization.jsonObject(with: modelData) as? [String: Any])?["models"] as? [[String: Any]] ?? [])
             .filter { $0["visibility"] as? String == "list" }
         let slugs = listed.compactMap { $0["slug"] as? String }
@@ -130,7 +132,7 @@ enum ChatGPTSpike {
             "stream": true,
         ])
         let started = Date()
-        let (bytes, askResponse) = try await URLSession.shared.bytes(for: ask)
+        let (bytes, askResponse) = try await session.bytes(for: ask)
         let status = (askResponse as? HTTPURLResponse)?.statusCode ?? 0
         var text = "", outcome = "ended without completion", raw = ""
         for try await line in bytes.lines {

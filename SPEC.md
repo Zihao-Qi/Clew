@@ -97,7 +97,9 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
    Calendar on this Mac; it never stores them, and changes one only when you edit it
    on the timeline (2026-11-19). Only if turned on in
    Settings › About (off by default, 2026-11-13), Clew also asks GitHub once a day
-   whether a newer release exists (see "About and updates").
+   whether a newer release exists (see "About and updates"). Only while signed in to
+   ChatGPT in Settings › AI (2026-11-22), Clew sends what "Suggest steps" lists to
+   OpenAI, when the person asks for suggestions.
 9. **Launch at login** (`SMAppService`), toggled in a small Settings window.
 10. **Task details.** Double-clicking a row opens its details (*changed* 2026-11-21,
     *user*: a click unfolds a task with steps; see "Steps in a task"); so does
@@ -1068,45 +1070,62 @@ stopped daily use, not adding features.
   - **Steps:** (1) steps in the list and the details, with the new clicks; (2) steps on
     the timeline, and a task block's count.
 
-- **Suggest steps (AI-1, 2026-11-22, *user*).** The first AI help (docs/AGENT.md v2):
-  for a one-off task, ChatGPT proposes a few small steps and the person picks which to
-  add. Off by default; Clew is complete without it.
-  - **Turning it on:** Settings › **AI** (a new pane): **Continue with ChatGPT** signs
-    in through the browser with the person's ChatGPT plan (OpenAI's Sign in with
-    ChatGPT for open-source, local apps; nothing is paid to Clew). Then: the account's
-    email, **Sign out**, **Manage usage** (chatgpt.com/settings/usage), the model (the
-    plan's list, the first one by default) and the switch **Suggest steps** (on once
-    signed in). One line says what is sent: "Sends the task's title, its steps and its
-    note to OpenAI, using your ChatGPT plan." A plan without that permission: "AI isn't
-    available on this ChatGPT plan." On first use, once: "You're using your ChatGPT
-    plan" with **Got it** (OpenAI's rule).
-  - **Where:** only while signed in and the switch is on, and only where a step can be
-    added (a one-off task, not done). In Add Step…'s line a small ✨ **Suggest** button
-    at its right end; in the details, **Suggest Steps** beside **Add Step**. VoiceOver:
-    a "Suggest steps" action on the task's row too.
-  - **While it thinks** (a few seconds): the button becomes a small spinner with
-    **Cancel**; typing in the line still works. Closing the line, leaving the list or
-    details, the menu closing or the rollover cancel it; nothing appears later.
-  - **Suggestions:** 3 to 5 steps, the first one a start of about 2 minutes, listed
-    under the line (or under the details' steps) as quiet rows: a dotted circle, the
-    text in secondary colour, and **+** on each, with **Add all** and **Dismiss**
-    below. **+** adds that step at the end (as typing it would) and removes it from the
-    suggestions; **Add all** adds the rest in order; **Dismiss**, closing the line or
-    Esc drop them. Nothing is added without a tap; suggestions are never kept.
-  - **What is sent:** the task's title, its steps (done or not) and its note, and the
-    instruction to reply in the title's language. Never other tasks, ticks, ratings,
-    dates or links' pages. A fetched page title is marked untrusted (docs/AGENT.md §4).
-  - **Checked before showing:** at most 5, each 1–80 characters after trimming (a
-    leading "1." or "-" removed), none the same as an existing step or another
-    suggestion (ignoring case), no banned words (docs/AGENT.md §5). Fewer than 1 left
-    counts as a failure.
-  - **When it fails:** "Couldn't suggest steps. Try again." in the line's place for a
-    few seconds (no retry by itself). Usage limit: "ChatGPT usage limit reached ·
-    Manage usage". Signed out elsewhere: the switch turns off and Settings › AI says
-    to sign in again. Offline: the same "Couldn't suggest steps".
-  - **Kept:** only the sign-in (in the Keychain), the issued app id and the model
-    choice. No suggestions, no history; a debug build logs each request's size, time and
-    outcome locally, never its text.
+- **Suggest steps (AI-1, 2026-11-22, *user*; Gemini Neon review).** The first AI help
+  (docs/AGENT.md v2): for a one-off task, ChatGPT proposes a few small steps and the
+  person picks which to add. Off until the person signs in; Clew is complete without it.
+  - **Settings › AI** (a new pane, icon `sparkles`, just above About): **Continue with
+    ChatGPT** signs in through the browser with the person's ChatGPT plan (OpenAI's
+    Sign in with ChatGPT for open-source, local apps; nothing is paid to Clew). One
+    account per Mac; Sign out to change it. Signed in: the account's email, **Sign
+    out**, **Manage usage** (chatgpt.com/settings/usage), "Using ChatGPT plan" beside the
+    model (the plan's list, the first by default), and the switch **Suggest steps**
+    (signing in turns it on; it can be turned off). One line says what is sent: "Sends
+    the task's title, its note and its steps to OpenAI, using your ChatGPT plan." The
+    first time the person signs in, Settings shows once "You're using your ChatGPT
+    plan" with **Got it** (OpenAI's rule). Declined plan permission: "Clew can't use
+    your ChatGPT plan yet" with **Continue with ChatGPT** to ask again; a plan OpenAI
+    says is not eligible: "AI isn't available on this ChatGPT plan." All of this text,
+    OpenAI's included, is in the String Catalog.
+  - **Where:** only while signed in, the switch on, and a step can be added (a one-off
+    task, not done). In Add Step…'s line, a small ✨ button at its right end ("Suggest
+    steps" to VoiceOver); in the details, **Suggest Steps** beside **Add Step**. A
+    "Suggest steps" VoiceOver action on the task's row opens Add Step…'s line and asks.
+  - **Thinking** (a few seconds, at most 30): the button becomes a small spinner with
+    **Cancel** ("Cancel suggestions"); the line's typing keeps working and its text is
+    never sent or changed. Cancel, Esc, closing the line, leaving the list or the
+    details, the menu closing, the rollover, another task's Add Step… (one line at a
+    time) and the task becoming done or deleted all cancel it; nothing appears later.
+  - **Suggestions** appear under the line (in the details: under the steps) as up to 5
+    quiet rows: a dotted circle, the text in secondary colour, **+** on each ("Add
+    <step>"), then **Add all** and **Dismiss**, then a small "Using ChatGPT plan".
+    They count as part of the line, so clicking them never closes it. **+** adds that
+    step at the end of the task's steps, as typing it would, and takes it off the list;
+    **Add all** adds the rest in order. The block goes when it is empty, after Add all,
+    or on Dismiss; the line stays open either way. Esc, Return on the empty line,
+    closing the line, the menu closing, the rollover, and the task becoming done or
+    deleted drop them. Pressing ✨ again replaces them with a new set. In the details,
+    Esc goes back to the list as before (suggestions dropped). Nothing is added
+    without a tap; suggestions are never kept.
+  - **What is sent:** the task's title, its note, its steps' names and whether each is
+    done, and the instruction to reply in the title's language. Never other tasks, tick
+    times, ratings, dates, the link's address or any page's content. A fetched page
+    title is sent marked untrusted, and the instructions say to treat it as data only
+    (docs/AGENT.md §4).
+  - **Checked before showing:** each suggestion trimmed (a leading "1.", "-" or "•"
+    removed), 1–80 characters, not the same as an existing step or an earlier
+    suggestion (ignoring case and spaces), no banned words (docs/AGENT.md §5; the
+    person's own typed title is masked first, a fetched one is not). Up to 5 kept; none
+    left is a failure.
+  - **When it fails:** in the suggestions' place, "Couldn't suggest steps. Try again."
+    for 5 seconds; no retry by itself. Usage limit: "ChatGPT usage limit reached ·
+    Manage usage", until dismissed or the line closes; the next ✨ asks again. A
+    sign-in OpenAI has ended: the switch turns off and Settings › AI says "Sign in
+    again". Offline or no answer in 30 seconds: "Couldn't suggest steps. Try again."
+  - **Kept:** in the Keychain, the sign-in's tokens; in this Mac's preferences (not in
+    Clew's data, so not in exports or backups), the issued app id, this Mac's host id,
+    the account's email and id, the model, the switch and the one-time note's "Got it".
+    No suggestions and no history. A debug build logs each request's job, size, model,
+    time, outcome and OpenAI's request id, never its text or any token.
 
 ## Open question
 
