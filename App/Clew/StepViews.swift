@@ -269,7 +269,6 @@ struct NewStepLine: View {
                     .textFieldStyle(.plain)
                     .focused($focused)
                     .onSubmit(save)
-                    .onExitCommand { ask.cancel(); close() }
                     .accessibilityLabel(Text("New step of \(taskTitle)"))
                 if model.canSuggestSteps(taskId) || ask.isThinking {
                     SuggestButton(ask: ask, title: false, start: suggest)
@@ -280,6 +279,8 @@ struct NewStepLine: View {
             .padding(.vertical, 3)
             SuggestionList(ask: ask, leading: StepMetrics.leading) { model.addStep(to: taskId, title: $0) }
         }
+        // Esc anywhere in the line, the suggestions' buttons too (review).
+        .onExitCommand { ask.cancel(); close() }
         .background(OutsideClickWatcher(onOutside: close))
         .debugFrame("newStep:\(taskId)")
         .onAppear {

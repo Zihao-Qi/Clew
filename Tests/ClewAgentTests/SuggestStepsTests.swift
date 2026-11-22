@@ -38,6 +38,7 @@ import Testing
             == ["Open the slides", "Write the opening", "Time it", "Practise once", "Rest"])
         #expect(kept(["  Spaces around  "]) == ["Spaces around"])
         #expect(kept(["10 minutes of notes"]) == ["10 minutes of notes"])   // a number is not a list marker
+        #expect(kept(["1.5 hours of reading", "-10% on the slides"]) == ["1.5 hours of reading", "-10% on the slides"])
     }
 
     @Test func dropsLongEmptyAndRepeatedOnes() {
@@ -74,6 +75,10 @@ import Testing
         let typed = SuggestSteps.Input(title: "Read ADHD paper")
         #expect(kept(["Skim the ADHD paper's abstract"], typed) == ["Skim the ADHD paper's abstract"])
         #expect(kept(["Note any medication mentioned"], typed) == nil)   // only the title's own words
+        // Words of the title never open a phrase it does not carry (review).
+        #expect(kept(["You're behind schedule"], SuggestSteps.Input(title: "Update the schedule")) == nil)
+        #expect(kept(["Say you missed it"], SuggestSteps.Input(title: "Email you back")) == nil)
+        #expect(kept(["Plan the streak chart"], SuggestSteps.Input(title: "Fix streak bug")) == ["Plan the streak chart"])
         let fetched = SuggestSteps.Input(title: "Read ADHD paper", untrusted: true)
         #expect(kept(["Skim the ADHD paper's abstract"], fetched) == nil)
     }

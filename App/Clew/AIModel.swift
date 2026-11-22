@@ -73,9 +73,10 @@ final class AIModel {
         self.transport = transport
         account = ChatGPTAccount(store: store, transport: transport, now: { Date() })
         let noSchema = Set(prefs.stringArray(forKey: Key.noSchema) ?? [])
+        // UserDefaults is thread-safe (review: the injected preferences, not .standard).
+        nonisolated(unsafe) let saved = prefs
         provider = ChatGPTProvider(account: account, transport: transport, notes: ModelNotes(noSchema: noSchema) { set in
-            // UserDefaults is thread-safe; read again by its name, not captured.
-            UserDefaults.standard.set(Array(set).sorted(), forKey: Key.noSchema)
+            saved.set(Array(set).sorted(), forKey: Key.noSchema)
         })
         ended = prefs.bool(forKey: Key.ended)
         readSession()
@@ -127,15 +128,20 @@ final class AIModel {
         let listener = LoopbackCallback()
         callback = listener
         try await listener.bind()
+        // Cancelled while binding: no browser opens (review).
+        if Task.isCancelled { listener.stop(); throw CancellationError() }
         let attempt = SignInAttempt(port: listener.port, random: AICrypto.random, sha256: AICrypto.sha256)
         let url = attempt.authorizeURL(endpoints, clientId: keptClient, hostId: hostId,
                                        idTokenHint: keptClient == nil ? nil : previous?.idToken, consent: consent)
         NSWorkspace.shared.open(url)
-        let query = try await withTaskCancellationHandler {
-            try await listener.wait()
-        } onCancel: {
-            Task { @MainActor in listener.stop() }
-        }
+        let query: [String: String]
+        do {
+            query = try await withTaskCancellationHandler {
+                try await listener.wait()
+            } onCancel: {
+                Task { @MainActor in listener.stop() }
+            }
+        } catch where Task.isCancelled { throw CancellationError() }
         NSApp.activate()
         let (code, clientId) = try attempt.callback(query, keptClientId: keptClient)
         prefs.set(clientId, forKey: Key.clientId)
@@ -185,8 +191,14 @@ final class AIModel {
 
     /// Revokes the refresh token (a few tries on network errors or 5xx), then clears the
     /// tokens either way. The issued client id and this Mac's host id stay.
+    /// True while signing out (revocation may retry for a few seconds).
+    private(set) var signingOut = false
+
     func signOut() {
+        guard !signingOut else { return }
+        signingOut = true
         Task {
+            defer { signingOut = false }
             let session = try? store.load()
             var confirmed = true
             if let session { confirmed = await revoke(session) }

@@ -125,6 +125,32 @@ import Testing
         #expect(fine.sent("/responses").count == 1)   // never asked again by itself
     }
 
+    @Test func aRefusalAfterTextIsNotRetried() async throws {
+        let transport = FakeTransport()
+        transport.on("/responses", .lines(200, [
+            #"data: {"type":"response.output_text.delta","delta":"{"}"#,
+            #"data: {"type":"response.failed","response":{"error":{"code":"subscription_sharing_unsupported_capability","param":"text.format"}}}"#]))
+        transport.on("/responses", .lines(200, completed(["ok"])))
+        await #expect(throws: ProviderError.unsupported(nil)) { try await provider(transport).answer(ask) }
+        #expect(transport.sent("/responses").count == 1)
+    }
+
+    @Test func theModelsListConfirmsAnInvalidUserByARefresh() async throws {
+        let ended = FakeTransport()
+        ended.onJSON("/models", 401, #"{"detail":"no"}"#)
+        ended.onJSON("/token", 400, #"{"error":"refresh_token_expired"}"#)
+        let store = MemoryStore(session())
+        let account = ChatGPTAccount(store: store, transport: ended, now: { t0 })
+        await #expect(throws: ProviderError.signInEnded) { try await ChatGPTModels.list(account, ended) }
+        #expect(try store.load() == nil)
+
+        let fine = FakeTransport()
+        fine.onJSON("/models", 200, #"{"models":[{"slug":"a","visibility":"list"}]}"#)
+        let ok = ChatGPTAccount(store: MemoryStore(session()), transport: fine, now: { t0 })
+        #expect(try await ChatGPTModels.list(ok, fine).map(\.slug) == ["a"])
+        #expect(fine.sent("/models").first?.headers["Authorization"] == "Bearer A1")
+    }
+
     @Test func networkFailuresMapToOfflineAndTimedOut() async throws {
         let transport = FakeTransport()
         transport.on("/responses", .fail(TransportError.offline))

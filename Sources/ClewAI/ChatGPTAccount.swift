@@ -34,7 +34,10 @@ public actor ChatGPTAccount {
         let current = try session()
         guard current.hasPlanPermission else { throw ProviderError.noPlanPermission }
         if current.expiresAt.timeIntervalSince(now()) > Self.margin { return current.access }
-        return try await refresh(from: current).access
+        let next = try await refresh(from: current)
+        // A refresh may narrow the grant (review).
+        guard next.hasPlanPermission else { throw ProviderError.noPlanPermission }
+        return next.access
     }
 
     /// Refreshes now, whatever the expiry: to confirm whether OpenAI ended the sign-in

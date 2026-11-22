@@ -111,6 +111,8 @@ struct SuggestButton: View {
 struct SuggestionList: View {
     let ask: SuggestionAsk
     let leading: CGFloat
+    /// The details already pad their content; the list's rows do not.
+    var trailing: CGFloat = 12
     /// Adds one step as typing it would; false if it was refused.
     let add: (String) -> Bool
 
@@ -148,13 +150,14 @@ struct SuggestionList: View {
                     Button("Dismiss") { ask.cancel() }
                         .accessibilityLabel(Text("Dismiss suggestions"))
                     Spacer()
-                    Text("Using ChatGPT plan").font(.caption2).foregroundStyle(.tertiary)
+                    Text("Using ChatGPT plan").font(.caption2).foregroundStyle(.secondary)
                 }
                 .buttonStyle(.borderless)
                 .font(.caption)
+                .padding(.top, 3)
             }
             .padding(.leading, leading)
-            .padding(.trailing, 12)
+            .padding(.trailing, trailing)
             .padding(.vertical, 2)
         case .failed:
             Text("Couldn't suggest steps. Try again.")
@@ -164,20 +167,22 @@ struct SuggestionList: View {
                 .padding(.vertical, 2)
         case .usageLimit:
             HStack(spacing: 4) {
-                Text("ChatGPT usage limit reached")
-                Text(verbatim: "·")
+                Group {
+                    Text("ChatGPT usage limit reached")
+                    Text(verbatim: "·")
+                }
+                .foregroundStyle(.secondary)
                 Link("Manage usage", destination: ChatGPT.usageURL)
-                    .foregroundStyle(Color.accentColor)
                     .accessibilityLabel(Text("Manage ChatGPT usage"))
                 Spacer()
                 Button { ask.cancel() } label: { Image(systemName: "xmark").imageScale(.small) }
                     .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
                     .accessibilityLabel(Text("Dismiss"))
             }
             .font(.caption)
-            .foregroundStyle(.secondary)
             .padding(.leading, leading)
-            .padding(.trailing, 12)
+            .padding(.trailing, trailing)
             .padding(.vertical, 2)
         }
     }

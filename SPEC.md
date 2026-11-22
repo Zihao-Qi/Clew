@@ -1121,8 +1121,8 @@ stopped daily use, not adding features.
     (docs/AGENT.md §4).
   - **Checked before showing:** each suggestion trimmed (a leading "1.", "-" or "•"
     removed), 1–80 characters, not the same as an existing step or an earlier
-    suggestion (ignoring case and spaces), no banned words (docs/AGENT.md §5; the words
-    of the person's own typed title are masked first, a fetched title's are not). Up to 5 kept; none
+    suggestion (ignoring case and spaces), no banned words (docs/AGENT.md §5; a banned
+    phrase the person's own typed title carries is allowed, a fetched title's is not). Up to 5 kept; none
     left is a failure.
   - **When it fails:** in the suggestions' place, "Couldn't suggest steps. Try again."
     for 5 seconds; no retry by itself. Usage limit: "ChatGPT usage limit reached ·

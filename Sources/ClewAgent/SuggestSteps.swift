@@ -76,12 +76,12 @@ public struct SuggestSteps: Job {
             return .failure(JobFailure(reasons: [.schema]))
         }
         var kept: [String] = [], seen = Set(input.steps.map { Self.key($0.name) }), refused = Set<JobFailure.Reason>()
-        let masked = input.untrusted ? [] : [input.title]
+        let allowed = input.untrusted ? [] : [input.title]
         for raw in answer.steps {
             let step = Self.cleaned(raw)
             if step.isEmpty { refused.insert(.empty); continue }
             if step.count > Self.longest { refused.insert(.tooLong); continue }
-            if Banned.trips(step, masking: masked) { refused.insert(.banned); continue }
+            if Banned.trips(step, allowing: allowed) { refused.insert(.banned); continue }
             guard seen.insert(Self.key(step)).inserted else { refused.insert(.duplicate); continue }
             kept.append(step)
             if kept.count == Self.most { break }
@@ -92,7 +92,8 @@ public struct SuggestSteps: Job {
     /// Trimmed, with a leading "1.", "1)", "-", "*" or "•" removed.
     static func cleaned(_ raw: String) -> String {
         var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let range = s.range(of: #"^(\d{1,2}[.)]|[-*•])\s*"#, options: .regularExpression) {
+        // A marker is followed by a space, so "1.5 hours" and "-10%" stay whole (review).
+        if let range = s.range(of: #"^(\d{1,2}[.)]|[-*•])(\s+|$)"#, options: .regularExpression) {
             s.removeSubrange(range)
         }
         return s.trimmingCharacters(in: .whitespacesAndNewlines)

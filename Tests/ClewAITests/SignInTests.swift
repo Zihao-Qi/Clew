@@ -81,5 +81,10 @@ import Testing
         #expect(try ChatGPTEndpoints.parse(config()).revocation.path == "/r")
         #expect(throws: SignInError.discovery) { try ChatGPTEndpoints.parse(config(issuer: "https://evil.example")) }
         #expect(throws: SignInError.discovery) { try ChatGPTEndpoints.parse(config(host: "evil.example")) }
+        let plain = HTTPResponse(status: 200, body: Data("""
+        {"issuer":"https://auth.openai.com","authorization_endpoint":"http://auth.openai.com/a","token_endpoint":"https://auth.openai.com/t",
+         "revocation_endpoint":"https://auth.openai.com/r","jwks_uri":"https://auth.openai.com/j"}
+        """.utf8))
+        #expect(throws: SignInError.discovery) { try ChatGPTEndpoints.parse(plain) }
     }
 }

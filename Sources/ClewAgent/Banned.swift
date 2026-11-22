@@ -13,14 +13,15 @@ public enum Banned {
         "adhd", "diagnos", "disorder", "symptom", "medication",
     ]
 
-    /// True if `text` carries a banned phrase once the words of the person's own text
-    /// (`masking`, e.g. their typed title) are blanked out, so for the task "Read ADHD
-    /// paper" the step "Skim the ADHD paper's abstract" passes.
-    public static func trips(_ text: String, masking own: [String] = []) -> Bool {
-        let mine = Set(own.flatMap(words))
-        let kept = words(text).map { mine.contains($0) ? "_" : $0 }.joined(separator: " ")
+    /// True if `text` carries a banned phrase, other than one the person's own text
+    /// (`allowing`, e.g. their typed title) carries itself: for the task "Read ADHD paper"
+    /// the step "Skim the ADHD paper's abstract" passes, but for "Update the schedule" the
+    /// step "You're behind schedule" does not (review).
+    public static func trips(_ text: String, allowing own: [String] = []) -> Bool {
+        let mine = own.map { words($0).joined(separator: " ") }
+        let kept = words(text).joined(separator: " ")
         // Substrings, so stems catch their forms ("diagnos": "diagnosis", "streak": "streaks").
-        return phrases.contains { kept.contains($0) }
+        return phrases.contains { phrase in kept.contains(phrase) && !mine.contains { $0.contains(phrase) } }
     }
 
     /// Lowercased words: letters and digits, split on anything else.

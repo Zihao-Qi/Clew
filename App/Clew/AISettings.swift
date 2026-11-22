@@ -33,7 +33,6 @@ struct AISettings: View {
                             .accessibilityLabel(Text("Cancel signing in"))
                     } else {
                         Button(ai.ended ? "Sign in again" : "Continue with ChatGPT") { ai.signIn() }
-                            .accessibilityLabel(Text("Continue with ChatGPT"))
                         Spacer()
                     }
                 }
@@ -53,6 +52,7 @@ struct AISettings: View {
             Section {
                 LabeledContent {
                     Button("Sign out") { ai.signOut() }
+                        .disabled(ai.signingOut)
                         .accessibilityLabel(Text("Sign out of ChatGPT"))
                 } label: {
                     Text(verbatim: ai.email ?? String(localized: "Signed in"))

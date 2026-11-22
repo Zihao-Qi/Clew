@@ -236,11 +236,16 @@ public enum ChatGPTModels {
         }
     }
 
-    /// Reads the list with a valid access token.
+    /// Reads the list with a valid access token. A 401 or an invalid user ends the sign-in
+    /// only if a refresh confirms it, as for a request (review).
     public static func list(_ account: ChatGPTAccount, _ transport: HTTPTransport) async throws -> [ChatGPTModel] {
         let access = try await account.access()
-        do { return try parse(try await transport.send(request(access: access))) } catch let error as ProviderError {
-            throw error
-        } catch { throw ProviderError.from(transport: error) }
+        let response: HTTPResponse
+        do { response = try await transport.send(request(access: access)) } catch { throw ProviderError.from(transport: error) }
+        if response.status != 200, case .invalidUser = Responses.failure(status: response.status, body: response.body) {
+            try await account.confirm()
+            throw ProviderError.unavailable
+        }
+        return try parse(response)
     }
 }

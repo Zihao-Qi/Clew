@@ -148,10 +148,11 @@ address or any page's content.
    tests" is fine): comparisons with other people ("than most", "other people",
    "average person"), streak or guilt phrases ("you missed", "you failed", "you
    broke", "streak", "behind schedule", "lazy"), medical or diagnostic terms ("ADHD",
-   "diagnos", "disorder", "symptom", "medication"). The words of the person's own typed
-   title are masked before this check, so for "Read ADHD paper" the step "Skim the ADHD
-   paper's abstract" passes; untrusted titles are not masked, so a fetched title cannot
-   carry banned text through. The list lives in
+   "diagnos", "disorder", "symptom", "medication"). A phrase the person's own typed
+   title carries is allowed, so for "Read ADHD paper" the step "Skim the ADHD paper's
+   abstract" passes; the title's single words never open a longer phrase ("Update the
+   schedule" does not let "behind schedule" through). Untrusted titles allow nothing,
+   so a fetched title cannot carry banned text through. The list lives in
    code with a test per phrase.
 5. On any failure the job returns nothing: the plain behaviour, a short "Couldn't
    suggest steps" line, and in a debug build the reason as a code ("tooLong",

@@ -31,6 +31,9 @@ import Testing
         #expect(next.access == "A2" && next.refresh == "R2" && next.idToken == "I1")
         #expect(next.expiresAt == t0.addingTimeInterval(1800))
         #expect(next.scopes == ["openid", "email"] && !next.hasPlanPermission)
+        let newId = Tokens.refreshed(session(), TokenAnswer(access: "A2", refresh: "R2", idToken: "I2", expiresIn: 60,
+                                                            scopes: nil), now: t0)
+        #expect(newId.idToken == "I2")
         let noRotation = Tokens.refreshed(session(), TokenAnswer(access: "A3", refresh: nil, idToken: nil,
                                                                  expiresIn: 60, scopes: nil), now: t0)
         #expect(noRotation.refresh == "R1" && noRotation.scopes == session().scopes)
@@ -82,6 +85,13 @@ import Testing
         await #expect(throws: ProviderError.unavailable) { try await account.access() }
         await #expect(throws: ProviderError.offline) { try await account.access() }
         #expect(try store.load() != nil)
+    }
+
+    @Test func aRefreshThatDropsThePlanPermissionStops() async throws {
+        let transport = FakeTransport()
+        transport.onJSON("/token", 200, #"{"access_token":"A2","refresh_token":"R2","scope":"openid email"}"#)
+        let account = ChatGPTAccount(store: MemoryStore(session(expiresIn: 0)), transport: transport, now: { t0 })
+        await #expect(throws: ProviderError.noPlanPermission) { try await account.access() }
     }
 
     @Test func withoutPlanPermissionNothingIsAsked() async throws {
