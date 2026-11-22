@@ -101,7 +101,8 @@ final class AIModel {
         signInTask = Task {
             do {
                 try await runSignIn(consent: consent)
-            } catch is CancellationError {
+            } catch where error is CancellationError || Task.isCancelled {
+                // Cancelled, whatever the failure it caused: nothing to say (review).
             } catch {
                 message = Self.text(for: error)
                 logOutcome("signIn", error)
