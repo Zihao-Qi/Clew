@@ -32,6 +32,10 @@ enum EventSpan { case thisEvent, futureEvents }
 final class EventKitCalendar: CalendarReading {
     private let store = EKEventStore()
     private var observer: NSObjectProtocol?
+    #if DEBUG
+    /// The live check (CLEW_EVENTKIT_UNDO_TEST) sets up and removes its own calendar here.
+    var storeForCheck: EKEventStore { store }
+    #endif
 
     var access: CalendarAccess {
         switch EKEventStore.authorizationStatus(for: .event) {
@@ -91,6 +95,8 @@ final class EventKitCalendar: CalendarReading {
             store.reset()           // the refused change is not kept in memory either
             return nil
         }
+        // After "All future events" the series is split; the saved handle's id already
+        // names the new one (checked live, CLEW_EVENTKIT_UNDO_TEST, 2026-11-21).
         return Self.id(e, start: e.startDate)
     }
 
