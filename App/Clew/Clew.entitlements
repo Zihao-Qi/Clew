@@ -5,11 +5,12 @@
 	<!-- Sandbox on; no files outside the container. -->
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
-	<!-- Outgoing only: fetching a pasted link's page title, and the update check when the user turns it on (SPEC §8). -->
+	<!-- Outgoing only: fetching a pasted link's page title, the update check when the user turns it on (SPEC §8), and AI requests to auth.openai.com and api.openai.com after the user signs in with ChatGPT (docs/AGENT.md §3). -->
 	<key>com.apple.security.network.client</key>
 	<true/>
 	<!-- Incoming, on 127.0.0.1 only, while a browser is paired: the extension's
-	     Watch Later import (ARCHITECTURE §6 Gateway). -->
+	     Watch Later import (ARCHITECTURE §6 Gateway); and while signing in with ChatGPT,
+	     the browser's callback (docs/AGENT.md §3). -->
 	<key>com.apple.security.network.server</key>
 	<true/>
 	<!-- Reads today's events from macOS Calendar for the day timeline, only after the user

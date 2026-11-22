@@ -14,6 +14,8 @@ struct StepsList: View {
     let steps: TaskSteps
     /// Add Step…'s line is open after the steps.
     let adding: Bool
+    /// The line opened from the row's "Suggest steps" VoiceOver action: it asks at once.
+    var suggestOnOpen = false
     let onAddClose: () -> Void
     let onOpen: () -> Void
     /// The step under the pointer: the Delete key deletes it.
@@ -62,7 +64,8 @@ struct StepsList: View {
                 stepRow(entry)
             }
             if adding {
-                NewStepLine(model: model, taskId: row.id, taskTitle: row.item.title, close: onAddClose)
+                NewStepLine(model: model, taskId: row.id, taskTitle: row.item.title, suggestOnOpen: suggestOnOpen,
+                            close: onAddClose)
             }
         }
         .coordinateSpace(name: space)
@@ -240,38 +243,61 @@ enum StepMetrics {
 }
 
 /// Add Step…'s line (SPEC 2026-11-21): Return adds the step and opens the next line;
-/// Esc, Return on an empty line, a click elsewhere and the menu closing close it.
+/// Esc, Return on an empty line, a click elsewhere and the menu closing close it. With
+/// AI on, ✨ at its right end suggests steps under it (SPEC "Suggest steps"); they are part
+/// of the line, so clicking them never closes it.
 struct NewStepLine: View {
     let model: AppModel
     let taskId: UUID
     let taskTitle: String
+    var suggestOnOpen = false
     let close: () -> Void
 
     @State private var text = ""
+    @State private var ask = SuggestionAsk()
     @FocusState private var focused: Bool
 
+    private var canAdd: Bool { model.row(taskId).map(model.canAddStep) ?? false }
+
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "circle")
-                .foregroundStyle(.tertiary)
-                .accessibilityHidden(true)
-            TextField(text: $text) { Text("New step") }
-                .textFieldStyle(.plain)
-                .focused($focused)
-                .onSubmit(save)
-                .onExitCommand(perform: close)
-                .accessibilityLabel(Text("New step of \(taskTitle)"))
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: "circle")
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+                TextField(text: $text) { Text("New step") }
+                    .textFieldStyle(.plain)
+                    .focused($focused)
+                    .onSubmit(save)
+                    .onExitCommand { ask.cancel(); close() }
+                    .accessibilityLabel(Text("New step of \(taskTitle)"))
+                if model.canSuggestSteps(taskId) || ask.isThinking {
+                    SuggestButton(ask: ask, title: false, start: suggest)
+                }
+            }
+            .padding(.leading, StepMetrics.leading)
+            .padding(.trailing, 12)
+            .padding(.vertical, 3)
+            SuggestionList(ask: ask, leading: StepMetrics.leading) { model.addStep(to: taskId, title: $0) }
         }
-        .padding(.leading, StepMetrics.leading)
-        .padding(.trailing, 12)
-        .padding(.vertical, 3)
         .background(OutsideClickWatcher(onOutside: close))
         .debugFrame("newStep:\(taskId)")
-        .onAppear { DispatchQueue.main.async { focused = true } }
+        .onAppear {
+            DispatchQueue.main.async { focused = true }
+            if suggestOnOpen { suggest() }
+        }
+        .onDisappear { ask.cancel() }
+        // The task became done or was deleted: nothing appears later.
+        .onChange(of: canAdd) { _, now in if !now { ask.cancel() } }
+    }
+
+    private func suggest() {
+        guard let ai = model.ai, model.canSuggestSteps(taskId), let input = model.suggestInput(taskId) else { return }
+        ask.ask(ai, input)
     }
 
     private func save() {
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return close() }
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { ask.cancel(); return close() }
         // Refused (too long): the line keeps its text, and the notice says why.
         if model.addStep(to: taskId, title: text) {
             text = ""

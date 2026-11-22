@@ -148,9 +148,10 @@ address or any page's content.
    tests" is fine): comparisons with other people ("than most", "other people",
    "average person"), streak or guilt phrases ("you missed", "you failed", "you
    broke", "streak", "behind schedule", "lazy"), medical or diagnostic terms ("ADHD",
-   "diagnos", "disorder", "symptom", "medication"). The person's own typed titles are
-   masked before this check, so "Read ADHD paper" never trips it; untrusted titles are
-   not masked, so a fetched title cannot carry banned text through. The list lives in
+   "diagnos", "disorder", "symptom", "medication"). The words of the person's own typed
+   title are masked before this check, so for "Read ADHD paper" the step "Skim the ADHD
+   paper's abstract" passes; untrusted titles are not masked, so a fetched title cannot
+   carry banned text through. The list lives in
    code with a test per phrase.
 5. On any failure the job returns nothing: the plain behaviour, a short "Couldn't
    suggest steps" line, and in a debug build the reason as a code ("tooLong",
@@ -233,8 +234,9 @@ first jobs have earned their place.
 - **2026-11-22 (*user*)**: no typing to Clew, at most choosing among options (§1.3);
   jobs may read the calendar, check-ins, goals and memory; memory is a main direction;
   other providers will follow; emotional support is undecided (§10).
-- **2026-11-22**: the debug spike (`CLEW_CHATGPT_SPIKE`, `App/Clew/ChatGPTSpike.swift`)
-  is deleted when AI-1's real sign-in lands.
+- **2026-11-22**: the debug spike (`CLEW_CHATGPT_SPIKE`) was deleted when AI-1's real
+  sign-in landed. Debug checks: `CLEW_AI_CHECK=1` (the app's AI with recorded answers)
+  and `CLEW_AI_RENDER=1` (Settings › AI and the suggestions, light and dark).
 - Superseded 2026-11-22: the bundled `clew-agent` helper, Codex OAuth reuse, the
   monthly token cap (the plan's own limits apply), `AgentOutput` records (Suggest
   steps keeps nothing).

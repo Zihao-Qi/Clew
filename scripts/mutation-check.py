@@ -13,6 +13,7 @@ import json, pathlib, re, subprocess, sys
 
 repo = pathlib.Path(sys.argv[1])
 D, C, S, W = "Sources/ClewDomain/", "Sources/ClewCore/", "Sources/ClewStore/", "Sources/ClewGateway/"
+AI, AG = "Sources/ClewAI/", "Sources/ClewAgent/"
 TL = "TimelineTests|FocusTests|FocusRecordTests"
 SL = "SlotTests|TimelineTests|FocusTests"
 M = [
@@ -846,6 +847,56 @@ M = [
  ("SP41 delete keeps blocks", C+"Steps.swift", "            for var b in try w.timeBlocks(from: today) where b.stepId == id && b.removedAt == nil {", "            for var b in try w.timeBlocks(from: today) where false && b.stepId == id && b.removedAt == nil {", "StepBlockTests"),
  ("SP42 export drops step", D+"Facts.swift", "            stepId: try c.decodeIfPresent(UUID.self, forKey: .stepId),", "            stepId: nil,", "StepBlockTests"),
  ("SP43 late finish hidden", C+"Timeline.swift", "                b.tickId = made?.finished?.id\n", "", "StepBlockTests"),
+ # AI-1 (docs/AGENT.md §3, §5): ClewAI and ClewAgent
+ ("AI1 no agent name", AI+"ChatGPTSignIn.swift", "if clientId == nil { items.append(URLQueryItem(name: \"agent_name_hint\"", "if clientId == \"\" { items.append(URLQueryItem(name: \"agent_name_hint\"", "ClewAITests"),
+ ("AI2 hint on first", AI+"ChatGPTSignIn.swift", "if let idTokenHint, clientId != nil {", "if let idTokenHint {", "ClewAITests"),
+ ("AI3 no consent", AI+"ChatGPTSignIn.swift", "if consent { items.append", "if false && consent { items.append", "ClewAITests"),
+ ("AI4 plain challenge", AI+"ChatGPTSignIn.swift", "challenge = base64url(sha256(Data(verifier.utf8)))", "challenge = verifier", "ClewAITests"),
+ ("AI5 state after error", AI+"ChatGPTSignIn.swift", "        guard query[\"state\"] == state else { throw SignInError.stateMismatch }\n        if let error = query[\"error\"] {\n            throw error == \"access_denied\" ? SignInError.denied : SignInError.callback(error)\n        }", "        if let error = query[\"error\"] {\n            throw error == \"access_denied\" ? SignInError.denied : SignInError.callback(error)\n        }\n        guard query[\"state\"] == state else { throw SignInError.stateMismatch }", "ClewAITests"),
+ ("AI6 client id may change", AI+"ChatGPTSignIn.swift", "if let issued, issued != keptClientId { throw SignInError.clientIdChanged }", "", "ClewAITests"),
+ ("AI7 dynamic id accepted", AI+"ChatGPTSignIn.swift", "guard let issued, issued != ChatGPT.firstClientId else", "guard let issued else", "ClewAITests"),
+ ("AI8 exchange no verifier", AI+"ChatGPTSignIn.swift", "(\"code_verifier\", verifier), ", "", "ClewAITests"),
+ ("AI9 any issuer", AI+"ChatGPTSignIn.swift", "json[\"issuer\"] as? String == ChatGPT.issuer else", "json[\"issuer\"] != nil else", "ClewAITests"),
+ ("AI10 any host", AI+"ChatGPTSignIn.swift", "url.scheme == \"https\",\n                  url.host == \"auth.openai.com\" else", "url.scheme == \"https\" else", "ClewAITests"),
+ ("AI11 refresh with scope", AI+"ChatGPTTokens.swift", "(\"refresh_token\", session.refresh), (\"resource\", ChatGPT.api)])", "(\"refresh_token\", session.refresh), (\"resource\", ChatGPT.api), (\"scope\", ChatGPT.scopes)])", "ClewAITests"),
+ ("AI12 refresh not rotated", AI+"ChatGPTTokens.swift", "next.refresh = answer.refresh ?? session.refresh", "next.refresh = session.refresh", "ClewAITests"),
+ ("AI13 scopes kept stale", AI+"ChatGPTTokens.swift", "if let scopes = answer.scopes { next.scopes = scopes }", "", "ClewAITests"),
+ ("AI14 ending reused", AI+"ChatGPTTokens.swift", "\"refresh_token_invalidated\", \"refresh_token_reused\",", "\"refresh_token_invalidated\",", "ClewAITests"),
+ ("AI15 no plan check", AI+"ChatGPTTokens.swift", "public var hasPlanPermission: Bool { scopes.contains(ChatGPT.planScope) }", "public var hasPlanPermission: Bool { true }", "ClewAITests"),
+ ("AI16 aud unchecked", AI+"ChatGPTTokens.swift", "guard audience.contains(clientId) else", "guard !audience.isEmpty else", "ClewAITests"),
+ ("AI17 nonce unchecked", AI+"ChatGPTTokens.swift", "guard nonce == expected else { throw SignInError.idToken(\"nonce\") }", "_ = expected", "ClewAITests"),
+ ("AI18 exp unchecked", AI+"ChatGPTTokens.swift", "guard let expires, expires > now else", "guard expires != nil || now > .distantPast else", "ClewAITests"),
+ ("AI19 alg none", AI+"ChatGPTTokens.swift", "guard algorithm == \"RS256\" else", "guard !algorithm.isEmpty else", "ClewAITests"),
+ ("AI20 der no zero", AI+"ChatGPTTokens.swift", "if value.first! & 0x80 != 0 { value.insert(0, at: 0) }", "", "ClewAITests"),
+ ("AI21 der short len", AI+"ChatGPTTokens.swift", "if n < 0x80 { return Data([UInt8(n)]) }", "if n < 0x100 { return Data([UInt8(n)]) }", "ClewAITests"),
+ ("AI22 refresh not serial", AI+"ChatGPTAccount.swift", "if let refreshing { return try await refreshing.value }", "", "ClewAITests"),
+ ("AI23 refresh late", AI+"ChatGPTAccount.swift", "if current.expiresAt.timeIntervalSince(now()) > Self.margin {", "if current.expiresAt.timeIntervalSince(now()) > 0 {", "ClewAITests"),
+ ("AI24 ending keeps tokens", AI+"ChatGPTAccount.swift", "                    try? store.clear()\n", "", "ClewAITests"),
+ ("AI25 any error ends", AI+"ChatGPTAccount.swift", "                if error.endsSignIn {", "                if true {", "ClewAITests"),
+ ("AI26 store true", AI+"ChatGPTProvider.swift", "\"store\": false,", "\"store\": true,", "ClewAITests"),
+ ("AI27 no schema ever", AI+"ChatGPTProvider.swift", "if withSchema, let parsed", "if false, let parsed", "ClewAITests"),
+ ("AI28 schema not remembered", AI+"ChatGPTProvider.swift", "            await notes.markNoSchema(request.model)\n", "", "ClewAITests"),
+ ("AI29 retry any capability", AI+"ChatGPTProvider.swift", "if param?.hasPrefix(\"text\") == true { throw Refusal.schema }", "throw Refusal.schema", "ClewAITests"),
+ ("AI30 stream end is ok", AI+"ChatGPTProvider.swift", "            throw ProviderError.incomplete   // the stream just ended", "            out.yield(.done); return", "ClewAITests"),
+ ("AI31 invalid user ends", AI+"ChatGPTProvider.swift", "            try await account.confirm()\n            throw ProviderError.unavailable", "            throw ProviderError.signInEnded", "ClewAITests"),
+ ("AI32 detail as code", AI+"ChatGPTProvider.swift", "        return failure(code: error?[\"code\"] as? String, param: error?[\"param\"] as? String, status: status)", "        return failure(code: error?[\"code\"] as? String ?? json?[\"detail\"] as? String, param: error?[\"param\"] as? String, status: status)", "ClewAITests"),
+ ("AI33 limit unavailable", AI+"ChatGPTProvider.swift", "case \"subscription_sharing_usage_limit_exceeded\": return .error(.usageLimit)", "case \"subscription_sharing_usage_limit_exceeded\": return .error(.unavailable)", "ClewAITests"),
+ ("AI34 hidden models", AI+"ChatGPTProvider.swift", "guard item[\"visibility\"] as? String == \"list\", let slug", "guard let slug", "ClewAITests"),
+ ("AI35 answer w/o done", AI+"Provider.swift", "guard completed else { throw ProviderError.incomplete }", "", "ClewAITests|ClewAgentTests"),
+ ("AG1 extra fields ok", AG+"SuggestSteps.swift", "guard any.allKeys.map(\\.stringValue) == [\"steps\"] else {", "guard any.allKeys.contains(where: { $0.stringValue == \"steps\" }) else {", "ClewAgentTests"),
+ ("AG2 no marker strip", AG+"SuggestSteps.swift", "        if let range = s.range(of: #\"^(\\d{1,2}[.)]|[-*•])\\s*\"#, options: .regularExpression) {\n            s.removeSubrange(range)\n        }", "", "ClewAgentTests"),
+ ("AG3 81 chars", AG+"SuggestSteps.swift", "if step.count > Self.longest {", "if step.count > Self.longest + 1 {", "ClewAgentTests"),
+ ("AG4 dup vs existing", AG+"SuggestSteps.swift", "seen = Set(input.steps.map { Self.key($0.name) })", "seen = Set<String>()", "ClewAgentTests"),
+ ("AG5 dup case", AG+"SuggestSteps.swift", "s.lowercased().filter { !$0.isWhitespace }", "s.filter { !$0.isWhitespace }", "ClewAgentTests"),
+ ("AG6 six kept", AG+"SuggestSteps.swift", "if kept.count == Self.most { break }", "", "ClewAgentTests"),
+ ("AG7 no banned check", AG+"SuggestSteps.swift", "if Banned.trips(step, masking: masked) { refused.insert(.banned); continue }", "", "ClewAgentTests"),
+ ("AG8 fetched masked", AG+"SuggestSteps.swift", "let masked = input.untrusted ? [] : [input.title]", "let masked = [input.title]", "ClewAgentTests"),
+ ("AG9 nothing masked", AG+"SuggestSteps.swift", "let masked = input.untrusted ? [] : [input.title]", "let masked: [String] = []", "ClewAgentTests"),
+ ("AG10 case-sensitive ban", AG+"Banned.swift", "text.lowercased().split", "text.split", "ClewAgentTests"),
+ ("AG11 empty is success", AG+"SuggestSteps.swift", "return kept.isEmpty ? .failure(JobFailure(reasons: refused.union([.none]))) : .success(kept)", "return .success(kept)", "ClewAgentTests"),
+ ("AG12 untrusted dropped", AG+"SuggestSteps.swift", "if untrusted { try task.encode(true, forKey: .untrusted) }", "", "ClewAgentTests"),
+ ("AG13 no timeout", AG+"Job.swift", "                try await Task.sleep(for: timeout)\n                throw ProviderError.timedOut", "                try await Task.sleep(for: .seconds(3600))\n                throw ProviderError.timedOut", "ClewAgentTests"),
+ ("AG14 log text", AG+"Job.swift", "outcome: outcome, requestId: requestId))", "outcome: outcome + text, requestId: requestId))", "ClewAgentTests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

@@ -52,15 +52,18 @@ struct ClewApp: App {
             Snapshot.startEventTest()
             return
         }
-        if ProcessInfo.processInfo.environment["CLEW_CHATGPT_SPIKE"] != nil {
-            _model = State(initialValue: AppModel(clew: nil, notify: false))
-            ChatGPTSpike.start()
-            return
-        }
         if ProcessInfo.processInfo.environment["CLEW_EVENTKIT_UNDO_TEST"] != nil {
             _model = State(initialValue: AppModel(clew: nil, notify: false))
             Snapshot.startEventUndoCheck()
             return
+        }
+        if ProcessInfo.processInfo.environment["CLEW_AI_CHECK"] != nil {
+            _model = State(initialValue: AppModel(clew: nil, notify: false))
+            Snapshot.startAICheck()
+            return
+        }
+        if ProcessInfo.processInfo.environment["CLEW_AI_RENDER"] != nil {
+            Snapshot.renderAIAndExit()
         }
         if ProcessInfo.processInfo.environment["CLEW_STEPS_RENDER"] != nil {
             Snapshot.renderStepsAndExit()

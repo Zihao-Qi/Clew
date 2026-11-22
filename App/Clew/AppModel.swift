@@ -40,6 +40,12 @@ final class AppModel {
 
     /// The Chrome extension's connection (live app only).
     private(set) var browser: BrowserConnection?
+    /// Clew's AI (docs/AGENT.md): the ChatGPT sign-in and its jobs (live app only).
+    private(set) var ai: AIModel?
+    #if DEBUG
+    /// The debug AI check and render use an AI with recorded answers.
+    func useAI(_ ai: AIModel) { self.ai = ai }
+    #endif
     /// The About pane and the opt-in update check (SPEC 2026-11-13); per Mac.
     let updates: Updates
 
@@ -100,6 +106,7 @@ final class AppModel {
         do {
             self.init(databaseAt: try Self.databaseURL())
             if let clew { browser = BrowserConnection(clew: clew) }
+            ai = AIModel()
             calendarSource = EventKitCalendar()
             OpenShortcutHotkey.shared.start()
             updates.start()

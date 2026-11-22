@@ -424,6 +424,7 @@ struct DetailSteps: View {
 
     @State private var adding = false
     @State private var newStep = ""
+    @State private var ask = SuggestionAsk()
     @FocusState private var addFocused: Bool
 
     private var steps: [TaskSteps.Entry] { model.allSteps(of: task.id) }
@@ -439,6 +440,8 @@ struct DetailSteps: View {
                 ForEach(steps) { entry in
                     DetailStepRow(model: model, entry: entry)
                 }
+                // Suggestions go under the steps (SPEC "Suggest steps").
+                SuggestionList(ask: ask, leading: 0) { model.addStep(to: task.id, title: $0) }
                 if canAdd {
                     if adding {
                         HStack(spacing: 6) {
@@ -450,29 +453,47 @@ struct DetailSteps: View {
                                 .focused($addFocused)
                                 .debugFrame("detailNew:\(task.id)")
                                 .onSubmit(add)
-                                .onExitCommand { adding = false; newStep = "" }
+                                .onExitCommand { adding = false; newStep = ""; ask.cancel() }
                                 .accessibilityLabel(Text("New step of \(task.title)"))
+                            if model.canSuggestSteps(task.id) || ask.isThinking {
+                                SuggestButton(ask: ask, title: false, start: suggest)
+                            }
                         }
                         .onAppear { DispatchQueue.main.async { addFocused = true } }
                     } else {
-                        Button { adding = true } label: { Label("Add Step", systemImage: "plus") }
-                            .buttonStyle(.borderless)
-                            .debugFrame("detailAdd:\(task.id)")
-                            .accessibilityLabel(Text("Add a step to \(task.title)"))
+                        HStack(spacing: 12) {
+                            Button { adding = true } label: { Label("Add Step", systemImage: "plus") }
+                                .buttonStyle(.borderless)
+                                .debugFrame("detailAdd:\(task.id)")
+                                .accessibilityLabel(Text("Add a step to \(task.title)"))
+                            if model.canSuggestSteps(task.id) || ask.isThinking {
+                                SuggestButton(ask: ask, title: true, start: suggest)
+                            }
+                        }
                     }
                 }
                 // A refused name (too long) says why here too (review).
                 NoticeView(text: model.notice).padding(.horizontal, -12)
             }
-            // The task got done (its last step, its circle): the line goes and drops its text (review).
-            .onChange(of: canAdd) { _, now in if !now { adding = false; newStep = "" } }
+            // The task got done (its last step, its circle): the line goes and drops its text (review),
+            // and no suggestion appears later.
+            .onChange(of: canAdd) { _, now in if !now { adding = false; newStep = ""; ask.cancel() } }
+            // Leaving the details or the rollover drops them too (SPEC "Suggest steps").
+            .onDisappear { ask.cancel() }
+            .onChange(of: model.today?.day) { ask.cancel() }
         }
+    }
+
+    private func suggest() {
+        guard let ai = model.ai, model.canSuggestSteps(task.id), let input = model.suggestInput(task.id) else { return }
+        ask.ask(ai, input)
     }
 
     /// Return adds the step and keeps the line for another; Return on an empty line closes it.
     private func add() {
         guard !newStep.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             adding = false
+            ask.cancel()
             return
         }
         if model.addStep(to: task.id, title: newStep) {
