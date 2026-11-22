@@ -585,10 +585,15 @@ struct TimelineBlockView: View {
 
     private var b: TimeBlock { block.block }
     private var row: TodayRow? { model.today?.rows.first { $0.id == b.itemId } }
-    /// Ticked, covered by a hand tick, or the task is done anyway.
+    /// A step's block (SPEC 2026-11-21): its step, while it exists.
+    private var step: TaskSteps.Entry? { b.stepId.flatMap { model.stepEntry($0) } }
+    /// Ticked, covered by a hand tick, or the task (a step's block: the step) is done anyway.
     private var looksDone: Bool {
-        block.state == .ticked || block.state == .covered || (block.state == .skipped && row?.isDone == true)
+        if b.stepId != nil { return block.state == .ticked || (block.state == .skipped && step?.isDone == true) }
+        return block.state == .ticked || block.state == .covered || (block.state == .skipped && row?.isDone == true)
     }
+    /// What the Delete key deletes under the pointer: the step of a step's block.
+    private var hoverId: UUID { b.stepId ?? b.itemId }
     private var minutes: Int { b.minutes + resizeBy }
     /// Running now: it stands out a little (user, 2026-11-11). Redrawn at each block's start
     /// and end, when the app refreshes.
@@ -620,16 +625,17 @@ struct TimelineBlockView: View {
             .onTapGesture(perform: onOpen)
             .gesture(moveGesture)
             .onHover { inside in
-                if inside { hovered = b.itemId } else if hovered == b.itemId { hovered = nil }
+                if inside { hovered = hoverId } else if hovered == hoverId { hovered = nil }
             }
-            .contextMenu { menu }
+            .contextMenu { if b.stepId != nil { stepMenu } else { menu } }
+            .debugFrame("block:\(b.id)")
             .onChange(of: dragging) { _, live in
                 // Ended or cancelled: nothing of the drag stays on screen.
                 if !live, isLifted { onDrag(nil) }
             }
             .onDisappear {
                 if isLifted { onDrag(nil) }
-                if hovered == b.itemId { hovered = nil }
+                if hovered == hoverId { hovered = nil }
             }
             .help(Text(verbatim: "\(block.title) · \(range)"))
             .accessibilityElement(children: .ignore)
@@ -640,14 +646,19 @@ struct TimelineBlockView: View {
             .accessibilityAction(named: Text("Move to…"), onMove)
             .accessibilityAction(named: Text("Remove block")) { model.removeBlock(b.id) }
             .accessibilityActions {
-                if let row, !row.isGoalReached, row.item.kind == .goal || !row.isDone {
-                    Button(row.item.kind == .goal ? "+1" : "Done") { model.tap(row) }
-                }
-                if let row, row.todayAmount > 0 {
-                    Button(row.item.kind == .goal ? "Undo +1" : "Undo") { model.undo(row) }
-                }
-                if timer != nil {
-                    Button("Stop the timer") { model.stopFocus() }
+                if let step {
+                    Button(step.isDone ? "Undo" : "Done") { model.tapStep(step) }
+                    Button("Delete") { model.deleteStep(step.step) }
+                } else {
+                    if let row, !row.isGoalReached, row.item.kind == .goal || !row.isDone {
+                        Button(row.item.kind == .goal ? "+1" : "Done") { model.tap(row) }
+                    }
+                    if let row, row.todayAmount > 0 {
+                        Button(row.item.kind == .goal ? "Undo +1" : "Undo") { model.undo(row) }
+                    }
+                    if timer != nil {
+                        Button("Stop the timer") { model.stopFocus() }
+                    }
                 }
             }
     }
@@ -713,16 +724,31 @@ struct TimelineBlockView: View {
         }
     }
 
-    /// The goal's progress in its current round, as its row counts it.
+    /// The goal's progress in its current round, as its row counts it; a task's own block
+    /// shows its steps done, as its row does (SPEC 2026-11-21).
     private var count: (done: Int, target: Int)? {
-        guard let row, let target = row.item.progress.target else { return nil }
-        return (row.progressAmount, target)
+        guard let row else { return nil }
+        if let target = row.item.progress.target { return (row.progressAmount, target) }
+        if b.stepId == nil, !row.isDone, let steps = model.steps(of: row.id) { return (steps.done, steps.total) }
+        return nil
     }
 
-    private var title: Text {
-        Text(block.title)
+    /// A step's block keeps the step's name: the task's part truncates first (review).
+    @ViewBuilder
+    private var title: some View {
+        if let step, let task = row?.item.title {
+            HStack(spacing: 0) {
+                Text(task)
+                Text(verbatim: " - ").fixedSize()
+                Text(step.step.title).layoutPriority(1)
+            }
             .font(TimelineMetrics.titleFont)
             .foregroundStyle(.primary)
+        } else {
+            Text(block.title)
+                .font(TimelineMetrics.titleFont)
+                .foregroundStyle(.primary)
+        }
     }
 
     /// What a block says besides its title: a slot block's question, or its focus timer.
@@ -827,8 +853,37 @@ struct TimelineBlockView: View {
         Clew.snapMinutes(Double(points / TimelineMetrics.pointsPerMinute))
     }
 
-    /// The running focus timer, if it is this task's.
-    private var timer: FocusTimer? { model.focus?.itemId == b.itemId ? model.focus : nil }
+    /// The running focus timer, if it is this task's (never on a step's block: Focus is the
+    /// task's).
+    private var timer: FocusTimer? { model.focus?.itemId == b.itemId && b.stepId == nil ? model.focus : nil }
+
+    /// A step's block (SPEC 2026-11-21): Done / Undo for the step, then the block's own; no
+    /// Focus (it is the task's); Delete deletes the step.
+    @ViewBuilder
+    private var stepMenu: some View {
+        if let step {
+            Button(step.isDone ? "Undo" : "Done") { model.tapStep(step) }
+            Divider()
+        }
+        if block.state == .ticked {
+            Button("Not finished") { model.blockNotFinished(b.id) }
+        }
+        Button("Move to…", action: onMove)
+        Menu("Length") {
+            ForEach(Clew.blockLengths.filter { $0 <= TimelineMetrics.room(after: b.start, in: day) }, id: \.self) { m in
+                Button("\(m) min") { model.resizeBlock(b.id, minutes: m) }
+                    .disabled(m == b.minutes)
+            }
+        }
+        if model.canAddBlock(after: b), row != nil {
+            Button("Add another block") { model.addBlock(after: b.id) }
+        }
+        Divider()
+        Button("Remove block") { model.removeBlock(b.id) }
+        if let step {
+            Button("Delete", role: .destructive) { model.deleteStep(step.step) }
+        }
+    }
 
     /// The row's menu first (user, 2026-11-10: the same operations in the list and on the
     /// timeline), then the block's own.
@@ -1068,7 +1123,11 @@ struct PlaceView: View {
     @State private var minutes = Clew.blockDefaultMinutes
 
     private var day: TimelineDay? { model.timeline }
-    private var title: String { model.today?.rows.first { $0.id == itemId }?.item.title ?? "" }
+    /// A step's block is named as on the timeline: "Prepare the talk - Speech notes" (review).
+    private var title: String {
+        blockId.flatMap { id in day?.blocks.first { $0.id == id }?.title }
+            ?? model.today?.rows.first { $0.id == itemId }?.item.title ?? ""
+    }
     /// The time on today's timeline: before the rollover hour it is the night after
     /// midnight, at the timeline's end.
     private var start: Date? {

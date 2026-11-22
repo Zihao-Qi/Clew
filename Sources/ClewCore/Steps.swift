@@ -76,18 +76,26 @@ extension Clew {
     }
 
     /// Delete a step: a tombstone. It never ticks or unticks the task (SPEC 2026-11-21).
+    /// Its blocks of today go with it, in the same write.
     public func deleteStep(id: UUID) throws {
         let now = clockForQueries.now()
+        let today = currentDay()
         try storeForQueries.write { w in
             guard var step = try w.step(id: id) else { throw ClewError.itemNotFound }
             guard step.deletedAt == nil else { return }
             step.deletedAt = now
             step.updatedAt = now
             try w.save(step)
+            for var b in try w.timeBlocks(from: today) where b.stepId == id && b.removedAt == nil {
+                b.removedAt = now
+                b.updatedAt = now
+                try w.save(b)
+            }
         }
     }
 
-    /// The Undo of "Deleted “Practice”": the step comes back where it was, with its ticks.
+    /// The Undo of "Deleted “Practice”": the step comes back where it was, with its ticks
+    /// and without its blocks (as a task's Undo).
     public func undeleteStep(id: UUID) throws {
         let now = clockForQueries.now()
         try storeForQueries.write { w in
@@ -149,20 +157,28 @@ extension Clew {
             guard let step = try w.step(id: id), step.deletedAt == nil else { throw ClewError.itemNotFound }
             let task = try Self.stepTask(w, step.taskId)
             guard task.state == .active || task.state == .later else { throw ClewError.notAllowed }
-            // A done task shows every step done: there is no open one to tick.
-            let shown = try Self.taskSteps(w, taskIds: [step.taskId])[step.taskId]
-            guard let open = shown?.open, open.contains(where: { $0.id == id }) else { return nil }
-            var finished: CheckIn?
-            if open.count == 1 {
-                let checkIn = CheckIn(id: newID(), itemId: step.taskId, localDay: day, at: now,
-                                      timeZoneId: zone.identifier, amount: 1, source: source)
-                try w.insert(checkIn)
-                finished = checkIn
-            }
-            try w.insert(StepTick(id: newID(), stepId: id, taskId: step.taskId, localDay: day, at: now,
-                                  source: source, finishedCheckInId: finished?.id))
-            return finished
+            return try tickStep(step, day: day, at: now, zone: zone, source: source, w)?.finished
         }
+    }
+
+    /// Inside a write: ticks an open step for `day` (a step block's end ticks for its own
+    /// day). Nil when the step is not open (done, or its task is).
+    func tickStep(_ step: Step, day: LocalDay, at now: Date, zone: TimeZone, source: Source,
+                  _ w: any StoreWriter) throws -> (tick: StepTick, finished: CheckIn?)? {
+        // A done task shows every step done: there is no open one to tick.
+        let shown = try Self.taskSteps(w, taskIds: [step.taskId])[step.taskId]
+        guard let open = shown?.open, open.contains(where: { $0.id == step.id }) else { return nil }
+        var finished: CheckIn?
+        if open.count == 1 {
+            let checkIn = CheckIn(id: newID(), itemId: step.taskId, localDay: day, at: now,
+                                  timeZoneId: zone.identifier, amount: 1, source: source)
+            try w.insert(checkIn)
+            finished = checkIn
+        }
+        let tick = StepTick(id: newID(), stepId: step.id, taskId: step.taskId, localDay: day, at: now,
+                            source: source, finishedCheckInId: finished?.id)
+        try w.insert(tick)
+        return (tick, finished)
     }
 
     /// Unticks a step. On a done task this unticks the task too: its steps go back to how
@@ -171,13 +187,28 @@ extension Clew {
         let now = clockForQueries.now()
         try storeForQueries.write { w in
             guard let step = try w.step(id: id), step.deletedAt == nil else { throw ClewError.itemNotFound }
-            for c in try w.checkIns(itemIds: [step.taskId], from: Self.allDays) {
-                try w.voidCheckIn(id: c.id, at: now, reason: "undo")
-            }
-            for t in try w.stepTicks(taskIds: [step.taskId]) where t.stepId == id {
-                try w.voidStepTick(id: t.id, at: now)
-            }
+            try Self.untick(step, at: now, w)
         }
+    }
+
+    /// Inside a write: the step's ticks are voided, and its task's check-ins (a done task
+    /// is unticked too).
+    static func untick(_ step: Step, at now: Date, _ w: any StoreWriter) throws {
+        for c in try w.checkIns(itemIds: [step.taskId], from: allDays) {
+            try w.voidCheckIn(id: c.id, at: now, reason: "undo")
+        }
+        for t in try w.stepTicks(taskIds: [step.taskId]) where t.stepId == step.id {
+            try w.voidStepTick(id: t.id, at: now)
+        }
+    }
+
+    /// Whether a step tick stands: live, and the check-in it made (if any) not undone.
+    static func stands(_ tickId: UUID?, taskId: UUID, _ r: any StoreReader) throws -> Bool {
+        guard let tickId, let tick = try r.stepTicks(taskIds: [taskId]).first(where: { $0.id == tickId }) else {
+            return false
+        }
+        guard let finished = tick.finishedCheckInId else { return true }
+        return try r.checkIn(id: finished)?.isVoided == false
     }
 }
 

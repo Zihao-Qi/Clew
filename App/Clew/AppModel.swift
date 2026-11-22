@@ -561,6 +561,25 @@ final class AppModel {
         if blockAlerts { askForNotifications() }
         return run { try $0.placeOnTimeline(itemId: itemId, start: start, minutes: minutes) }
     }
+    /// A step dropped on an hour (SPEC 2026-11-21).
+    @discardableResult
+    func placeStep(_ stepId: UUID, at start: Date, minutes: Int? = nil) -> Bool {
+        if blockAlerts { askForNotifications() }
+        return run { try $0.placeStepOnTimeline(stepId: stepId, start: start, minutes: minutes) }
+    }
+    /// VoiceOver's "Put on timeline" on a step: the next quarter hour (the day's last one if
+    /// none is left), 30 minutes cut at the day's end.
+    func placeStepAtNextQuarter(_ stepId: UUID) {
+        guard let day = timeline else { return }
+        let minutes = Date().timeIntervalSince(day.start) / 60
+        let next = (minutes / Double(Clew.blockStepMinutes)).rounded(.down) + 1
+        placeStep(stepId, at: Clew.quarterStart(minutesIn: next * Double(Clew.blockStepMinutes), day: day))
+    }
+    /// The step a block or the Delete key refers to, if `id` is a step's.
+    func stepEntry(_ id: UUID) -> TaskSteps.Entry? {
+        steps.values.lazy.flatMap(\.entries).first { $0.id == id }
+    }
+
     /// The timeline's name box, on Return (SPEC 2026-11-13): a today task and its block, in
     /// one step. A link's page title is kept as fetched unless it was edited.
     @discardableResult

@@ -44,11 +44,16 @@ public struct TimelineDay: Hashable, Sendable {
     /// Tasks with a block today: they live on the timeline, not in the list (SPEC
     /// 2026-11-10, changed after first use).
     /// A goal that reached its total goes back to the list (its blocks are released).
-    public var placedItems: Set<UUID> { Set(blocks.filter { $0.block.releasedAt == nil }.map(\.block.itemId)) }
+    /// A step's block leaves its task in the list (SPEC 2026-11-21).
+    public var placedItems: Set<UUID> {
+        Set(blocks.filter { $0.block.releasedAt == nil && $0.block.stepId == nil }.map(\.block.itemId))
+    }
+    /// Steps with a block today: they live on the timeline, not under their task.
+    public var placedSteps: Set<UUID> { Set(blocks.compactMap(\.block.stepId)) }
 
     /// The start of the task's next block that has not ended, for its row ("10:00").
     public func nextStart(of itemId: UUID, now: Date) -> Date? {
-        blocks.filter { $0.block.itemId == itemId && $0.block.end > now }.map(\.block.start).min()
+        blocks.filter { $0.block.itemId == itemId && $0.block.stepId == nil && $0.block.end > now }.map(\.block.start).min()
     }
 }
 
@@ -95,8 +100,10 @@ extension Clew {
         let (start, end) = dayBounds(today)
         return try storeForQueries.read { r in
             let rows = Dictionary(uniqueKeysWithValues: try todayList(r, on: today).rows.map { ($0.id, $0) })
+            let steps = Dictionary(uniqueKeysWithValues: try r.steps(taskIds: Array(rows.keys)).map { ($0.id, $0) })
             let live = try r.timeBlocks(from: today)
-                .filter { $0.localDay == today && $0.removedAt == nil && rows[$0.itemId] != nil }
+                .filter { $0.localDay == today && $0.removedAt == nil && rows[$0.itemId] != nil
+                          && ($0.stepId.map { steps[$0] != nil } ?? true) }
                 .sorted { ($0.start, $0.placedAt, $0.id.uuidString) < ($1.start, $1.placedAt, $1.id.uuidString) }
             let lanes = Self.lanes(live.map { ($0.start, $0.end) })
             let rounds = try r.roundStarts(itemIds: Array(Set(live.map(\.itemId))))
@@ -104,11 +111,17 @@ extension Clew {
             for (b, lane) in zip(live, lanes) {
                 let tick = try b.tickId.flatMap { try r.checkIn(id: $0) }
                 let cover = try b.coverId.flatMap { try r.checkIn(id: $0) }
-                let state: BlockState = b.decidedAt == nil ? (b.askedAt == nil ? .pending : .asking)
+                var state: BlockState = b.decidedAt == nil ? (b.askedAt == nil ? .pending : .asking)
                     : tick.map { $0.isVoided ? .undone : .ticked }
                     ?? (cover.map { !$0.isVoided } == true ? .covered : .skipped)
+                if b.decidedAt != nil, b.stepTickId != nil {
+                    state = try Self.stands(b.stepTickId, taskId: b.itemId, r) ? .ticked : .undone
+                }
+                let taskTitle = rows[b.itemId]?.item.title ?? ""
+                // A step's block reads "Prepare the talk - Speech notes" (user, 2026-11-21).
+                let title = b.stepId.flatMap { steps[$0] }.map { "\(taskTitle) - \($0.title)" } ?? taskTitle
                 blocks.append(TimelineBlock(
-                    block: b, title: rows[b.itemId]?.item.title ?? "", state: state,
+                    block: b, title: title, state: state,
                     canChange: !Self.roundClosed(over: tick, roundStart: rounds[b.itemId]),
                     lane: lane.lane, lanes: lane.lanes))
             }
@@ -185,6 +198,8 @@ extension Clew {
         for var b in try w.timeBlocks(from: today) where b.localDay == today && b.removedAt == nil {
             if rows[b.itemId] == nil {
                 b.removedAt = now
+            } else if let stepId = b.stepId, try w.step(id: stepId)?.deletedAt != nil {
+                b.removedAt = now           // its step was deleted
             } else if b.releasedAt == nil, rows[b.itemId]?.isGoalReached == true {
                 b.releasedAt = now          // a reached goal goes back to the list
             } else {
@@ -236,6 +251,22 @@ extension Clew {
               item.state == .active || (item.state == .later && movedThatDay)
         else {
             b.removedAt = now
+            try w.save(b)
+            return true
+        }
+        if let stepId = b.stepId {
+            // A step's block ticks the step (the last open one finishes the task), or skips
+            // when the step or its task is already done (SPEC 2026-11-21).
+            b.decidedAt = now
+            if let step = try w.step(id: stepId), step.deletedAt == nil {
+                let made = try tickStep(step, day: b.localDay, at: now, zone: zone, source: .timeline, w)
+                b.stepTickId = made?.tick.id
+                // The task's check-in it made, when it was the last open step: an earlier
+                // day's shows in "Ticked for yesterday" like a task block's (review).
+                b.tickId = made?.finished?.id
+            } else {
+                b.removedAt = now
+            }
             try w.save(b)
             return true
         }
@@ -372,7 +403,8 @@ extension Clew {
                 throw ClewError.notAllowed
             }
             let open = try w.timeBlocks(from: today)
-                .filter { $0.itemId == itemId && $0.localDay == today && $0.removedAt == nil && $0.end > now }
+                .filter { $0.itemId == itemId && $0.stepId == nil && $0.localDay == today && $0.removedAt == nil
+                          && $0.end > now }
                 .min { ($0.start, $0.id.uuidString) < ($1.start, $1.id.uuidString) }
             let room = Int(bounds.end.timeIntervalSince(start) / 60)
             if let open {
@@ -384,6 +416,42 @@ extension Clew {
             try Self.checkLength(length, start: start, bounds)
             let block = TimeBlock(id: newID(), itemId: itemId, localDay: today, start: start, minutes: length,
                                   placedAt: now, updatedAt: now)
+            try w.save(block)
+            return try decideIfEnded(block, now: now, w)
+        }
+    }
+
+    /// A step dragged onto an hour, or its "Put on timeline" (SPEC 2026-11-21): moves the
+    /// step's earliest block that has not ended, else adds one (30 minutes, cut at the
+    /// day's end). A step of a Goals & Later task moves its task to Today first.
+    @discardableResult
+    public func placeStepOnTimeline(stepId: UUID, start: Date, minutes: Int? = nil) throws -> TimeBlock {
+        let now = clockForQueries.now()
+        let today = currentDay()
+        let bounds = dayBounds(today)
+        try Self.checkStart(start, bounds)
+        return try storeForQueries.write { w in
+            guard let step = try w.step(id: stepId), step.deletedAt == nil else { throw ClewError.itemNotFound }
+            let list = try todayList(w, on: today)
+            if !list.rows.contains(where: { $0.id == step.taskId }),
+               list.goalsAndLater.contains(where: { $0.id == step.taskId }) {
+                try place(itemId: step.taskId, in: .today, after: list.rows.last?.id, before: nil, day: today, now: now, w)
+            }
+            guard try todayList(w, on: today).rows.contains(where: { $0.id == step.taskId }) else {
+                throw ClewError.notAllowed
+            }
+            let open = try w.timeBlocks(from: today)
+                .filter { $0.stepId == stepId && $0.localDay == today && $0.removedAt == nil && $0.end > now }
+                .min { ($0.start, $0.id.uuidString) < ($1.start, $1.id.uuidString) }
+            let room = Int(bounds.end.timeIntervalSince(start) / 60)
+            if let open {
+                return try change(open, start: start, minutes: minutes ?? min(open.minutes, room), today: today,
+                                  now: now, w)
+            }
+            let length = minutes ?? min(Self.blockDefaultMinutes, room)
+            try Self.checkLength(length, start: start, bounds)
+            let block = TimeBlock(id: newID(), itemId: step.taskId, localDay: today, start: start, minutes: length,
+                                  placedAt: now, updatedAt: now, stepId: stepId)
             try w.save(block)
             return try decideIfEnded(block, now: now, w)
         }
@@ -449,7 +517,7 @@ extension Clew {
             }
             try Self.checkLength(b.minutes, start: b.end, bounds)
             let next = TimeBlock(id: newID(), itemId: b.itemId, localDay: today, start: b.end, minutes: b.minutes,
-                                 placedAt: now, updatedAt: now)
+                                 placedAt: now, updatedAt: now, stepId: b.stepId)
             try w.save(next)
             return try decideIfEnded(next, now: now, w)
         }
@@ -471,6 +539,7 @@ extension Clew {
                !Self.roundClosed(over: tick, roundStart: try w.roundStarts(itemIds: [b.itemId])[b.itemId]) {
                 try w.voidCheckIn(id: tick.id, at: now, reason: "blockRemoved")
             }
+            try untickStepOfBlock(b, now: now, w)
             b.removedAt = now
             b.touchedAt = now
             b.updatedAt = now
@@ -484,6 +553,12 @@ extension Clew {
         let today = currentDay()
         try storeForQueries.write { w in
             var b = try liveBlock(id, today: today, w)
+            if b.stepId != nil {
+                guard try untickStepOfBlock(b, now: now, w) else { throw ClewError.notAllowed }
+                b.updatedAt = now
+                try w.save(b)
+                return
+            }
             guard let tick = try liveTick(of: b, w),
                   !Self.roundClosed(over: tick, roundStart: try w.roundStarts(itemIds: [b.itemId])[b.itemId])
             else { throw ClewError.notAllowed }
@@ -547,12 +622,19 @@ extension Clew {
     func blockNotifications(_ r: any StoreReader, now: Date, today: LocalDay) throws -> [PlannedNotification] {
         guard try r.setting(Self.blockAlertsKey) != "false" else { return [] }
         let rows = Dictionary(uniqueKeysWithValues: try todayList(r, on: today).rows.map { ($0.id, $0) })
+        let steps = try Self.taskSteps(r, taskIds: Array(rows.keys))
         return try r.timeBlocks(from: today).compactMap { b in
             guard b.localDay == today, b.removedAt == nil, b.start > now, let row = rows[b.itemId],
                   row.item.progress.target != nil ? !row.isGoalReached : !row.isDone
             else { return nil }
+            var title = row.item.title
+            if let stepId = b.stepId {
+                // A step's block: only while the step is open; titled as on the timeline.
+                guard let step = steps[b.itemId]?.open.first(where: { $0.id == stepId }) else { return nil }
+                title = "\(row.item.title) - \(step.step.title)"
+            }
             return PlannedNotification(id: NotificationPlanner.idPrefix + "block." + b.id.uuidString, fireAt: b.start,
-                                       content: .blockStarts(itemId: b.itemId, title: row.item.title, until: b.end))
+                                       content: .blockStarts(itemId: b.itemId, title: title, until: b.end))
         } + slotQuestions(r, now: now, today: today, rows: rows)
     }
 
@@ -580,6 +662,17 @@ extension Clew {
         return b
     }
 
+    /// A step block's tick is undone (Not finished, a move, Remove block): the step is
+    /// unticked, and its task too if it is done (SPEC 2026-11-21). False if it had none
+    /// standing.
+    @discardableResult
+    private func untickStepOfBlock(_ b: TimeBlock, now: Date, _ w: any StoreWriter) throws -> Bool {
+        guard let stepId = b.stepId, try Self.stands(b.stepTickId, taskId: b.itemId, w),
+              let step = try w.step(id: stepId) else { return false }
+        try Self.untick(step, at: now, w)
+        return true
+    }
+
     private func liveTick(of b: TimeBlock, _ r: any StoreReader) throws -> CheckIn? {
         guard let id = b.tickId, let tick = try r.checkIn(id: id), !tick.isVoided else { return nil }
         return tick
@@ -600,10 +693,12 @@ extension Clew {
             }
             try w.voidCheckIn(id: tick.id, at: now, reason: "blockMoved")
         }
+        try untickStepOfBlock(b, now: now, w)
         b.start = start
         b.minutes = minutes
         b.decidedAt = nil
         b.tickId = nil
+        b.stepTickId = nil
         b.askedAt = nil             // a moved slot block asks again at its new end
         b.touchedAt = now           // today's own now: Edit no longer moves it
         b.releasedAt = nil          // placed again: the task lives on the timeline again
@@ -742,7 +837,8 @@ extension Clew {
         let today = currentDay()
         return try storeForQueries.read { r in
             try r.timeBlocks(from: today)
-                .filter { $0.itemId == itemId && $0.localDay == today && $0.removedAt == nil && $0.end > now }
+                .filter { $0.itemId == itemId && $0.stepId == nil && $0.localDay == today && $0.removedAt == nil
+                          && $0.end > now }
                 .min { ($0.start, $0.id.uuidString) < ($1.start, $1.id.uuidString) }
         }
     }

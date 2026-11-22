@@ -226,6 +226,8 @@ final class FakeStore: ClewStore, @unchecked Sendable {
             guard state.items[block.itemId] != nil else { throw FactViolation.missingItem }
             // As the table's CHECK: whole quarter hours, 15 minutes to a long (DST) day.
             guard (15...1500).contains(block.minutes), block.minutes % 15 == 0 else { throw FactViolation.outOfRange }
+            // As the trigger: a block keeps its step.
+            if let old = state.timeBlocks[block.id], old.stepId != block.stepId { throw FactViolation.outOfRange }
             state.timeBlocks[block.id] = block
         }
         func insert(_ session: FocusSession) throws {

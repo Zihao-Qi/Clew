@@ -179,13 +179,18 @@ public struct TimeBlock: Hashable, Sendable, Identifiable, Codable {
     /// A goal that reached its total while placed goes back to the list: its blocks are
     /// released and no longer hold it on the timeline.
     public var releasedAt: Date?
+    /// A step's block (SPEC 2026-11-21): its end ticks that step of the task `itemId`,
+    /// and the task stays in the list. Never changes.
+    public let stepId: UUID?
+    /// The step tick this block made, if any.
+    public var stepTickId: UUID?
 
     public enum Origin: String, Codable, Sendable { case hand, slot }
 
     public init(id: UUID, itemId: UUID, localDay: LocalDay, start: Date, minutes: Int, placedAt: Date,
                 updatedAt: Date, decidedAt: Date? = nil, tickId: UUID? = nil, coverId: UUID? = nil,
                 removedAt: Date? = nil, origin: Origin = .hand, touchedAt: Date? = nil, askedAt: Date? = nil,
-                releasedAt: Date? = nil) {
+                releasedAt: Date? = nil, stepId: UUID? = nil, stepTickId: UUID? = nil) {
         self.id = id
         self.itemId = itemId
         self.localDay = localDay
@@ -201,11 +206,13 @@ public struct TimeBlock: Hashable, Sendable, Identifiable, Codable {
         self.touchedAt = touchedAt
         self.askedAt = askedAt
         self.releasedAt = releasedAt
+        self.stepId = stepId
+        self.stepTickId = stepTickId
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, itemId, localDay, start, minutes, placedAt, updatedAt, decidedAt, tickId, coverId, removedAt,
-             origin, touchedAt, askedAt, releasedAt
+             origin, touchedAt, askedAt, releasedAt, stepId, stepTickId
     }
 
     /// Exports from before slots have no origin: those blocks were placed by hand.
@@ -223,7 +230,9 @@ public struct TimeBlock: Hashable, Sendable, Identifiable, Codable {
             origin: try c.decodeIfPresent(Origin.self, forKey: .origin) ?? .hand,
             touchedAt: try c.decodeIfPresent(Date.self, forKey: .touchedAt),
             askedAt: try c.decodeIfPresent(Date.self, forKey: .askedAt),
-            releasedAt: try c.decodeIfPresent(Date.self, forKey: .releasedAt))
+            releasedAt: try c.decodeIfPresent(Date.self, forKey: .releasedAt),
+            stepId: try c.decodeIfPresent(UUID.self, forKey: .stepId),
+            stepTickId: try c.decodeIfPresent(UUID.self, forKey: .stepTickId))
     }
 
     public var end: Date { start.addingTimeInterval(TimeInterval(minutes * 60)) }

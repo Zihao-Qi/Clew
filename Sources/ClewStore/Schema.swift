@@ -21,7 +21,22 @@ enum Schema {
         migrator.registerMigration("v12-one-day-reminders", migrate: v12)
         migrator.registerMigration("v13-priority", migrate: v13)
         migrator.registerMigration("v14-steps", migrate: v14)
+        migrator.registerMigration("v15-step-blocks", migrate: v15)
         return migrator
+    }
+
+    /// A step on the timeline (SPEC 2026-11-21): a block may be a step's, which it keeps;
+    /// its tick is a step tick.
+    private static func v15(_ db: Database) throws {
+        try db.execute(sql: """
+            ALTER TABLE timeBlock ADD COLUMN stepId TEXT REFERENCES step(id);
+            ALTER TABLE timeBlock ADD COLUMN stepTickId TEXT REFERENCES stepTick(id);
+            DROP TRIGGER timeBlock_fixed;
+            CREATE TRIGGER timeBlock_fixed BEFORE UPDATE ON timeBlock
+            WHEN NEW.id IS NOT OLD.id OR NEW.itemId IS NOT OLD.itemId OR NEW.localDay IS NOT OLD.localDay
+              OR NEW.placedAt IS NOT OLD.placedAt OR NEW.stepId IS NOT OLD.stepId
+            BEGIN SELECT RAISE(ABORT, 'a time block keeps its task, step, day and placing'); END;
+            """)
     }
 
     /// Steps in a task (SPEC 2026-11-21): steps are definitions (tombstoned, never

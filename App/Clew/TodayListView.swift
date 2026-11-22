@@ -206,7 +206,8 @@ struct TodayListView: View {
                 // quarter hour under the pointer; the other rows stay where they are.
                 if isOverTimeline(value.location.y), let day = model.timeline {
                     let start = TimelineMetrics.start(atContentY: value.location.y - timelineGeo.contentTop, in: day)
-                    let open = day.blocks.first { $0.block.itemId == row.id && $0.block.end > Date() }?.block.minutes
+                    let open = day.blocks.first { $0.block.itemId == row.id && $0.block.stepId == nil
+                                                  && $0.block.end > Date() }?.block.minutes
                     let minutes = min(open ?? Clew.blockDefaultMinutes, TimelineMetrics.room(after: start, in: day))
                     lifted = Lifted(itemId: row.id, blockId: nil, title: row.item.title, overTimeline: true,
                                     frame: blockFrame(start: start, minutes: minutes), start: start, minutes: minutes)
@@ -273,8 +274,16 @@ struct TodayListView: View {
                 ? Clew.blockStart(minutesIn: Double(top / TimelineMetrics.pointsPerMinute), minutes: b.minutes, day: day)
                 : b.start
             lifted = Lifted(itemId: b.itemId, blockId: b.id, title: block.title, overTimeline: true,
-                            frame: blockFrame(start: start, minutes: b.minutes), start: start, minutes: b.minutes)
+                            frame: blockFrame(start: start, minutes: b.minutes), start: start, minutes: b.minutes,
+                            stepId: b.stepId)
             scrollAtEdge(value.location.y)
+            listEdgeScroll(nil)
+        } else if b.stepId != nil {
+            // A step's block over the list goes back to its task wherever it is dropped:
+            // no gap opens (SPEC 2026-11-21).
+            lifted = Lifted(itemId: b.itemId, blockId: b.id, title: block.title, overTimeline: false,
+                            frame: rowFrame(centeredAt: value.location.y), minutes: b.minutes, stepId: b.stepId)
+            scrollAtEdge(nil)
             listEdgeScroll(nil)
         } else {
             // Down over the list: a row, with the rows opening the gap it would take.
@@ -303,7 +312,9 @@ struct TodayListView: View {
         var t = Transaction()
         t.disablesAnimations = true
         withTransaction(t) {
-            if let landing, !landing.overTimeline {
+            if let landing, !landing.overTimeline, block.block.stepId != nil {
+                model.removeBlock(block.block.id)              // back under its task
+            } else if let landing, !landing.overTimeline {
                 let slot = landing.slot ?? 0
                 if let label = sequence.firstIndex(of: Self.labelID), slot > label {
                     // Dropped in Goals & Later (SPEC 2026-11-15).
@@ -322,7 +333,15 @@ struct TodayListView: View {
     /// one tint for both. Its frame moves smoothly from one shape to the other.
     @ViewBuilder
     private var liftedCard: some View {
-        if let lifted, let row = model.row(lifted.itemId) {
+        if let lifted, lifted.stepId != nil {
+            LiftedBlockCard(title: lifted.title, start: lifted.overTimeline ? lifted.start : nil, minutes: lifted.minutes)
+                .frame(width: lifted.frame.width, height: lifted.frame.height)
+                .clipped()
+                .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
+                .position(x: lifted.frame.midX, y: lifted.frame.midY)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        } else if let lifted, let row = model.row(lifted.itemId) {
             ZStack(alignment: .topLeading) {
                 VStack(alignment: .leading, spacing: 0) {
                     RowView(row: row, model: model, onEdit: {}, onOpen: {}, isDragged: true,
@@ -366,6 +385,38 @@ struct TodayListView: View {
         screen = .detail(row.id)
     }
 
+    /// A step dragged in the list (SPEC 2026-11-21): over the hours the card is the block it
+    /// would be, at the quarter hour under the pointer. Nil: the drag is over.
+    private func stepDragged(_ entry: TaskSteps.Entry, of row: TodayRow, at point: CGPoint?) -> Bool {
+        guard let point else {
+            if lifted?.stepId == entry.id { lifted = nil }
+            scrollAtEdge(nil)
+            return false
+        }
+        guard isOverTimeline(point.y), let day = model.timeline else {
+            if lifted?.stepId == entry.id { lifted = nil }
+            scrollAtEdge(nil)
+            return false
+        }
+        let start = TimelineMetrics.start(atContentY: point.y - timelineGeo.contentTop, in: day)
+        let open = day.blocks.first { $0.block.stepId == entry.id && $0.block.end > Date() }?.block.minutes
+        let minutes = min(open ?? Clew.blockDefaultMinutes, TimelineMetrics.room(after: start, in: day))
+        lifted = Lifted(itemId: row.id, blockId: nil, title: "\(row.item.title) - \(entry.step.title)",
+                        overTimeline: true, frame: blockFrame(start: start, minutes: minutes), start: start,
+                        minutes: minutes, stepId: entry.id)
+        scrollAtEdge(point.y)
+        return true
+    }
+
+    /// Dropped over the hours: the step goes there.
+    private func stepDropped(_ entry: TaskSteps.Entry) -> Bool {
+        guard let landing = lifted, landing.stepId == entry.id, landing.blockId == nil, landing.overTimeline,
+              let start = landing.start else { return false }
+        lifted = nil
+        scrollAtEdge(nil)
+        return model.placeStep(entry.id, at: start, minutes: landing.minutes)
+    }
+
     /// Add Step…: unfold the task with an empty step line after its steps.
     private func startAddingStep(_ row: TodayRow) {
         startAddingStep(row.id)
@@ -400,7 +451,10 @@ struct TodayListView: View {
             if (steps != nil && model.isUnfolded(row.id)) || adding {
                 StepsList(model: model, row: row, steps: steps ?? TaskSteps(taskId: row.id, entries: []),
                           adding: adding, onAddClose: { if addingStep == row.id { addingStep = nil } },
-                          onOpen: { screen = .detail(row.id) }, hoveredStep: $hoveredStep)
+                          onOpen: { screen = .detail(row.id) }, hoveredStep: $hoveredStep,
+                          listSpace: Self.listSpace,
+                          onTimelineDrag: { entry, point in stepDragged(entry, of: row, at: point) },
+                          onTimelineDrop: { entry in stepDropped(entry) })
                     .padding(.bottom, 2)
             }
         }
@@ -660,6 +714,9 @@ struct TodayListView: View {
                 if let id = hoveredStep, let entry = model.steps.values.lazy.flatMap(\.entries).first(where: { $0.id == id }) {
                     hoveredStep = nil
                     model.deleteStep(entry.step)
+                } else if let id = hoveredItem, let entry = model.stepEntry(id) {
+                    hoveredItem = nil                          // a step's block
+                    model.deleteStep(entry.step)
                 } else if let id = hoveredItem {
                     hoveredItem = nil
                     model.delete(id)
@@ -717,6 +774,9 @@ struct Lifted: Equatable {
     var minutes: Int = Clew.blockDefaultMinutes
     /// A block over the list: the gap it would take.
     var slot: Int? = nil
+    /// A step dragged from the list, or a step's block (SPEC 2026-11-21): drawn as a block
+    /// card everywhere, and it opens no gap in the list.
+    var stepId: UUID? = nil
 }
 
 /// The lifted card's block shape: the same tint as a dragged row, the block's title and

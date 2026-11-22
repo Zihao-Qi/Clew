@@ -309,16 +309,18 @@ private struct Access: StoreWriter {
         try db.execute(
             sql: """
                 INSERT INTO timeBlock (id, itemId, localDay, start, minutes, placedAt, updatedAt, decidedAt, tickId,
-                                       coverId, removedAt, origin, touchedAt, askedAt, releasedAt)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                       coverId, removedAt, origin, touchedAt, askedAt, releasedAt, stepId, stepTickId)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET start = excluded.start, minutes = excluded.minutes,
                     updatedAt = excluded.updatedAt, decidedAt = excluded.decidedAt, tickId = excluded.tickId,
                     coverId = excluded.coverId, removedAt = excluded.removedAt, touchedAt = excluded.touchedAt,
-                    askedAt = excluded.askedAt, releasedAt = excluded.releasedAt
+                    askedAt = excluded.askedAt, releasedAt = excluded.releasedAt, stepId = excluded.stepId,
+                    stepTickId = excluded.stepTickId
                 """,
             arguments: [b.id.uuidString, b.itemId.uuidString, b.localDay.description, b.start, b.minutes, b.placedAt,
                         b.updatedAt, b.decidedAt, b.tickId?.uuidString, b.coverId?.uuidString, b.removedAt,
-                        b.origin.rawValue, b.touchedAt, b.askedAt, b.releasedAt]
+                        b.origin.rawValue, b.touchedAt, b.askedAt, b.releasedAt, b.stepId?.uuidString,
+                        b.stepTickId?.uuidString]
         )
     }
 
@@ -628,7 +630,9 @@ private struct Access: StoreWriter {
             origin: try raw(row, "origin", table: t),
             touchedAt: row["touchedAt"],
             askedAt: row["askedAt"],
-            releasedAt: row["releasedAt"]
+            releasedAt: row["releasedAt"],
+            stepId: try optionalUUID(row, "stepId", table: t),
+            stepTickId: try optionalUUID(row, "stepTickId", table: t)
         )
     }
 
