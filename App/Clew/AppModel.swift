@@ -1,4 +1,5 @@
 import AppKit
+import ClewAgent
 import ClewCore
 import ClewDomain
 import ClewStore
@@ -408,9 +409,11 @@ final class AppModel {
     func tap(_ row: TodayRow) {
         if row.item.kind == .goal || !row.isDone {
             var tick: CheckIn?
-            guard run({ tick = try $0.checkIn(itemId: row.id) }), tick != nil else { return }
+            guard run({ tick = try $0.checkIn(itemId: row.id) }), let tick else { return }
+            remember(.taskTicked, row.item, tick: tick.id)
             if Clew.hintsRatingAfterTick(row.item) { offerRating(itemId: row.id) }
         } else {
+            ai?.untick(row.lastTickToday?.id)
             run { try $0.undoToday(itemId: row.id) }
             if ratingPrompt?.itemId == row.id { ratingPrompt = nil }
         }
@@ -447,13 +450,28 @@ final class AppModel {
     func resumeFocus() { run { try $0.resumeFocus() } }
     func extendFocus() { run { try $0.extendFocus() } }
     func startBreak() { run { try $0.startBreak() } }
-    func stopFocus() { run { try $0.stopFocus() } }
+    func stopFocus() {
+        let ended = focus
+        guard run({ try $0.stopFocus() }) else { return }
+        rememberFocus(ended)
+    }
     /// "Done" when time is up: the tick (or +1) the user asked for, never an undo, then
     /// the timer ends.
     func finishFocus(_ row: TodayRow) {
+        let ended = focus
         var tick: CheckIn?
         guard run({ tick = try $0.finishFocus() }) else { return }
+        rememberFocus(ended)
+        if let tick { remember(.taskTicked, row.item, tick: tick.id) }
         if tick != nil { offerRating(itemId: row.id) }
+    }
+
+    /// Focus time ended, in whole minutes, if a focus (not a break) was running.
+    private func rememberFocus(_ timer: FocusTimer?) {
+        guard let timer, timer.phase == .focus, let item = item(timer.itemId) else { return }
+        let spent = (timer.pausedAt ?? Date()).timeIntervalSince(timer.startedAt) - timer.pausedFor
+        let minutes = Int((min(spent, timer.length) / 60).rounded())
+        if minutes > 0 { remember(.focusEnded, item, value: minutes) }
     }
     func setFocusOffersBreak(_ on: Bool) { run { try $0.setFocusOffersBreak(on) } }
 
@@ -716,6 +734,7 @@ final class AppModel {
     func rate(_ row: TodayRow, _ rating: Int) {
         guard let tick = row.lastTickToday else { return }
         guard run({ try $0.rate(checkInId: tick.id, rating: rating) }) else { return }
+        remember(.rated, row.item, value: rating, tick: tick.id)
         let prompt = RatingPrompt(itemId: row.id, rating: rating)
         ratingPrompt = prompt
         hideRatingPrompt(after: .milliseconds(1200), unlessChangedFrom: prompt)
@@ -747,6 +766,7 @@ final class AppModel {
     }
 
     func undo(_ row: TodayRow) {
+        ai?.untick(row.lastTickToday?.id)
         run { try $0.undoToday(itemId: row.id) }
         if ratingPrompt?.itemId == row.id { ratingPrompt = nil }
     }
@@ -924,23 +944,54 @@ final class AppModel {
 
     @discardableResult
     func addStep(to taskId: UUID, title: String) -> Bool { run { try $0.addStep(taskId: taskId, title: title) } }
+
+    /// + or Add all on a suggestion: added as typing it would, and remembered (SPEC "Memory").
+    @discardableResult
+    func addSuggestedStep(to taskId: UUID, title: String) -> Bool {
+        let before = Set(allSteps(of: taskId).map(\.step.id))
+        guard addStep(to: taskId, title: title) else { return false }
+        if let added = allSteps(of: taskId).first(where: { !before.contains($0.step.id) }), let task = item(taskId) {
+            ai?.suggested(added.step.id)
+            remember(.suggestionAdded, task, step: added.step.title)
+        }
+        return true
+    }
+
+    // MARK: - Memory (SPEC "Memory")
+
+    func item(_ id: UUID) -> Item? { row(id)?.item ?? ((try? clew?.item(id: id)) ?? nil) }
+
+    /// What the person did, for Clew's notes: only while AI is ready, and text only for
+    /// a task whose title they typed (docs/AGENT.md §7).
+    func remember(_ kind: ActivityEvent.Kind, _ task: Item, step: String? = nil, value: Int? = nil, tick: UUID? = nil) {
+        ai?.record(kind, task: task.title, typed: task.titleOrigin == .typed, step: step, value: value, tick: tick)
+    }
     @discardableResult
     func renameStep(_ id: UUID, _ title: String) -> Bool { run { try $0.renameStep(id: id, title: title) } }
     func moveStep(_ id: UUID, toOpenIndex index: Int) { run { try $0.moveStep(id: id, toOpenIndex: index) } }
 
     func deleteStep(_ step: Step) {
         guard run({ try $0.deleteStep(id: step.id) }) else { return }
+        if ai?.memory.activity.isSuggested(step.id) == true, let task = item(step.taskId) {
+            remember(.suggestedStepDeleted, task, step: step.title)
+        }
         showDeleted(step.id, step.title, isStep: true)
     }
 
     /// A step's circle: tick it, or untick it (on a done task that unticks the task too).
     func tapStep(_ entry: TaskSteps.Entry) {
         if entry.isDone {
+            ai?.untick(entry.step.id)
+            if let row = row(entry.step.taskId), row.isDone { ai?.untick(row.lastTickToday?.id) }
             run { try $0.untickStep(id: entry.step.id) }
             if ratingPrompt?.itemId == entry.step.taskId { ratingPrompt = nil }
         } else {
             var finished: CheckIn?
             guard run({ finished = try $0.tickStep(id: entry.step.id) }) else { return }
+            if let task = item(entry.step.taskId) {
+                remember(.stepTicked, task, step: entry.step.title, tick: entry.step.id)
+                if let finished { remember(.taskTicked, task, tick: finished.id) }
+            }
             // The last step finished the task: as its own tick does.
             if finished != nil, let row = row(entry.step.taskId), Clew.hintsRatingAfterTick(row.item) {
                 offerRating(itemId: row.id)

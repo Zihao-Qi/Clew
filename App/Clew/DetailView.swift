@@ -441,7 +441,7 @@ struct DetailSteps: View {
                     DetailStepRow(model: model, entry: entry)
                 }
                 // Suggestions go under the steps (SPEC "Suggest steps").
-                SuggestionList(ask: ask, leading: 0, trailing: 0) { model.addStep(to: task.id, title: $0) }
+                SuggestionList(ask: ask, leading: 0, trailing: 0) { model.addSuggestedStep(to: task.id, title: $0) }
                 if canAdd {
                     if adding {
                         HStack(spacing: 6) {

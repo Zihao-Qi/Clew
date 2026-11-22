@@ -23,12 +23,15 @@ final class SuggestionAsk {
     init() { state = Self.preset ?? .idle }
     #endif
     @ObservationIgnored private var generation = 0
+    /// Who asked and for which task, to record a dismissal (SPEC "Memory").
+    @ObservationIgnored private var asked: (ai: AIModel, input: SuggestSteps.Input)?
 
     var isThinking: Bool { state == .thinking }
 
     /// Asks again; a new set replaces the old one.
     func ask(_ ai: AIModel, _ input: SuggestSteps.Input) {
-        cancel()
+        reset()   // asking again replaces the set; not a dismissal
+        asked = (ai, input)
         generation += 1
         let mine = generation
         state = .thinking
@@ -46,8 +49,17 @@ final class SuggestionAsk {
         }
     }
 
-    /// Cancel, Esc, the line closing: nothing appears later.
+    /// Cancel, Esc, Dismiss, the line closing: nothing appears later. Suggestions still
+    /// shown count as dismissed.
     func cancel() {
+        if case .shown(let steps) = state, !steps.isEmpty, let asked {
+            asked.ai.record(.suggestionsDismissed, task: asked.input.title, typed: !asked.input.untrusted,
+                            value: steps.count)
+        }
+        reset()
+    }
+
+    private func reset() {
         generation += 1
         task?.cancel()
         task = nil
