@@ -342,8 +342,17 @@ final class AppModel {
 
     // MARK: - Last week's card (SPEC 2026-11-15)
 
-    /// The card taken when the menu opened on the list; fixed for that opening.
+    /// The card's lines, taken when the menu opened on the list; fixed for that opening.
+    /// nil in a card that shows only "What Clew noticed".
     private(set) var weekCard: WeekRecap?
+    /// The card is open in this opening, with or without last week's lines.
+    private(set) var weekCardOpen = false
+    /// "What Clew noticed" (SPEC, AI-N): the rows chosen when the card appeared; never refilled.
+    private(set) var noticed: [Note] = []
+    /// Only while AI is ready: losing it removes the section at once.
+    var noticedShown: [Note] { ai?.isReady == true ? noticed : [] }
+    /// A card is never left empty: a notes-only card closes when its section goes.
+    var showsWeekCard: Bool { weekCardOpen && (weekCard != nil || !noticedShown.isEmpty) }
     /// Between the menu window becoming key and losing it: one opening.
     @ObservationIgnored private var menuSessionOpen = false
     /// Counts the menu's closings, so views that stay mounted (the details) can drop
@@ -355,27 +364,45 @@ final class AppModel {
     func menuOpened(onList: Bool) {
         guard !menuSessionOpen else { return }
         menuSessionOpen = true
-        weekCard = nil
+        closeWeekCard()
         // The one refresh of an opening, on any screen: the menu shows today as it is
         // now (SPEC 2026-11-19). Blocks settle first, so a Sunday block that ended counts.
         refresh()
         guard onList, let clew else { return }
-        guard let card = try? clew.weekCard() else { return }
-        weekCard = card
-        try? clew.markWeekCardShown(card)
+        guard let due = try? clew.weekCardDue() else { return }
+        let notes = ai.map { $0.isReady ? Memory.noticed($0.memory.notes) : [] } ?? []
+        guard due.recap != nil || !notes.isEmpty else { return }
+        weekCard = due.recap
+        noticed = notes
+        weekCardOpen = true
+        try? clew.markWeekCardShown(lastWeek: due.lastWeek)
+    }
+
+    private func closeWeekCard() {
+        weekCard = nil
+        weekCardOpen = false
+        noticed = []
+    }
+
+    /// True or Not really on a row of "What Clew noticed": the row leaves at once; the
+    /// answer applies only if the note is still as it was shown.
+    func answerNoticed(_ note: Note, true yes: Bool) {
+        noticed.removeAll { $0.id == note.id }
+        ai?.answer(note, true: yes)
+        if !showsWeekCard { closeWeekCard() }
     }
 
     /// The menu window lost the keyboard or closed: the opening is over.
     func menuClosed() {
         menuSessionOpen = false
         menuCloses += 1
-        weekCard = nil
+        closeWeekCard()
         // A refusal line never greets the next opening or the next day (SPEC 2026-11-17).
         notice = nil
     }
 
     /// × on the card, or leaving the list: it does not come back this week.
-    func dropWeekCard() { weekCard = nil }
+    func dropWeekCard() { closeWeekCard() }
 
     /// Settings › Progress: last week, whatever the switch says and whether shown.
     func lastWeek() -> WeekRecap? { (try? clew?.lastWeek()) ?? nil }
@@ -391,7 +418,10 @@ final class AppModel {
 
     #if DEBUG
     /// The snapshot shows the card without a real menu opening.
-    func showWeekCardForSnapshot() { weekCard = (try? clew?.lastWeek()) ?? nil }
+    func showWeekCardForSnapshot() {
+        weekCard = (try? clew?.lastWeek()) ?? nil
+        weekCardOpen = weekCard != nil
+    }
     #endif
 
     /// Read fresh on every render; the details page is small.
