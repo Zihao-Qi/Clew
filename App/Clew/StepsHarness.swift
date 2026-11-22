@@ -16,9 +16,14 @@ extension Snapshot {
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(1))
             var failures = 0
+            // Clicks and drags need Clew in front; macOS may keep another app there while
+            // the person uses it. Such failures say so, rather than look like bugs (2026-11-22).
+            var lostFront = false
             @MainActor func report(_ name: String, _ ok: Bool) {
                 if !ok { failures += 1 }
-                print(ok ? "PASS" : "FAIL", name); fflush(stdout)
+                if !NSApp.isActive { lostFront = true }
+                print(ok ? "PASS" : "FAIL", name, !ok && lostFront ? "(another app took the front during the run)" : "")
+                fflush(stdout)
             }
             do {
                 let clew = Clew(store: try SQLiteStore.inMemory(), clock: SystemClock(), zones: SystemTimeZone())
@@ -29,6 +34,14 @@ extension Snapshot {
                 let milk = try clew.addItem(NewItem(title: "Buy milk", shape: .today)).id
                 AppModel.foldDefaults = UserDefaults(suiteName: "clew-steps-test")!
                 let model = AppModel(clew: clew, notify: false)
+                // AI signed in, as on a Mac that uses Suggest steps: its row action must not
+                // change any click (2026-11-22).
+                if ProcessInfo.processInfo.environment["CLEW_STEPS_AI"] != nil {
+                    let ai = testAI(MemorySession.signedIn(), RecordedAI(), "steps")
+                    await ai.refreshModels()
+                    model.useAI(ai)
+                    print("AI signed in:", model.canSuggestSteps(talk)); fflush(stdout)
+                }
                 model.setUnfolded(talk, false)
                 model.refresh()
                 let probe = StepsProbe()
@@ -54,10 +67,15 @@ extension Snapshot {
                 /// The Mac may be in use while this runs: the test window takes the keyboard
                 /// back before each action, or its events go nowhere.
                 @MainActor func focus(_ w: NSWindow) async throws {
-                    guard !w.isKeyWindow || !NSApp.isActive else { return }
-                    NSApp.activate(ignoringOtherApps: true)
-                    w.makeKeyAndOrderFront(nil)
-                    try await Task.sleep(for: .milliseconds(200))
+                    for attempt in 0..<10 {
+                        if w.isKeyWindow && NSApp.isActive { return }
+                        if attempt == 0, !NSApp.isActive, number > 0 { lostFront = true }   // taken after the first click
+                        NSApp.activate(ignoringOtherApps: true)
+                        w.makeKeyAndOrderFront(nil)
+                        try await Task.sleep(for: .milliseconds(200))
+                    }
+                    // Only another app in front counts; a window that won't take key is a real failure.
+                    if !NSApp.isActive { lostFront = true }
                 }
                 @MainActor func mouse(_ p: NSPoint, clicks: Int = 1, settle: Int = 120) async throws {
                     try await focus(window)
@@ -285,6 +303,9 @@ extension Snapshot {
                 try await detailKey("\u{1b}", code: 53)
                 report("then Esc goes back", backs == 1)
                 _ = steps
+                if failures > 0 && lostFront {
+                    print("Clew could not stay in front: run again with no other app in use."); fflush(stdout)
+                }
                 exit(failures == 0 ? 0 : 1)
             } catch {
                 print("steps test failed:", error)
