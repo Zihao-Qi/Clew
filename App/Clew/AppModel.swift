@@ -413,8 +413,8 @@ final class AppModel {
             remember(.taskTicked, row.item, tick: tick.id)
             if Clew.hintsRatingAfterTick(row.item) { offerRating(itemId: row.id) }
         } else {
-            ai?.untick(row.lastTickToday?.id)
-            run { try $0.undoToday(itemId: row.id) }
+            let last = row.lastTickToday?.id
+            if run({ try $0.undoToday(itemId: row.id) }) { ai?.untick(last) }
             if ratingPrompt?.itemId == row.id { ratingPrompt = nil }
         }
     }
@@ -449,7 +449,11 @@ final class AppModel {
     func pauseFocus() { run { try $0.pauseFocus() } }
     func resumeFocus() { run { try $0.resumeFocus() } }
     func extendFocus() { run { try $0.extendFocus() } }
-    func startBreak() { run { try $0.startBreak() } }
+    func startBreak() {
+        let ended = focus
+        guard run({ try $0.startBreak() }) else { return }
+        rememberFocus(ended)   // the focus that just ended is time worked (review)
+    }
     func stopFocus() {
         let ended = focus
         guard run({ try $0.stopFocus() }) else { return }
@@ -459,10 +463,12 @@ final class AppModel {
     /// the timer ends.
     func finishFocus(_ row: TodayRow) {
         let ended = focus
+        // A task already done today gets its existing tick back: not a new one (review).
+        let alreadyDone = row.isDone && row.item.kind != .goal
         var tick: CheckIn?
         guard run({ tick = try $0.finishFocus() }) else { return }
         rememberFocus(ended)
-        if let tick { remember(.taskTicked, row.item, tick: tick.id) }
+        if let tick, !alreadyDone { remember(.taskTicked, row.item, tick: tick.id) }
         if tick != nil { offerRating(itemId: row.id) }
     }
 
@@ -766,8 +772,8 @@ final class AppModel {
     }
 
     func undo(_ row: TodayRow) {
-        ai?.untick(row.lastTickToday?.id)
-        run { try $0.undoToday(itemId: row.id) }
+        let last = row.lastTickToday?.id
+        if run({ try $0.undoToday(itemId: row.id) }) { ai?.untick(last) }
         if ratingPrompt?.itemId == row.id { ratingPrompt = nil }
     }
 
@@ -981,15 +987,19 @@ final class AppModel {
     /// A step's circle: tick it, or untick it (on a done task that unticks the task too).
     func tapStep(_ entry: TaskSteps.Entry) {
         if entry.isDone {
-            ai?.untick(entry.step.id)
-            if let row = row(entry.step.taskId), row.isDone { ai?.untick(row.lastTickToday?.id) }
-            run { try $0.untickStep(id: entry.step.id) }
+            let taskTick = row(entry.step.taskId).flatMap { $0.isDone ? $0.lastTickToday?.id : nil }
+            if run({ try $0.untickStep(id: entry.step.id) }) {
+                ai?.untick(entry.step.id)
+                ai?.untick(taskTick)
+            }
             if ratingPrompt?.itemId == entry.step.taskId { ratingPrompt = nil }
         } else {
             var finished: CheckIn?
             guard run({ finished = try $0.tickStep(id: entry.step.id) }) else { return }
             if let task = item(entry.step.taskId) {
-                remember(.stepTicked, task, step: entry.step.title, tick: entry.step.id)
+                // The last step finishing the task shares the task's tick, so unticking the
+                // task drops both (review).
+                remember(.stepTicked, task, step: entry.step.title, tick: finished?.id ?? entry.step.id)
                 if let finished { remember(.taskTicked, task, tick: finished.id) }
             }
             // The last step finished the task: as its own tick does.

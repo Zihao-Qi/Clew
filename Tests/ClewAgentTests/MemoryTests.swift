@@ -101,7 +101,19 @@ import Testing
         let schemaText = try #require(request.schema).json
         let schema = try #require(JSONSerialization.jsonObject(with: Data(schemaText.utf8)) as? [String: Any])
         #expect((schema["required"] as? [String]) == ["steps", "note"])
-        #expect((schema["properties"] as? [String: Any])?["note"] != nil)
+        // OpenAI's strict mode: a nullable object, every field required, nothing else allowed.
+        let noteSchema = try #require((schema["properties"] as? [String: Any])?["note"] as? [String: Any])
+        let options = try #require(noteSchema["anyOf"] as? [[String: Any]])
+        #expect(options.count == 2 && options[1]["type"] as? String == "null")
+        let object = options[0]
+        #expect(object["type"] as? String == "object" && object["additionalProperties"] as? Bool == false)
+        #expect(Set(object["required"] as? [String] ?? []) == ["action", "id", "about", "says", "based_on"])
+        let fields = try #require(object["properties"] as? [String: [String: Any]])
+        let idType = fields["id"]?["type"] as? [String]
+        let actions = fields["action"]?["enum"] as? [String]
+        #expect(idType == ["string", "null"])
+        #expect(actions == ["add", "change", "delete"])
+        #expect(Set(fields.keys) == ["action", "id", "about", "says", "based_on"])
         #expect(log.records.first?.note == "change" && !"\(log.records)".contains("11"))
     }
 
@@ -139,6 +151,10 @@ import Testing
         #expect((try? missing.result.get()) == ["Open the slides"] && missing.note == .failure(.noteSchema))
         let none = await run(#"{"steps":["Open the slides"],"note":null}"#)
         #expect(none.note == .success(nil))
+        // A model asked without structured output may fence its JSON.
+        let fenced = await run("```json\n{\"steps\":[\"Open the slides\"],\"note\":\(good)}\n```")
+        #expect((try? fenced.result.get()) == ["Open the slides"])
+        #expect(fenced.note == .success(ProposedNote(change: change(.add), sent: [:])))
         let unfinished = await run("", events: [.text(#"{"steps":["a"],"note":null}"#)])
         #expect(unfinished.note == nil && unfinished.sentEvents.isEmpty)
         let limited = await run("", events: [], error: .usageLimit)

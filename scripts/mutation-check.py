@@ -944,6 +944,11 @@ M = [
  ("AG53 no memory instructions", AG+"Job.swift", "            instructions += \"\\n\" + Memory.instructions\n", "", "ClewAgentTests"),
  ("AG54 steps never untrusted", AG+"SuggestSteps.swift", "public func untrusted(_ input: Input) -> Bool { input.untrusted }", "public func untrusted(_ input: Input) -> Bool { false }", "ClewAgentTests"),
  ("AG55 note code wrong", AG+"Job.swift", "case .success(let p?): p.change.action.rawValue", "case .success(let p?): \"x\"", "ClewAgentTests"),
+ ("AG56 note open to extra fields", AG+"Memory.swift", "\"additionalProperties\": false,\n            ] as [String: Any]", "\"additionalProperties\": true,\n            ] as [String: Any]", "ClewAgentTests"),
+ ("AG57 note not nullable", AG+"Memory.swift", "            [\"type\": \"null\"],\n", "", "ClewAgentTests"),
+ ("AG58 id not nullable", AG+"Memory.swift", "\"id\": [\"type\": [\"string\", \"null\"]],", "\"id\": [\"type\": \"string\"],", "ClewAgentTests"),
+ ("AG59 fence kept", AG+"Job.swift", "jsonObject(with: Data(SuggestSteps.unfenced(text).utf8))", "jsonObject(with: Data(text.utf8))", "ClewAgentTests"),
+ ("AI41 confirm keeps a narrowed grant", AI+"ChatGPTAccount.swift", "        guard next.hasPlanPermission else { throw ProviderError.noPlanPermission }\n    }\n\n    private func refresh", "    }\n\n    private func refresh", "ClewAITests"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

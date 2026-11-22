@@ -222,6 +222,7 @@ final class AIModel {
             var confirmed = true
             if let session { confirmed = await revoke(session) }
             try? store.clear()
+            useAI = false   // again, in case it was turned on while revoking (review)
             revocationUnconfirmed = !confirmed
             models = []
             message = nil

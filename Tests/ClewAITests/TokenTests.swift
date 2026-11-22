@@ -92,6 +92,12 @@ import Testing
         transport.onJSON("/token", 200, #"{"access_token":"A2","refresh_token":"R2","scope":"openid email"}"#)
         let account = ChatGPTAccount(store: MemoryStore(session(expiresIn: 0)), transport: transport, now: { t0 })
         await #expect(throws: ProviderError.noPlanPermission) { try await account.access() }
+
+        // Confirming an invalid user by a refresh says so too (review, AI-M).
+        let again = FakeTransport()
+        again.onJSON("/token", 200, #"{"access_token":"A2","refresh_token":"R2","scope":"openid email"}"#)
+        let confirming = ChatGPTAccount(store: MemoryStore(session()), transport: again, now: { t0 })
+        await #expect(throws: ProviderError.noPlanPermission) { try await confirming.confirm() }
     }
 
     @Test func withoutPlanPermissionNothingIsAsked() async throws {

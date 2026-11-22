@@ -137,6 +137,15 @@ extension Snapshot {
                 if let row = model.row(talk) { model.tap(row) }   // untick
                 report("unticking drops the tick's event",
                        !ai.memory.activity.events.contains { $0.kind == .taskTicked && $0.task == "Prepare the talk" })
+                let pack = try clew.addItem(NewItem(title: "Pack", shape: .today)).id
+                try clew.addStep(taskId: pack, title: "Socks")
+                model.refresh()
+                let before = ai.memory.activity.events.count
+                if let socks = model.allSteps(of: pack).first { model.tapStep(socks) }
+                let finished = ai.memory.activity.events.count == before + 2
+                if let row = model.row(pack) { model.tap(row) }   // untick the task the step finished
+                report("unticking a task its last step finished drops both events",
+                       finished && ai.memory.activity.events.count == before)
                 transport.reply(200, RecordedAI.steps(["Rehearse once"], note: [
                     "action": "add", "id": NSNull(), "about": "Talks", "says": "Starts with the slides",
                     "based_on": "Added a slides step first"]))

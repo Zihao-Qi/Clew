@@ -44,7 +44,9 @@ struct AISettings: View {
                         Text(verbatim: note.says)
                         Group {
                             if note.from == .you {
-                                Text("\(note.about) · Your note")
+                                if note.about.isEmpty { Text("Your note") } else { Text("\(note.about) · Your note") }
+                            } else if note.about.isEmpty {
+                                Text(verbatim: note.basedOn ?? "")
                             } else {
                                 Text(verbatim: "\(note.about) · \(note.basedOn ?? "")")
                             }
@@ -180,6 +182,8 @@ struct AISettings: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    .disabled(ai.signingOut)
+                    .accessibilityLabel(Text("Use AI"))
                 }
             }
             if let message = ai.message {
