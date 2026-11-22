@@ -98,8 +98,8 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
    on the timeline (2026-11-19). Only if turned on in
    Settings › About (off by default, 2026-11-13), Clew also asks GitHub once a day
    whether a newer release exists (see "About and updates"). Only while signed in to
-   ChatGPT in Settings › AI (2026-11-22), Clew sends what "Suggest steps" lists to
-   OpenAI, when the person asks for suggestions.
+   ChatGPT in Settings › AI with **Use AI** on (2026-11-22), Clew sends what "Suggest
+   steps" and "Memory" list to OpenAI, when the person asks for suggestions.
 9. **Launch at login** (`SMAppService`), toggled in a small Settings window.
 10. **Task details.** Double-clicking a row opens its details (*changed* 2026-11-21,
     *user*: a click unfolds a task with steps; see "Steps in a task"); so does
@@ -133,7 +133,7 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
 
 - **Daruma goals and badges.** Paint one eye when a counted goal starts and the
   second when it's finished. Levels come from lifetime totals.
-- Opt-in AI help beyond Suggest steps: an evening line, "fits today" from Goals & Later,
+- Opt-in AI help beyond Suggest steps and Memory: an evening line, "fits today" from Goals & Later,
   a reader (see docs/AGENT.md, v2 2026-11-22).
 - Sync with Dayflow (its local JSON API: `GET /api/day`, `PATCH /api/tasks/:id`).
 - iPhone, iCloud sync, Obsidian export.
@@ -1078,9 +1078,12 @@ stopped daily use, not adding features.
     Sign in with ChatGPT for open-source, local apps; nothing is paid to Clew). One
     account per Mac; Sign out to change it. Signed in: the account's email, **Sign
     out**, **Manage usage** (chatgpt.com/settings/usage), "Using ChatGPT plan" beside the
-    model (the plan's list, the first by default), and the switch **Suggest steps**
-    (signing in turns it on; it can be turned off). One line says what is sent: "Sends
-    the task's title, its note and its steps to OpenAI, using your ChatGPT plan." The
+    model (the plan's list, the first by default; the person chooses), and one toggle,
+    **Use AI** (*changed* 2026-11-22, *user*: it replaces the switch **Suggest steps**;
+    on means every AI job and Memory, off means none; signing in turns it on). Its line
+    says in general what it does, not each field sent (*user*): "Clew suggests steps
+    and keeps notes on how you work, using your ChatGPT plan." Below it, **What Clew
+    knows** (see "Memory"). The
     first time the person signs in, Settings shows once "You're using your ChatGPT
     plan" with **Got it** (OpenAI's rule). Declined plan permission: "Clew can't use
     your ChatGPT plan yet" with **Continue with ChatGPT** to ask again; a plan OpenAI
@@ -1094,7 +1097,7 @@ stopped daily use, not adding features.
     again to use AI." with **Sign in again**. A sign-out OpenAI could not confirm: "Clew
     couldn't confirm the sign-out with OpenAI. To be sure, disconnect Clew in ChatGPT's
     settings." All of this text, OpenAI's included, is in the String Catalog.
-  - **Where:** only while signed in, the switch on, and a step can be added (a one-off
+  - **Where:** only while signed in, Use AI on, and a step can be added (a one-off
     task, not done). In Add Step…'s line, a small ✨ button at its right end ("Suggest
     steps" to VoiceOver); in the details, **Suggest Steps** beside **Add Step**. A
     "Suggest steps" VoiceOver action on the task's row opens Add Step…'s line and asks.
@@ -1117,8 +1120,9 @@ stopped daily use, not adding features.
     Esc goes back to the list as before (suggestions dropped). Nothing is added
     without a tap; suggestions are never kept.
   - **What is sent:** the task's title, its note, its steps' names and whether each is
-    done, and the instruction to reply in the title's language. Never other tasks, tick
-    times, ratings, dates, the link's address or any page's content. A fetched page
+    done, and the instruction to reply in the title's language; with them, the notes
+    and recent activity (see "Memory"). Never the link's address or any page's
+    content. A fetched page
     title is sent marked untrusted, and the instructions say to treat it as data only
     (docs/AGENT.md §4).
   - **Checked before showing:** each suggestion trimmed (a leading "1.", "-" or "•"
@@ -1129,13 +1133,50 @@ stopped daily use, not adding features.
   - **When it fails:** in the suggestions' place, "Couldn't suggest steps. Try again."
     for 5 seconds; no retry by itself. Usage limit: "ChatGPT usage limit reached ·
     Manage usage", until dismissed or the line closes; the next ✨ asks again. A
-    sign-in OpenAI has ended: the switch turns off and Settings › AI says "Sign in
+    sign-in OpenAI has ended: Use AI turns off and Settings › AI says "Sign in
     again". Offline or no answer in 30 seconds: "Couldn't suggest steps. Try again."
   - **Kept:** in the Keychain, the sign-in's tokens; in this Mac's preferences (not in
     Clew's data, so not in exports or backups), the issued app id, this Mac's host id,
-    the account's email and id, the model, the switch and the one-time note's "Got it".
-    No suggestions and no history. A debug build logs each request's job, size, model,
+    the account's email and id, the model, the toggle and the one-time note's "Got it".
+    No suggestions are kept (the notes are, see "Memory"). A debug build logs each request's job, size, model,
     time, outcome and OpenAI's request id, never its text or any token.
+
+- **Memory (AI-M, 2026-11-22, *user*).** Clew keeps short notes about how the person
+  works, so its suggestions fit them better, and shows every note
+  (docs/AGENT.md §7). Only notes: no preferences, no settings, no categories.
+  - **A note:** what it is about (≤ 30 characters, like "Writing"), one line (≤ 100,
+    "Goes better before noon"), from Clew or from you, and for Clew's notes what it is
+    based on (≤ 100, "5 of 6 writing tasks ticked before 12"). At most 40.
+  - **Settings › AI › What Clew knows** (under Use AI; also while signed out, if any
+    notes are kept): one row per note, newest change first: the line, and in
+    secondary text "Writing · 5 of 6 writing tasks ticked before 12" (Clew's) or
+    "Writing · Your note" (yours), with **Edit** ("Edit note <line>") and **Delete**
+    ("Delete note <line>"), which deletes at once. Then **Add note** (disabled at 40,
+    "Clew keeps up to 40 notes.") and **Forget everything**, which asks first: "Forget
+    everything Clew knows?" / "This deletes all notes and what Clew has recorded. It
+    can't be undone." with **Forget** and **Cancel**. No notes: "No notes yet. Clew adds
+    them as it learns how you work, and you can add your own." Footer: "Clew never
+    changes a note you added or edited."
+  - **Edit and Add** open a small sheet: **About** and **Note** fields, capped at 30
+    and 100 characters, with **Cancel** and **Save** (Save needs a note line). Saving
+    makes the note yours and drops its "based on". Your text is never checked or
+    changed.
+  - **How notes are made** (after each job, *user*): while Use AI is on, Clew records
+    on this Mac what happens: a task or step ticked (its title, time of day and
+    weekday), a rating, focus time, a step added from a suggestion, suggestions
+    dismissed, a suggested step deleted later. A fetched page title is recorded only as
+    "a saved link". Each job's request sends all notes and the latest 20 events not yet
+    sent; its answer may add one note, or change or delete one of Clew's own. No
+    extra request is made. A new or changed note appears in the list at once, with
+    nothing in the menu.
+  - **Checked before keeping** (Clew's notes only): the caps, no banned words (none
+    allowed by any title), not the same as an existing note (ignoring case and spaces),
+    the note it changes exists and is Clew's, at most 40. A failing note is dropped
+    silently and the job's own result still shows. When the job's task has a fetched
+    title, no note is kept from that answer.
+  - **Kept** in its own file on this Mac, apart from Clew's data: not in exports or
+    backups. Use AI off stops and clears the record of what happens; the notes stay.
+    Signing out keeps them. Only Delete and Forget everything remove them.
 
 ## Open question
 

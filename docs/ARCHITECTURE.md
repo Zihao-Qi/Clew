@@ -959,7 +959,10 @@ history too, e.g. "show my goal as it was in March".
 at read time. That is simpler, but wrong after time-zone changes and for 1 a.m. ticks.
 
 **ADR-4 The agent never changes user data.** It reads, and writes only its own
-`AgentOutput` namespace; the user applies anything it proposes. *Alternative:*
+`AgentOutput` namespace; the user applies anything it proposes. Memory notes
+(AGENT §7, 2026-11-22) are such a namespace: their own file in Application Support,
+not facts, not exported or backed up; the person may edit, add or delete them, the
+agent only its own. *Alternative:*
 agent writes directly, which is faster but risks silent list churn that undermines
 trust. Automatic ingestion (e.g. new Watch Later videos into Later) belongs to
 the *import* path (extension, `import` scope), not the agent.
@@ -993,7 +996,7 @@ remains an option for an App Store build.
 1. Distribution: Mac App Store is possible but unlikely (2026-11-08). The sandbox
    stays on anyway as a no-regret choice; the store-vs-Developer-ID decision waits
    until public release.
-2. AI decisions are tracked in [AGENT.md](AGENT.md) §11.
+2. AI decisions are tracked in [AGENT.md](AGENT.md) §12.
 
 ## 15. Project-wide rules (decided 2026-11-08)
 

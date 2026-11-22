@@ -88,7 +88,7 @@ import Testing
     }
 }
 
-/// docs/AGENT.md §2, §8: one request, no retry, a 30-second cap, a log without text.
+/// docs/AGENT.md §2, §9: one request, no retry, a 30-second cap, a log without text.
 @Suite struct AgentTests {
     struct Scripted: Provider {
         var events: [ProviderEvent] = []
