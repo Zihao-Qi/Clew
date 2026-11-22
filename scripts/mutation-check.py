@@ -8,6 +8,7 @@ reports which tests failed. "SURVIVED" means no test noticed: add or fix a test.
 source file is always restored, even on error.
 
   python3 -I scripts/mutation-check.py . [first] [last]      # default: all
+  python3 -I scripts/mutation-check.py . --patterns           # only check the patterns
 """
 import json, pathlib, re, subprocess, sys
 
@@ -134,7 +135,7 @@ M = [
  ("C53 blank og ok", C+"PageTitle.swift", "return metaContents(html)[\"og:title\"].flatMap { QuickEntry.cleanTitle(decodeEntities($0)) } != nil", "return metaContents(html)[\"og:title\"] != nil", "ClewCoreTests"),
  ("C54 gt ends tag", C+"PageTitle.swift", "#\"<meta\\s(?:[^>\"']|\"[^\"]*\"|'[^']*')*>\"#", "#\"<meta\\s[^>]*>\"#", "ClewCoreTests"),
  ("C55 head stop", C+"PageTitle.swift", "guard prefix.range(of: Data(\"og:title\".utf8)) != nil else { return false }", "if prefix.range(of: Data(\"</head>\".utf8)) != nil { return true }", "ClewCoreTests"),
- ("E1 voided active", S+"SQLiteStore.swift", "SELECT DISTINCT localDay FROM checkIn WHERE voidedAt IS NULL AND localDay >= ?", "SELECT DISTINCT localDay FROM checkIn WHERE localDay >= ?", "ClewStoreTests"),
+ ("E1 voided active", S+"SQLiteStore.swift", "SELECT localDay FROM checkIn WHERE voidedAt IS NULL AND localDay >= ?", "SELECT localDay FROM checkIn WHERE localDay >= ?", "ClewStoreTests"),
  ("E2 seven is eight", C+"Export.swift", "last7: inWindow.filter { $0 >= today.adding(days: -6) }.count", "last7: inWindow.filter { $0 >= today.adding(days: -7) }.count", "ClewCoreTests"),
  ("E3 fourteen is fifteen", C+"Export.swift", "try $0.activeDays(from: today.adding(days: -13))", "try $0.activeDays(from: today.adding(days: -14))", "ClewCoreTests"),
  ("E4 future counted", C+"Export.swift", "let inWindow = days.filter { $0 <= today }", "let inWindow = days", "ClewCoreTests"),
@@ -434,9 +435,9 @@ M = [
  ("TL13 move stays decided", C+"Timeline.swift", "        b.decidedAt = nil\n", "", TL),
  ("TL14 remove keeps tick", C+"Timeline.swift", "try w.voidCheckIn(id: tick.id, at: now, reason: \"blockRemoved\")", "", TL),
  ("TL15 rounds ignored", C+"Timeline.swift", "return tick.at < roundStart", "return false", TL),
- ("TL18 drag always adds", C+"Timeline.swift", "            if let open {", "            if false, let open {", TL),
- ("TL19 drag moves ended", C+"Timeline.swift", "let open = try w.timeBlocks(from: today)\n                .filter { $0.itemId == itemId && $0.localDay == today && $0.removedAt == nil && $0.end > now }", "let open = try w.timeBlocks(from: today)\n                .filter { $0.itemId == itemId && $0.localDay == today && $0.removedAt == nil }", TL),
- ("TL20 not cut at end", C+"Timeline.swift", "let length = minutes ?? min(Self.blockDefaultMinutes, room)", "let length = minutes ?? Self.blockDefaultMinutes", TL),
+ ("TL18 drag always adds", C+"Timeline.swift", "            if let open {\n                // Its length goes with it", "            if false, let open {\n                // Its length goes with it", "TimelineTests|FocusTests|FocusRecordTests"),
+ ("TL19 drag moves ended", C+"Timeline.swift", "$0.removedAt == nil\n                          && $0.end > now }\n                .min { ($0.start, $0.id.uuidString) < ($1.start, $1.id.uuidString) }\n            let room", "$0.removedAt == nil }\n                .min { ($0.start, $0.id.uuidString) < ($1.start, $1.id.uuidString) }\n            let room", "TimelineTests|FocusTests|FocusRecordTests"),
+ ("TL20 not cut at end", C+"Timeline.swift", "let length = minutes ?? min(Self.blockDefaultMinutes, room)\n            try Self.checkLength(length, start: start, bounds)\n            let block = TimeBlock(id: newID(), itemId: itemId,", "let length = minutes ?? Self.blockDefaultMinutes\n            try Self.checkLength(length, start: start, bounds)\n            let block = TimeBlock(id: newID(), itemId: itemId,", "TimelineTests|FocusTests|FocusRecordTests"),
  ("TL21 any minute", C+"Timeline.swift", "offset.truncatingRemainder(dividingBy: TimeInterval(blockStepMinutes * 60)) == 0", "offset >= 0", TL),
  ("TL22 any task", C+"Timeline.swift", "guard let row = try todayList(w, on: today).rows.first(where: { $0.id == itemId }), !row.isGoalReached else {", "guard let row = Optional(try todayList(w, on: today).rows.first ?? TodayRow?.none), row?.isGoalReached != true else {", TL),
  ("TL23 late any day", C+"Timeline.swift", "                  LocalDay(of: decided, in: zone, rolloverHour: rolloverHour) == today,\n", "", TL),
@@ -449,7 +450,7 @@ M = [
  ("TL31 no permission for blocks", C+"Reminders.swift", "|| anyReminder || anyBlock", "|| anyReminder", TL),
  ("TL32 lanes never reused", C+"Timeline.swift", "let lane = columnEnds.firstIndex { $0 <= span.start } ?? columnEnds.count", "let lane = columnEnds.count", TL),
  ("TL34 blocks not exported", S+"SQLiteStore.swift", "timeBlocks: try Row.fetchAll(db, sql: \"SELECT * FROM timeBlock ORDER BY placedAt, id\").map(Self.timeBlock)", "timeBlocks: []", "SQLiteStoreTests"),
- ("TL35 blocks not observed", S+"SQLiteStore.swift", "Table(\"focusSession\"),\n                                                     Table(\"timeBlock\"))", "Table(\"focusSession\"))", "SQLiteStoreTests"),
+ ("TL35 blocks not observed", S+"SQLiteStore.swift", "Table(\"focusSession\"),\n                                                     Table(\"timeBlock\"), Table(\"step\")", "Table(\"focusSession\"),\n                                                     Table(\"step\")", "SQLiteStoreTests"),
  ("TL36 old exports refused", C+"ClewStore.swift", "timeBlocks: try c.decodeIfPresent([TimeBlock].self, forKey: .timeBlocks) ?? []", "timeBlocks: try c.decode([TimeBlock].self, forKey: .timeBlocks)", "SQLiteStoreTests"),
  ("TL37 not finished keeps", C+"Timeline.swift", "try w.voidCheckIn(id: tick.id, at: now, reason: \"notFinished\")\n            b.updatedAt", "b.updatedAt", TL),
  ("TL38 late undo keeps", C+"Timeline.swift", "for (_, tick) in late { try w.voidCheckIn(id: tick.id, at: now, reason: \"notFinished\") }", "", TL),
@@ -463,8 +464,8 @@ M = [
  ("TL48 skipped shows pending", C+"Timeline.swift", "?? (cover.map { !$0.isVoided } == true ? .covered : .skipped)", "?? (cover.map { !$0.isVoided } == true ? .covered : .pending)", TL),
  ("TL49 another for any task", C+"Timeline.swift", "            let b = try liveBlock(id, today: today, w)\n            guard try todayList(w, on: today).rows.contains(where: { $0.id == b.itemId }) else {\n                throw ClewError.notAllowed\n            }\n", "            let b = try liveBlock(id, today: today, w)\n", TL),
  ("TL50 any length", C+"Timeline.swift", "guard minutes >= blockStepMinutes, minutes % blockStepMinutes == 0, minutes <= room else {", "guard minutes <= room else {", TL),
- ("TL51 drag not cut", C+"Timeline.swift", "minutes: minutes ?? min(open.minutes, room), today: today,", "minutes: minutes ?? open.minutes, today: today,", TL),
- ("TL52 placed stay in list", C+"Timeline.swift", "public var placedItems: Set<UUID> { Set(blocks.filter { $0.block.releasedAt == nil }.map(\\.block.itemId)) }", "public var placedItems: Set<UUID> { [] }", TL),
+ ("TL51 drag not cut", C+"Timeline.swift", "like a new block's.\n                return try change(open, start: start, minutes: minutes ?? min(open.minutes, room)", "like a new block's.\n                return try change(open, start: start, minutes: minutes ?? open.minutes", "TimelineTests|FocusTests|FocusRecordTests"),
+ ("TL52 placed stay in list", C+"Timeline.swift", "public var placedItems: Set<UUID> {\n        Set(blocks.filter { $0.block.releasedAt == nil && $0.block.stepId == nil }.map(\\.block.itemId))\n", "public var placedItems: Set<UUID> {\n        []\n", "TimelineTests|FocusTests|FocusRecordTests"),
  ("TL53 hidden rows ignored", C+"Clew.swift", "let others = (all ?? order).filter { $0 != dragged }", "let others = order.filter { $0 != dragged }", "ReorderTests"),
  ("TL54 slot by top", C+"Clew.swift", "spans.filter { ($0.minY + $0.maxY) / 2 < pointerY }.count", "spans.filter { $0.minY < pointerY }.count", "ReorderTests"),
  ("TL55 gap after slot", C+"Clew.swift", "index >= slot ? height : 0", "index > slot ? height : 0", "ReorderTests"),
@@ -494,7 +495,7 @@ M = [
  ("SL11 edit ignores started", C+"Timeline.swift", "if let slot = item.slot, let place = slotPlacement(slot, on: today), place.start > now {", "if let slot = item.slot, let place = slotPlacement(slot, on: today) {", SL),
  ("SL12 hand move untouched", C+"Timeline.swift", "        b.touchedAt = now           // today's own now: Edit no longer moves it\n", "", SL),
  ("SL13 never released", C+"Timeline.swift", "} else if b.releasedAt == nil, rows[b.itemId]?.isGoalReached == true {", "} else if false, b.releasedAt == nil, rows[b.itemId]?.isGoalReached == true {", SL),
- ("SL14 released still placed", C+"Timeline.swift", "Set(blocks.filter { $0.block.releasedAt == nil }.map(\\.block.itemId))", "Set(blocks.map(\\.block.itemId))", SL),
+ ("SL14 released still placed", C+"Timeline.swift", "Set(blocks.filter { $0.block.releasedAt == nil && $0.block.stepId == nil }.map(\\.block.itemId))", "Set(blocks.filter { $0.block.stepId == nil }.map(\\.block.itemId))", "SlotTests|TimelineTests|FocusTests"),
  ("SL15 reached placeable", C+"Timeline.swift", "guard let row = try todayList(w, on: today).rows.first(where: { $0.id == itemId }), !row.isGoalReached else {", "guard let row = try todayList(w, on: today).rows.first(where: { $0.id == itemId }) else {", SL),
  ("SL16 replaced stays released", C+"Timeline.swift", "        b.releasedAt = nil          // placed again: the task lives on the timeline again\n", "", SL),
  ("SL17 gap not skipped", C+"Timeline.swift", "           gapEnd <= start {\n            start = gapEnd", "           gapEnd > start {\n            start = gapEnd", SL),
@@ -539,7 +540,7 @@ M = [
  # A new task from the timeline (SPEC 2026-11-13)
  ("DC1 new block never decides", C+"Timeline.swift", "            return (item, try decideIfEnded(block, now: now, w))", "            return (item, block)", "TimelineTests"),
  ("DC2 any start", C+"Timeline.swift", "        try Self.checkStart(start, bounds)\n        // 15 or 30:", "        // 15 or 30:", "TimelineTests"),
- ("DC3 not cut at 4", C+"Timeline.swift", "let length = min(Self.blockDefaultMinutes, Int(bounds.end.timeIntervalSince(start) / 60))", "let length = Self.blockDefaultMinutes", "TimelineTests"),
+ ("DC3 not cut at 4", C+"Timeline.swift", "let length = minutes ?? min(Self.blockDefaultMinutes, Int(bounds.end.timeIntervalSince(start) / 60))", "let length = minutes ?? Self.blockDefaultMinutes", "TimelineTests"),
  ("DC4 half made", C+"Timeline.swift", "        try Self.checkStart(start, bounds)\n        // 15 or 30:", "        _ = try? addItem(NewItem(title: title, shape: .today))\n        try Self.checkStart(start, bounds)\n        // 15 or 30:", "TimelineTests"),
  ("DC5 untrimmed", C+"Clew.swift", "        let title = try Self.validTitle(new.title)\n        let url = try new.url.map(Self.validURL)\n", "        _ = try Self.validTitle(new.title)\n        let title = new.title\n        let url = try new.url.map(Self.validURL)\n", "TimelineTests"),
  ("DC6 draft first on a tie", C+"CalendarEvents.swift", "if let draft { spans.append((.draft, draft.start, draft.end, 0, blocks.count)) }", "if let draft { spans.append((.draft, draft.start, draft.end, 0, -1)) }", "CalendarEventTests"),
@@ -622,7 +623,7 @@ M = [
  ("TE1 an untouched block moves", C+"Timeline.swift", "case (let open?, let w?) where open.start == w.start && open.minutes == w.minutes: self = .keep", "case (let open?, let w?) where false && open.start == w.start && open.minutes == w.minutes: self = .keep", "TimelineEditTests"),
  ("TE2 unchecking keeps it", C+"Timeline.swift", "case (let open?, nil): self = .remove(open.id)", "case (_?, nil): self = .keep", "TimelineEditTests"),
  ("TE3 a length change is kept", C+"Timeline.swift", "where open.start == w.start && open.minutes == w.minutes", "where open.start == w.start", "TimelineEditTests"),
- ("TE4 ended blocks are open", C+"Timeline.swift", "                .filter { $0.itemId == itemId && $0.localDay == today && $0.removedAt == nil && $0.end > now }\n                .min { ($0.start, $0.id.uuidString) < ($1.start, $1.id.uuidString) }\n        }\n    }\n}", "                .filter { $0.itemId == itemId && $0.localDay == today && $0.removedAt == nil }\n                .min { ($0.start, $0.id.uuidString) < ($1.start, $1.id.uuidString) }\n        }\n    }\n}", "TimelineEditTests"),
+ ("TE4 ended blocks are open", C+"Timeline.swift", "$0.removedAt == nil\n                          && $0.end > now }\n                .min { ($0.start, $0.id.uuidString) < ($1.start, $1.id.uuidString) }\n        }\n    }\n}", "$0.removedAt == nil }\n                .min { ($0.start, $0.id.uuidString) < ($1.start, $1.id.uuidString) }\n        }\n    }\n}", "TimelineEditTests"),
  ("AS1 top scrolls down", C+"ListAutoScroll.swift", "            return -speed(depth: (viewport.minY + edge - pointerY) / edge)", "            return speed(depth: (viewport.minY + edge - pointerY) / edge)", "ListAutoScrollTests"),
  ("AS2 no top band", C+"ListAutoScroll.swift", "        if pointerY < viewport.minY + edge {", "        if pointerY < viewport.minY {", "ListAutoScrollTests"),
  ("AS3 no slowest step", C+"ListAutoScroll.swift", "        max(1, min(1, depth) * maxStep)", "        min(1, depth) * maxStep", "ListAutoScrollTests"),
@@ -736,11 +737,11 @@ M = [
  ("MB1 count by default", C+"MenuBarStyle.swift", "public static let defaultMenuBarStyle = MenuBarStyle.ring", "public static let defaultMenuBarStyle = MenuBarStyle.count", "MenuBarStyleTests"),
  ("MB2 unknown throws", C+"MenuBarStyle.swift", "return (try? JSONDecoder().decode(MenuBarStyle.self, from: Data(json.utf8))) ?? Self.defaultMenuBarStyle", "return try JSONDecoder().decode(MenuBarStyle.self, from: Data(json.utf8))", "MenuBarStyleTests"),
  ("MB3 not saved", C+"MenuBarStyle.swift", "try storeForQueries.write { try $0.saveSetting(Self.menuBarStyleKey, json: json, updatedAt: now) }", "_ = (json, now)", "MenuBarStyleTests"),
- ("MB4 ring with no tasks", C+"MenuBarStyle.swift", "guard total > 0 else { return nil }\n        let done = max(0, done)\n        if done >= total {\n", "guard total >= 0 else { return nil }\n        let done = max(0, done)\n        if done >= total {\n", "MenuBarStyleTests"),
+ ("MB4 ring with no tasks", C+"MenuBarStyle.swift", "guard total > 0 else { return nil }\n        let done = max(0, done)\n        let gold = min(max(0, gold), done)\n", "guard total >= 0 else { return nil }\n        let done = max(0, done)\n        let gold = min(max(0, gold), done)\n", "MenuBarStyleTests"),
  ("MB5 finished one early", C+"MenuBarStyle.swift", "if done >= total {\n            self = .finished", "if done >= total - 1 {\n            self = .finished", "MenuBarStyleTests"),
  ("MB6 parts up to 7", C+"MenuBarStyle.swift", "} else if total <= Self.maxParts {", "} else if total < Self.maxParts {", "MenuBarStyleTests"),
  ("MB7 parts always", C+"MenuBarStyle.swift", "} else if total <= Self.maxParts {", "} else if true {", "MenuBarStyleTests"),
- ("MB8 share of the left", C+"MenuBarStyle.swift", "self = .share(Double(done) / Double(total))", "self = .share(Double(total - done) / Double(total))", "MenuBarStyleTests"),
+ ("MB8 share of the left", C+"MenuBarStyle.swift", "self = .share(Double(done) / Double(total), gold:", "self = .share(Double(total - done) / Double(total), gold:", "MenuBarStyleTests"),
  ("MB9 daruma with no tasks", C+"MenuBarStyle.swift", "        guard total > 0 else { return nil }\n        let done = max(0, done)\n        if done >= total { return 5 }", "        guard total >= 0 else { return nil }\n        let done = max(0, done)\n        if done >= total { return 5 }", "MenuBarStyleTests"),
  ("MB10 both eyes one early", C+"MenuBarStyle.swift", "if done >= total { return 5 }", "if done >= total - 1 { return 5 }", "MenuBarStyleTests"),
  ("MB11 one eye before a tick", C+"MenuBarStyle.swift", "if done == 0 { return 1 }", "if done < 0 { return 1 }", "MenuBarStyleTests"),
@@ -809,8 +810,8 @@ M = [
  ("SP1 steps on habits", C+"Steps.swift", "(item.kind == .once || item.kind == .link) && !isCollectionItem(item)", "item.kind != .goal && !isCollectionItem(item)", "StepTests"),
  ("SP2 add to done task", C+"Steps.swift", "            guard try !Self.isDone(w, taskId) else { throw ClewError.notAllowed }\n            let last", "            let last", "StepTests"),
  ("SP3 last step no finish", C+"Steps.swift", "if open.count == 1 {", "if open.count == 0 {", "StepTests"),
- ("SP5 untick keeps task", C+"Steps.swift", "            for c in try w.checkIns(itemIds: [step.taskId], from: Self.allDays) {\n                try w.voidCheckIn(id: c.id, at: now, reason: \"undo\")\n            }\n", "", "StepTests"),
- ("SP6 untick keeps step", C+"Steps.swift", "            for t in try w.stepTicks(taskIds: [step.taskId]) where t.stepId == id {\n                try w.voidStepTick(id: t.id, at: now)\n            }\n", "", "StepTests"),
+ ("SP5 untick keeps task", C+"Steps.swift", "        for c in try w.checkIns(itemIds: [step.taskId], from: allDays) {\n            try w.voidCheckIn(id: c.id, at: now, reason: \"undo\")\n        }\n", "", "StepTests"),
+ ("SP6 untick keeps step", C+"Steps.swift", "        for t in try w.stepTicks(taskIds: [step.taskId]) where t.stepId == step.id {\n            try w.voidStepTick(id: t.id, at: now)\n        }\n", "", "StepTests"),
  ("SP7 finishing tick stands", D+"Steps.swift", "            if let finished = t.finishedCheckInId, !taskTickIds.contains(finished) { continue }\n", "", "StepTests"),
  ("SP8 task done not all steps", D+"Steps.swift", "Entry(step: s, doneAt: own[s.id] ?? taskDoneAt)", "Entry(step: s, doneAt: own[s.id])", "StepTests"),
  ("SP9 done not first", D+"Steps.swift", "return TaskSteps(taskId: taskId, entries: done + open)", "return TaskSteps(taskId: taskId, entries: open + done)", "StepTests"),
@@ -951,6 +952,15 @@ M = [
  ("AI41 confirm keeps a narrowed grant", AI+"ChatGPTAccount.swift", "        guard next.hasPlanPermission else { throw ProviderError.noPlanPermission }\n    }\n\n    private func refresh", "    }\n\n    private func refresh", "ClewAITests"),
 ]
 
+# --patterns: only check that every entry still matches its source exactly once (fast;
+# CI runs it so a moved line is noticed when it moves, not months later).
+if len(sys.argv) > 2 and sys.argv[2] == "--patterns":
+    stale = [(name, (repo / path).read_text().count(old)) for name, path, old, new, flt in M
+             if (repo / path).read_text().count(old) != 1]
+    for name, count in stale:
+        print(f"{name:28} PATTERN NOT UNIQUE ({count})")
+    print(f"{len(M) - len(stale)} of {len(M)} patterns match once")
+    sys.exit(1 if stale else 0)
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0
 hi = int(sys.argv[3]) if len(sys.argv) > 3 else len(M)
 results = []
