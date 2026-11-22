@@ -51,7 +51,16 @@ extension Snapshot {
                 }
                 var number = 0
                 /// `clicks` clicks at a point in the window, 60 ms apart, like a person's.
+                /// The Mac may be in use while this runs: the test window takes the keyboard
+                /// back before each action, or its events go nowhere.
+                @MainActor func focus(_ w: NSWindow) async throws {
+                    guard !w.isKeyWindow || !NSApp.isActive else { return }
+                    NSApp.activate(ignoringOtherApps: true)
+                    w.makeKeyAndOrderFront(nil)
+                    try await Task.sleep(for: .milliseconds(200))
+                }
                 @MainActor func mouse(_ p: NSPoint, clicks: Int = 1, settle: Int = 120) async throws {
+                    try await focus(window)
                     for n in 1...clicks {
                         for (i, type) in [NSEvent.EventType.leftMouseDown, .leftMouseUp].enumerated() {
                             number += 1
@@ -66,6 +75,7 @@ extension Snapshot {
                     try await Task.sleep(for: .milliseconds(settle))
                 }
                 @MainActor func key(_ chars: String, code: UInt16 = 0) async throws {
+                    try await focus(window)
                     for type in [NSEvent.EventType.keyDown, .keyUp] {
                         let e = NSEvent.keyEvent(with: type, location: .zero, modifierFlags: [],
                                                  timestamp: ProcessInfo.processInfo.systemUptime,
@@ -179,6 +189,58 @@ extension Snapshot {
                 try await Task.sleep(for: .milliseconds(300))
                 report("Esc closes it and drops what was typed",
                        frame("newStep:\(talk)") == nil && !shown().contains("dropped"))
+                // On the timeline (SPEC 2026-11-21): a step dragged up onto the hours becomes
+                // a block "Task - Step" and leaves the list; dragged back down, it returns.
+                try clew.setTimelineShown(true)
+                model.refresh()
+                model.setUnfolded(talk, true)
+                try await Task.sleep(for: .milliseconds(600))
+                @MainActor func drag(from p0: NSPoint, to p1: NSPoint) async throws {
+                    try await focus(window)
+                    func post(_ type: NSEvent.EventType, _ p: NSPoint) {
+                        number += 1
+                        NSApp.postEvent(NSEvent.mouseEvent(with: type, location: p, modifierFlags: [],
+                                                           timestamp: ProcessInfo.processInfo.systemUptime,
+                                                           windowNumber: window.windowNumber, context: nil,
+                                                           eventNumber: number, clickCount: 1,
+                                                           pressure: type == .leftMouseUp ? 0 : 1)!, atStart: false)
+                    }
+                    post(.leftMouseDown, p0)
+                    try await Task.sleep(for: .milliseconds(50))
+                    for i in 1...8 {
+                        let f = CGFloat(i) / 8
+                        post(.leftMouseDragged, NSPoint(x: p0.x + (p1.x - p0.x) * f, y: p0.y + (p1.y - p0.y) * f))
+                        try await Task.sleep(for: .milliseconds(40))
+                    }
+                    post(.leftMouseUp, p1)
+                    try await Task.sleep(for: .milliseconds(500))
+                }
+                let open = model.steps(of: talk)?.open.first
+                if let open, let stepFrame = frame("step:\(open.id)") {
+                    // Window points: the hours are near the top, above the list.
+                    let target = NSPoint(x: 200, y: window.frame.height - 28 - 90)
+                    try await drag(from: NSPoint(x: stepFrame.midX, y: stepFrame.midY), to: target)
+                    let block = model.timeline?.blocks.first { $0.block.stepId == open.id }
+                    report("a step dragged onto the hours becomes its block, named \"Task - Step\"",
+                           block?.title == "Prepare the talk - \(open.step.title)" && block?.block.itemId == talk)
+                    report("… and leaves the list while its task stays",
+                           frame("step:\(open.id)") == nil && model.listRows.contains { $0.id == talk })
+                    if let block, let blockFrame = frame("block:\(block.id)") {
+                        let back = frame("circle:\(milk)") ?? milkCircle
+                        try await drag(from: NSPoint(x: blockFrame.midX, y: blockFrame.midY),
+                                       to: NSPoint(x: 200, y: back.midY))
+                        report("dragged back onto the list, it returns to its task",
+                               model.timeline?.blocks.contains { $0.block.stepId == open.id } == false
+                               && frame("step:\(open.id)") != nil)
+                    } else {
+                        report("the step's block is shown", false)
+                    }
+                } else {
+                    report("an open step is shown", false)
+                }
+                try clew.setTimelineShown(false)
+                model.refresh()
+
                 // Details: Esc closes the step line before it leaves the page (review).
                 var backs = 0
                 let detailHost = NSHostingView(rootView: DetailView(model: model, itemId: talk, onEdit: { _ in },
@@ -190,6 +252,7 @@ extension Snapshot {
                 detailWindow.makeKeyAndOrderFront(nil)
                 try await Task.sleep(for: .milliseconds(Int(NSEvent.doubleClickInterval * 1000) + 400))
                 @MainActor func detailClick(_ key: String) async throws {
+                    try await focus(detailWindow)
                     guard let r = DebugFrames.frames[key] else { report("found \(key)", false); return }
                     let p = NSPoint(x: r.midX, y: detailWindow.frame.height - r.midY)
                     for (i, type) in [NSEvent.EventType.leftMouseDown, .leftMouseUp].enumerated() {
@@ -203,6 +266,7 @@ extension Snapshot {
                     try await Task.sleep(for: .milliseconds(400))
                 }
                 @MainActor func detailKey(_ chars: String, code: UInt16) async throws {
+                    try await focus(detailWindow)
                     for type in [NSEvent.EventType.keyDown, .keyUp] {
                         NSApp.postEvent(NSEvent.keyEvent(with: type, location: .zero, modifierFlags: [],
                                                          timestamp: ProcessInfo.processInfo.systemUptime,
@@ -258,6 +322,21 @@ extension Snapshot {
             model.refresh()
             for (name, look) in [("light", NSAppearance.Name.aqua), ("dark", .darkAqua)] {
                 render(RootView(model: model), appearance: look, to: dir.appendingPathComponent("steps-list-\(name).png"))
+            }
+            // On the timeline (SPEC 2026-11-21): a step's block "Task - Step" at the next
+            // quarter hour, the task's own block with its count an hour later; the step
+            // leaves the unfolded list, the task stays.
+            try clew.setTimelineShown(true)
+            let day = try clew.timeline()
+            let quarter = day.start.addingTimeInterval((Date().timeIntervalSince(day.start) / 900).rounded(.down) * 900 + 900)
+            if quarter.addingTimeInterval(5400) <= day.end {
+                try clew.placeStepOnTimeline(stepId: talkSteps[1], start: quarter, minutes: 45)
+                try clew.placeOnTimeline(itemId: move, start: quarter.addingTimeInterval(3600), minutes: 30)
+            }
+            model.setUnfolded(move, false)
+            model.refresh()
+            for (name, look) in [("light", NSAppearance.Name.aqua), ("dark", .darkAqua)] {
+                render(RootView(model: model), appearance: look, to: dir.appendingPathComponent("steps-timeline-\(name).png"))
                 render(RootView(model: model, screen: .detail(talk)), appearance: look,
                        to: dir.appendingPathComponent("steps-detail-\(name).png"))
             }

@@ -471,6 +471,27 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         #expect(all.steps.map(\.id) == [step.id] && all.stepTicks.map(\.id) == [tick.id])
     }
 
+    @Test func aStepsBlockKeepsItsStepAndRecordsItsTick() throws {
+        // SPEC 2026-11-21: a step's block round-trips with its step and step tick; its step
+        // never changes.
+        let store = try SQLiteStore.inMemory()
+        let task = sampleItem(.once)
+        let step = Step(id: UUID(), taskId: task.id, title: "a", sortKey: 1, createdAt: t0, updatedAt: t0)
+        let other = Step(id: UUID(), taskId: task.id, title: "b", sortKey: 2, createdAt: t0, updatedAt: t0)
+        let tick = StepTick(id: UUID(), stepId: step.id, taskId: task.id, localDay: day("2026-11-11"), at: t0, source: .timeline)
+        var b = TimeBlock(id: UUID(), itemId: task.id, localDay: day("2026-11-11"), start: t0, minutes: 30, placedAt: t0,
+                          updatedAt: t0, stepId: step.id)
+        try store.write { w in try w.insert(task); try w.save(step); try w.save(other); try w.save(b); try w.insert(tick) }
+        b.stepTickId = tick.id
+        b.decidedAt = t0 + 60
+        try store.write { try $0.save(b) }
+        #expect(try store.read { try $0.timeBlock(id: b.id) } == b)
+        #expect(throws: DatabaseError.self) {
+            try store.writer.write { try $0.execute(sql: "UPDATE timeBlock SET stepId = ? WHERE id = ?",
+                                                    arguments: [other.id.uuidString, b.id.uuidString]) }
+        }
+    }
+
     @Test func aStandingStepTickMakesADayActive() throws {
         // SPEC 2026-11-21: a step tick alone makes a day active, but one that finished its
         // task stands only while that check-in does.

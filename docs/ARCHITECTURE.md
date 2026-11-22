@@ -106,7 +106,8 @@ Settings        key (PK), value (JSON), updatedAt
 WatchProgress   itemId (PK), fraction (0–1), observedAt, source   (v1.1) ← latest only, YouTube watch %
 FocusSession    id, itemId, localDay, at, minutes (1–720), kind: timer | manual, voidedAt?   (v1.2) ← a fact
 TimeBlock       id, itemId, localDay, start, minutes, placedAt, updatedAt, decidedAt?, tickId?,
-                coverId?, removedAt?   (v1.2) ← a definition: the day timeline (§6)
+                coverId?, removedAt?, stepId?, stepTickId?   (v1.2; steps 2026-11-21) ← a definition: the day
+                  timeline (§6); a step's block keeps its step (trigger)
 Step            id, taskId, title, sortKey, createdAt, updatedAt, deletedAt?   (2026-11-21) ← a definition:
                   a step of a once task or link; keeps its task (trigger)
 StepTick        id, stepId, taskId, localDay, at, source, finishedCheckInId?, voidedAt?   (2026-11-21) ← a fact
@@ -166,6 +167,14 @@ Award           id = hash(kind, itemId, milestone), kind (e.g. goal.finished),
   task voids the task's live check-ins and that step's ticks. Active days include
   standing step ticks. Which tasks are unfolded is a per-Mac `UserDefaults` value, not
   part of the task (it would bump `updatedAt` and lose to other devices' edits, §8).
+  **A step's block** (schema v15) is a `TimeBlock` with `stepId`; `itemId` is its task,
+  which stays in the list (`TimelineDay.placedItems` leaves it out; `placedSteps` holds
+  the steps that leave their task's list). Its end ticks the step through the same
+  in-write tick as a step's circle (`source = timeline`; the last open step also makes
+  the task's check-in) and records `stepTickId`; it skips when the step or task is done.
+  Not finished, a move and Remove block untick the step (and the task, if done) only while
+  that tick stands; a step ticked by hand is never touched. A deleted step's blocks go.
+  Edit's open block and a task row's drop never pick a step's block.
 - **Watch progress is latest-state, not a fact stream.** It arrives with each
   Watch Later scan (`ExternalEntry.progress`, 0–1, rounded to 0.01; out of range is
   ignored, the video still imported). `WatchProgress` keeps one row per item, the

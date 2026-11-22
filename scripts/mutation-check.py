@@ -828,6 +828,22 @@ M = [
  ("SP22 tick substance", S+"Schema.swift", "              OR NEW.finishedCheckInId IS NOT OLD.finishedCheckInId\n", "", "stepsAreDefinitionsAndTheirTicksAreFacts"),
  ("SP23 void voided read", S+"SQLiteStore.swift", "SELECT * FROM stepTick WHERE voidedAt IS NULL AND taskId IN", "SELECT * FROM stepTick WHERE taskId IN", "stepsAreDefinitionsAndTheirTicksAreFacts"),
  ("SP24 deleted read", S+"SQLiteStore.swift", "SELECT * FROM step WHERE deletedAt IS NULL AND taskId IN", "SELECT * FROM step WHERE taskId IN", "stepsAreDefinitionsAndTheirTicksAreFacts"),
+ ("SP25 step block holds task", C+"Timeline.swift", "Set(blocks.filter { $0.block.releasedAt == nil && $0.block.stepId == nil }.map(\\.block.itemId))", "Set(blocks.filter { $0.block.releasedAt == nil }.map(\\.block.itemId))", "StepBlockTests"),
+ ("SP26 step block title", C+"Timeline.swift", "let title = b.stepId.flatMap { steps[$0] }.map { \"\\(taskTitle) - \\($0.title)\" } ?? taskTitle", "let title = taskTitle", "StepBlockTests"),
+ ("SP27 step block no tick", C+"Timeline.swift", "                b.stepTickId = try tickStep(step, day: b.localDay, at: now, zone: zone, source: .timeline, w)?.tick.id\n", "", "StepBlockTests"),
+ ("SP28 step block ticks task", C+"Timeline.swift", "        if let stepId = b.stepId {\n            // A step's block ticks", "        if let stepId = b.stepId, false {\n            // A step's block ticks", "StepBlockTests"),
+ ("SP29 remove keeps step tick", C+"Timeline.swift", "            try untickStepOfBlock(b, now: now, w)\n            b.removedAt = now", "            b.removedAt = now", "StepBlockTests"),
+ ("SP30 move keeps step tick", C+"Timeline.swift", "        try untickStepOfBlock(b, now: now, w)\n        b.start = start", "        b.start = start", "StepBlockTests"),
+ ("SP31 not finished noop", C+"Timeline.swift", "                guard try untickStepOfBlock(b, now: now, w) else { throw ClewError.notAllowed }", "                _ = b", "StepBlockTests"),
+ ("SP32 hand tick undone", C+"Steps.swift", "        guard let tickId, let tick = try r.stepTicks(taskIds: [taskId]).first(where: { $0.id == tickId }) else {", "        guard let tick = try r.stepTicks(taskIds: [taskId]).first else {", "StepBlockTests"),
+ ("SP33 deleted step keeps block", C+"Timeline.swift", "                          && ($0.stepId.map { steps[$0] != nil } ?? true) }", "                          }", "StepBlockTests"),
+ ("SP34 new step block each drop", C+"Timeline.swift", "                .filter { $0.stepId == stepId && $0.localDay == today && $0.removedAt == nil && $0.end > now }", "                .filter { _ in false }", "StepBlockTests"),
+ ("SP35 later step not moved", C+"Timeline.swift", "            if !list.rows.contains(where: { $0.id == step.taskId }),\n               list.goalsAndLater.contains(where: { $0.id == step.taskId }) {", "            if false {", "StepBlockTests"),
+ ("SP36 alert done step", C+"Timeline.swift", "                guard let step = steps[b.itemId]?.open.first(where: { $0.id == stepId }) else { return nil }", "                guard let step = steps[b.itemId]?.entries.first(where: { $0.id == stepId }) else { return nil }", "StepBlockTests"),
+ ("SP37 edit sees step block", C+"Timeline.swift", "                .filter { $0.itemId == itemId && $0.stepId == nil && $0.localDay == today && $0.removedAt == nil\n                          && $0.end > now }\n                .min { ($0.start, $0.id.uuidString) < ($1.start, $1.id.uuidString) }\n        }", "                .filter { $0.itemId == itemId && $0.localDay == today && $0.removedAt == nil\n                          && $0.end > now }\n                .min { ($0.start, $0.id.uuidString) < ($1.start, $1.id.uuidString) }\n        }", "StepBlockTests"),
+ ("SP38 add block drops step", C+"Timeline.swift", "                                 placedAt: now, updatedAt: now, stepId: b.stepId)", "                                 placedAt: now, updatedAt: now)", "StepBlockTests"),
+ ("SP39 block step mutable", S+"Schema.swift", "              OR NEW.placedAt IS NOT OLD.placedAt OR NEW.stepId IS NOT OLD.stepId", "              OR NEW.placedAt IS NOT OLD.placedAt", "aStepsBlockKeepsItsStep"),
+ ("SP40 block step not read", S+"SQLiteStore.swift", "            stepId: try optionalUUID(row, \"stepId\", table: t),", "            stepId: nil,", "aStepsBlockKeepsItsStep"),
 ]
 
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0

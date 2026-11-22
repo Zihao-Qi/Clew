@@ -4,8 +4,10 @@ import SwiftUI
 
 /// An unfolded task's steps, under its row (SPEC "Steps in a task", 2026-11-21): done
 /// steps first, in the order they were done, then the open ones in your order; each with
-/// its own circle. Open steps reorder by dragging within their task. A click on a step
-/// does nothing; a double-click opens its task's details.
+/// its own circle. Open steps reorder by dragging within their task, or go onto an hour
+/// of the timeline when dragged up there (the list draws that card). A step on the
+/// timeline is not listed. A click on a step does nothing; a double-click opens its task's
+/// details.
 struct StepsList: View {
     let model: AppModel
     let row: TodayRow
@@ -16,6 +18,13 @@ struct StepsList: View {
     let onOpen: () -> Void
     /// The step under the pointer: the Delete key deletes it.
     @Binding var hoveredStep: UUID?
+    /// The list's coordinate space, where the timeline is too.
+    var listSpace: String? = nil
+    /// A step dragged in the list's space (nil: the drag ended or was cancelled); true
+    /// while it is over the hours, where the list draws it as a block.
+    var onTimelineDrag: (TaskSteps.Entry, CGPoint?) -> Bool = { _, _ in false }
+    /// Dropped: true if it went onto the timeline.
+    var onTimelineDrop: (TaskSteps.Entry) -> Bool = { _ in false }
 
     /// A step ticked out of order keeps its place until the pointer leaves it, so no other
     /// step slides under the pointer (SPEC, *user* 2026-11-21).
@@ -27,14 +36,20 @@ struct StepsList: View {
     @State private var dragFrames: [CGRect] = []
     /// Cleared by itself when a step drag ends or is cancelled (the menu closing, Esc).
     @GestureState private var dragLive = false
+    @State private var draggedEntry: TaskSteps.Entry?
+    @State private var overTimeline = false
+    /// Where this list starts in the list's space: drags are measured there.
+    @State private var origin: CGFloat = 0
 
     private var space: String { "steps-\(row.id.uuidString)" }
 
     /// The steps as drawn: the held order while a ticked step is under the pointer.
     private var shown: [TaskSteps.Entry] {
-        guard let held else { return steps.entries }
+        let placed = model.timelineShown ? model.timeline?.placedSteps ?? [] : []
+        let entries = steps.entries.filter { !placed.contains($0.id) }
+        guard let held else { return entries }
         let rank = Dictionary(uniqueKeysWithValues: held.order.enumerated().map { ($1, $0) })
-        return steps.entries.enumerated().sorted { a, b in
+        return entries.enumerated().sorted { a, b in
             (rank[a.element.id] ?? held.order.count + a.offset) < (rank[b.element.id] ?? held.order.count + b.offset)
         }.map(\.element)
     }
@@ -51,10 +66,11 @@ struct StepsList: View {
             }
         }
         .coordinateSpace(name: space)
+        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(listSpace ?? space)).minY } action: { origin = $0 }
         .onPreferenceChange(StepFrames.self) { frames = $0 }
         .onChange(of: dragLive) { _, live in
             // A cancelled drag leaves nothing behind (review).
-            if !live, dragging != nil { dragging = nil; dragTranslation = 0; dragSlot = nil }
+            if !live, dragging != nil { endDrag() }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in
             // The menu closing: no step stays held or hovered (review).
@@ -86,8 +102,17 @@ struct StepsList: View {
         return CGFloat(Clew.dragShift(index: index, from: from, to: dragSlot ?? from, draggedHeight: height))
     }
 
+    private func endDrag() {
+        if let draggedEntry { _ = onTimelineDrag(draggedEntry, nil) }
+        draggedEntry = nil
+        overTimeline = false
+        dragging = nil
+        dragTranslation = 0
+        dragSlot = nil
+    }
+
     private func reorder(_ entry: TaskSteps.Entry) -> some Gesture {
-        DragGesture(minimumDistance: 3, coordinateSpace: .named(space))
+        DragGesture(minimumDistance: 3, coordinateSpace: .named(listSpace ?? space))
             .updating($dragLive) { _, live, _ in live = true }
             .onChanged { value in
                 // Done steps stay where they are; the drag still belongs to the step, never
@@ -96,7 +121,17 @@ struct StepsList: View {
                 if dragging == nil {
                     dragFrames = openIds.map { frames[$0] ?? .zero }
                     dragging = entry.id
+                    draggedEntry = entry
                 }
+                // Up over the hours: the list draws it as the block it would be, and the
+                // steps stay where they are (SPEC 2026-11-21).
+                let over = onTimelineDrag(entry, value.location)
+                if over != overTimeline { overTimeline = over }
+                if over {
+                    if dragSlot != nil { withAnimation(.easeOut(duration: 0.15)) { dragSlot = nil } }
+                    return
+                }
+                let localY = value.location.y - (listSpace == nil ? 0 : origin)
                 let from = openIds.firstIndex(of: entry.id) ?? 0
                 let own = dragFrames.indices.contains(from) ? dragFrames[from] : .zero
                 if let first = dragFrames.first, let last = dragFrames.last {
@@ -106,18 +141,20 @@ struct StepsList: View {
                         list: (minY: Double(first.minY), maxY: Double(last.maxY))))
                 }
                 let spans = dragFrames.map { (minY: Double($0.minY), maxY: Double($0.maxY)) }
-                let slot = Clew.dragSlot(pointerY: Double(value.location.y), spans: spans)
+                let slot = Clew.dragSlot(pointerY: Double(localY), spans: spans)
                 if slot != dragSlot { withAnimation(.easeOut(duration: 0.15)) { dragSlot = slot } }
             }
             .onEnded { _ in
-                if let dragging, let from = openIds.firstIndex(of: dragging), let to = dragSlot, to != from {
-                    var t = Transaction()
-                    t.disablesAnimations = true
-                    withTransaction(t) { model.moveStep(dragging, toOpenIndex: to) }
+                var t = Transaction()
+                t.disablesAnimations = true
+                withTransaction(t) {
+                    if overTimeline, let draggedEntry, onTimelineDrop(draggedEntry) {
+                        // Placed: it leaves the list.
+                    } else if let dragging, let from = openIds.firstIndex(of: dragging), let to = dragSlot, to != from {
+                        model.moveStep(dragging, toOpenIndex: to)
+                    }
+                    endDrag()
                 }
-                dragging = nil
-                dragTranslation = 0
-                dragSlot = nil
             }
     }
 
@@ -159,6 +196,8 @@ struct StepsList: View {
             Color.clear.preference(key: StepFrames.self, value: [entry.id: g.frame(in: .named(space))])
         })
         .offset(y: offset(entry.id))
+        // Over the hours, the list's card stands in for it.
+        .opacity(dragging == entry.id && overTimeline ? 0 : 1)
         .debugFrame("step:\(entry.id)")
         .zIndex(dragging == entry.id ? 1 : 0)
         .onTapGesture(count: 2, perform: onOpen)
@@ -184,6 +223,10 @@ struct StepsList: View {
                 Button("Move Down") { model.moveStep(entry.id, toOpenIndex: index + 1) }
             }
             Button("Delete") { model.deleteStep(entry.step) }
+            // Nothing needs a drag (SPEC 2026-11-21): the next quarter hour, 30 minutes.
+            if !entry.isDone, model.timelineShown, model.timeline != nil {
+                Button("Put on timeline") { model.placeStepAtNextQuarter(entry.id) }
+            }
         }
     }
 }
