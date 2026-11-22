@@ -1105,7 +1105,9 @@ stopped daily use, not adding features.
     time) and the task becoming done or deleted all cancel it; nothing appears later.
   - **Suggestions** appear under the line (in the details: under the steps) as up to 5
     quiet rows: a dotted circle, the text in secondary colour, **+** on each ("Add
-    <step>"), then **Add all** and **Dismiss**, then a small "Using ChatGPT plan".
+    <step>"), then **Add all** and **Dismiss** (no "Using ChatGPT plan" here, *user*
+    2026-11-22: Settings › AI says it beside the model). Each is a short to-do item of
+    2 to 5 words starting with a verb, like "Set a budget" (*user* 2026-11-22).
     They count as part of the line, so clicking them never closes it. **+** adds that
     step at the end of the task's steps, as typing it would, and takes it off the list;
     **Add all** adds the rest in order. The block goes when it is empty, after Add all,
@@ -1120,7 +1122,7 @@ stopped daily use, not adding features.
     title is sent marked untrusted, and the instructions say to treat it as data only
     (docs/AGENT.md §4).
   - **Checked before showing:** each suggestion trimmed (a leading "1.", "-" or "•"
-    removed), 1–80 characters, not the same as an existing step or an earlier
+    removed, and a final period), 1–80 characters, not the same as an existing step or an earlier
     suggestion (ignoring case and spaces), no banned words (docs/AGENT.md §5; a banned
     phrase the person's own typed title carries is allowed, a fetched title's is not). Up to 5 kept; none
     left is a failure.

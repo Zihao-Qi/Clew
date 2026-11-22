@@ -150,7 +150,6 @@ struct SuggestionList: View {
                     Button("Dismiss") { ask.cancel() }
                         .accessibilityLabel(Text("Dismiss suggestions"))
                     Spacer()
-                    Text("Using ChatGPT plan").font(.caption2).foregroundStyle(.secondary)
                 }
                 .buttonStyle(.borderless)
                 .font(.caption)
