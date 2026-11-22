@@ -114,7 +114,7 @@ import Testing
         #expect(idType == ["string", "null"])
         #expect(actions == ["add", "change", "delete"])
         #expect(Set(fields.keys) == ["action", "id", "about", "says", "based_on"])
-        #expect(log.records.first?.note == "change" && !"\(log.records)".contains("11"))
+        #expect(log.records.first?.note == "change" && !"\(log.records)".contains("Goes best"))
     }
 
     @Test func untrustedInputSendsNoActivityAndItsNoteIsIgnored() async throws {
