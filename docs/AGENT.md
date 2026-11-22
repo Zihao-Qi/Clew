@@ -125,7 +125,7 @@ streamed answer in 3.0 s. No helper process, no JavaScript.
   and `invalid_client` are bugs (debug log, plain failure).
 - **OpenAI's interface rules**: a **Continue with ChatGPT** button; the first time the
   person signs in, "You're using your ChatGPT plan" with **Got it**; "Using ChatGPT
-  plan" beside the model choice and under suggestions; **Manage usage** links to
+  plan" beside the model choice (not under suggestions in the menu, *user* 2026-11-22); **Manage usage** links to
   chatgpt.com/settings/usage; "ChatGPT usage limit reached" when it is.
 - It is a **preview** at OpenAI: details may change. Everything above sits in ClewAI,
   so a change stays there.
@@ -162,7 +162,7 @@ address or any page's content.
 
 | Job | Where | Output | Phase |
 |---|---|---|---|
-| **Suggest steps** | Add Step… and Details' Steps (SPEC "Suggest steps") | asks for 3–5 steps, the first a 2-minute start; keeps up to 5 that pass (1–80 characters, no repeats) | AI-1 |
+| **Suggest steps** | Add Step… and Details' Steps (SPEC "Suggest steps") | asks for 3–5 to-do items of 2–5 words, the first a 2-minute start; keeps up to 5 that pass (1–80 characters, no repeats) | AI-1 |
 | **Evening line** | the 21:00 summary | one line ≤ 120 characters naming something done | AI-2 |
 | **Fits today** | Goals & Later | ≤ 3 items with a free slot on today's timeline and a reason ≤ 80 | AI-3 |
 | Reader, memory | later | §10 | later |

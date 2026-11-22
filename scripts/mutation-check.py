@@ -904,6 +904,8 @@ M = [
  ("AI39 models skip confirm", AI+"ChatGPTProvider.swift", "            try await account.confirm()\n            throw ProviderError.unavailable\n        }\n        return try parse(response)", "            throw ProviderError.unavailable\n        }\n        return try parse(response)", "ClewAITests"),
  ("AI40 narrowed grant", AI+"ChatGPTAccount.swift", "        guard next.hasPlanPermission else { throw ProviderError.noPlanPermission }\n", "", "ClewAITests"),
  ("AG15 title words mask", AG+"Banned.swift", "kept.contains(phrase) && !mine.contains { $0.contains(phrase) }", "kept.contains(phrase) && !mine.contains { m in phrase.split(separator: \" \").contains { m.contains($0) } }", "ClewAgentTests"),
+ ("AG17 period kept", AG+"SuggestSteps.swift", "        if s.hasSuffix(\".\"), !s.hasSuffix(\"..\") { s.removeLast() }\n", "", "ClewAgentTests"),
+ ("AG18 ellipsis cut", AG+"SuggestSteps.swift", "if s.hasSuffix(\".\"), !s.hasSuffix(\"..\") {", "if s.hasSuffix(\".\") {", "ClewAgentTests"),
  ("AG16 marker eats digits", AG+"SuggestSteps.swift", "(\\s+|$)\"#", "\\s*\"#", "ClewAgentTests"),
 ]
 
