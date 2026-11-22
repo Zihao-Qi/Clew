@@ -206,7 +206,8 @@ struct TodayListView: View {
                 // quarter hour under the pointer; the other rows stay where they are.
                 if isOverTimeline(value.location.y), let day = model.timeline {
                     let start = TimelineMetrics.start(atContentY: value.location.y - timelineGeo.contentTop, in: day)
-                    let open = day.blocks.first { $0.block.itemId == row.id && $0.block.end > Date() }?.block.minutes
+                    let open = day.blocks.first { $0.block.itemId == row.id && $0.block.stepId == nil
+                                                  && $0.block.end > Date() }?.block.minutes
                     let minutes = min(open ?? Clew.blockDefaultMinutes, TimelineMetrics.room(after: start, in: day))
                     lifted = Lifted(itemId: row.id, blockId: nil, title: row.item.title, overTimeline: true,
                                     frame: blockFrame(start: start, minutes: minutes), start: start, minutes: minutes)

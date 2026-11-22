@@ -212,7 +212,7 @@ public struct TimeBlock: Hashable, Sendable, Identifiable, Codable {
 
     private enum CodingKeys: String, CodingKey {
         case id, itemId, localDay, start, minutes, placedAt, updatedAt, decidedAt, tickId, coverId, removedAt,
-             origin, touchedAt, askedAt, releasedAt
+             origin, touchedAt, askedAt, releasedAt, stepId, stepTickId
     }
 
     /// Exports from before slots have no origin: those blocks were placed by hand.
@@ -230,7 +230,9 @@ public struct TimeBlock: Hashable, Sendable, Identifiable, Codable {
             origin: try c.decodeIfPresent(Origin.self, forKey: .origin) ?? .hand,
             touchedAt: try c.decodeIfPresent(Date.self, forKey: .touchedAt),
             askedAt: try c.decodeIfPresent(Date.self, forKey: .askedAt),
-            releasedAt: try c.decodeIfPresent(Date.self, forKey: .releasedAt))
+            releasedAt: try c.decodeIfPresent(Date.self, forKey: .releasedAt),
+            stepId: try c.decodeIfPresent(UUID.self, forKey: .stepId),
+            stepTickId: try c.decodeIfPresent(UUID.self, forKey: .stepTickId))
     }
 
     public var end: Date { start.addingTimeInterval(TimeInterval(minutes * 60)) }

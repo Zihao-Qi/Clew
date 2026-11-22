@@ -259,7 +259,11 @@ extension Clew {
             // when the step or its task is already done (SPEC 2026-11-21).
             b.decidedAt = now
             if let step = try w.step(id: stepId), step.deletedAt == nil {
-                b.stepTickId = try tickStep(step, day: b.localDay, at: now, zone: zone, source: .timeline, w)?.tick.id
+                let made = try tickStep(step, day: b.localDay, at: now, zone: zone, source: .timeline, w)
+                b.stepTickId = made?.tick.id
+                // The task's check-in it made, when it was the last open step: an earlier
+                // day's shows in "Ticked for yesterday" like a task block's (review).
+                b.tickId = made?.finished?.id
             } else {
                 b.removedAt = now
             }

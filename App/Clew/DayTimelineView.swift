@@ -589,7 +589,7 @@ struct TimelineBlockView: View {
     private var step: TaskSteps.Entry? { b.stepId.flatMap { model.stepEntry($0) } }
     /// Ticked, covered by a hand tick, or the task (a step's block: the step) is done anyway.
     private var looksDone: Bool {
-        if b.stepId != nil { return block.state == .ticked || step?.isDone == true }
+        if b.stepId != nil { return block.state == .ticked || (block.state == .skipped && step?.isDone == true) }
         return block.state == .ticked || block.state == .covered || (block.state == .skipped && row?.isDone == true)
     }
     /// What the Delete key deletes under the pointer: the step of a step's block.
@@ -733,10 +733,22 @@ struct TimelineBlockView: View {
         return nil
     }
 
-    private var title: Text {
-        Text(block.title)
+    /// A step's block keeps the step's name: the task's part truncates first (review).
+    @ViewBuilder
+    private var title: some View {
+        if let step, let task = row?.item.title {
+            HStack(spacing: 0) {
+                Text(task)
+                Text(verbatim: " - ").fixedSize()
+                Text(step.step.title).layoutPriority(1)
+            }
             .font(TimelineMetrics.titleFont)
             .foregroundStyle(.primary)
+        } else {
+            Text(block.title)
+                .font(TimelineMetrics.titleFont)
+                .foregroundStyle(.primary)
+        }
     }
 
     /// What a block says besides its title: a slot block's question, or its focus timer.
@@ -1111,7 +1123,11 @@ struct PlaceView: View {
     @State private var minutes = Clew.blockDefaultMinutes
 
     private var day: TimelineDay? { model.timeline }
-    private var title: String { model.today?.rows.first { $0.id == itemId }?.item.title ?? "" }
+    /// A step's block is named as on the timeline: "Prepare the talk - Speech notes" (review).
+    private var title: String {
+        blockId.flatMap { id in day?.blocks.first { $0.id == id }?.title }
+            ?? model.today?.rows.first { $0.id == itemId }?.item.title ?? ""
+    }
     /// The time on today's timeline: before the rollover hour it is the night after
     /// midnight, at the timeline's end.
     private var start: Date? {

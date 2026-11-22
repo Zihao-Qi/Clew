@@ -76,18 +76,26 @@ extension Clew {
     }
 
     /// Delete a step: a tombstone. It never ticks or unticks the task (SPEC 2026-11-21).
+    /// Its blocks of today go with it, in the same write.
     public func deleteStep(id: UUID) throws {
         let now = clockForQueries.now()
+        let today = currentDay()
         try storeForQueries.write { w in
             guard var step = try w.step(id: id) else { throw ClewError.itemNotFound }
             guard step.deletedAt == nil else { return }
             step.deletedAt = now
             step.updatedAt = now
             try w.save(step)
+            for var b in try w.timeBlocks(from: today) where b.stepId == id && b.removedAt == nil {
+                b.removedAt = now
+                b.updatedAt = now
+                try w.save(b)
+            }
         }
     }
 
-    /// The Undo of "Deleted “Practice”": the step comes back where it was, with its ticks.
+    /// The Undo of "Deleted “Practice”": the step comes back where it was, with its ticks
+    /// and without its blocks (as a task's Undo).
     public func undeleteStep(id: UUID) throws {
         let now = clockForQueries.now()
         try storeForQueries.write { w in

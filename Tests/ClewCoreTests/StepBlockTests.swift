@@ -98,6 +98,19 @@ private func at(_ d: Int, _ h: Int, _ m: Int = 0) -> Date {
         #expect(try clew.timeline().blocks.isEmpty)
     }
 
+    @Test func removingOrMovingABlockThatTickedAStepOpensThatStep() throws {
+        let (id, steps) = try talk()
+        let b = try clew.placeStepOnTimeline(stepId: steps[0], start: at(10, 9))
+        try settle(at: at(10, 9, 30))
+        #expect(try shown(id).first == "✓slides" && !taskDone(id))
+        try clew.moveBlock(id: b.id, start: at(10, 11))       // its end has not passed now
+        #expect(try shown(id) == ["slides", "notes", "practice"])
+        try clew.moveBlock(id: b.id, start: at(10, 9))        // ended: it ticks again
+        #expect(try shown(id).first == "✓slides")
+        try clew.removeBlock(id: b.id)
+        #expect(try shown(id) == ["slides", "notes", "practice"])
+    }
+
     @Test func aStepTickedByHandIsNotUndoneByItsBlock() throws {
         let (id, steps) = try talk()
         let b = try clew.placeStepOnTimeline(stepId: steps[0], start: at(10, 10))
@@ -115,6 +128,36 @@ private func at(_ d: Int, _ h: Int, _ m: Int = 0) -> Date {
         #expect(try clew.timeline().blocks.isEmpty)
         try clew.settleBlocks()
         #expect(store.state.timeBlocks.values.allSatisfy { $0.removedAt != nil })
+    }
+
+    @Test func deletingAStepTakesItsBlocksAtOnceAndUndoLeavesThemOff() throws {
+        let (_, steps) = try talk()
+        let b = try clew.placeStepOnTimeline(stepId: steps[0], start: at(10, 10))
+        try clew.deleteStep(id: steps[0])                     // no settle in between
+        #expect(store.state.timeBlocks[b.id]?.removedAt != nil)
+        try clew.undeleteStep(id: steps[0])
+        #expect(try clew.timeline().blocks.isEmpty)
+    }
+
+    @Test func anExportKeepsAStepsBlockAsTheStepsAndItsTick() throws {
+        let (_, steps) = try talk()
+        try clew.placeStepOnTimeline(stepId: steps[0], start: at(10, 9))
+        try settle(at: at(10, 9, 30))
+        let data = try clew.exportDocument().encoded()
+        let back = try ExportDocument.decode(data).records.timeBlocks
+        #expect(back.first?.stepId == steps[0] && back.first?.stepTickId != nil)
+    }
+
+    @Test func aLastStepFinishedOvernightShowsInTickedForYesterday() throws {
+        let (id, steps) = try talk()
+        try clew.tickStep(id: steps[0])
+        try clew.tickStep(id: steps[1])
+        try clew.placeStepOnTimeline(stepId: steps[2], start: at(11, 3))   // 3:00 a.m., still the 10th's day
+        try settle(at: at(11, 9))                            // asleep past 4 a.m.
+        let late = try clew.lateTicks()
+        #expect(late.map(\.itemId) == [id] && late.first?.canUndo == true)
+        try clew.undoLateTicks(itemId: id)
+        #expect(try shown(id) == ["✓slides", "✓notes", "practice"])
     }
 
     @Test func aStepOfAGoalsAndLaterTaskBringsItsTaskToToday() throws {

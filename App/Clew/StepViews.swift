@@ -81,6 +81,8 @@ struct StepsList: View {
             // Folded without the pointer leaving (VoiceOver's Fold): the Delete key must
             // not reach a step that is no longer shown (review).
             if let h = hoveredStep, steps.entries.contains(where: { $0.id == h }) { hoveredStep = nil }
+            // Gone mid-drag: the list's card goes too (review).
+            if dragging != nil { endDrag() }
         }
         .onChange(of: steps) { _, now in
             // A step that is gone (deleted elsewhere) is no longer held.
