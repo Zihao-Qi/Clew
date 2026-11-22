@@ -5,11 +5,12 @@ import EventKit
 import Foundation
 
 extension Snapshot {
-    /// `CLEW_EVENTKIT_UNDO_TEST=1`: the real Calendar, on this Mac only. Makes a calendar
-    /// "Clew test (temporary)" in On My Mac (never iCloud: it refuses without a local
-    /// source), a daily event five times from tomorrow, then changes the third with "All
-    /// future events" and undoes it as the app does, and the same with "This event only";
-    /// then removes the calendar. Prints PASS/FAIL. Run only with the user's say-so.
+    /// `CLEW_EVENTKIT_UNDO_TEST=1`: the real Calendar. Makes a calendar "Clew test
+    /// (temporary)" in On My Mac (or in iCloud with `CLEW_EVENTKIT_UNDO_SOURCE=icloud`; any
+    /// other value is refused, and so is a missing source), a daily event five times from
+    /// tomorrow, then changes the third with "All future events" and undoes it as the app
+    /// does, and the same with "This event only"; then removes the calendar. Prints
+    /// PASS/FAIL. Run only with the user's say-so (2026-11-21: On My Mac, passed).
     static func startEventUndoCheck() {
         Task { @MainActor in
             var failures = 0
@@ -23,7 +24,9 @@ extension Snapshot {
             let store = source.storeForCheck
             // CLEW_EVENTKIT_UNDO_SOURCE=icloud: in iCloud instead (the user's choice,
             // 2026-11-21), where the server may rewrite a split series.
-            let wantsICloud = ProcessInfo.processInfo.environment["CLEW_EVENTKIT_UNDO_SOURCE"] == "icloud"
+            let asked = ProcessInfo.processInfo.environment["CLEW_EVENTKIT_UNDO_SOURCE"]
+            guard asked == nil || asked == "icloud" else { print("FAIL: unknown source \(asked!); nothing was made"); exit(1) }
+            let wantsICloud = asked == "icloud"
             guard let local = wantsICloud
                     ? store.sources.first(where: { $0.sourceType == .calDAV && $0.title == "iCloud" })
                     : store.sources.first(where: { $0.sourceType == .local }) else {
@@ -44,8 +47,13 @@ extension Snapshot {
             calendar.title = "Clew test (temporary)"
             calendar.source = local
             do { try store.saveCalendar(calendar, commit: true) } catch { print("FAIL: calendar not made:", error); exit(1) }
+            let calendarId = calendar.calendarIdentifier
             @MainActor func cleanUp() {
-                do { try store.removeCalendar(calendar, commit: true); print("removed the test calendar") }
+                // Found again by its id: a refused save resets the store and its objects.
+                guard let made = store.calendar(withIdentifier: calendarId) else {
+                    print("COULD NOT FIND the test calendar to remove it:", calendarId); return
+                }
+                do { try store.removeCalendar(made, commit: true); print("removed the test calendar") }
                 catch { print("COULD NOT REMOVE the test calendar:", error) }
             }
             let cal = Calendar.current
@@ -64,11 +72,12 @@ extension Snapshot {
             await settle()
 
             /// Ours, as Clew reads them: the hour each of the five days starts at.
+            /// One event a day, or -1 (none) / -2 (more than one: a split that doubled one).
             @MainActor func hours() -> [Int] {
                 (0..<5).map { d in
-                    source.events(from: at(d, 0), to: at(d, 24))
-                        .first { $0.calendarId == calendar.calendarIdentifier }
-                        .map { cal.component(.hour, from: $0.start) } ?? -1
+                    let ours = source.events(from: at(d, 0), to: at(d, 24)).filter { $0.calendarId == calendarId }
+                    guard ours.count == 1, let one = ours.first else { return ours.isEmpty ? -1 : -2 }
+                    return cal.component(.hour, from: one.start)
                 }
             }
             @MainActor func occurrence(_ d: Int) -> CalendarEvent? {
@@ -82,6 +91,7 @@ extension Snapshot {
                 let id = source.change(third, title: third.title, start: at(2, 11), end: at(2, 11).addingTimeInterval(1800),
                                        span: .futureEvents)
                 print("  series before:", original, "after:", id ?? "nil")
+                report("the change split the series (a new series id)", id.map { !$0.hasPrefix(original) } == true)
                 await settle()
                 report("all future events moves the third and after", id != nil && hours() == [10, 10, 11, 11, 11])
                 if let id {
@@ -110,6 +120,8 @@ extension Snapshot {
                     await settle()
                     report("Undo puts it back", back != nil && hours() == [10, 10, 10, 10, 10])
                 }
+            } else {
+                report("the fourth is read", false)
             }
             cleanUp()
             exit(failures == 0 ? 0 : 1)
