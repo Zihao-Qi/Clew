@@ -413,8 +413,9 @@ stopped daily use, not adding features.
     day, or a "Not finished" changes them, and can bring or remove the card.
   - **Off switch:** Settings › General › "Last week's card" (default on); it turns
     off the menu's card only.
-  - VoiceOver reads the card as one element ("Last week: 23 done, 3 hours 20 minutes
-    of focus, …"); × is "Close last week's card". Every number has its singular form.
+  - VoiceOver reads the card's lines as one element ("Last week: 23 done, 3 hours 20
+    minutes of focus, …"); × is "Close last week's card". "What Clew noticed" adds its
+    own elements after these (see there). Every number has its singular form.
 
 - **Done so far (user, 2026-11-18; design: the "Clew progress line" canvas).** A line
   that only rises: everything got done, from the first tick (Design rules: celebrate
@@ -1162,8 +1163,8 @@ stopped daily use, not adding features.
     changes a note you added or edited."
   - **Edit and Add** open a small sheet: **About** and **Note** fields, capped at 30
     and 100 characters, with **Cancel** and **Save** (Save needs a note line). Saving
-    makes the note yours and drops its "based on". Your text is never checked or
-    changed.
+    makes the note yours and drops its "based on" (and its confirmation, see "What
+    Clew noticed"). Your text is never checked or changed.
   - **How notes are made** (after each job, *user*): only while ready, Clew records
     on this Mac what happens, with the weekday and time of day (never a date): the
     person ticks a task or a step (not imports' own ticks), a rating, focus time
@@ -1202,14 +1203,23 @@ stopped daily use, not adding features.
     with the card's own rules (once a week, the menu's top, × and the off switch).
     Only while Use AI is ready. A heading "Clew noticed", then up to 3 of Clew's notes
     not yet answered (not confirmed), newest change first: the note's line, and its
-    about in secondary text, with **True** and **Not really** ("True: <line>", "Not
-    really: <line>" to VoiceOver). These rows are their own VoiceOver elements, after
-    the card's summary element.
+    about in secondary text, with **True** and **Not really**. VoiceOver: the card's
+    summary element first (as before; "Last week" alone for a card with only this
+    section), then ×, then the heading "Clew noticed", then each row's text as one
+    element followed by its buttons "True: <line>" and "Not really: <line>".
   - **The card for this alone:** unanswered notes bring the card even in a week with
-    nothing done; it then shows "Last week", ×, and only this section.
+    nothing done, watched or read; it then shows "Last week", × and only this section
+    (no focus line, which never brings the card alone). Answering its last row closes
+    such a card, as × does; it is never left empty.
+  - **Fixed for the opening:** the rows are chosen when the card appears and stay for
+    that opening; answering one does not bring a fourth. An answer applies only if the
+    note still exists unchanged since it was shown (Clew may have changed or deleted
+    it meanwhile, or the person in Settings); otherwise the row just leaves. Losing
+    ready (Use AI off, signing out, …) removes the section at once.
   - **True** confirms the note: it stays, marked confirmed, and Clew never changes or
     deletes it afterwards (Settings › AI shows "<about> · You confirmed" instead of
-    its "based on"). **Not really** deletes the note. Either way the row leaves the
+    its "based on"; its place in the list does not change). **Not really** deletes the
+    note. Either way the row leaves the
     card at once; when none are left the section goes (the card stays). Both are
     recorded as activity for the next request, with the note's line. Editing a
     confirmed note in Settings makes it yours, as any edit does.

@@ -243,7 +243,7 @@ Settings › AI, edits any, adds their own and deletes any.
   even when the job's own output fails (§5.5 then shows the job's plain failure).
 - **Yours are yours:** a note the person added or edited is *from you*. Clew never
   changes or deletes it; it only reads it. Editing one of Clew's notes makes it yours
-  and clears its *based on*. The person's text is not checked.
+  and clears its *based on* and *confirmed*. The person's text is not checked.
 - **Shown at once** (*user*): a new or changed note appears in the list straight
   away, with no question; in the menu only through "What Clew noticed" below.
 - **What Clew noticed** (AI-N, *user* 2026-11-22): once a week, last week's card
@@ -252,14 +252,19 @@ Settings › AI, edits any, adds their own and deletes any.
   and the answers make them better. No request is made; it only shows notes. **True**
   marks the note *confirmed* (a date): it stays Clew's, and from then on Clew never
   changes or deletes it, as for the person's own notes. **Not really** deletes it.
-  Both are recorded as activity (`noteConfirmed`, `noteRejected`, with the note's
-  line), so the next answer knows; they are recorded only while ready, like any
-  event. Notes are sent with `"confirmed": true` when confirmed, and the instructions
-  say not to write again a note the person rejected.
+  Confirming does not change the note's *changed* date. Both are recorded as
+  activity: kind `noteConfirmed` or `noteRejected`, the weekday and time, and the
+  note's line under the key `"note"` (no `task`, no `link`: a note is never made from
+  untrusted text), so the next answer knows. Notes are sent with `"confirmed": true`
+  when confirmed, and the instructions say not to write again a note the person
+  rejected. The rows shown are fixed for that opening of the menu (no refill); an
+  answer applies only if the note still exists unchanged (equal to what was shown),
+  otherwise the row just leaves. The section shows only while ready, and goes at once
+  if ready is lost.
 - **Kept** on this Mac in Application Support, in its own file, apart from Clew's
   data: not facts, not in exports or backups. **Forget everything** clears all
   notes, the events and the suggested step ids. Besides Clew deleting its own notes,
-  only the person's Delete and Forget everything remove notes.
+  only the person's Delete, Not really (AI-N) and Forget everything remove notes.
 
 ## 8. Settings › AI
 
