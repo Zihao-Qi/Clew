@@ -1088,8 +1088,8 @@ stopped daily use, not adding features.
     plan" with **Got it** (OpenAI's rule). Declined plan permission: "Clew can't use
     your ChatGPT plan yet" with **Continue with ChatGPT** to ask again; a plan OpenAI
     says is not eligible: "AI isn't available on this ChatGPT plan." Signed out, one line
-    says what AI does: "Clew can suggest small steps for a task, using your ChatGPT plan.
-    Nothing is sent until you sign in and ask. Clew works fully without it." While the
+    says what AI does: "Clew can suggest small steps for a task and keep notes on how you
+    work, using your ChatGPT plan. Nothing is sent until you sign in and ask. Clew works fully without it." While the
     browser is open: "Waiting for the browser…" with **Cancel**; the browser's page after
     signing in says "You can close this tab and go back to Clew." A failed sign-in says
     "Couldn't sign in. Try again." (or that it was cancelled in the browser, or that
@@ -1161,22 +1161,30 @@ stopped daily use, not adding features.
     and 100 characters, with **Cancel** and **Save** (Save needs a note line). Saving
     makes the note yours and drops its "based on". Your text is never checked or
     changed.
-  - **How notes are made** (after each job, *user*): while Use AI is on, Clew records
-    on this Mac what happens: a task or step ticked (its title, time of day and
-    weekday), a rating, focus time, a step added from a suggestion, suggestions
-    dismissed, a suggested step deleted later. A fetched page title is recorded only as
-    "a saved link". Each job's request sends all notes and the latest 20 events not yet
-    sent; its answer may add one note, or change or delete one of Clew's own. No
-    extra request is made. A new or changed note appears in the list at once, with
-    nothing in the menu.
-  - **Checked before keeping** (Clew's notes only): the caps, no banned words (none
-    allowed by any title), not the same as an existing note (ignoring case and spaces),
-    the note it changes exists and is Clew's, at most 40. A failing note is dropped
-    silently and the job's own result still shows. When the job's task has a fetched
-    title, no note is kept from that answer.
+  - **How notes are made** (after each job, *user*): only while signed in with plan
+    permission, eligible, and Use AI on, Clew records on this Mac what happens, with
+    the weekday and time of day (never a date): a task or step ticked, a rating, focus
+    time ended, a step added from a suggestion, suggestions dismissed, a suggested
+    step deleted later. Titles and step names are included only when the person typed
+    them: a fetched or imported title is recorded only as a link, a suggested step
+    only as "suggested". Unticking drops that tick's event if not yet sent. At most the
+    20 newest unsent events are kept. Each job's request sends all notes and these
+    events; its answer may add one note, or change or delete one of Clew's own. When
+    the answer completes, its events count as sent; a cancel, a timeout or a failure
+    keeps them. A task with a fetched or imported title sends no events and keeps no
+    note from that answer. No extra request is made. A new or changed note appears in
+    the list at once, with nothing in the menu.
+  - **Checked before keeping** (Clew's notes only), against the notes as they are when
+    the answer arrives: about, line and based on each 1 to their cap; no banned words
+    in any of them (none allowed by any title); the line not the same as another note's
+    (ignoring case and spaces); adding only below 40; a note changed or deleted must
+    still exist, be Clew's, and be unchanged since the request was sent. A failing
+    change is dropped silently and the job's own result still shows. Signing out, Use AI
+    off or Forget everything while a request runs drops its note change.
   - **Kept** in its own file on this Mac, apart from Clew's data: not in exports or
-    backups. Use AI off stops and clears the record of what happens; the notes stay.
-    Signing out keeps them. Only Delete and Forget everything remove them.
+    backups. Signing out turns Use AI off. Use AI off, signing out, OpenAI ending the
+    sign-in and "not eligible" stop the recording and clear what was recorded; the
+    notes stay. Only Delete and Forget everything remove them.
 
 ## Open question
 

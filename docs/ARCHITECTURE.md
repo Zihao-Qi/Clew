@@ -819,7 +819,8 @@ only, over an injected HTTP transport) and `ClewAgent` (jobs: input snapshot →
 validated output; depends on ClewDomain and ClewAI, never on the store or ClewCore's
 writer). The app supplies the transport, the browser sign-in, PKCE hashing, the ID
 token check and the Keychain. The provider is the person's ChatGPT plan through
-OpenAI's Sign in with ChatGPT. Jobs return suggestions; only the person's tap writes.
+OpenAI's Sign in with ChatGPT. Jobs return suggestions; only the person's tap writes
+user data, and the agent's only kept writes are its own memory notes (AGENT §7).
 Clew works fully with AI off.
 
 **Dayflow connector (v2).** Outbound only, driven by `ChangeLog.seq` with a stored
