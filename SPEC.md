@@ -131,7 +131,8 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
 
 - **Daruma goals and badges.** Paint one eye when a counted goal starts and the
   second when it's finished. Levels come from lifetime totals.
-- Opt-in AI coach: recap, Later suggestions, quick start (see docs/AGENT.md).
+- Opt-in AI help beyond Suggest steps: an evening line, "fits today" from Goals & Later,
+  a reader (see docs/AGENT.md, v2 2026-11-22).
 - Sync with Dayflow (its local JSON API: `GET /api/day`, `PATCH /api/tasks/:id`).
 - iPhone, iCloud sync, Obsidian export.
 
@@ -1067,6 +1068,46 @@ stopped daily use, not adding features.
   - **Steps:** (1) steps in the list and the details, with the new clicks; (2) steps on
     the timeline, and a task block's count.
 
+- **Suggest steps (AI-1, 2026-11-22, *user*).** The first AI help (docs/AGENT.md v2):
+  for a one-off task, ChatGPT proposes a few small steps and the person picks which to
+  add. Off by default; Clew is complete without it.
+  - **Turning it on:** Settings › **AI** (a new pane): **Continue with ChatGPT** signs
+    in through the browser with the person's ChatGPT plan (OpenAI's Sign in with
+    ChatGPT for open-source, local apps; nothing is paid to Clew). Then: the account's
+    email, **Sign out**, **Manage usage** (chatgpt.com/settings/usage), the model (the
+    plan's list, the first one by default) and the switch **Suggest steps** (on once
+    signed in). One line says what is sent: "Sends the task's title, its steps and its
+    note to OpenAI, using your ChatGPT plan." A plan without that permission: "AI isn't
+    available on this ChatGPT plan." On first use, once: "You're using your ChatGPT
+    plan" with **Got it** (OpenAI's rule).
+  - **Where:** only while signed in and the switch is on, and only where a step can be
+    added (a one-off task, not done). In Add Step…'s line a small ✨ **Suggest** button
+    at its right end; in the details, **Suggest Steps** beside **Add Step**. VoiceOver:
+    a "Suggest steps" action on the task's row too.
+  - **While it thinks** (a few seconds): the button becomes a small spinner with
+    **Cancel**; typing in the line still works. Closing the line, leaving the list or
+    details, the menu closing or the rollover cancel it; nothing appears later.
+  - **Suggestions:** 3 to 5 steps, the first one a start of about 2 minutes, listed
+    under the line (or under the details' steps) as quiet rows: a dotted circle, the
+    text in secondary colour, and **+** on each, with **Add all** and **Dismiss**
+    below. **+** adds that step at the end (as typing it would) and removes it from the
+    suggestions; **Add all** adds the rest in order; **Dismiss**, closing the line or
+    Esc drop them. Nothing is added without a tap; suggestions are never kept.
+  - **What is sent:** the task's title, its steps (done or not) and its note, and the
+    instruction to reply in the title's language. Never other tasks, ticks, ratings,
+    dates or links' pages. A fetched page title is marked untrusted (docs/AGENT.md §4).
+  - **Checked before showing:** at most 5, each 1–80 characters after trimming (a
+    leading "1." or "-" removed), none the same as an existing step or another
+    suggestion (ignoring case), no banned words (docs/AGENT.md §5). Fewer than 1 left
+    counts as a failure.
+  - **When it fails:** "Couldn't suggest steps. Try again." in the line's place for a
+    few seconds (no retry by itself). Usage limit: "ChatGPT usage limit reached ·
+    Manage usage". Signed out elsewhere: the switch turns off and Settings › AI says
+    to sign in again. Offline: the same "Couldn't suggest steps".
+  - **Kept:** only the sign-in (in the Keychain), the issued app id and the model
+    choice. No suggestions, no history; a debug build logs each request's size, time and
+    outcome locally, never its text.
+
 ## Open question
 
 None currently open.
@@ -1085,4 +1126,6 @@ day timeline's events (v1.2) need the sandbox's Calendars entitlement
 `NSCalendarsFullAccessUsageDescription`, and full access: macOS 14 offers only full or
 write-only access, no read-only. The prompt text says Clew shows the events and
 changes one only when you edit it on the timeline (2026-11-19; it said "only reads"
-before editing came).
+before editing came). Suggest steps (2026-11-22) uses the existing network permissions:
+the sign-in's callback listens on `127.0.0.1:1455` only while signing in, and requests go
+to `auth.openai.com` and `api.openai.com`; the sign-in is kept in the Keychain.

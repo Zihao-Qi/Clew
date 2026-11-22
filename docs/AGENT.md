@@ -1,225 +1,164 @@
-# Clew Agent
+# Clew AI
 
-Status: **design**, 2026-11-08. Builds on [ARCHITECTURE.md](ARCHITECTURE.md)
-(ADR-4, ADR-5). Not a coding agent: a task and wellbeing companion that reads
-your record and says a little, kindly.
+Status: **design v2**, 2026-11-22. Replaces the 2026-11-08 plan (a bundled TypeScript
+helper on pi-agent-core); see §11 for what changed and why. Builds on
+[ARCHITECTURE.md](ARCHITECTURE.md). Not a chat and not a coding agent: small, optional
+help that suggests, and you choose.
 
 ## 1. Principles
 
-1. **Clew is complete without it.** Every feature works with AI off. Summaries
-   fall back to plain counts, and the Later pile is managed by hand.
-2. **It never changes your data.** It reads history and writes only its own
-   `AgentOutput` records. Swift enforces this, not the prompt (§7).
-3. **No conversation.** There is no chat or text box. Its only inputs are your task
-   history and the optional evening question (§5).
-4. **A friend, not a coach with a whistle.** Encouraging, brief, never pushy.
-   **Never compares you to anyone.** No streaks, no guilt, no "you missed".
-5. **Say less.** One line in the menu bar, one notification line. Never paragraphs.
-6. **Grounded in practice, then tuned by use.** We start with established
-   methods (§6) and adjust from the user's feedback, not from guesses.
+1. **Clew is complete without it.** Every feature works with AI off; each AI feature
+   only adds a button or a line. Off by default.
+2. **It never changes your data.** A job returns a suggestion; only your tap writes
+   (Add, Add all). Swift enforces this: jobs have no access to the store's writer.
+3. **No conversation.** No chat or text box. A job's input is built by Clew from what
+   is already there.
+4. **A friend, not a coach with a whistle.** Brief, encouraging, never pushy. Never
+   compares you to anyone. No streaks, no guilt, no "you missed".
+5. **Say less.** Short items, one line at most. Never paragraphs.
+6. **Small core, clear seams** (borrowed from pi's design, *user* 2026-11-22): layers
+   that each do one thing, a tiny prompt, only the input a job needs, typed output.
+   A provider or a job is easy to add; nothing else is pluggable.
 
-## 2. Switches (user-selected, all off by default)
-
-| Switch | What it does | Cost |
-|---|---|---|
-| **Daily coach** | Evening recap line with encouragement; quick-start hints; daily dream | ~2 calls/day |
-| **Later helper** | "3 that fit tonight" from the Later pile, each with a short reason | ~1 call/day |
-| **Reader** | Opens a link: summary, minutes, energy needed, key points, and help while reading | Most expensive; **on request per item by default**; automatic for new Later items is an opt-in setting |
-
-- **Monthly token cap** in Settings, with usage shown next to it. Swift totals the
-  usage `pi-ai` reports per job and refuses jobs that would exceed the cap, falling
-  back to the non-AI behaviour.
-- The Later helper without the Reader works from titles, lengths and sources only.
-  Imported titles (YouTube, X) are **untrusted text**; see §4.
-
-## 3. Runtime
+## 2. Layers
 
 ```
-Clew.app (Swift)                               clew-agent (bundled helper)
- AgentRuntime ── spawn per job ──stdio──▶  pi-agent-core  +  pi-ai
-   │  ◀── toolCall {name,args}                  (loop, hooks)   (providers, login)
-   │  ──▶ toolResult  (read-only ClewCore query)
-   │  ◀── credential.get/put  ──▶ Keychain
-   │  ◀── usage {tokens}
-   │  ◀── result {json}  ──▶ validate (§7) ──▶ AgentOutput
+App (Clew.app)        Suggest button, sign-in, Keychain, Settings › AI, debug log
+  │ uses
+ClewAgent (SwiftPM)   Jobs: instructions + input snapshot → typed output → validated
+  │ uses
+ClewAI (SwiftPM)      Provider: one streaming request, cancellable; ChatGPT plan first
 ```
 
-- **clew-agent**: TypeScript on `@earendil-works/pi-agent-core` and `pi-ai`, with
-  **exact versions pinned** (1.5.0 at time of writing). Compiled with Bun into one
-  executable, **bundled and signed at build time** in `Clew.app/Contents/Helpers`.
-  It ships to everyone, but runs only when a switch is on. It is wrapped behind our own `AgentRuntime` protocol, so it
-  can be replaced without touching the rest of the app.
-- **Spawned per job, exits after.** No resident process and no database handle.
-- **Protocol:** newline-delimited JSON over stdio, versioned (`proto: 1`).
-- **Credentials:** the helper's `CredentialStore` implementation forwards to the
-  Swift Keychain. Tokens are never written by the helper.
-- **Providers** (all through `pi-ai`):
-  - ChatGPT subscription via the Codex OAuth login. **Personal use only.** A public
-    build must use OpenAI's official "Sign in with ChatGPT" programme instead.
-  - API keys: OpenAI, Anthropic, Google.
-  - Local: Ollama, for users who want nothing to leave the Mac.
-  - Claude *subscription* login is not offered (reportedly disallowed for
-    third-party tools; verify before release).
-- **Unverified:** whether Bun's JIT needs `com.apple.security.cs.allow-jit` under the
-  sandbox and hardened runtime. Measure this in the first spike.
+- **ClewAI** (Foundation only). `Provider` takes a request (instructions, input text,
+  model, an optional JSON schema) and returns an `AsyncThrowingStream` of events:
+  `text(String)`, `done(usage)`, `failed(ProviderError)`. Cancelling the task cancels
+  the request. Providers: **ChatGPT plan** (§3) first; Apple's on-device model or an
+  API key can follow behind the same protocol.
+- **ClewAgent** (Foundation + ClewDomain + ClewAI; never ClewCore's writer, never the
+  store). A `Job` has a name, its instructions (a few lines), an `Encodable` input
+  snapshot, a `Decodable` output, and `validate(output, input) → Result`. One request,
+  one answer, **no retry** (a retry spends the person's plan); on any failure the job
+  returns nothing and the app shows its plain fallback. **No agent loop and no tools**:
+  every planned job is one question and one answer. A loop is a layer to add only when
+  a job must act (e.g. a Reader fetching a page).
+- **App**: composes them, owns the credentials (Keychain), the Settings section and
+  where each job's result appears.
 
-## 4. Two roles, kept apart
+Layering is enforced by SwiftPM targets, as for the rest of Clew (AGENTS.md rule 4).
 
-Web content is untrusted: a page can contain text written to steer a model. So
-the role that reads the web never sees the user, and the role that sees the user
-never reads the web.
+## 3. Provider: the person's ChatGPT plan
 
-| | **Reader** | **Coach** (planner) |
-|---|---|---|
-| Sees | one item's URL and fetched content | a **snapshot Swift builds for the job**: history aggregates, memory digest, mood answers, item fields |
-| Tools | `fetch_url` (GET, size-capped, text only) | **none**. Swift already knows each job's inputs, so the Coach gets them up front: fewer turns, fewer tokens, nothing to misuse |
-| Never | sees Clew data, mood, notes | fetches the web |
-| Writes | `Enrichment` for that item | `Recap`, `Suggestions`, `QuickStart`, memory note ops |
+OpenAI's **Sign in with ChatGPT** for open-source, locally run apps
+(developers.openai.com/siwc/token-sharing-open-source; Clew's repo is public and it
+runs on the Mac). Clew registers as itself ("Clew"); it does not borrow Codex's or
+pi's login. **Spike 2026-11-22** (`CLEW_CHATGPT_SPIKE`, a debug build signed with
+Clew's sandbox entitlements): signed in, plan permission granted, models listed, one
+streamed answer in 3.0 s. No helper process, no JavaScript.
 
-Reader output reaches the Coach only as **validated, length-capped fields**
-(summary ≤ 140 chars, minutes, energy, ≤ 3 tags), never as raw page text.
+- **Sign-in**: the system browser, PKCE (S256), a loopback callback on
+  `127.0.0.1:1455` (`/auth/callback`; Clew already has the network server
+  entitlement). First sign-in uses `client_id=dynamic_agent_client` and
+  `agent_name_hint=Clew`; the callback's issued client id (`oaiapp_…`) is kept and used
+  from then on. `ext_agent_host_id` is a `urn:uuid:` chosen once per Mac. Scopes
+  `openid profile email offline_access resource.invoke chatgpt.tokens.use.direct`,
+  resource `https://api.openai.com/v1`. Plan use needs `chatgpt.tokens.use.direct` in
+  the granted scopes; without it Clew keeps the sign-in and says AI is not available
+  on this plan.
+- **ID token**: signature checked against OpenAI's JWKS (from
+  `auth.openai.com/.well-known/openid-configuration`), with issuer, audience (the issued
+  client id), expiry and nonce.
+- **Tokens** in the Keychain, never in files, logs or URLs. Access tokens last an hour;
+  a refresh (`grant_type=refresh_token`, issued client id, resource) returns a new
+  refresh token each time, saved together; refreshes are serialized. A refresh error
+  of the `invalid_grant` family means signing in again. **Sign out** revokes the
+  refresh token (revocation endpoint from the OpenID configuration) and clears it; the
+  client id and host id stay.
+- **Requests**: `POST https://api.openai.com/v1/responses`, `stream: true`,
+  `store: false`, `instructions` for the job's text (no system messages), structured
+  output (a JSON schema) when the model takes it. No `temperature`, `max_output_tokens`
+  and the other fields the preview refuses. Success is `response.completed` only;
+  `response.failed`, `response.incomplete` or a stream that just ends are failures.
+- **Models**: `GET /v1/models`, items with `visibility == "list"`, shown by
+  `display_name`, sent as `slug`. Default: the first listed; Settings › AI can choose.
+- **Errors** (OpenAI's list): usage limit (`subscription_sharing_usage_limit_exceeded`)
+  pauses AI and shows "Usage limit reached · Manage usage"; `…_unavailable` /
+  503 retry later (not now: no retry within a job); not eligible, invalid user or a
+  revoked sign-in end the sign-in with a plain message. Never loop through sign-in.
+- **OpenAI's interface rules**: a **Continue with ChatGPT** button; once, on first use,
+  "You're using your ChatGPT plan" with **Got it**; **Manage usage** links to
+  chatgpt.com/settings/usage; "Usage limit reached" when it is.
+- It is a **preview** at OpenAI: details may change. Everything above sits in ClewAI,
+  so a change stays there.
 
-**Untrusted text is broader than web pages.** Imported titles and notes (X
-bookmarks, YouTube titles), titles fetched for pasted links (`titleOrigin =
-fetched`) and Reader outputs were all written or shaped by strangers. Rules:
-- In Coach snapshots, untrusted fields are quoted and tagged `untrusted: true`.
-  They may appear only in short-lived outputs (today's suggestions), which are
-  validated and expire.
-- **The Dream never receives untrusted text.** Its inputs are facts, user-typed
-  titles, kinds, durations, ratings and reflections. Persistent memory therefore
-  cannot be poisoned by a bookmarked tweet.
-- Memory notes are length-capped. A note that reads like an instruction (imperative
-  phrasing aimed at the model) is rejected by the validator.
+## 4. Untrusted text
 
-## 5. Inputs
+Text Clew did not get from the person's typing is untrusted: page titles fetched for
+pasted links (`titleOrigin = fetched`), imported YouTube and X titles. A job's input
+marks such fields `untrusted: true` and quotes them; they may shape only short-lived,
+validated suggestions, never anything kept. Jobs never see URLs' contents.
 
-**Task history** (from ClewCore read models): check-ins with `localDay`, time and
-rating; picks from Later; items ignored or abandoned (e.g. watch % stalled); what
-was planned versus done.
+## 5. Validation (Swift, before anything is shown)
 
-**Data minimisation:** the Coach receives aggregates for a recent window (default
-14 days), plus memory notes. It never receives the whole raw history.
-
-**Evening question** (optional, once a day, skippable; works with AI off too):
-
-1. **"How did today feel?"**: one slider, *unpleasant ↔ pleasant*. This follows the
-   valence axis of the circumplex model of affect, as Apple's State of Mind
-   logging does, and avoids judgemental words like "bad" or "low". *Later option:*
-   a Mood-Meter-style 2×2 (pleasantness × energy; Yale RULER).
-2. **"Which one felt best?"**: tap one of today's done items. This is a no-typing
-   form of "Three Good Things" (savouring what went well), and it is the Coach's
-   strongest preference signal.
-
-Both answers are facts (`DayReflection`), owned by the user, never by the agent.
+1. The output decodes into the job's type; unknown fields are refused.
+2. Length and count caps per job.
+3. Every item id exists and is in the job's allowed set.
+4. **Banned content**: comparisons with other people, streak or guilt words ("you
+   missed", "broke", "failed"), medical or diagnostic terms. Item titles are masked
+   before this check, so "Fix broken build" never trips it.
+5. On any failure the job returns nothing: the plain behaviour, a short "Couldn't
+   suggest steps" line, and in a debug build the reason (never the content) in the log.
 
 ## 6. Jobs
 
-| Job | When | Output |
-|---|---|---|
-| **Recap** | evening summary time (default 21:00) | `Recap { line ≤ 120 chars, highlightItemId? }` |
-| **Dream** | right after Recap, daily | memory note ops (§8) |
-| **Later suggestions** | morning, and when Later is opened (cached for the day) | `Suggestions [{itemId, reason ≤ 80}] ≤ 3` |
-| **Quick start** | when an item is opened and has no hint yet | `QuickStart { step ≤ 100 chars }`: a 2-minute first action (from AAHD) |
-| **Read** | on request (default), or for every new Later item if "read automatically" is on | `Enrichment { summary, minutes, energy: light/focus, tags, keyPoints? }` |
+| Job | Where | Output | Phase |
+|---|---|---|---|
+| **Suggest steps** | Add Step… and Details' Steps (SPEC "Suggest steps") | 3–5 steps, ≤ 80 characters each, the first a 2-minute start | AI-1 |
+| **Evening line** | the 21:00 summary | one line ≤ 120 characters naming something done | AI-2 |
+| **Fits today** | Goals & Later | ≤ 3 items with a free slot on today's timeline and a reason ≤ 80 | AI-3 |
+| Reader, memory | later | from the 2026-11-08 plan (§10) | later |
 
-**How the Coach decides what to say.** These are the starting rules; tune from feedback.
-- **Adjust the load to the day:** after a less pleasant day, suggest 1 light item,
-  not 3. If the plan has more than 6 items, gently suggest a smaller list.
-- **Reframe (CBT):** recap what *was* done ("3 done, including the hard one"),
-  never what wasn't.
-- **Autonomy (motivational interviewing):** offer, don't instruct. "Maybe…",
-  "If you feel like it…".
-- **Savour:** name the item you said felt best, or the highest-rated one.
-- **Zero-tick days use curated lines, not the model** (shipped in v1b for the
-  evening summary, `NotificationsAdapter.kindLines`): a hard-coded, rotating,
-  non-repeating set ("Rest is part of the plan." / "Tomorrow's list is ready when
-  you are."). This is safer on a hard day, costs nothing, and works with AI off.
+Zero-tick days keep the hand-written lines (shipped), never a model's.
 
-## 7. Output validation (Swift, before anything is stored or shown)
+## 7. Settings › AI
 
-1. JSON matches the job's schema; unknown fields are rejected.
-2. Length caps (above) and language (English in v1.2; the system language later, §12).
-3. Every `itemId` exists and is in the allowed set for that job (e.g. Later items only).
-4. **Banned content:** comparisons with other people ("than most", "other
-   people", "average user"…), streak or guilt language ("you missed", "broke",
-   "failed"), medical or diagnostic terms. This is a word-list check plus a rule in
-   the prompt; a failure drops the output. **Item titles are masked before the
-   check**, so an item called "Fix broken build" or "Read ADHD paper" never causes a
-   false rejection.
-5. On any failure: use the non-AI fallback, and log the reason, never the content, in debug.
+Off by default. **Continue with ChatGPT** (then the account's email, **Sign out**,
+**Manage usage**), the model, and a switch per job. Each says plainly what is sent:
+"Sends the task's title, its steps and its note to OpenAI, using your ChatGPT plan."
 
-## 8. Memory (after Anthropic's "components of agent memory")
+## 8. Debug log and evals
 
-| Layer | In Clew |
-|---|---|
-| Transcripts | the fact history (check-ins, picks, reflections): append-only and attributed, so it is trustworthy ground truth |
-| Notes | short observations, each with evidence: `{claim, evidence: "12 of 15 evening picks", firstSeen, lastConfirmed}` |
-| Representation | a small structured profile: sections such as Evenings, Videos, Courses, Load |
-| Injected context | a ≤ 15-line digest of the profile, sent into every Coach job |
+- A debug build keeps a local log of each job: name, input size, model, time, whether
+  it passed validation and why not. Never tokens, never content. It is how prompts are
+  tuned.
+- **Evals**: fixed inputs with expected *properties* (Suggest steps: 3–5 items, under
+  the caps, the first short, none repeating an existing step, no banned words), run
+  against the live model on request and against recorded answers in CI. Each must fail
+  against a deliberately broken prompt or validator (AGENTS.md rule 1).
 
-**Dream (daily, after Recap):**
-- **re-test** each note against recent facts, and weaken or delete the ones the facts contradict;
-- **merge** duplicates;
-- **promote** stable notes into the digest, and **demote** details out of it;
-- **prune** notes not confirmed in about 30 days.
+## 9. Privacy
 
-Purpose-directed rather than rule-driven: the dream prompt says what the memory is
-*for* (better-fitting, kinder suggestions), not what to record.
+- Off by default; nothing is sent until the person signs in and turns a job on.
+- Each job sends only its own input (§6), never the history.
+- Measuring helpfulness, if ever, from local behaviour only (suggestions added); no
+  tracking (AGENTS.md rule 8).
 
-- **No approval step.** The memory updates itself.
-- **Visibility:** shown **only in debug mode** ("What Clew noticed", read-only).
-  Regular users do not see it (decided 2026-11-08); "Delete agent data" (§11) still
-  clears it.
-- Notes are agent-owned (`AgentOutput.notes`). Deleting them never touches user facts.
+## 10. Kept from the 2026-11-08 plan, for later
 
-## 9. Safety boundaries
+The evening question (a pleasantness slider and "Which one felt best?", facts the
+person owns), the support nudge after a run of very unpleasant evenings (hard-coded,
+at most every 14 days), the Reader (one link's summary, kept apart from the person's
+data) and memory notes with a daily "dream". Each comes back as its own job when the
+first jobs have earned their place.
 
-- Not therapy; no diagnosis; no medical advice; no comparisons.
-- There is no free-text input, so open-ended distress cannot be entered.
-- **Support nudge (decided 2026-11-08, option a):** after a run of very unpleasant
-  evenings (starting threshold 5 of 7), show one **hard-coded** gentle line, e.g.
-  "It's been a heavy week. Talking to someone you trust can help." No links, no
-  crisis framing. At most once every 14 days, never model-generated, and it works
-  with AI off (it reads `DayReflection` facts only).
-- The agent cannot act outside its own outputs: no notifications of its own, and no
-  changes to schedules or reminders.
+## 11. Decisions
 
-## 10. Measuring whether it helps
-
-From behaviour only, with no rating buttons for the agent:
-- **pick rate**: suggested items picked;
-- **follow-through**: picked → done the same day;
-- **coach-on vs coach-off days**: done/planned ratio, and evening valence;
-- **active days**: the SPEC's 5-of-7 bar.
-
-**Offline evals:** synthetic histories with expected *properties*, run against
-prompt + validator. Examples: a zero-tick day gets a curated line; a low-valence day
-gets ≤ 1 suggestion; no output ever contains a comparison; Reader output never
-appears unvalidated in Coach input. Per AGENTS.md, each eval must fail against a
-deliberately broken prompt or validator.
-
-## 11. Privacy
-
-- Off by default. Each switch says plainly what is sent and to whom.
-- Mood answers go only to the Coach, and only when the Coach is on.
-- Local-only mode via Ollama.
-- "Delete agent data" removes all `AgentOutput` (notes, recaps, enrichments).
-
-## 12. Phases
-
-1. **v1.2a**: evening question (no AI), curated lines, `AgentRuntime` + helper spike
-   (measure size, JIT, login).
-2. **v1.2b**: daily Coach (recap + dream), Later helper, quick start.
-3. **v1.2c**: Reader (enrichment, then reading help).
-4. Later: Mood-Meter option, reward-theme-aware recaps, system-language output.
-
-## 13. Open questions
-
-None currently open.
-
-Decided 2026-11-08: `clew-agent` is bundled at build time (an optional download
-would break the code signature). Revisit before public release: a separate signed
-"Clew AI" companion app. The memory page stays debug-only.
-
-Decided 2026-11-08: the memory page is debug-only; the Reader runs on request by
-default, with automatic reading as an opt-in setting.
+- **2026-11-22 (*user*)**: the person's ChatGPT plan through Sign in with ChatGPT, in
+  Swift, replaces the bundled pi-agent-core helper: the spike passed in the sandbox,
+  with no helper, no JavaScript, no borrowed login. pi's design is kept as a shape
+  (layers, small prompts, typed output), not as code.
+- **2026-11-22**: no agent loop, no tools, no plug-ins until a job needs them.
+- **2026-11-22**: the first job is Suggest steps (SPEC).
+- Superseded 2026-11-22: the bundled `clew-agent` helper, Codex OAuth reuse, the
+  monthly token cap (the plan's own limits apply), `AgentOutput` records (Suggest
+  steps keeps nothing).
