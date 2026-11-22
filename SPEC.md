@@ -1084,8 +1084,16 @@ stopped daily use, not adding features.
     first time the person signs in, Settings shows once "You're using your ChatGPT
     plan" with **Got it** (OpenAI's rule). Declined plan permission: "Clew can't use
     your ChatGPT plan yet" with **Continue with ChatGPT** to ask again; a plan OpenAI
-    says is not eligible: "AI isn't available on this ChatGPT plan." All of this text,
-    OpenAI's included, is in the String Catalog.
+    says is not eligible: "AI isn't available on this ChatGPT plan." Signed out, one line
+    says what AI does: "Clew can suggest small steps for a task, using your ChatGPT plan.
+    Nothing is sent until you sign in and ask. Clew works fully without it." While the
+    browser is open: "Waiting for the browser…" with **Cancel**; the browser's page after
+    signing in says "You can close this tab and go back to Clew." A failed sign-in says
+    "Couldn't sign in. Try again." (or that it was cancelled in the browser, or that
+    you're offline). After OpenAI ends a sign-in: "OpenAI ended Clew's sign-in. Sign in
+    again to use AI." with **Sign in again**. A sign-out OpenAI could not confirm: "Clew
+    couldn't confirm the sign-out with OpenAI. To be sure, disconnect Clew in ChatGPT's
+    settings." All of this text, OpenAI's included, is in the String Catalog.
   - **Where:** only while signed in, the switch on, and a step can be added (a one-off
     task, not done). In Add Step…'s line, a small ✨ button at its right end ("Suggest
     steps" to VoiceOver); in the details, **Suggest Steps** beside **Add Step**. A
@@ -1113,8 +1121,8 @@ stopped daily use, not adding features.
     (docs/AGENT.md §4).
   - **Checked before showing:** each suggestion trimmed (a leading "1.", "-" or "•"
     removed), 1–80 characters, not the same as an existing step or an earlier
-    suggestion (ignoring case and spaces), no banned words (docs/AGENT.md §5; the
-    person's own typed title is masked first, a fetched one is not). Up to 5 kept; none
+    suggestion (ignoring case and spaces), no banned words (docs/AGENT.md §5; a banned
+    phrase the person's own typed title carries is allowed, a fetched title's is not). Up to 5 kept; none
     left is a failure.
   - **When it fails:** in the suggestions' place, "Couldn't suggest steps. Try again."
     for 5 seconds; no retry by itself. Usage limit: "ChatGPT usage limit reached ·

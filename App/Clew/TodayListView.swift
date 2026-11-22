@@ -50,6 +50,8 @@ struct TodayListView: View {
     /// The task whose Add Step… line is open (SPEC 2026-11-21). It lives with the list:
     /// leaving the list closes it.
     @State private var addingStep: UUID?
+    /// Add Step…'s line opened by the row's "Suggest steps" VoiceOver action: it asks at once.
+    @State private var suggestingStep: UUID?
     /// A click folds or unfolds at once; the double-click's second click puts the fold
     /// back the way it was before the first (SPEC 2026-11-21).
     @State private var foldClicks = FoldClicks()
@@ -422,10 +424,14 @@ struct TodayListView: View {
         startAddingStep(row.id)
     }
 
-    private func startAddingStep(_ id: UUID) {
+    private func startAddingStep(_ id: UUID, suggest: Bool = false) {
         guard let row = model.row(id) else { return }
         model.setUnfolded(row.id, true)
-        addingStep = row.id
+        suggestingStep = suggest ? row.id : nil
+        // Already open: reopen it, so the new line asks.
+        if suggest, addingStep == row.id { addingStep = nil; DispatchQueue.main.async { addingStep = row.id } } else {
+            addingStep = row.id
+        }
     }
 
     /// One row of either list; Move Up / Move Down stop at its own list's ends. An
@@ -447,10 +453,16 @@ struct TodayListView: View {
                     onClick: { clicked(row) },
                     onDoubleClick: { doubleClicked(row) },
                     onAddStep: { startAddingStep(row) })
+                .accessibilityActions {
+                    if model.canSuggestSteps(row.id) {
+                        Button("Suggest steps") { startAddingStep(row.id, suggest: true) }
+                    }
+                }
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { if steps == nil { rowHeight = $0 } }
             if (steps != nil && model.isUnfolded(row.id)) || adding {
                 StepsList(model: model, row: row, steps: steps ?? TaskSteps(taskId: row.id, entries: []),
-                          adding: adding, onAddClose: { if addingStep == row.id { addingStep = nil } },
+                          adding: adding, suggestOnOpen: suggestingStep == row.id,
+                          onAddClose: { if addingStep == row.id { addingStep = nil; suggestingStep = nil } },
                           onOpen: { screen = .detail(row.id) }, hoveredStep: $hoveredStep,
                           listSpace: Self.listSpace,
                           onTimelineDrag: { entry, point in stepDragged(entry, of: row, at: point) },

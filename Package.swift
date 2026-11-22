@@ -6,6 +6,8 @@ import PackageDescription
 //   ClewCore    -> ClewDomain
 //   ClewStore   -> ClewCore, GRDB
 //   ClewGateway -> ClewCore (the local API, v1.1; Apple platforms only)
+//   ClewAI      -> Foundation only (providers; docs/AGENT.md §2)
+//   ClewAgent   -> ClewDomain, ClewAI (jobs; never ClewCore or the store)
 // Never add a dependency to ClewDomain or ClewCore.
 let package = Package(
     name: "Clew",
@@ -15,6 +17,8 @@ let package = Package(
         .library(name: "ClewCore", targets: ["ClewCore"]),
         .library(name: "ClewStore", targets: ["ClewStore"]),
         .library(name: "ClewGateway", targets: ["ClewGateway"]),
+        .library(name: "ClewAI", targets: ["ClewAI"]),
+        .library(name: "ClewAgent", targets: ["ClewAgent"]),
     ],
     dependencies: [
         .package(url: "https://github.com/groue/GRDB.swift", exact: "7.11.1"),
@@ -27,9 +31,13 @@ let package = Package(
             .product(name: "GRDB", package: "GRDB.swift"),
         ]),
         .target(name: "ClewGateway", dependencies: ["ClewCore"]),
+        .target(name: "ClewAI"),
+        .target(name: "ClewAgent", dependencies: ["ClewDomain", "ClewAI"]),
         .testTarget(name: "ClewDomainTests", dependencies: ["ClewDomain"]),
         .testTarget(name: "ClewCoreTests", dependencies: ["ClewCore"]),
         .testTarget(name: "ClewStoreTests", dependencies: ["ClewStore"]),
         .testTarget(name: "ClewGatewayTests", dependencies: ["ClewGateway", "ClewStore"]),
+        .testTarget(name: "ClewAITests", dependencies: ["ClewAI"]),
+        .testTarget(name: "ClewAgentTests", dependencies: ["ClewAgent", "ClewAI"]),
     ]
 )

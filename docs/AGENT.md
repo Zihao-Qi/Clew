@@ -11,8 +11,10 @@ help that suggests, and you choose.
    only adds a button or a line. Off by default.
 2. **It never changes your data.** A job returns a suggestion; only your tap writes
    (Add, Add all). Swift enforces this: jobs have no access to the store's writer.
-3. **No conversation.** No chat or text box. A job's input is built by Clew from what
-   is already there.
+3. **No conversation** (*user* 2026-11-22). Clew may show the person something short
+   it wrote, but the person never types to it: no chat, no text box. At most the
+   person chooses among a few options Clew offers, so using it stays easy and
+   relaxed. A job's input is built by Clew from what is already there.
 4. **A friend, not a coach with a whistle.** Brief, encouraging, never pushy. Never
    compares you to anyone. No streaks, no guilt, no "you missed".
 5. **Say less.** Short items, one line at most. Never paragraphs.
@@ -146,9 +148,11 @@ address or any page's content.
    tests" is fine): comparisons with other people ("than most", "other people",
    "average person"), streak or guilt phrases ("you missed", "you failed", "you
    broke", "streak", "behind schedule", "lazy"), medical or diagnostic terms ("ADHD",
-   "diagnos", "disorder", "symptom", "medication"). The person's own typed titles are
-   masked before this check, so "Read ADHD paper" never trips it; untrusted titles are
-   not masked, so a fetched title cannot carry banned text through. The list lives in
+   "diagnos", "disorder", "symptom", "medication"). A phrase the person's own typed
+   title carries is allowed, so for "Read ADHD paper" the step "Skim the ADHD paper's
+   abstract" passes; the title's single words never open a longer phrase ("Update the
+   schedule" does not let "behind schedule" through). Untrusted titles allow nothing,
+   so a fetched title cannot carry banned text through. The list lives in
    code with a test per phrase.
 5. On any failure the job returns nothing: the plain behaviour, a short "Couldn't
    suggest steps" line, and in a debug build the reason as a code ("tooLong",
@@ -161,7 +165,7 @@ address or any page's content.
 | **Suggest steps** | Add Step… and Details' Steps (SPEC "Suggest steps") | asks for 3–5 steps, the first a 2-minute start; keeps up to 5 that pass (1–80 characters, no repeats) | AI-1 |
 | **Evening line** | the 21:00 summary | one line ≤ 120 characters naming something done | AI-2 |
 | **Fits today** | Goals & Later | ≤ 3 items with a free slot on today's timeline and a reason ≤ 80 | AI-3 |
-| Reader, memory | later | from the 2026-11-08 plan (§10) | later |
+| Reader, memory | later | §10 | later |
 
 Zero-tick days keep the hand-written lines (shipped), never a model's.
 
@@ -190,11 +194,29 @@ in SPEC "Suggest steps".
 
 - Off by default; nothing is sent until the person signs in (which turns Suggest steps
   on; it has its own switch) and asks for suggestions.
-- Each job sends only its own input (§6), never the history.
+- Each job sends only the input it declares (§6), and Settings › AI says what that
+  is. A job that reads more (the calendar, past check-ins, goals, memory; §10) says
+  so in its own switch's line.
 - Measuring helpfulness, if ever, from local behaviour only (suggestions added); no
   tracking (AGENTS.md rule 8).
 
-## 10. Kept from the 2026-11-08 plan, for later
+## 10. For later
+
+**Decided 2026-11-22 (*user*), each to be designed before it is built:**
+
+- **What jobs may read:** the calendar, past check-ins and ticks, goals, and the
+  memory below, as each job needs. Each job declares what it reads (§9).
+- **Memory, a main direction.** Clew keeps notes about the person across jobs, so its
+  feedback, plans and steps fit them better, and so the person can understand
+  themselves better. The notes are the agent's own, kept apart from the person's data
+  (rule 2 still holds: it never changes their tasks, ticks or goals). To design: what
+  a note is, how one is made, and how the person sees, corrects and deletes each note.
+- **Emotional support:** maybe, not decided. If ever, within §1.4 and the support
+  nudge's limits below.
+- **Other providers:** yes, behind ClewAI's `Provider` (§2): Apple's on-device model,
+  an API key or another service, for people without a ChatGPT plan or as a fallback.
+
+**Kept from the 2026-11-08 plan:**
 
 The evening question (a pleasantness slider and "Which one felt best?", facts the
 person owns), the support nudge after a run of very unpleasant evenings (hard-coded,
@@ -210,8 +232,12 @@ first jobs have earned their place.
   (layers, small prompts, typed output), not as code.
 - **2026-11-22**: no agent loop, no tools, no plug-ins until a job needs them.
 - **2026-11-22**: the first job is Suggest steps (SPEC).
-- **2026-11-22**: the debug spike (`CLEW_CHATGPT_SPIKE`, `App/Clew/ChatGPTSpike.swift`)
-  is deleted when AI-1's real sign-in lands.
+- **2026-11-22 (*user*)**: no typing to Clew, at most choosing among options (§1.3);
+  jobs may read the calendar, check-ins, goals and memory; memory is a main direction;
+  other providers will follow; emotional support is undecided (§10).
+- **2026-11-22**: the debug spike (`CLEW_CHATGPT_SPIKE`) was deleted when AI-1's real
+  sign-in landed. Debug checks: `CLEW_AI_CHECK=1` (the app's AI with recorded answers)
+  and `CLEW_AI_RENDER=1` (Settings › AI and the suggestions, light and dark).
 - Superseded 2026-11-22: the bundled `clew-agent` helper, Codex OAuth reuse, the
   monthly token cap (the plan's own limits apply), `AgentOutput` records (Suggest
   steps keeps nothing).

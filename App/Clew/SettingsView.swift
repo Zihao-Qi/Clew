@@ -64,7 +64,7 @@ struct SettingsView: View {
 
     /// The sidebar's sections.
     enum Pane: String, CaseIterable, Identifiable {
-        case general, summaries, progress, calendar, browser, data, about
+        case general, summaries, progress, calendar, browser, data, ai, about
         var id: String { rawValue }
         var title: Text {
             switch self {
@@ -74,6 +74,7 @@ struct SettingsView: View {
             case .calendar: Text("Calendar")
             case .browser: Text("Browser")
             case .data: Text("Data")
+            case .ai: Text("AI")
             case .about: Text("About")
             }
         }
@@ -85,6 +86,7 @@ struct SettingsView: View {
             case .calendar: "calendar"
             case .browser: "puzzlepiece.extension"
             case .data: "externaldrive"
+            case .ai: "sparkles"
             case .about: "info.circle"
             }
         }
@@ -341,6 +343,13 @@ struct SettingsView: View {
                     Text("Everything Clew stores, as one JSON file.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+
+                case .ai:
+                if let ai = model.ai {
+                    AISettings(ai: ai)
+                } else {
+                    Text("Not available in this window.").foregroundStyle(.secondary)
                 }
 
                 case .about:

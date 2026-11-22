@@ -62,6 +62,8 @@ dependencies make the layering a **compile error** rather than a lint rule:
 | `ClewCore` | Domain | Use cases (commands + queries), validation, attribution, the `ClewStore` *protocol*, the `Notifier` *protocol*. |
 | `ClewStore` | Core, GRDB | GRDB implementation: schema, migrations, change feed, backups, observation. |
 | `ClewGateway` (v1.1) | Core | Local HTTP API `/v1`, pairing and auth, the loopback listener (Network). Apple platforms only (CryptoKit). |
+| `ClewAI` (AI-1) | Foundation only | Model providers: the ChatGPT plan's sign-in rules, tokens and refresh, the streamed Responses request and its errors, over an injected transport (docs/AGENT.md §2–3). |
+| `ClewAgent` (AI-1) | Domain, ClewAI | Jobs (Suggest steps), their input snapshots and Swift validation of every answer; never the store (AGENTS.md rule 7). |
 | `ClewApp` (app target) | all | SwiftUI `MenuBarExtra`, notifications adapter, settings, composition root. |
 | `clew-mcp` (v1.2, executable) | none of the above | Thin stdio MCP server that calls the Gateway. |
 

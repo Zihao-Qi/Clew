@@ -40,6 +40,12 @@ final class AppModel {
 
     /// The Chrome extension's connection (live app only).
     private(set) var browser: BrowserConnection?
+    /// Clew's AI (docs/AGENT.md): the ChatGPT sign-in and its jobs (live app only).
+    private(set) var ai: AIModel?
+    #if DEBUG
+    /// The debug AI check and render use an AI with recorded answers.
+    func useAI(_ ai: AIModel) { self.ai = ai }
+    #endif
     /// The About pane and the opt-in update check (SPEC 2026-11-13); per Mac.
     let updates: Updates
 
@@ -100,6 +106,7 @@ final class AppModel {
         do {
             self.init(databaseAt: try Self.databaseURL())
             if let clew { browser = BrowserConnection(clew: clew) }
+            ai = AIModel()
             calendarSource = EventKitCalendar()
             OpenShortcutHotkey.shared.start()
             updates.start()
@@ -338,6 +345,9 @@ final class AppModel {
     private(set) var weekCard: WeekRecap?
     /// Between the menu window becoming key and losing it: one opening.
     @ObservationIgnored private var menuSessionOpen = false
+    /// Counts the menu's closings, so views that stay mounted (the details) can drop
+    /// what must not greet the next opening, such as suggestions (SPEC "Suggest steps").
+    private(set) var menuCloses = 0
 
     /// The menu's own window became key: a new opening. On the list, it takes last
     /// week's card if one is due, and marks the week shown only when it took one.
@@ -357,6 +367,7 @@ final class AppModel {
     /// The menu window lost the keyboard or closed: the opening is over.
     func menuClosed() {
         menuSessionOpen = false
+        menuCloses += 1
         weekCard = nil
         // A refusal line never greets the next opening or the next day (SPEC 2026-11-17).
         notice = nil
