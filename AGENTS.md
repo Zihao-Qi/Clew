@@ -28,7 +28,7 @@ anything AI-related, [docs/AGENT.md](docs/AGENT.md) before changing code.
 6. **Facts are never updated in substance or deleted.** Corrections are voids;
    the mutable fields and their merge rules are listed in ARCHITECTURE §4.2 / §8.
 7. **The agent never changes user data.** Swift validates every agent output
-   (AGENT §7).
+   (AGENT §5).
 8. **No tracking; all UI text in the String Catalog; every control has an
    accessibility label.**
 

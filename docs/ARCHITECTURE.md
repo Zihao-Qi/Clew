@@ -811,12 +811,14 @@ not running it launches it in the background (`open -g -b <bundle id>`) and
 retries once; only then does it report "Clew isn't running". Whether App Nap
 delays a menu bar app's listener is **unverified** and must be measured in v1.1.
 
-**AI agent (v1.2, ADR-5).** Designed in full in [AGENT.md](AGENT.md). In short:
-`clew-agent` is a bundled helper built on Pi's lower two layers (`pi-agent-core`
-+ `pi-ai`), compiled with Bun, **bundled in the app** (ADR-5), and spawned
-per job by a Swift `AgentRuntime` over stdio. It has no database access: tools are
-answered by Swift with read-only queries, and its JSON outputs are validated by
-Swift before being stored as `AgentOutput`. Clew works fully with it absent.
+**AI (ADR-5, revised 2026-11-22).** Designed in [AGENT.md](AGENT.md) v2. In short:
+two SwiftPM targets, `ClewAI` (requests, streaming, the provider's rules; Foundation
+only, over an injected HTTP transport) and `ClewAgent` (jobs: input snapshot → typed,
+validated output; depends on ClewDomain and ClewAI, never on the store or ClewCore's
+writer). The app supplies the transport, the browser sign-in, PKCE hashing, the ID
+token check and the Keychain. The provider is the person's ChatGPT plan through
+OpenAI's Sign in with ChatGPT. Jobs return suggestions; only the person's tap writes.
+Clew works fully with AI off.
 
 **Dayflow connector (v2).** Outbound only, driven by `ChangeLog.seq` with a stored
 cursor. It sends `X-Dayflow-Mutation-Id` so replays are safe. The mapping (CheckIn
@@ -919,8 +921,8 @@ per table.
 
 - No server, account, or cloud in v1–v1.3.
 - No full event sourcing, CQRS buses, or plugin system.
-- No LLM calls from the app process. AI runs only in the optional `clew-agent`
-  helper (AGENT.md); its credentials live in the Keychain.
+- No AI helper process (the 2026-11-08 `clew-agent` plan, superseded 2026-11-22): AI
+  requests run in the app, through `ClewAI`; credentials live in the Keychain.
 - No Accessibility, CGEvent, or screen reading. If that is ever needed, it goes in a
   separate helper, never in the main app.
 - No multi-process database writers (see ADR-1).
@@ -960,7 +962,12 @@ agent writes directly, which is faster but risks silent list churn that undermin
 trust. Automatic ingestion (e.g. new Watch Later videos into Later) belongs to
 the *import* path (extension, `import` scope), not the agent.
 
-**ADR-5 Agent is a bundled helper on Pi's lower layers** (revised 2026-11-08).
+**ADR-5, superseded 2026-11-22 (*user*):** AI runs in the app in Swift, using the
+person's ChatGPT plan through OpenAI's Sign in with ChatGPT (a spike passed in the
+sandbox); pi's design is kept as a shape (layers, small prompts, typed output). The
+2026-11-08 text follows for the record.
+
+**ADR-5 (2026-11-08) Agent is a bundled helper on Pi's lower layers.**
 `pi-ai` brings every provider and the ChatGPT login; `pi-agent-core` brings the
 loop and a pre-tool-call hook. *Rejected:* (a) the user's own `pi` CLI via launchd
 (first draft): fine for one power user, too heavy for the public, and the coding
@@ -984,7 +991,7 @@ remains an option for an App Store build.
 1. Distribution: Mac App Store is possible but unlikely (2026-11-08). The sandbox
    stays on anyway as a no-regret choice; the store-vs-Developer-ID decision waits
    until public release.
-2. Agent open questions are tracked in [AGENT.md](AGENT.md) §13.
+2. AI decisions are tracked in [AGENT.md](AGENT.md) §11.
 
 ## 15. Project-wide rules (decided 2026-11-08)
 
