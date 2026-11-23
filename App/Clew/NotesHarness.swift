@@ -46,6 +46,45 @@ extension Snapshot {
                 try clew.stopFocus()
                 model.refresh()
                 report("a done task's block is not chosen; nothing running: no task", model.noteContext() == nil)
+                // A paused focus says so; a goal's running block counts until it is reached;
+                // of a task's own block and a step's starting together, the task's.
+                try clew.startFocus(itemId: intro, minutes: 25)
+                try clew.pauseFocus()
+                model.refresh()
+                report("a paused focus says paused", model.noteContext()?.detail.contains("paused") == true)
+                try clew.stopFocus()
+                let pages = try clew.addItem(NewItem(title: "Read pages", shape: .goal(target: 2))).id
+                let talk = try clew.addItem(NewItem(title: "Prepare the talk", shape: .today)).id
+                let notes = try clew.addStep(taskId: talk, title: "Speech notes").id
+                let earlier = blockStart.addingTimeInterval(-900)
+                try clew.placeOnTimeline(itemId: pages, start: blockStart, minutes: 60)
+                model.refresh()
+                report("a goal not reached: its block is the task", model.noteContext()?.itemId == pages)
+                try clew.checkIn(itemId: pages); try clew.checkIn(itemId: pages)
+                // Earlier than the goal's: only the goal being reached lets them be chosen.
+                try clew.placeStepOnTimeline(stepId: notes, start: earlier, minutes: 90)
+                try clew.placeOnTimeline(itemId: talk, start: earlier, minutes: 90)
+                model.refresh()
+                report("a reached goal is not; of a task's block and a step's together, the task's",
+                       model.noteContext()?.itemId == talk && model.noteContext()?.title == "Prepare the talk")
+                for b in model.timeline?.blocks ?? [] where b.block.itemId == talk && b.block.stepId == nil { _ = model.removeBlock(b.id) }
+                report("a step's block names task and step",
+                       model.noteContext()?.title == "Prepare the talk - Speech notes")
+                for b in model.timeline?.blocks ?? [] { _ = model.removeBlock(b.id) }
+
+                // Times on the page: this Mac's clock; a weekday within 6 days; a date before.
+                var cal = Calendar(identifier: .gregorian)
+                cal.timeZone = .current
+                let ref = cal.date(from: DateComponents(year: 2026, month: 11, day: 22, hour: 15))!
+                let sameDay = NoteTime.time(ref.addingTimeInterval(-3600), now: ref, calendar: cal)
+                let twoDays = NoteTime.time(ref.addingTimeInterval(-2 * 86400), now: ref, calendar: cal)
+                let month = NoteTime.time(ref.addingTimeInterval(-30 * 86400), now: ref, calendar: cal)
+                let lastYear = NoteTime.time(ref.addingTimeInterval(-400 * 86400), now: ref, calendar: cal)
+                report("note times: clock today, weekday this week, date before, year if not this year",
+                       sameDay == ref.addingTimeInterval(-3600).formatted(date: .omitted, time: .shortened)
+                       && twoDays.hasPrefix(ref.addingTimeInterval(-2 * 86400).formatted(.dateTime.weekday(.abbreviated)))
+                       && !month.contains(":") && !month.contains("2026") && lastYear.contains("2025"))
+
                 try clew.startFocus(itemId: intro, minutes: 25)
                 model.refresh()
 
@@ -63,11 +102,13 @@ extension Snapshot {
                     panel.sendEvent(e)
                 }
                 func type(_ text: String) { for c in text { key(String(c), code: 0) } }
+                let oneLine = panel.frame.height
                 type("Call the bank")
                 key("\r", code: 36, shift: true)
                 type("about the card")
                 try await Task.sleep(for: .milliseconds(200))
                 report("⇧Return starts a new line", box.state.text == "Call the bank\nabout the card" && box.isOpen)
+                report("the box grows with its lines", panel.frame.height > oneLine + 10)
                 key("\r", code: 36)
                 try await Task.sleep(for: .milliseconds(300))
                 let saved = model.openNotes.first
@@ -93,6 +134,7 @@ extension Snapshot {
                 box.open()
                 try await Task.sleep(for: .milliseconds(300))
                 report("the draft is back when it opens again", box.state.text == "   half a thought")
+                report("it opens again one line tall, not as tall as before", abs(panel.frame.height - oneLine) < 2)
                 box.close()
 
                 // The page's commands.

@@ -123,8 +123,9 @@ struct NotesView: View {
             Button("Done") { model.setNoteDone(note.id, true) }
             Button("Delete", role: .destructive) { model.deleteNote(note.id) }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text(verbatim: "\(note.text), \(NoteTime.caption(note))"))
+        // While editing, VoiceOver reaches the field itself (review).
+        .accessibilityElement(children: editing == note.id ? .contain : .combine)
+        .accessibilityLabel(editing == note.id ? Text("Edit note") : Text(verbatim: "\(note.text), \(NoteTime.caption(note))"))
         .accessibilityActions {
             Button("Edit") { startEditing(note) }
             Button("Make a task in Today") { model.makeTask(fromNote: note.id, in: .today) }
@@ -183,6 +184,10 @@ struct NotesView: View {
 
     private func startEditing(_ note: QuickNote) {
         guard editing != note.id else { return }
+        // Another note being edited saves first, as a click elsewhere would (review).
+        if let other = editing, let open = model.openNotes.first(where: { $0.id == other }) {
+            finishEditing(open, save: true)
+        }
         draft = note.text
         editing = note.id
     }

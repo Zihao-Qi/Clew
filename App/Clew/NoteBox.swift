@@ -39,7 +39,8 @@ final class NoteBox: NSObject, NSWindowDelegate {
         state.focusRequest += 1
         let panel = self.panel ?? makePanel()
         self.panel = panel
-        place(panel, height: 90)
+        // One line to start; the editor measures its text and sets the height (review).
+        place(panel, height: 50)
         panel.makeKeyAndOrderFront(nil)
     }
 
@@ -95,6 +96,7 @@ final class NoteBox: NSObject, NSWindowDelegate {
             try? await Task.sleep(for: .seconds(3))
             guard !Task.isCancelled else { return }
             await NSAnimationContext.runAnimationGroup { $0.duration = 0.3; self?.banner?.animator().alphaValue = 0 }
+            guard !Task.isCancelled else { return }   // a newer banner keeps showing
             self?.closeBanner()
         }
     }
@@ -119,10 +121,10 @@ final class NoteBox: NSObject, NSWindowDelegate {
     }
 
     private func makeBanner() -> NSPanel {
-        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 440, height: 64),
-                            styleMask: [.nonactivatingPanel, .borderless], backing: .buffered, defer: true)
+        let panel = BannerPanel(contentRect: NSRect(x: 0, y: 0, width: 440, height: 64),
+                                styleMask: [.nonactivatingPanel, .borderless], backing: .buffered, defer: true)
         configure(panel)
-        panel.contentView = NSHostingView(rootView: NoteBannerView(state: state) { [weak self] in self?.closeBanner() })
+        panel.contentView = FirstClickHostingView(rootView: NoteBannerView(state: state) { [weak self] in self?.closeBanner() })
         return panel
     }
 
@@ -144,7 +146,7 @@ final class NoteBox: NSObject, NSWindowDelegate {
         let pointer = NSEvent.mouseLocation
         let screen = NSScreen.screens.first { NSMouseInRect(pointer, $0.frame, false) } ?? NSScreen.main
         guard let visible = screen?.visibleFrame else { return }
-        let size = NSSize(width: 440, height: max(panel.frame.height, height))
+        let size = NSSize(width: 440, height: height)
         panel.setFrame(NSRect(x: visible.midX - size.width / 2, y: visible.maxY - size.height - 8,
                               width: size.width, height: size.height), display: false)
     }
@@ -174,6 +176,17 @@ final class NoteTextView: NSTextView {
         defer { shiftHeld = false }
         super.keyDown(with: event)
     }
+}
+
+/// The banner never takes the keyboard (review).
+final class BannerPanel: NSPanel {
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
+}
+
+/// A click on the banner counts at once, though Clew is not in front (as the peek's).
+final class FirstClickHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
 /// Takes the keyboard although Clew is not in front.
@@ -292,6 +305,7 @@ struct NoteEditorField: NSViewRepresentable {
         context.coordinator.updatePlaceholder(view)
         if context.coordinator.focused != focusRequest {
             context.coordinator.focused = focusRequest
+            context.coordinator.height = -1   // measure again: the box opens at its text's height
             DispatchQueue.main.async {
                 view.window?.makeFirstResponder(view)
                 view.setSelectedRange(NSRange(location: (view.string as NSString).length, length: 0))
@@ -301,7 +315,15 @@ struct NoteEditorField: NSViewRepresentable {
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSScrollView, context: Context) -> CGSize? {
-        CGSize(width: proposal.width ?? 412, height: context.coordinator.height)
+        // Wrapped at the width it is given (the Notes page is narrower than the box).
+        if let width = proposal.width, width > 0, let view = nsView.documentView as? NSTextView,
+           abs(view.frame.width - width) > 0.5 {
+            nsView.setFrameSize(NSSize(width: width, height: nsView.frame.height))
+            view.setFrameSize(NSSize(width: width, height: view.frame.height))
+            context.coordinator.height = -1
+            context.coordinator.measure(view)
+        }
+        return CGSize(width: proposal.width ?? 412, height: max(context.coordinator.height, 22))
     }
 
     @MainActor

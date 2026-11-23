@@ -284,6 +284,8 @@ final class AppModel {
             self.clew = fresh
             browser?.use(fresh)
             observation = fresh.observeChanges { [weak self] in Task { @MainActor in self?.refresh() } }
+            // A backup from before Notes: the note shortcut's first choice, saved (SPEC "Notes").
+            try? fresh.settleWriteNoteShortcut()
             refresh()
             let date = SettingsView.dayText(entry.day)
             return String(localized: "Restored the backup from \(date). Your data from before is saved as a backup too.")

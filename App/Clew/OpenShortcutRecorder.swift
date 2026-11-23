@@ -9,6 +9,8 @@ struct OpenShortcutRecorder: View {
     var name: Text = Text("Open the list shortcut")
 
     @State private var recording = false
+    @State private var token = UUID()
+    static let started = Notification.Name("ClewShortcutRecorderStarted")
 
     var body: some View {
         HStack {
@@ -47,6 +49,9 @@ struct OpenShortcutRecorder: View {
             }
         }
         .onDisappear { if recording { stopRecording() } }
+        .onReceive(NotificationCenter.default.publisher(for: Self.started)) { note in
+            if recording, (note.object as? UUID) != token { stopRecording() }
+        }
     }
 
     private var recorderAccessibilityLabel: Text {
@@ -61,6 +66,8 @@ struct OpenShortcutRecorder: View {
 
     private func startRecording() {
         guard !recording else { return }
+        // One recorder at a time: another one recording stops (review).
+        NotificationCenter.default.post(name: Self.started, object: token)
         recording = true
         // Both shortcuts stand aside, so the keys reach the recorder (SPEC "Notes").
         OpenShortcutHotkey.all.forEach { $0.suspend() }

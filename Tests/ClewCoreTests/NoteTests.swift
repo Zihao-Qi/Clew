@@ -24,9 +24,10 @@ private func at(_ d: Int, _ h: Int, _ m: Int = 0) -> Date {
         #expect(throws: ClewError.emptyTitle) { try clew.addNote(" \n \t") }
         let long = try clew.addNote(String(repeating: "a", count: 1200))
         #expect(long.text.count == QuickNote.maxLength)
-        // The task's title changing later never changes the note.
-        let renamed = try clew.notes().open.first { $0.id == note.id }
-        #expect(renamed?.duringTitle == "Write the intro")
+        // The task going later never changes the note: its title then stays.
+        try clew.deleteItem(itemId: task)
+        let kept = try clew.notes().open.first { $0.id == note.id }
+        #expect(kept?.duringTitle == "Write the intro" && kept?.duringItemId == task)
     }
 
     @Test func openNewestFirstDoneMostRecentlyDoneFirstDeletedNowhere() throws {
