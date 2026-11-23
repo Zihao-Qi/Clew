@@ -349,12 +349,13 @@ extension Snapshot {
                 }
                 try clew.setTimelineShown(false)
                 model.refresh()
-                // Dragging a task folds its steps until it is dropped (user, 2026-11-22).
+                // Dragging a task folds its steps until it is dropped (user, 2026-11-22): the
+                // rows below close up, and it can be dropped past them.
                 model.setUnfolded(talk, true)
                 try await Task.sleep(for: .milliseconds(400))
                 let firstStep = model.steps(of: talk)?.entries.first?.id
-                if let c = frame("circle:\(talk)"), let firstStep, frame("step:\(firstStep)") != nil {
-                    let p0 = NSPoint(x: 200, y: c.midY)
+                if let c = frame("circle:\(talk)"), let m = frame("circle:\(milk)"), let firstStep,
+                   frame("step:\(firstStep)") != nil, m.midY < c.midY {
                     func post(_ type: NSEvent.EventType, _ p: NSPoint) {
                         number += 1
                         NSApp.postEvent(NSEvent.mouseEvent(with: type, location: p, modifierFlags: [],
@@ -364,17 +365,28 @@ extension Snapshot {
                                                            pressure: type == .leftMouseUp ? 0 : 1)!, atStart: false)
                     }
                     try await focus(window)
-                    post(.leftMouseDown, p0)
+                    post(.leftMouseDown, NSPoint(x: 200, y: c.midY))
                     try await Task.sleep(for: .milliseconds(50))
-                    for i in 1...4 { post(.leftMouseDragged, NSPoint(x: 200, y: c.midY - CGFloat(i) * 2)); try await Task.sleep(for: .milliseconds(40)) }
+                    for i in 1...3 { post(.leftMouseDragged, NSPoint(x: 200, y: c.midY - CGFloat(i) * 2)); try await Task.sleep(for: .milliseconds(40)) }
                     try await Task.sleep(for: .milliseconds(300))
                     let foldedWhileDragged = frame("step:\(firstStep)") == nil
-                    post(.leftMouseUp, NSPoint(x: 200, y: c.midY - 8))
-                    try await Task.sleep(for: .milliseconds(500))
-                    report("a dragged task's steps fold while it moves, and come back when dropped",
-                           foldedWhileDragged && frame("step:\(firstStep)") != nil && model.isUnfolded(talk))
+                    let closedUp = (frame("circle:\(milk)")?.midY ?? m.midY) > m.midY + 20
+                    // Down past "Buy milk", then let go.
+                    let target = (frame("circle:\(milk)")?.minY ?? m.minY) - 6
+                    for i in 1...6 {
+                        let y = c.midY - 6 + (target - (c.midY - 6)) * CGFloat(i) / 6
+                        post(.leftMouseDragged, NSPoint(x: 200, y: y)); try await Task.sleep(for: .milliseconds(40))
+                    }
+                    post(.leftMouseUp, NSPoint(x: 200, y: target))
+                    try await Task.sleep(for: .milliseconds(600))
+                    let order = model.listRows.map(\.id)
+                    report("a dragged task's steps fold while it moves and the rows below close up",
+                           foldedWhileDragged && closedUp)
+                    report("… it drops past them, and its steps come back",
+                           (order.firstIndex(of: milk) ?? 0) < (order.firstIndex(of: talk) ?? 0)
+                           && frame("step:\(firstStep)") != nil && model.isUnfolded(talk))
                 } else {
-                    report("an unfolded task with steps is shown", false)
+                    report("an unfolded task with steps above another row is shown", false)
                 }
 
                 // Details: Esc closes the step line before it leaves the page (review).
