@@ -12,6 +12,9 @@ struct NotesView: View {
     @State private var editing: UUID?
     /// The note under the pointer: → Today shows, and the Delete key deletes it.
     @State private var hovered: UUID?
+    /// Whether that note is in the Done section (a note moving between sections leaves
+    /// the row it was hovered in).
+    @State private var hoveredDone = false
     @State private var draft = ""
     @State private var listHeight: CGFloat = 0
     private static let maxListHeight: CGFloat = 380
@@ -72,8 +75,8 @@ struct NotesView: View {
         .background {
             // The Delete key deletes the note under the pointer, as in the list.
             Button("Delete") {
-                // Only a note still shown under the pointer (review).
-                if let hovered, visibleIds.contains(hovered) { model.deleteNote(hovered) }
+                // Only a note still shown under the pointer, in its section (review).
+                if let hovered, stillShown(hovered, done: hoveredDone) { model.deleteNote(hovered) }
                 hovered = nil
             }
                 .keyboardShortcut(.delete, modifiers: [])
@@ -85,16 +88,19 @@ struct NotesView: View {
         .debugFrame("notesPage")
         // A note that left (done, deleted, made a task, folded away) is no longer under
         // the pointer or being edited (review).
-        .onChange(of: visibleIds) { _, ids in
-            if let h = hovered, !ids.contains(h) { hovered = nil }
-            if let e = editing, !model.openNotes.contains(where: { $0.id == e }) { editing = nil }
-        }
+        .onChange(of: model.openNotes.map(\.id)) { reconcile() }
+        .onChange(of: model.doneNotes.map(\.id)) { reconcile() }
+        .onChange(of: showsDone) { reconcile() }
         .onDisappear { model.lastDeletedNote = nil }
     }
 
-    /// The notes shown on the page now: open ones, and done ones while Done is unfolded.
-    private var visibleIds: Set<UUID> {
-        Set(model.openNotes.map(\.id) + (showsDone ? model.doneNotes.map(\.id) : []))
+    private func stillShown(_ id: UUID, done: Bool) -> Bool {
+        done ? showsDone && model.doneNotes.contains { $0.id == id } : model.openNotes.contains { $0.id == id }
+    }
+
+    private func reconcile() {
+        if let h = hovered, !stillShown(h, done: hoveredDone) { hovered = nil }
+        if let e = editing, !model.openNotes.contains(where: { $0.id == e }) { editing = nil }
     }
 
     private var emptyText: String {
@@ -145,7 +151,7 @@ struct NotesView: View {
         .padding(.vertical, 3)
         .contentShape(Rectangle())
         .onHover { inside in
-            if inside { hovered = note.id } else if hovered == note.id { hovered = nil }
+            if inside { hovered = note.id; hoveredDone = false } else if hovered == note.id { hovered = nil }
         }
         .contextMenu {
             Button("Add to Today") { model.makeTask(fromNote: note.id, in: .today) }
@@ -192,7 +198,7 @@ struct NotesView: View {
         .padding(.vertical, 3)
         .contentShape(Rectangle())
         .onHover { inside in
-            if inside { hovered = note.id } else if hovered == note.id { hovered = nil }
+            if inside { hovered = note.id; hoveredDone = true } else if hovered == note.id { hovered = nil }
         }
         .contextMenu {
             Button("Not done") { model.setNoteDone(note.id, false) }
