@@ -6,7 +6,7 @@ import SwiftUI
 /// steps first, in the order they were done, then the open ones in your order; each with
 /// its own circle. Open steps reorder by dragging within their task, or go onto an hour
 /// of the timeline when dragged up there (the list draws that card). A step on the
-/// timeline is not listed. A click on a step does nothing; a double-click opens its task's
+/// timeline stays listed with its time (SPEC 2026-11-22). A click on a step does nothing; a double-click opens its task's
 /// details.
 struct StepsList: View {
     let model: AppModel
@@ -154,7 +154,7 @@ struct StepsList: View {
                 t.disablesAnimations = true
                 withTransaction(t) {
                     if overTimeline, let draggedEntry, onTimelineDrop(draggedEntry) {
-                        // Placed: it leaves the list.
+                        // Placed: it stays listed with its time; its task leaves once every open step is placed.
                     } else if let dragging, let from = openIds.firstIndex(of: dragging), let to = dragSlot, to != from {
                         model.moveStep(dragging, toOpenIndex: to)
                     }
@@ -251,7 +251,9 @@ struct StepsList: View {
             Button("Rename") { model.renamingStep = entry.id }
             Button("Delete") { model.deleteStep(entry.step) }
             // Nothing needs a drag (SPEC 2026-11-21): the next quarter hour, 30 minutes.
-            if !entry.isDone, model.timelineShown, model.timeline != nil {
+            // Not for a step already planned: its block offers Move to… (review).
+            if !entry.isDone, model.timelineShown, let day = model.timeline,
+               day.nextStart(ofStep: entry.id, now: Date()) == nil {
                 Button("Put on timeline") { model.placeStepAtNextQuarter(entry.id) }
             }
         }

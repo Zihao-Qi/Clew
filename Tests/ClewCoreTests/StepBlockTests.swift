@@ -219,4 +219,31 @@ private func at(_ d: Int, _ h: Int, _ m: Int = 0) -> Date {
         try clew.checkIn(itemId: id)
         #expect(try !hidden())
     }
+
+    /// Review: a step whose block was Not finished has nothing planned: its task stays.
+    /// A step's time is its own earliest block still to come.
+    @Test func onlyBlocksStillToComeHideTheTaskAndTimeIsTheStepsOwnEarliest() throws {
+        let (id, steps) = try talk()
+        try clew.tickStep(id: steps[0])
+        try clew.tickStep(id: steps[1])
+        let b = try clew.placeStepOnTimeline(stepId: steps[2], start: at(10, 10))
+        func hidden() throws -> Bool {
+            try clew.timeline().tasksWithAllStepsPlaced(clew.steps(taskIds: [id])).contains(id)
+        }
+        #expect(try hidden())
+        try settle(at: at(10, 10, 30))                              // its end finishes the task
+        try clew.blockNotFinished(id: b.id)                         // open again, nothing planned
+        #expect(try shown(id) == ["✓slides", "✓notes", "practice"])
+        #expect(try !hidden())
+
+        let (other, more) = try talk()
+        let later = try clew.placeStepOnTimeline(stepId: more[0], start: at(10, 14))
+        let second = try clew.addBlock(after: later.id)
+        try clew.placeStepOnTimeline(stepId: more[1], start: at(10, 11))
+        try clew.placeOnTimeline(itemId: other, start: at(10, 12))
+        let day = try clew.timeline()
+        #expect(second.start > later.start)
+        #expect(day.nextStart(ofStep: more[0], now: at(10, 11)) == at(10, 14))   // its own, the earliest
+        #expect(day.nextStart(ofStep: more[1], now: at(10, 11, 30)) == nil)      // ended
+    }
 }

@@ -53,8 +53,10 @@ public struct TimelineDay: Hashable, Sendable {
 
     /// Tasks whose every open step is on the timeline: their row leaves the list with its
     /// steps, as a placed task's does (SPEC 2026-11-22). A task with no open step stays.
+    /// Only blocks still to come count: a step whose block was Not finished or skipped is
+    /// open with nothing planned, so its task stays (review).
     public func tasksWithAllStepsPlaced(_ steps: [UUID: TaskSteps]) -> Set<UUID> {
-        let placed = placedSteps
+        let placed = Set(blocks.filter { $0.state == .pending }.compactMap(\.block.stepId))
         return Set(steps.compactMap { id, s in
             !s.open.isEmpty && s.open.allSatisfy { placed.contains($0.id) } ? id : nil
         })

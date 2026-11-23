@@ -318,12 +318,12 @@ extension Snapshot {
                     try await Task.sleep(for: .milliseconds(400))
                     report("with every open step placed, the task leaves the list",
                            !model.listRows.contains { $0.id == talk } && frame("circle:\(talk)") == nil)
-                    if let one = model.timeline?.blocks.first(where: { $0.block.itemId == talk && $0.block.stepId != nil }) {
-                        _ = model.removeBlock(one.id)
-                    }
+                    let one = model.timeline?.blocks.first(where: { $0.block.itemId == talk && $0.block.stepId != nil })
+                    if let one { _ = model.removeBlock(one.id) }
                     try await Task.sleep(for: .milliseconds(400))
                     report("one step back, the task and its steps return",
-                           model.listRows.contains { $0.id == talk } && frame("circle:\(talk)") != nil)
+                           model.listRows.contains { $0.id == talk } && frame("circle:\(talk)") != nil
+                           && one.flatMap(\.block.stepId).map { frame("step:\($0)") != nil } == true)
                     for b in model.timeline?.blocks ?? [] where b.block.itemId == talk { _ = model.removeBlock(b.id) }
                 } else {
                     report("an open step is shown", false)
