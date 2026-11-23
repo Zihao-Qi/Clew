@@ -316,14 +316,15 @@ struct NoteEditorField: NSViewRepresentable {
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSScrollView, context: Context) -> CGSize? {
         // Wrapped at the width it is given (the Notes page is narrower than the box).
-        if let width = proposal.width, width > 0, let view = nsView.documentView as? NSTextView,
+        if let width = proposal.width, width.isFinite, width > 0, let view = nsView.documentView as? NSTextView,
            abs(view.frame.width - width) > 0.5 {
             nsView.setFrameSize(NSSize(width: width, height: nsView.frame.height))
             view.setFrameSize(NSSize(width: width, height: view.frame.height))
             context.coordinator.height = -1
             context.coordinator.measure(view)
         }
-        return CGSize(width: proposal.width ?? 412, height: max(context.coordinator.height, 22))
+        let width = proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? 412
+        return CGSize(width: width, height: max(context.coordinator.height, 22))
     }
 
     @MainActor

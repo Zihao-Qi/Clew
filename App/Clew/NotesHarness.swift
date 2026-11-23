@@ -58,18 +58,20 @@ extension Snapshot {
                 let notes = try clew.addStep(taskId: talk, title: "Speech notes").id
                 let earlier = blockStart.addingTimeInterval(-900)
                 try clew.placeOnTimeline(itemId: pages, start: blockStart, minutes: 60)
-                model.refresh()
-                report("a goal not reached: its block is the task", model.noteContext()?.itemId == pages)
-                try clew.checkIn(itemId: pages); try clew.checkIn(itemId: pages)
-                // Earlier than the goal's: only the goal being reached lets them be chosen.
+                // Task blocks and a step's block started earlier; the goal's started last.
+                let anna = try clew.addItem(NewItem(title: "Email Anna", shape: .today)).id   // after the talk in the list
                 try clew.placeStepOnTimeline(stepId: notes, start: earlier, minutes: 90)
-                try clew.placeOnTimeline(itemId: talk, start: earlier, minutes: 90)
+                try clew.placeOnTimeline(itemId: anna, start: earlier, minutes: 90)
+                try clew.checkIn(itemId: pages)                                // 1 of 2: still needs something
                 model.refresh()
-                report("a reached goal is not; of a task's block and a step's together, the task's",
-                       model.noteContext()?.itemId == talk && model.noteContext()?.title == "Prepare the talk")
-                for b in model.timeline?.blocks ?? [] where b.block.itemId == talk && b.block.stepId == nil { _ = model.removeBlock(b.id) }
+                report("the block that started last is the task, a goal half done too", model.noteContext()?.itemId == pages)
+                try clew.checkIn(itemId: pages)                                // reached
+                model.refresh()
+                report("a reached goal is not; of a task's own block and a step's starting together, the task's",
+                       model.noteContext()?.itemId == anna && model.noteContext()?.title == "Email Anna")
+                for b in model.timeline?.blocks ?? [] where b.block.itemId == anna { _ = model.removeBlock(b.id) }
                 report("a step's block names task and step",
-                       model.noteContext()?.title == "Prepare the talk - Speech notes")
+                       model.noteContext()?.itemId == talk && model.noteContext()?.title == "Prepare the talk - Speech notes")
                 for b in model.timeline?.blocks ?? [] { _ = model.removeBlock(b.id) }
 
                 // Times on the page: this Mac's clock; a weekday within 6 days; a date before.
@@ -77,13 +79,15 @@ extension Snapshot {
                 cal.timeZone = .current
                 let ref = cal.date(from: DateComponents(year: 2026, month: 11, day: 22, hour: 15))!
                 let sameDay = NoteTime.time(ref.addingTimeInterval(-3600), now: ref, calendar: cal)
-                let twoDays = NoteTime.time(ref.addingTimeInterval(-2 * 86400), now: ref, calendar: cal)
+                let sixDays = ref.addingTimeInterval(-6 * 86400)
+                let twoDays = NoteTime.time(sixDays, now: ref, calendar: cal)
+                let sevenDays = NoteTime.time(ref.addingTimeInterval(-7 * 86400), now: ref, calendar: cal)
                 let month = NoteTime.time(ref.addingTimeInterval(-30 * 86400), now: ref, calendar: cal)
                 let lastYear = NoteTime.time(ref.addingTimeInterval(-400 * 86400), now: ref, calendar: cal)
                 report("note times: clock today, weekday this week, date before, year if not this year",
                        sameDay == ref.addingTimeInterval(-3600).formatted(date: .omitted, time: .shortened)
-                       && twoDays.hasPrefix(ref.addingTimeInterval(-2 * 86400).formatted(.dateTime.weekday(.abbreviated)))
-                       && !month.contains(":") && !month.contains("2026") && lastYear.contains("2025"))
+                       && twoDays == "\(sixDays.formatted(.dateTime.weekday(.abbreviated))) \(sixDays.formatted(date: .omitted, time: .shortened))"
+                       && !sevenDays.contains(":") && !month.contains(":") && !month.contains("2026") && lastYear.contains("2025"))
 
                 try clew.startFocus(itemId: intro, minutes: 25)
                 model.refresh()
