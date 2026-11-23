@@ -31,6 +31,11 @@ final class AppModel {
     private(set) var menuBarStyle = Clew.defaultMenuBarStyle
     /// The global shortcut that opens the list (Settings › General). `nil` if cleared.
     private(set) var openListShortcut: OpenShortcut? = .default
+    /// The shortcut that writes a note (SPEC "Notes"); nil when cleared.
+    private(set) var writeNoteShortcut: OpenShortcut? = .writeNoteDefault
+    /// Notes (SPEC "Notes"): open ones newest first, done ones most recently done first.
+    private(set) var openNotes: [QuickNote] = []
+    private(set) var doneNotes: [QuickNote] = []
     /// Set when the database cannot be opened; the list is replaced by this message.
     private(set) var fatalMessage: String?
     /// A short, transient message for a rejected action.
@@ -113,6 +118,9 @@ final class AppModel {
             ai = AIModel()
             calendarSource = EventKitCalendar()
             OpenShortcutHotkey.shared.start()
+            try? clew?.settleWriteNoteShortcut()
+            OpenShortcutHotkey.note.start()
+            NoteBox.shared.model = self
             updates.start()
             refresh()
         } catch {
@@ -186,6 +194,9 @@ final class AppModel {
             menuBarStyle = (try? clew.menuBarStyle()) ?? Clew.defaultMenuBarStyle
             do { openListShortcut = try clew.openListShortcut() } catch { }
             OpenShortcutHotkey.shared.apply(openListShortcut)
+            do { writeNoteShortcut = try clew.writeNoteShortcut() } catch { }
+            OpenShortcutHotkey.note.apply(writeNoteShortcut)
+            if let notes = try? clew.notes() { (openNotes, doneNotes) = notes }
             timings.mark("settings")
             steps = try clew.steps(taskIds: (list.rows + list.goalsAndLater).map(\.id))
             timings.mark("steps")
@@ -802,8 +813,32 @@ final class AppModel {
         run { try $0.setMenuBarStyle(style) }
     }
 
-    func setOpenListShortcut(_ shortcut: OpenShortcut?) {
-        run { try $0.setOpenListShortcut(shortcut) }
+    /// A refusal to show under the recorder, or nil (SPEC "Notes": never the note's).
+    @discardableResult
+    func setOpenListShortcut(_ shortcut: OpenShortcut?) -> String? {
+        setShortcut { try $0.setOpenListShortcut(shortcut) }
+            .map { _ in String(localized: "Already used to write a note.") }
+    }
+
+    @discardableResult
+    func setWriteNoteShortcut(_ shortcut: OpenShortcut?) -> String? {
+        setShortcut { try $0.setWriteNoteShortcut(shortcut) }
+            .map { _ in String(localized: "Already used to open the list.") }
+    }
+
+    /// Runs a shortcut change; returns `.shortcutTaken` when the other shortcut has it.
+    private func setShortcut(_ change: (Clew) throws -> Void) -> ClewError? {
+        guard let clew else { return nil }
+        do {
+            try change(clew)
+            refresh()
+            return nil
+        } catch ClewError.shortcutTaken {
+            return .shortcutTaken
+        } catch {
+            notice = String(localized: "That didn't save. Try again.")
+            return nil
+        }
     }
 
     func undo(_ row: TodayRow) {
@@ -925,6 +960,10 @@ final class AppModel {
         }
         return placed
     }
+    /// The note deleted last, for a few seconds: "Deleted note · Undo" (SPEC "Notes").
+    var lastDeletedNote: UUID?
+    @ObservationIgnored var lastDeletedNoteTask: Task<Void, Never>?
+
     /// The task deleted last, for a few seconds: "Deleted “…” · Undo" (SPEC 2026-11-10).
     private(set) var lastDeleted: (id: UUID, title: String, isStep: Bool)?
     @ObservationIgnored private var lastDeletedTask: Task<Void, Never>?
@@ -1087,7 +1126,7 @@ final class AppModel {
     }
 
     @discardableResult
-    private func run(_ command: (Clew) throws -> Any?) -> Bool {
+    func run(_ command: (Clew) throws -> Any?) -> Bool {
         guard let clew else { return false }
         do {
             _ = try command(clew)
@@ -1113,6 +1152,7 @@ final class AppModel {
     static func message(for error: ClewError) -> String {
         switch error {
         case .emptyTitle: String(localized: "Give it a name.")
+        case .shortcutTaken: String(localized: "The other shortcut already uses this one.")
         case .titleTooLong(let max): String(localized: "Keep the name under \(max) characters.")
         case .invalidURL: String(localized: "Links must start with http:// or https://.")
         case .invalidTarget: String(localized: "Pick a total between 1 and 100,000.")
