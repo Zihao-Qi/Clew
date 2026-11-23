@@ -654,12 +654,16 @@ struct TodayListView: View {
                 .onPreferenceChange(RowFrames.self) { rowFrames = $0 }
             }
 
-            // Imported lists, below the tasks with no heading (SPEC 2026-11-09).
-            if !model.collections.isEmpty {
+            // Imported lists, below the tasks with no heading (SPEC 2026-11-09), then the
+            // Notes row in their style (SPEC "Notes", 2026-11-23).
+            if !model.collections.isEmpty || !model.openNotes.isEmpty {
                 Divider().padding(.horizontal, 12)
                 VStack(spacing: 0) {
                     ForEach(model.collections) { summary in
                         CollectionRowView(summary: summary) { screen = .collection(summary.source) }
+                    }
+                    if !model.openNotes.isEmpty {
+                        NotesRowView(count: model.openNotes.count) { screen = .notes }
                     }
                 }
                 .padding(.vertical, 6)
@@ -712,37 +716,20 @@ struct TodayListView: View {
                     .accessibilityLabel(Text("YouTube import needs an update. Nothing was removed."))
             }
 
-            // Open notes (SPEC "Notes"): the last line above the bottom bar.
-            if !model.openNotes.isEmpty {
-                let count = model.openNotes.count
-                Button { screen = .notes } label: {
-                    (count == 1 ? Text("1 note") : Text("\(count) notes")) + Text(verbatim: " ›")
-                }
-                .buttonStyle(.borderless)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 6)
-                .accessibilityLabel(count == 1 ? Text("1 note, show notes") : Text("\(count) notes, show notes"))
-                .debugFrame("notesCount")
-            }
-
             Divider()
 
-            HStack(spacing: 12) {
-                Button { screen = .add } label: { Label("Add", systemImage: "plus") }
+            // Each icon close to its word, the two buttons further apart (user, 2026-11-23).
+            HStack(spacing: 22) {
+                Button { screen = .add } label: { BarLabel(title: Text("Add"), icon: "plus") }
                     .keyboardShortcut("n")
                     .accessibilityLabel(Text("Add an item"))
                 // Writes a note (SPEC "Notes"): the menu closes first, then the note box.
                 Button {
                     MenuBarExtraToggle.closeMenu()
                     DispatchQueue.main.async { NoteBox.shared.open() }
-                } label: { Label("Note", systemImage: "square.and.pencil") }
+                } label: { BarLabel(title: Text("Note"), icon: "square.and.pencil") }
                     .help(Text("Write a note"))
                     .accessibilityLabel(Text("Write a note"))
-                    .accessibilityAction(named: Text("Show Notes")) { screen = .notes }
-                    .contextMenu { Button("Show Notes") { screen = .notes } }
                     .debugFrame("noteButton")
                 Spacer()
                 // No "Later (N)" button or ⌘L: Later items are in Goals & Later (SPEC
@@ -814,6 +801,8 @@ struct TodayListView: View {
         }
         .onChange(of: dragging != nil || lifted != nil) { _, active in PeekController.shared.dragChanged(active) }
         .onChange(of: model.collections) { _, lists in PeekController.shared.collectionsChanged(lists) }
+        .onChange(of: model.openNotes.count) { _, count in PeekController.shared.notesChanged(count) }
+        .onChange(of: model.notesPageRequest) { screen = .notes }
         .onAppear {
             #if DEBUG
             DebugFrames.addStep = { startAddingStep($0) }

@@ -35,6 +35,8 @@ final class AppModel {
     private(set) var writeNoteShortcut: OpenShortcut? = .writeNoteDefault
     /// Notes (SPEC "Notes"): open ones newest first, done ones most recently done first.
     private(set) var openNotes: [QuickNote] = []
+    /// A press in the Notes peek asks the menu to open the Notes page.
+    var notesPageRequest = 0
     private(set) var doneNotes: [QuickNote] = []
     /// Set when the database cannot be opened; the list is replaced by this message.
     private(set) var fatalMessage: String?

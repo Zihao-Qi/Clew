@@ -98,6 +98,11 @@ extension Snapshot {
                 try await Task.sleep(for: .milliseconds(400))
                 guard let panel = box.panelForChecks else { report("the box opens", false); exit(1) }
                 report("the box opens and takes the keyboard", box.isOpen && panel.isKeyWindow)
+                if let visible = panel.screen?.visibleFrame {
+                    report("it opens a quarter of the way down the screen, centred",
+                           abs(panel.frame.maxY - (visible.maxY - visible.height / 4)) < 2
+                           && abs(panel.frame.midX - visible.midX) < 2)
+                }
                 func key(_ chars: String, code: UInt16, shift: Bool = false) {
                     let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: shift ? [.shift] : [],
                                              timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: panel.windowNumber,
@@ -121,8 +126,10 @@ extension Snapshot {
                        && saved?.duringTitle == "Write the intro" && !box.isOpen)
                 report("then the banner: Saved. Back to: the task, with its minutes left",
                        box.isBannerShown && box.bannerText?.hasPrefix("Saved. Back to: Write the intro · ") == true)
-                try await Task.sleep(for: .milliseconds(3600))
-                report("the banner goes by itself after 3 seconds", !box.isBannerShown)
+                try await Task.sleep(for: .milliseconds(1000))
+                report("the banner stays after the sweep, settled", box.isBannerShown && box.state.settled)
+                try await Task.sleep(for: .milliseconds(3300))
+                report("the banner goes by itself after about 3.6 seconds (sweep and 3 s)", !box.isBannerShown)
 
                 box.open()
                 try await Task.sleep(for: .milliseconds(300))
@@ -187,7 +194,9 @@ extension Snapshot {
                        to: dir.appendingPathComponent("notes-page-\(name).png"))
                 render(NoteBoxView(box: NoteBox.shared, state: state).padding(10), appearance: look,
                        to: dir.appendingPathComponent("notes-box-\(name).png"))
-                render(NoteBannerView(state: state, dismiss: {}).padding(10), appearance: look,
+                state.savedText = "Ask Sam about the venue"
+                NoteBannerView.startSettled = true
+                render(NoteBannerView(state: state, dismiss: {}).frame(height: 76).padding(10), appearance: look,
                        to: dir.appendingPathComponent("notes-banner-\(name).png"))
             }
             exit(0)
