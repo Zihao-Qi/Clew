@@ -113,7 +113,8 @@ TimeBlock       id, itemId, localDay, start, minutes, placedAt, updatedAt, decid
 Step            id, taskId, title, sortKey, createdAt, updatedAt, deletedAt?   (2026-11-21) ← a definition:
                   a step of a once task or link; keeps its task (trigger)
 StepTick        id, stepId, taskId, localDay, at, source, finishedCheckInId?, voidedAt?   (2026-11-21) ← a fact
-QuickNote       id, text, createdAt, duringItemId?, duringTitle?, doneAt?, taskId?, updatedAt, deletedAt?
+QuickNote       id, text, createdAt, duringItemId?, duringTitle?, doneAt?, taskId?, madeTo: today | later?,
+                updatedAt, deletedAt?
                   (2026-11-22) ← a definition: the person's own note (SPEC "Notes"); text, done and
                   task are mutable (latest updatedAt wins), Delete is a tombstone; exported and backed up
 ChangeLog       seq (monotonic), entity, entityId, op, at, source  (v1.1) ← for Gateway "changes since" and sync
