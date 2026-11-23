@@ -1263,43 +1263,74 @@ stopped daily use, not adding features.
   written down in seconds and kept, so the fear of forgetting it does not pull the
   person away; then Clew points back to the task. Notes are the person's own (Clew's
   AI notes are "Memory").
-  - **Writing one:** the global shortcut **⌥⌘.** (Settings › General › "Write a note",
-    beside "Open the list"; changeable and clearable the same way, and never the same
-    as the other) from any app, or **✎ Note** in the menu's bottom bar, after **+ Add**
-    (the menu closes first). Both open the **note box**: a small panel at the top of
-    the screen with the menu bar (centred, 440 points wide), over every app, with one
-    text field already focused (placeholder "A thought to keep…"); it wraps and grows
-    to 4 lines, at most 1,000 characters. **Return** saves; **⇧Return** starts a new
-    line. **Esc** or clicking elsewhere closes it and keeps what was typed as a draft
-    that comes back the next time it opens (a thought is never lost by a slip); an
-    empty box keeps nothing. Opening it again while open focuses it.
-  - **Back to the task:** after saving, the box shows for 3 seconds, larger and tinted
-    with the accent colour: "Saved. Back to: **Write the intro**", then closes by itself
-    (a click closes it at once). The task is the running focus timer's ("Saved. Back
-    to: **Write the intro** · 12 min left"), else the task whose block is on the
-    timeline now, else none: "Saved." alone. VoiceOver announces the same text. The app
-    that was in front before comes back to the front.
-  - **What a note keeps:** its text, when it was written, and the task it was written
-    during (its title then, and which task), if any. Notes are the person's data: in
-    Clew's database, in exports and backups; never sent to AI (for now).
-  - **Seeing them:** while there are notes not yet dealt with, a quiet line above the
-    bottom bar: "3 notes ›" (one note: "1 note ›"). Clicking it opens the **Notes**
-    page (also from ✎'s right-click: "Show Notes"): newest first, each with its text
-    and, in secondary text, "10:42 · during Write the intro" (another day: "Mon 10:42";
-    older than a week: "12 Nov"). Clicking a note's text edits it in place (Return
-    saves, Esc keeps it). Each note has **Make a task** (a small menu: **Today**,
-    **Later**), **Done** and **Delete** (also its right-click; Delete shows "Deleted
-    note · Undo" for a few seconds). At the bottom, **Done (N)** folds out the notes
-    dealt with, newest first, each with **Not done** and **Delete**. Empty: "No notes.
-    Press ⌥⌘. any time to write one down." Esc or ‹ goes back to the list.
-  - **Make a task** adds a one-off task to Today or Later with the note's text as its
-    title (its first line, cut at the title's limit), typed by the person, and marks
-    the note done, with "→ task" beside it in Done. The note stays; deleting the task
-    later does not bring it back.
-  - **Done** keeps the note, under Done; **Delete** is a tombstone (Undo brings it
-    back), as for tasks.
-  - VoiceOver: ✎ is "Write a note"; the box's field is "Note"; each note reads its text
-    and when; Make a task, Done and Delete are actions.
+  - **Writing one:** the global shortcut **⌥⌘.** from any app, or **✎ Note** in the
+    menu's bottom bar, right after **+ Add** (the menu closes first). Both open the
+    **note box**: a small panel at the top of the screen the pointer is on, centred
+    under the menu bar, 440 points wide, above every app and on every Space, with one
+    text field already focused (placeholder "A thought to keep…"). It wraps and grows
+    to 4 lines (then scrolls), at most 1,000 characters. **Return** saves; **⇧Return**
+    starts a new line. Return with nothing but spaces does nothing. **Esc** closes it;
+    so does clicking anywhere else. Either way what was typed is kept as a **draft**
+    (in this Mac's preferences, so it survives quitting) and is back in the field the
+    next time the box opens; only spaces count as nothing. Pressing the shortcut while
+    the box is open focuses it; while "Saved." shows, it opens the box again at once.
+  - **Back to the task:** saving gives the front back to the app that was in front
+    when the box opened (with Esc too; a click elsewhere already chose an app), and
+    the box stays 3 seconds as a banner that takes no keyboard, larger text, tinted
+    with the accent colour: "Saved. Back to: **Write the intro**", then fades; a click
+    on it closes it at once. VoiceOver announces the same text. **The task** is chosen
+    when the box opens: the focus timer's task if a focus (not a break) is running
+    ("… · 12 min left", minutes rounded up; "… · paused" while paused); else, with the
+    timeline on, the block running now (its start passed, its end not; a step's block
+    names "Prepare the talk - Speech notes"; of several, the one that started last,
+    then the first in the list's order); else none, and the banner reads "Saved."
+  - **What a note keeps:** its text; when it was written; and the task it was written
+    during (the same choice as above): which task and its title then. That title never
+    changes afterwards, even if the task is renamed or deleted. Notes are the person's
+    data: in Clew's database, in exports (older exports without notes still import)
+    and backups. **Never sent to AI**, and writing, editing, finishing or deleting one
+    is never recorded as AI activity; a task made from a note is an ordinary typed
+    task like any other.
+  - **The count:** while there are open notes (not done, not deleted), a quiet line
+    right above the bottom bar's divider, below every other line there (the
+    collection rows and the import-update line), on the list screen: "3 notes ›" ("1
+    note ›"); transient lines (Undo, a refused action) show above it. Clicking it opens
+    the **Notes** page; so does ✎'s right-click › **Show Notes**.
+  - **The Notes page** (a page like Add and the details; ‹ and Esc go back to the
+    list): open notes newest first, each with its text and, in secondary text, its time
+    and task: "10:42 · during Write the intro" (no task: just the time). Times use this
+    Mac's clock format; a note from an earlier calendar day within the last 6 days
+    shows its weekday ("Mon 10:42"), an older one its date ("Nov 12", with the year if
+    not this year). Each open note has **Make a task** (a small menu: **Today**,
+    **Later**), **Done** and **Delete**, as buttons and in its right-click. Below them,
+    **Done (N)**, folded each time the page opens and absent when there are none: the
+    done notes, most recently done first, each with **Not done** and **Delete**, and
+    "→ Today" / "→ Later" after one that made a task. Empty: "No notes. Press ⌥⌘. any
+    time to write one down." (the current shortcut; with none set: "Use ✎ Note any time
+    to write one down.").
+  - **Editing:** clicking an open note's text edits it in place: Return saves,
+    ⇧Return starts a new line, a click elsewhere saves, Esc keeps it as it was and
+    stays on the page; an empty text is not saved. The Delete key edits text there;
+    the list's hover-Delete never acts on the Notes page. Done notes are not edited.
+  - **Make a task** adds, in one step, a one-off task to Today or Later whose title is
+    the note's first line that is not empty, trimmed, cut to the title limit as typing
+    it would be ("…" at 200), taken as plain text (a link in it is not fetched or made a
+    link task), typed by the person; the note becomes done and remembers that task.
+    **Not done** opens it again and forgets the task (the task stays). Deleting the
+    task later changes nothing about the note.
+  - **Done** keeps the note under Done. **Delete** is a tombstone, with "Deleted note
+    · Undo" for a few seconds, as for tasks; Undo brings it back as it was, open or done.
+  - **Shortcut in Settings › General:** a second recorder, "Write a note", under "Open
+    the list", working the same way (record, clear). Each refuses the other's
+    combination with "Already used to open the list." / "Already used to write a
+    note."; a combination macOS or another app holds shows the same message as for the
+    list's. On first launch with this feature, if the list's shortcut is already ⌥⌘.,
+    the note's starts with none set.
+  - **VoiceOver:** ✎ "Write a note" (with the action "Show Notes"); the count line
+    "3 notes, show notes"; the box's field "Note"; the banner as announced; ‹ "Back";
+    each note reads its text, time and task, with actions Make a task in Today, Make a
+    task in Later, Done, Delete (done ones: Not done, Delete); "Done (N)" is a
+    collapsible heading; the recorder "Shortcut to write a note".
 
 ## Open question
 

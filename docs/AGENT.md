@@ -276,8 +276,8 @@ Nothing is sent until the person signs in. **One toggle, Use AI** (*user* 2026-1
 on turns on every job and memory, off turns them all off; there are no per-job
 switches. Signing in turns it on. **Continue with ChatGPT** (then the account's email,
 **Sign out**, **Manage usage**), the model with "Using ChatGPT plan" (the person
-chooses it, *user*), **Use AI**, and **What Clew knows**: the notes, each with
-**Edit** and **Delete**, then **Add note** and **Forget everything**; it is shown
+chooses it, *user*), **Use AI**, and **Memory**: the notes, each with
+**Edit** and **Delete**, then **Add to memory** and **Forget everything**; it is shown
 whenever Clew is ready (§7) and, in any other state, while any notes are kept.
 Signing out turns Use AI off. The toggle says
 generally what it does, not each field sent (*user*). Non-secret settings (issued app

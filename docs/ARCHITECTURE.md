@@ -873,6 +873,7 @@ was false, because some fact fields change after insert.)
 | LaterReview | union by `id`; void is monotonic |
 | DayReflection | one row per `localDay`; last writer wins by `updatedAt` |
 | Step | row-level last writer wins by `updatedAt`; its task never changes; tombstones |
+| QuickNote | row-level last writer wins by `updatedAt`; `createdAt` and `during*` never change; tombstones (2026-11-22) |
 | StepTick | union by `id`; void is monotonic |
 | Item, Reminder, Settings | **row-level** last writer wins by `updatedAt` (every definition table has `updatedAt` + `deletedAt`). Field-level merge, if two devices editing different fields of one item ever matters, uses CKSyncEngine's server-record conflict callback with stored system fields; decided in v2 |
 | `Award.voidedAt` | monotonic |
