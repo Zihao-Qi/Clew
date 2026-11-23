@@ -314,10 +314,11 @@ extension Snapshot {
                        let f = frame("step:\(doneStep.id)") {
                         try await drag(from: NSPoint(x: f.midX, y: f.midY), to: hours)
                         let b = model.timeline?.blocks.first { $0.block.stepId == doneStep.id }
-                        report("a done step dragged onto the hours gets a block and stays done and listed",
-                               b != nil && model.allSteps(of: talk).first { $0.id == doneStep.id }?.isDone == true
-                               && frame("step:\(doneStep.id)") != nil)
                         if let b { _ = model.removeBlock(b.id) }
+                        report("a done step dragged onto the hours gets a block that ticks nothing; it stays done and listed",
+                               b != nil && b?.block.stepTickId == nil && b?.block.tickId == nil
+                               && model.allSteps(of: talk).first { $0.id == doneStep.id }?.isDone == true
+                               && frame("step:\(doneStep.id)") != nil)
                     } else {
                         report("a done step is shown", false)
                     }
@@ -327,9 +328,10 @@ extension Snapshot {
                     if let c = frame("circle:\(milk)"), c.minY > 0 {
                         try await drag(from: NSPoint(x: 200, y: c.midY), to: hours)
                         let b = model.timeline?.blocks.first { $0.block.itemId == milk }
-                        report("a done task dragged onto the hours gets a block and stays done",
-                               b != nil && model.row(milk)?.isDone == true)
                         if let b { _ = model.removeBlock(b.id) }
+                        report("a done task dragged onto the hours gets a block that ticks nothing; it stays done",
+                               b != nil && b?.block.tickId == nil && model.row(milk)?.isDone == true
+                               && model.row(milk)?.todayAmount == 1)
                         if let milkRow = model.row(milk), milkRow.isDone { model.tap(milkRow) }
                     } else {
                         report("a done task is shown", false)
@@ -508,9 +510,11 @@ extension Snapshot {
             try clew.setTimelineShown(true)
             let day = try clew.timeline()
             let quarter = day.start.addingTimeInterval((Date().timeIntervalSince(day.start) / 900).rounded(.down) * 900 + 900)
-            if quarter.addingTimeInterval(5400) <= day.end {
+            if quarter.addingTimeInterval(6300) <= day.end {
                 try clew.placeStepOnTimeline(stepId: talkSteps[1], start: quarter, minutes: 45)
                 try clew.placeOnTimeline(itemId: move, start: quarter.addingTimeInterval(3600), minutes: 30)
+                // A done step put on the timeline later today looks done (SPEC 2026-11-22).
+                try clew.placeStepOnTimeline(stepId: talkSteps[0], start: quarter.addingTimeInterval(5400), minutes: 15)
             }
             model.setUnfolded(move, false)
             model.refresh()

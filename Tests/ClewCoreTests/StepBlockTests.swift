@@ -246,4 +246,25 @@ private func at(_ d: Int, _ h: Int, _ m: Int = 0) -> Date {
         #expect(day.nextStart(ofStep: more[0], now: at(10, 11)) == at(10, 14))   // its own, the earliest
         #expect(day.nextStart(ofStep: more[1], now: at(10, 11, 30)) == nil)      // ended
     }
+
+    /// SPEC 2026-11-22: a done step's block shows when it was done; it never ticks or
+    /// unticks anything, at its end, on Not finished or when removed.
+    @Test func aDoneStepsBlockTicksNothing() throws {
+        let (id, steps) = try talk()
+        try clew.tickStep(id: steps[0])
+        let ticksBefore = store.state.stepTicks.values.filter { $0.voidedAt == nil }.count
+        let past = try clew.placeStepOnTimeline(stepId: steps[0], start: at(10, 8))     // already ended
+        let later = try clew.placeStepOnTimeline(stepId: steps[0], start: at(10, 11)) // a second block, still to come
+        #expect(later.id != past.id)
+        #expect(try shownBlock(later.id)?.state == .pending)
+        #expect(try shownBlock(past.id)?.state == .skipped)
+        try settle(at: at(10, 11, 30))
+        #expect(try shownBlock(later.id)?.state == .skipped)
+        #expect(try shown(id) == ["✓slides", "notes", "practice"])
+        #expect(store.state.stepTicks.values.filter { $0.voidedAt == nil }.count == ticksBefore)
+        #expect(try store.state.timeBlocks.values.allSatisfy { $0.stepTickId == nil && $0.tickId == nil })
+        #expect(throws: ClewError.notAllowed) { try clew.blockNotFinished(id: later.id) }   // nothing to undo
+        try clew.removeBlock(id: past.id)
+        #expect(try shown(id) == ["✓slides", "notes", "practice"] && !taskDone(id))
+    }
 }

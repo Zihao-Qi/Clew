@@ -123,6 +123,7 @@ struct StepsList: View {
                 // Done steps keep their place in the list, but may go onto the timeline
                 // (user, 2026-11-22); the drag still belongs to the step, never its task's row.
                 if entry.isDone {
+                    guard model.timelineShown else { return }
                     if dragging == nil {
                         dragFrames = []
                         dragging = entry.id
@@ -215,7 +216,8 @@ struct StepsList: View {
         .padding(.trailing, 12)
         .padding(.vertical, 3)
         .background {
-            if dragging == entry.id {
+            // A done step never lifts in the list: only its card over the hours moves.
+            if dragging == entry.id && !entry.isDone {
                 RoundedRectangle(cornerRadius: 6)
                     .fill(Color(nsColor: .windowBackgroundColor))
                     .overlay(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.12)))
@@ -232,7 +234,7 @@ struct StepsList: View {
         // Over the hours, the list's card stands in for it.
         .opacity(dragging == entry.id && overTimeline ? 0 : 1)
         .debugFrame("step:\(entry.id)")
-        .zIndex(dragging == entry.id ? 1 : 0)
+        .zIndex(dragging == entry.id && !entry.isDone ? 1 : 0)
         // While renaming, clicks and drags belong to the edit line.
         .gesture(TapGesture(count: 2).onEnded(onOpen), including: model.renamingStep == entry.id ? .subviews : .all)
         .gesture(reorder(entry), including: model.renamingStep == entry.id ? .subviews : .all)
