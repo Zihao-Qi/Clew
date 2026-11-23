@@ -596,16 +596,21 @@ struct TimelineBlockView: View {
     /// A step's block (SPEC 2026-11-21): its step, while it exists.
     private var step: TaskSteps.Entry? { b.stepId.flatMap { model.stepEntry($0) } }
     /// Ticked, covered by a hand tick, or the task (a step's block: the step) is done anyway.
+    /// A block still to come for something already done (a done step or task put on the
+    /// timeline to show when, user 2026-11-22) looks done too, not running.
     private var looksDone: Bool {
-        if b.stepId != nil { return block.state == .ticked || (block.state == .skipped && step?.isDone == true) }
-        return block.state == .ticked || block.state == .covered || (block.state == .skipped && row?.isDone == true)
+        let waitingForDone = block.state == .pending || block.state == .skipped
+        if b.stepId != nil { return block.state == .ticked || (waitingForDone && step?.isDone == true) }
+        return block.state == .ticked || block.state == .covered
+            || (waitingForDone && row?.isDone == true && row?.item.kind != .goal)
+            || (block.state == .skipped && row?.isDone == true)
     }
     /// What the Delete key deletes under the pointer: the step of a step's block.
     private var hoverId: UUID { b.stepId ?? b.itemId }
     private var minutes: Int { b.minutes + resizeBy }
     /// Running now: it stands out a little (user, 2026-11-11). Redrawn at each block's start
     /// and end, when the app refreshes.
-    private var isNow: Bool { block.state == .pending && b.start <= Date() && Date() < b.end }
+    private var isNow: Bool { block.state == .pending && !looksDone && b.start <= Date() && Date() < b.end }
     private var height: CGFloat { CGFloat(minutes) * TimelineMetrics.pointsPerMinute }
 
     var body: some View {
@@ -677,7 +682,7 @@ struct TimelineBlockView: View {
 
     private var stateText: Text {
         switch block.state {
-        case .pending: Text("Not ended yet")
+        case .pending: looksDone ? Text("Done") : Text("Not ended yet")
         case .asking: Text("Ended. Done?")
         case .ticked, .covered: Text("Done")
         case .undone: Text("Not finished")

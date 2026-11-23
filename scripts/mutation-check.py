@@ -824,6 +824,7 @@ M = [
  ("SL23 undone block hides", C+"Timeline.swift", "let placed = Set(blocks.filter { $0.state == .pending }.compactMap(\\.block.stepId))", "let placed = placedSteps", "StepBlockTests"),
  ("SL24 latest block's time", C+"Timeline.swift", "blocks.filter { $0.block.stepId == stepId && $0.block.end > now }.map(\\.block.start).min()", "blocks.filter { $0.block.stepId == stepId && $0.block.end > now }.map(\\.block.start).max()", "StepBlockTests"),
  ("SL25 any block's time", C+"Timeline.swift", "blocks.filter { $0.block.stepId == stepId && $0.block.end > now }", "blocks.filter { $0.block.end > now }", "StepBlockTests"),
+ ("SL26 done step's block ticks again", C+"Steps.swift", "guard let open = shown?.open, open.contains(where: { $0.id == step.id }) else { return nil }", "guard let open = shown?.open else { return nil }", "StepBlockTests"),
  ("SP3 last step no finish", C+"Steps.swift", "if open.count == 1 {", "if open.count == 0 {", "StepTests"),
  ("SP5 untick keeps task", C+"Steps.swift", "        for c in try w.checkIns(itemIds: [step.taskId], from: allDays) {\n            try w.voidCheckIn(id: c.id, at: now, reason: \"undo\")\n        }\n", "", "StepTests"),
  ("SP6 untick keeps step", C+"Steps.swift", "        for t in try w.stepTicks(taskIds: [step.taskId]) where t.stepId == step.id {\n            try w.voidStepTick(id: t.id, at: now)\n        }\n", "", "StepTests"),
