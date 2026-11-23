@@ -25,8 +25,10 @@ def run(check: str, seconds: int) -> tuple[bool, str]:
     try:
         result = subprocess.run([binary], env={**base, check: "1"}, timeout=seconds, capture_output=True, text=True)
     except subprocess.TimeoutExpired as e:
-        out = e.stdout.decode() if isinstance(e.stdout, bytes) else (e.stdout or "")
-        return False, out + f"\nFAIL: {check} exceeded {seconds} seconds"
+        def text(x):
+            return x.decode(errors="replace") if isinstance(x, bytes) else (x or "")
+        out = text(e.stdout).splitlines()[-40:] + text(e.stderr).splitlines()[-20:]
+        return False, "\n".join(out) + f"\nFAIL: {check} exceeded {seconds} seconds"
     lines = result.stdout.splitlines()
     passes = sum(l.startswith("PASS") for l in lines)
     ok = result.returncode == 0 and passes > 0

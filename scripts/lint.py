@@ -55,6 +55,11 @@ def check_docrefs(files: dict[str, str], docs: dict[str, str]) -> list[str]:
     return found
 
 
+def code(line: str) -> str:
+    """The line without its `//` comment (not the `//` of "https://" in a string)."""
+    return re.sub(r"(?<![:\\])//.*$", "", line)
+
+
 # --- harness ----------------------------------------------------------------------
 
 FORBIDDEN = [
@@ -90,11 +95,12 @@ def check_harness(files: dict[str, str]) -> list[str]:
             for pattern, what in FORBIDDEN:
                 if pattern.search(line):
                     found.append(f"{path}:{line_no}: a debug harness uses {what}")
-        for m in re.finditer(r"\bAIModel\(", text):
-            args = text[m.end() - 1:balanced(text, m.end() - 1)]
+        uncommented = "\n".join(code(l) for l in text.splitlines())
+        for m in re.finditer(r"\bAIModel\(", uncommented):
+            args = uncommented[m.end() - 1:balanced(uncommented, m.end() - 1)]
             missing = [k for k in ("prefs:", "store:", "transport:", "memory:") if k not in args]
             if missing:
-                line_no = text.count("\n", 0, m.start()) + 1
+                line_no = uncommented.count("\n", 0, m.start()) + 1
                 found.append(f"{path}:{line_no}: a debug harness makes an AIModel with the real {', '.join(missing)}")
     return found
 
@@ -110,17 +116,25 @@ def skip_space(text: str, i: int) -> int:
 def modifier_chain(text: str, start: int) -> str:
     """The control's own modifiers after its closing brace: lines starting with "."
     (with their multi-line arguments), stopping at the first line that is not one."""
+    def delta(line: str) -> int:
+        return line.count("(") + line.count("{") - line.count(")") - line.count("}")
     end = text.find("\n", start)
-    chain = [text[start:end if end >= 0 else len(text)]]
-    depth = chain[0].count("(") + chain[0].count("{") - chain[0].count(")") - chain[0].count("}")
+    first = code(text[start:end if end >= 0 else len(text)])
+    chain = [first]
+    depth = delta(first)   # below 0: the container closes here, and what follows is its own
     i = end + 1 if end >= 0 else len(text)
     while i < len(text):
         nl = text.find("\n", i)
-        line = text[i:nl if nl >= 0 else len(text)]
-        if depth <= 0 and not line.lstrip().startswith((".", "//")):
+        line = code(text[i:nl if nl >= 0 else len(text)])
+        if line.strip() == "" and text[i:nl if nl >= 0 else len(text)].strip().startswith("//"):
+            i = nl + 1 if nl >= 0 else len(text)
+            continue   # a comment line between modifiers
+        if depth <= 0 and not line.lstrip().startswith("."):
+            break
+        depth += delta(line)
+        if depth < 0:
             break
         chain.append(line)
-        depth += line.count("(") + line.count("{") - line.count(")") - line.count("}")
         if nl < 0:
             break
         i = nl + 1
@@ -208,6 +222,7 @@ def self_test() -> int:
         ("harness good", check_harness({"App/Clew/XHarness.swift":
             "let a = AIModel(prefs: p, store: s,\n  transport: t, memory: MemoryBook(url: nil))"}), 0),
         ("harness comment", check_harness({"App/Clew/XHarness.swift": "// never UserDefaults.standard here"}), 0),
+        ("harness ai comment", check_harness({"App/Clew/XHarness.swift": "// never AIModel() here\nlet x = 1"}), 0),
         ("harness elsewhere", check_harness({"App/Clew/AppModel.swift": "ai = AIModel()"}), 0),
         ("a11y bad trailing", check_a11y({"App/Clew/V.swift":
             "Button { go() } label: { Image(systemName: \"trash\") }\n    .help(Text(\"Delete\"))\n"}), 1),
@@ -222,7 +237,17 @@ def self_test() -> int:
         ("a11y menu icon", check_a11y({"App/Clew/V.swift":
             "Menu {\n    Button(\"A\") { a() }\n} label: { Image(systemName: \"ellipsis\") }\n"}), 1),
         ("a11y label inside", check_a11y({"App/Clew/V.swift":
-            "Button { go() } label: { Image(systemName: \"x\").accessibilityLabel(Text(\"Close\")) }\n"}), 0),
+            "Button { go() } label: { Image(systemName: \"x\").accessibilityLabel(\"Close\") }\n"}), 0),
+        ("a11y container's label", check_a11y({"App/Clew/V.swift":
+            "HStack { Button { a() } label: { Image(systemName: \"x\") } }\n.accessibilityLabel(Text(\"Row\"))\n"}), 1),
+        ("a11y commented label", check_a11y({"App/Clew/V.swift":
+            "Button { a() } label: { Image(systemName: \"x\") }\n    // .accessibilityLabel(Text(\"X\"))\n"
+            "    .buttonStyle(.plain)\n"}), 1),
+        ("a11y label in a same-line comment", check_a11y({"App/Clew/V.swift":
+            "Button { a() } label: { Image(systemName: \"x\") } // .accessibilityLabel(Text(\"X\"))\n"}), 1),
+        ("a11y url in chain", check_a11y({"App/Clew/V.swift":
+            "Button { a() } label: { Image(systemName: \"x\") }\n    .help(Text(\"https://x\"))\n"
+            "    .accessibilityLabel(Text(\"X\"))\n"}), 0),
         ("a11y multiline modifier", check_a11y({"App/Clew/V.swift":
             "Button { go() } label: { Image(systemName: \"x\") }\n    .help(Text(\n  \"Close\"))\n    .accessibilityLabel(Text(\"Close\"))\n"}), 0),
         ("a11y comment in chain", check_a11y({"App/Clew/V.swift":
