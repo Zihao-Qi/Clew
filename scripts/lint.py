@@ -116,16 +116,18 @@ def skip_space(text: str, i: int) -> int:
 def modifier_chain(text: str, start: int) -> str:
     """The control's own modifiers after its closing brace: lines starting with "."
     (with their multi-line arguments), stopping at the first line that is not one."""
-    def delta(line: str) -> int:
-        return line.count("(") + line.count("{") - line.count(")") - line.count("}")
+    def cut(line: str, depth: int) -> tuple[str, int, bool]:
+        """The line up to where the container closes (depth below 0), the depth after,
+        and whether it closed there: what follows is the container's own."""
+        for k, ch in enumerate(line):
+            depth += {"(": 1, "{": 1, ")": -1, "}": -1}.get(ch, 0)
+            if ch in ")}" and depth < 0:
+                return line[:k], depth, True
+        return line, depth, False
     end = text.find("\n", start)
-    first = code(text[start:end if end >= 0 else len(text)])
-    # The container may close on this line: what follows it there and after is its own.
-    depth = 0
-    for k, ch in enumerate(first):
-        depth += {"(": 1, "{": 1, ")": -1, "}": -1}.get(ch, 0)
-        if depth < 0:
-            return first[:k]
+    first, depth, closed = cut(code(text[start:end if end >= 0 else len(text)]), 0)
+    if closed:
+        return first
     chain = [first]
     i = end + 1 if end >= 0 else len(text)
     while i < len(text):
@@ -136,10 +138,10 @@ def modifier_chain(text: str, start: int) -> str:
             continue   # a comment line between modifiers
         if depth <= 0 and not line.lstrip().startswith("."):
             break
-        depth += delta(line)
-        if depth < 0:
-            break
+        line, depth, closed = cut(line, depth)
         chain.append(line)
+        if closed:
+            break
         if nl < 0:
             break
         i = nl + 1
@@ -260,6 +262,14 @@ def self_test() -> int:
         ("a11y container closes after a modifier", check_a11y({"App/Clew/V.swift":
             "HStack { Button { a() } label: { Image(systemName: \"x\") }\n    .buttonStyle(.plain) }\n"
             ".accessibilityLabel(Text(\"Row\"))\n"}), 1),
+        ("a11y own label, then the container closes", check_a11y({"App/Clew/V.swift":
+            "HStack { Button { a() } label: { Image(systemName: \"x\") }\n    .accessibilityLabel(Text(\"X\")) }\n"}), 0),
+        ("a11y container's label after a modifier line", check_a11y({"App/Clew/V.swift":
+            "HStack { Button { a() } label: { Image(systemName: \"x\") }\n    .buttonStyle(.plain) }.accessibilityLabel(\n"
+            "  Text(\"Row\"))\n"}), 1),
+        ("a11y file url in chain", check_a11y({"App/Clew/V.swift":
+            "Button { a() } label: { Image(systemName: \"x\") }\n"
+            "    .help(Text(\"file:///x\")).accessibilityLabel(Text(\"X\"))\n"}), 0),
         ("a11y bracket in a comment", check_a11y({"App/Clew/V.swift":
             "Button { a() } label: { Image(systemName: \"x\") }\n    .buttonStyle(.plain) // (\n"
             "Button { b() } label: { Image(systemName: \"y\") }\n.accessibilityLabel(Text(\"B\"))\n"}), 1),
