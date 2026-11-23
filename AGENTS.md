@@ -37,4 +37,9 @@ anything AI-related, [docs/AGENT.md](docs/AGENT.md) before changing code.
 - Run long checks in the foreground and report results; do not leave polling
   loops running in the background.
 - Read every commit SHA from real command output; never guess one.
+- Before a commit, compare `git diff --stat` with the files you meant to change (a
+  multi-file edit can fail halfway and leave a partial change).
+- Before a PR: `python3 -I scripts/lint.py .` (also in CI) and, for app changes,
+  `scripts/run-app-checks.sh` after a Debug build (also in CI) and
+  `python3 -I scripts/mutation-check-app.py .` (local only: it rebuilds per mutation).
 - Keep agent replies short (≤ 20 lines) unless asked; long output scrolls away.

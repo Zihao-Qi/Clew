@@ -61,5 +61,7 @@ jobs:
             CODE_SIGN_IDENTITY=- build
       - name: Isolated shortcut UI smoke check
         run: bash scripts/check-open-shortcut-ui.sh
+      - name: The app's debug checks (AI, Notes, Steps)
+        run: bash scripts/run-app-checks.sh
       - name: Every UI string is in the String Catalog
         run: python3 -I scripts/sync-strings.py DerivedData --check
