@@ -24,6 +24,18 @@ jobs:
       - name: Domain, Core and AI tests
         run: swift test --filter 'ClewDomainTests|ClewCoreTests|ClewAITests|ClewAgentTests'
 
+  lint:
+    # Mistakes that kept coming back (2026-11-22): stale § references, harnesses
+    # touching real data, icon buttons without a VoiceOver label. The self-test
+    # proves each check still catches its bad samples.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint self-test
+        run: python3 -I scripts/lint.py . --self-test
+      - name: Lint
+        run: python3 -I scripts/lint.py .
+
   extension:
     runs-on: ubuntu-latest
     defaults:
@@ -61,5 +73,7 @@ jobs:
             CODE_SIGN_IDENTITY=- build
       - name: Isolated shortcut UI smoke check
         run: bash scripts/check-open-shortcut-ui.sh
+      - name: The app's debug checks (AI, Notes, Steps)
+        run: bash scripts/run-app-checks.sh
       - name: Every UI string is in the String Catalog
         run: python3 -I scripts/sync-strings.py DerivedData --check
