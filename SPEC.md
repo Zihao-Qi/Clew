@@ -1004,8 +1004,13 @@ stopped daily use, not adding features.
   task or a link) can be split into a few steps ("Prepare the talk": Make slides, Speech
   notes, Practice), ticked one by one (SPEC's "chunk big goals" for a task with an end).
   One level only. Habits, goals and a collection's items have no steps.
-  - **Adding:** right-click a task › **Add Step…** (after Edit…; also a VoiceOver action;
-    not offered on a done task), or in its details. Add has no steps. Add Step… unfolds
+  - **Adding:** right-click a task › **Add Step…** (after Edit…; also a VoiceOver action),
+    or in its details. *Changed* 2026-11-22 (*user*): also on a task done today, and
+    adding a step then **reopens it**: the task's tick is undone (today's count drops by
+    one), the steps done before stay done (the one whose tick finished the task too), and
+    the new step is open; steps that were only shown done because the task's own circle
+    finished it are open again, as when unticking. A task done on an earlier day has left
+    the list; its details offer no Add Step (that would change a past day). Add has no steps. Add Step… unfolds
     the task with an empty step line after its steps; Return adds the step and opens the
     next line; Esc, Return on an empty line, a click elsewhere, the menu closing, leaving
     the list and the rollover close it (a typed step not yet added is dropped). The
@@ -1051,7 +1056,11 @@ stopped daily use, not adding features.
     of it, onto another task, or into the list); VoiceOver gets Move Up / Move Down. The
     right-click menu gets no move items.
   - **A step's own right-click:** Delete (also the Delete key under the pointer), with
-    "Deleted “Practice” · Undo" as for a task. Rename is in the details.
+    "Deleted “Practice” · Undo" as for a task, and **Rename** (*added* 2026-11-22, *user*:
+    renaming only in the details was too hidden): the step's row becomes an edit line in
+    place, with its title selected; Return or a click elsewhere saves (as in the
+    details), Esc keeps the old title; an empty title is not saved. Also a VoiceOver action. Rename stays in the
+    details too.
   - **On the timeline:** drag a step from the unfolded list onto an hour (VoiceOver: a
     "Put on timeline" action on the step, at the next quarter hour for 30 minutes). A step
     of a Goals & Later task moves its task to Today first, as a row does. Its block reads

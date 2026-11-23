@@ -175,13 +175,17 @@ struct StepsList: View {
             .buttonStyle(.borderless)
             .accessibilityLabel(entry.isDone ? Text("Undo \(entry.step.title)") : Text("Mark \(entry.step.title) done"))
             .debugFrame("circle:\(entry.id)")
-            Text(entry.step.title)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .foregroundStyle(entry.isDone ? .secondary : .primary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityLabel(Text("\(entry.step.title), step of \(row.item.title)"))
-                .accessibilityAddTraits(entry.isDone ? .isSelected : [])
+            if model.renamingStep == entry.id {
+                StepRenameLine(model: model, step: entry.step) { model.renamingStep = nil }
+            } else {
+                Text(entry.step.title)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .foregroundStyle(entry.isDone ? .secondary : .primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityLabel(Text("\(entry.step.title), step of \(row.item.title)"))
+                    .accessibilityAddTraits(entry.isDone ? .isSelected : [])
+            }
         }
         .padding(.leading, StepMetrics.leading)
         .padding(.trailing, 12)
@@ -205,8 +209,9 @@ struct StepsList: View {
         .opacity(dragging == entry.id && overTimeline ? 0 : 1)
         .debugFrame("step:\(entry.id)")
         .zIndex(dragging == entry.id ? 1 : 0)
-        .onTapGesture(count: 2, perform: onOpen)
-        .gesture(reorder(entry))
+        // While renaming, clicks and drags belong to the edit line.
+        .gesture(TapGesture(count: 2).onEnded(onOpen), including: model.renamingStep == entry.id ? .subviews : .all)
+        .gesture(reorder(entry), including: model.renamingStep == entry.id ? .subviews : .all)
         .onHover { inside in
             if inside {
                 hoveredStep = entry.id
@@ -217,6 +222,7 @@ struct StepsList: View {
             }
         }
         .contextMenu {
+            Button("Rename") { model.renamingStep = entry.id }
             Button("Delete", role: .destructive) { model.deleteStep(entry.step) }
         }
         .accessibilityElement(children: .contain)
@@ -227,12 +233,52 @@ struct StepsList: View {
             if let index, index < open.count - 1 {
                 Button("Move Down") { model.moveStep(entry.id, toOpenIndex: index + 1) }
             }
+            Button("Rename") { model.renamingStep = entry.id }
             Button("Delete") { model.deleteStep(entry.step) }
             // Nothing needs a drag (SPEC 2026-11-21): the next quarter hour, 30 minutes.
             if !entry.isDone, model.timelineShown, model.timeline != nil {
                 Button("Put on timeline") { model.placeStepAtNextQuarter(entry.id) }
             }
         }
+    }
+}
+
+/// A step's title as an edit line, in place (SPEC 2026-11-22): Return or a click
+/// elsewhere saves, Esc keeps the old title; an empty title is not saved.
+struct StepRenameLine: View {
+    let model: AppModel
+    let step: Step
+    let done: () -> Void
+
+    @State private var text = ""
+    @State private var ended = false
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        TextField(text: $text, prompt: Text(verbatim: step.title)) { EmptyView() }
+            .textFieldStyle(.plain)
+            .focused($focused)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityLabel(Text("Rename \(step.title)"))
+            .debugFrame("rename:\(step.id)")
+            .onAppear {
+                text = step.title
+                focused = true
+            }
+            .onSubmit(save)
+            .onExitCommand {
+                ended = true
+                done()
+            }
+            .onChange(of: focused) { _, now in if !now { save() } }
+    }
+
+    private func save() {
+        guard !ended else { return }
+        ended = true
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty, trimmed != step.title { model.renameStep(step.id, trimmed) }
+        done()
     }
 }
 

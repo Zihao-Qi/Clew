@@ -364,6 +364,7 @@
     "Remove block" : {},
     "Remove one from %@" : {},
     "Rename" : {},
+    "Rename %@" : {},
     "Repeat" : {},
     "Repeats" : {},
     "Replace your current data with this backup?" : {},

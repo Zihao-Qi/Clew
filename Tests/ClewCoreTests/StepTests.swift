@@ -31,7 +31,7 @@ private func at(_ d: Int, _ h: Int, _ m: Int = 0) -> Date {
     func later(_ minutes: Int) { clock.set(clock.now().addingTimeInterval(TimeInterval(minutes * 60))) }
     func taskDone(_ id: UUID) throws -> Bool { try clew.today().rows.first { $0.id == id }?.isDone == true }
 
-    @Test func onlyOneOffTasksHaveStepsAndADoneTaskTakesNoNewOne() throws {
+    @Test func onlyOneOffTasksHaveSteps() throws {
         let habit = try clew.addItem(NewItem(title: "run", shape: .habit(.daily))).id
         let goal = try clew.addItem(NewItem(title: "books", shape: .goal(target: 30))).id
         let link = try clew.addItem(NewItem(title: "read", url: URL(string: "https://example.com")!, shape: .later)).id
@@ -39,10 +39,47 @@ private func at(_ d: Int, _ h: Int, _ m: Int = 0) -> Date {
         #expect(throws: ClewError.notAllowed) { try clew.addStep(taskId: goal, title: "a") }
         try clew.addStep(taskId: link, title: "skim")   // a link (Later, with a URL) can
         #expect(throws: ClewError.emptyTitle) { try clew.addStep(taskId: link, title: "   ") }
+        #expect(try shown(link) == ["skim"])
+    }
+
+    /// *Changed* 2026-11-22 (*user*): a step added to a task done today reopens it; the
+    /// steps done before stay done, the one whose tick finished the task too.
+    @Test func aStepAddedToATaskDoneTodayReopensIt() throws {
+        let (id, steps) = try talk()
+        for s in steps { try clew.tickStep(id: s); later(5) }
+        #expect(try taskDone(id))
+        try clew.addStep(taskId: id, title: "rehearse")
+        #expect(try !taskDone(id))
+        #expect(try shown(id) == ["✓slides", "✓notes", "✓practice", "rehearse"])
+        #expect(try clew.today().rows.first { $0.id == id }?.lastTickToday == nil)
+        // Ticking the new step finishes it again, once.
+        let again = try clew.tickStep(id: try clew.steps(taskId: id).open[0].id)
+        let doneAgain = try taskDone(id)
+        #expect(again?.itemId == id && doneAgain)
+
+        // Finished by its own circle: steps shown done only for that are open again.
+        let (other, more) = try talk()
+        try clew.tickStep(id: more[0])
+        try clew.checkIn(itemId: other)
+        #expect(try shown(other) == ["✓slides", "✓notes", "✓practice"])
+        try clew.addStep(taskId: other, title: "extra")
+        #expect(try shown(other) == ["✓slides", "notes", "practice", "extra"])
+        #expect(try !taskDone(other))
+
+        // A plain task done today takes a first step and is open again.
+        let plain = try task("plain")
+        try clew.checkIn(itemId: plain)
+        try clew.addStep(taskId: plain, title: "a")
+        #expect(try !taskDone(plain))
+        #expect(try shown(plain) == ["a"])
+    }
+
+    @Test func aTaskDoneOnAnEarlierDayTakesNoNewStep() throws {
         let done = try task("done")
         try clew.checkIn(itemId: done)
+        clock.set(at(12, 9))
         #expect(throws: ClewError.notAllowed) { try clew.addStep(taskId: done, title: "a") }
-        #expect(try shown(link) == ["skim"])
+        #expect(try clew.steps(taskId: done).entries.isEmpty)
     }
 
     @Test func stepsTickOneByOneAndTheLastFinishesTheTask() throws {

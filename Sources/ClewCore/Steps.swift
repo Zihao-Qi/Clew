@@ -46,15 +46,17 @@ extension Clew {
         (try r.progressAmounts(itemIds: [taskId])[taskId] ?? 0) > 0
     }
 
-    /// Add Step… (SPEC 2026-11-21): a new open step after the task's others. Not on a
-    /// done task.
+    /// Add Step… (SPEC 2026-11-21): a new open step after the task's others. On a task
+    /// done today it reopens the task (*changed* 2026-11-22, *user*): its tick is undone,
+    /// the steps done before stay done. Not on a task done on an earlier day.
     @discardableResult
     public func addStep(taskId: UUID, title: String) throws -> Step {
         let title = try Self.validTitle(title)
         let now = clockForQueries.now()
+        let today = currentDay()
         return try storeForQueries.write { w in
             _ = try Self.stepTask(w, taskId)
-            guard try !Self.isDone(w, taskId) else { throw ClewError.notAllowed }
+            if try Self.isDone(w, taskId) { try reopen(taskId, today: today, at: now, w) }
             let last = try w.steps(taskIds: [taskId]).map(\.sortKey).max()
             let step = Step(id: newID(), taskId: taskId, title: title, sortKey: (last ?? 0) + 1,
                             createdAt: now, updatedAt: now)
@@ -73,6 +75,24 @@ extension Clew {
             step.updatedAt = now
             try w.save(step)
         }
+    }
+
+    /// Inside a write: a task done today is open again. A step tick that finished it
+    /// stands only while the task's tick does, so it is replaced by a plain one first:
+    /// that step stays done. Steps shown done only because the task's own circle finished
+    /// it are open again, as when unticking.
+    func reopen(_ taskId: UUID, today: LocalDay, at now: Date, _ w: any StoreWriter) throws {
+        let ticks = try w.checkIns(itemIds: [taskId], from: Self.allDays)
+        // Done on an earlier day: reopening would change a past day.
+        guard !ticks.isEmpty, ticks.allSatisfy({ $0.localDay == today }) else { throw ClewError.notAllowed }
+        let finishing = Set(ticks.map(\.id))
+        for t in try w.stepTicks(taskIds: [taskId]) {
+            guard let made = t.finishedCheckInId, finishing.contains(made) else { continue }
+            try w.voidStepTick(id: t.id, at: now)
+            try w.insert(StepTick(id: newID(), stepId: t.stepId, taskId: taskId, localDay: t.localDay, at: t.at,
+                                  source: t.source, finishedCheckInId: nil))
+        }
+        for c in ticks { try w.voidCheckIn(id: c.id, at: now, reason: "undo") }
     }
 
     /// Delete a step: a tombstone. It never ticks or unticks the task (SPEC 2026-11-21).
