@@ -57,7 +57,7 @@ def check_docrefs(files: dict[str, str], docs: dict[str, str]) -> list[str]:
 
 def code(line: str) -> str:
     """The line without its `//` comment (not the `//` of "https://" in a string)."""
-    return re.sub(r"(?<![:\\])//.*$", "", line)
+    return re.sub(r"(?<![:/\\])//.*$", "", line)
 
 
 # --- harness ----------------------------------------------------------------------
@@ -120,8 +120,13 @@ def modifier_chain(text: str, start: int) -> str:
         return line.count("(") + line.count("{") - line.count(")") - line.count("}")
     end = text.find("\n", start)
     first = code(text[start:end if end >= 0 else len(text)])
+    # The container may close on this line: what follows it there and after is its own.
+    depth = 0
+    for k, ch in enumerate(first):
+        depth += {"(": 1, "{": 1, ")": -1, "}": -1}.get(ch, 0)
+        if depth < 0:
+            return first[:k]
     chain = [first]
-    depth = delta(first)   # below 0: the container closes here, and what follows is its own
     i = end + 1 if end >= 0 else len(text)
     while i < len(text):
         nl = text.find("\n", i)
@@ -246,8 +251,18 @@ def self_test() -> int:
         ("a11y label in a same-line comment", check_a11y({"App/Clew/V.swift":
             "Button { a() } label: { Image(systemName: \"x\") } // .accessibilityLabel(Text(\"X\"))\n"}), 1),
         ("a11y url in chain", check_a11y({"App/Clew/V.swift":
-            "Button { a() } label: { Image(systemName: \"x\") }\n    .help(Text(\"https://x\"))\n"
-            "    .accessibilityLabel(Text(\"X\"))\n"}), 0),
+            "Button { a() } label: { Image(systemName: \"x\") }\n"
+            "    .help(Text(\"https://x\")).accessibilityLabel(Text(\"X\"))\n"}), 0),
+        ("a11y container's multiline label", check_a11y({"App/Clew/V.swift":
+            "HStack { Button { a() } label: { Image(systemName: \"x\") } }\n.accessibilityLabel(\n  Text(\"Row\")\n)\n"}), 1),
+        ("a11y container's same-line label", check_a11y({"App/Clew/V.swift":
+            "HStack { Button { a() } label: { Image(systemName: \"x\") } }.accessibilityLabel(Text(\"Row\"))\n"}), 1),
+        ("a11y container closes after a modifier", check_a11y({"App/Clew/V.swift":
+            "HStack { Button { a() } label: { Image(systemName: \"x\") }\n    .buttonStyle(.plain) }\n"
+            ".accessibilityLabel(Text(\"Row\"))\n"}), 1),
+        ("a11y bracket in a comment", check_a11y({"App/Clew/V.swift":
+            "Button { a() } label: { Image(systemName: \"x\") }\n    .buttonStyle(.plain) // (\n"
+            "Button { b() } label: { Image(systemName: \"y\") }\n.accessibilityLabel(Text(\"B\"))\n"}), 1),
         ("a11y multiline modifier", check_a11y({"App/Clew/V.swift":
             "Button { go() } label: { Image(systemName: \"x\") }\n    .help(Text(\n  \"Close\"))\n    .accessibilityLabel(Text(\"Close\"))\n"}), 0),
         ("a11y comment in chain", check_a11y({"App/Clew/V.swift":
