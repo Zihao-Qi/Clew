@@ -197,7 +197,7 @@ struct TodayListView: View {
         // The folded steps come back: the rows are as tall as before the drag, so the list
         // never flips out of scrolling for a frame (review). An Add Step line that closed
         // stays closed, and the next measure corrects the height.
-        if let id = draggedId, let saved = rowsHeightAtDrag, model.steps(of: id) != nil, model.isUnfolded(id) {
+        if let id = draggedId, let saved = rowsHeightAtDrag, sequence.contains(id), model.steps(of: id) != nil, model.isUnfolded(id) {
             rowsHeight = saved
         }
         rowsHeightAtDrag = nil
