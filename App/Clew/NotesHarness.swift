@@ -97,6 +97,7 @@ extension Snapshot {
                 box.open()
                 try await Task.sleep(for: .milliseconds(400))
                 guard let panel = box.panelForChecks else { report("the box opens", false); exit(1) }
+                print("KEY:", panel.isKeyWindow, panel.canBecomeKey, panel.styleMask.rawValue, NSApp.keyWindow as Any); fflush(stdout)
                 report("the box opens and takes the keyboard", box.isOpen && panel.isKeyWindow)
                 if let visible = panel.screen?.visibleFrame {
                     report("it opens a quarter of the way down the screen, centred",
@@ -126,10 +127,10 @@ extension Snapshot {
                        && saved?.duringTitle == "Write the intro" && !box.isOpen)
                 report("then the banner: Saved. Back to: the task, with its minutes left",
                        box.isBannerShown && box.bannerText?.hasPrefix("Saved. Back to: Write the intro · ") == true)
-                try await Task.sleep(for: .milliseconds(1000))
+                try await Task.sleep(for: .milliseconds(900))
                 report("the banner stays after the sweep, settled", box.isBannerShown && box.state.settled)
-                try await Task.sleep(for: .milliseconds(3300))
-                report("the banner goes by itself after about 3.6 seconds (sweep and 3 s)", !box.isBannerShown)
+                try await Task.sleep(for: .milliseconds(1700))
+                report("the banner goes by itself after about 2 seconds (sweep and 1.5 s)", !box.isBannerShown)
 
                 box.open()
                 try await Task.sleep(for: .milliseconds(300))
@@ -159,6 +160,26 @@ extension Snapshot {
                     model.undoDeleteNote()
                     report("… done, under Done", model.doneNotes.first?.id == note.id)
                 }
+                // Five lines: the box is exactly as tall as what it draws (no gap, no line
+                // above it), stops growing at four lines; saved, the banner is the same frame.
+                box.open()
+                try await Task.sleep(for: .milliseconds(300))
+                var heights: [CGFloat] = []
+                for line in ["one", "two", "three", "four", "five"] {
+                    if !heights.isEmpty { key("\r", code: 36, shift: true) }
+                    type(line)
+                    try await Task.sleep(for: .milliseconds(150))
+                    heights.append(panel.frame.height)
+                }
+                let content = panel.contentView?.fittingSize.height ?? 0
+                report("the box is as tall as its content, with no gap", abs(panel.frame.height - content) < 1)
+                report("it grows to four lines, then scrolls", heights[3] > heights[0] + 30 && heights[4] == heights[3])
+                let boxFrame = panel.frame
+                key("\r", code: 36)
+                try await Task.sleep(for: .milliseconds(300))
+                report("the banner takes exactly the box's frame", box.bannerFrame == boxFrame)
+                box.closeBanner()
+
                 report("the two shortcuts never clash",
                        model.setWriteNoteShortcut(.default) == "Already used to open the list."
                        && model.setOpenListShortcut(.writeNoteDefault) == "Already used to write a note.")
