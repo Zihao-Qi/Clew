@@ -97,7 +97,6 @@ extension Snapshot {
                 box.open()
                 try await Task.sleep(for: .milliseconds(400))
                 guard let panel = box.panelForChecks else { report("the box opens", false); exit(1) }
-                print("KEY:", panel.isKeyWindow, panel.canBecomeKey, panel.styleMask.rawValue, NSApp.keyWindow as Any); fflush(stdout)
                 report("the box opens and takes the keyboard", box.isOpen && panel.isKeyWindow)
                 if let visible = panel.screen?.visibleFrame {
                     report("it opens a quarter of the way down the screen, centred",
