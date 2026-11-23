@@ -349,6 +349,33 @@ extension Snapshot {
                 }
                 try clew.setTimelineShown(false)
                 model.refresh()
+                // Dragging a task folds its steps until it is dropped (user, 2026-11-22).
+                model.setUnfolded(talk, true)
+                try await Task.sleep(for: .milliseconds(400))
+                let firstStep = model.steps(of: talk)?.entries.first?.id
+                if let c = frame("circle:\(talk)"), let firstStep, frame("step:\(firstStep)") != nil {
+                    let p0 = NSPoint(x: 200, y: c.midY)
+                    func post(_ type: NSEvent.EventType, _ p: NSPoint) {
+                        number += 1
+                        NSApp.postEvent(NSEvent.mouseEvent(with: type, location: p, modifierFlags: [],
+                                                           timestamp: ProcessInfo.processInfo.systemUptime,
+                                                           windowNumber: window.windowNumber, context: nil,
+                                                           eventNumber: number, clickCount: 1,
+                                                           pressure: type == .leftMouseUp ? 0 : 1)!, atStart: false)
+                    }
+                    try await focus(window)
+                    post(.leftMouseDown, p0)
+                    try await Task.sleep(for: .milliseconds(50))
+                    for i in 1...4 { post(.leftMouseDragged, NSPoint(x: 200, y: c.midY - CGFloat(i) * 2)); try await Task.sleep(for: .milliseconds(40)) }
+                    try await Task.sleep(for: .milliseconds(300))
+                    let foldedWhileDragged = frame("step:\(firstStep)") == nil
+                    post(.leftMouseUp, NSPoint(x: 200, y: c.midY - 8))
+                    try await Task.sleep(for: .milliseconds(500))
+                    report("a dragged task's steps fold while it moves, and come back when dropped",
+                           foldedWhileDragged && frame("step:\(firstStep)") != nil && model.isUnfolded(talk))
+                } else {
+                    report("an unfolded task with steps is shown", false)
+                }
 
                 // Details: Esc closes the step line before it leaves the page (review).
                 var backs = 0

@@ -198,7 +198,15 @@ struct TodayListView: View {
             .updating($rowDragLive) { _, live, _ in live = true }
             .onChanged { value in
                 if dragging == nil {
-                    dragFrames = ids.map { rowFrames[$0] ?? .zero }
+                    var frames = ids.map { rowFrames[$0] ?? .zero }
+                    // A dragged task's steps fold while it moves (user, 2026-11-22): it is as
+                    // tall as its own row, and the rows below close up.
+                    if let from = ids.firstIndex(of: row.id), rowHeight > 0, frames[from].height > rowHeight + 1 {
+                        let cut = frames[from].height - rowHeight
+                        frames[from].size.height = rowHeight
+                        for k in frames.indices where k > from { frames[k].origin.y -= cut }
+                    }
+                    dragFrames = frames
                     dragScrollStart = scroller.offset
                     dragging = row.id
                 }
@@ -452,7 +460,7 @@ struct TodayListView: View {
                     }
                 }
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { if steps == nil { rowHeight = $0 } }
-            if (steps != nil && model.isUnfolded(row.id)) || adding {
+            if ((steps != nil && model.isUnfolded(row.id)) || adding) && dragging != row.id {
                 StepsList(model: model, row: row, steps: steps ?? TaskSteps(taskId: row.id, entries: []),
                           adding: adding, suggestOnOpen: suggestingStep == row.id,
                           onAddClose: { if addingStep == row.id { addingStep = nil; suggestingStep = nil } },

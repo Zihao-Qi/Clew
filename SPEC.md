@@ -679,9 +679,9 @@ stopped daily use, not adding features.
     onto an hour (the timeline scrolls when the drag nears its top or bottom edge): the
     task **leaves the list and lives on the timeline** for the day, as a **30-minute
     block** snapped to 15 minutes. Drag a block to move it and its bottom edge to resize
-    it (15 minutes at least, ending at 4 a.m. at the latest). The bottom-edge grip takes at
-    most a quarter of a short block (reaching further below it instead), so a 15-minute
-    block or event is easy to move too (*user*, 2026-11-22). **Dragging a block back
+    it (15 minutes at least, ending at 4 a.m. at the latest). On a block or event under 30
+    minutes the bottom-edge grip is a strip of a quarter of it (at least 3 points), so a
+    15-minute one is easy to move too (*user*, 2026-11-22). **Dragging a block back
     onto the list** removes it; a task with no blocks left is back in the list, in the
     gap it was dropped in (*changed* 2026-11-15: dropped in Goals & Later, an item
     moved to Today moves back, an unticked once task or link moves to Later, and
@@ -1031,8 +1031,9 @@ stopped daily use, not adding features.
     in your order (*changed* for steps only: ticking moves a step; rows still never move
     on a tick). A step ticked out of order moves up once the pointer leaves it, so no
     other step slides under the pointer (*user*, 2026-11-21). Each task remembers on this Mac whether it is unfolded (a setting of this
-    Mac, not part of the task). Dragging the task's row carries its steps; the dragged
-    card shows only the task's own row (*user*, 2026-11-22).
+    Mac, not part of the task). Dragging the task's row carries its steps; while it is
+    dragged its steps fold, so the card is only the task's own row and the rows below
+    close up (*user*, 2026-11-22); they unfold again when it is dropped.
   - **Clicks on any row** (*changed*: a click opened the details): a click unfolds or
     folds a task with steps and does nothing on other rows; **a double-click opens the
     details** and leaves the task folded or unfolded as it was (the first click's change
