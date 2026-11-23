@@ -26,6 +26,13 @@ public struct PeekRect: Equatable, Sendable {
 /// When the hover panel beside a collection row is open (SPEC 2026-11-13, "A peek on
 /// hover"). Pure: the app feeds it pointer, panel and menu events with the time, and
 /// calls `tick` at `deadline`. Positions are screen points (AppKit: y grows upwards).
+/// What a peek is for: an imported list's row, or the Notes row (SPEC "Notes",
+/// 2026-11-23: notes peek the same way).
+public enum PeekKey: Hashable, Sendable {
+    case collection(Source)
+    case notes
+}
+
 public struct PeekState: Equatable, Sendable {
     public enum Side: Equatable, Sendable { case left, right }
 
@@ -35,21 +42,21 @@ public struct PeekState: Equatable, Sendable {
     /// Away from row and panel this long (and not heading for the panel) closes it.
     public static let closeDelay: TimeInterval = 0.2
 
-    /// The collection whose panel is open.
-    public private(set) var open: Source?
+    /// The row whose panel is open.
+    public private(set) var open: PeekKey?
     /// The side of the menu the open panel is on, for "heading toward it".
     public private(set) var side: Side?
 
     /// The row under the pointer, and whether the pointer has moved on it (two different
     /// positions), so a row sliding under a still pointer never opens anything.
-    private var row: Source?
+    private var row: PeekKey?
     private var moved = false
     private var restSince: Date?
     private var last: PeekPoint?
     private var inPanel = false
     private var closingSince: Date?
     /// Clicked: no panel for this row until the pointer has left it.
-    private var blocked: Source?
+    private var blocked: PeekKey?
     private var dragging = false
 
     public init() {}
@@ -62,7 +69,7 @@ public struct PeekState: Equatable, Sendable {
     }
 
     /// The pointer moved, on collection row `on` (nil: elsewhere in the menu), at `point`.
-    public mutating func pointer(on: Source?, at point: PeekPoint, now: Date) {
+    public mutating func pointer(on: PeekKey?, at point: PeekPoint, now: Date) {
         let previous = last
         last = point
         let heading = isHeadingToPanel(from: previous, to: point)
@@ -127,7 +134,7 @@ public struct PeekState: Equatable, Sendable {
     }
 
     /// `source` has nothing left: its panel closes.
-    public mutating func emptied(_ source: Source) {
+    public mutating func emptied(_ source: PeekKey) {
         if open == source { close() }
     }
 

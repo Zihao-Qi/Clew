@@ -75,6 +75,8 @@ M = [
     ("Notes step before task", A + "NotesModel.swift", "b.block.stepId == nil ? 0 : 1", "b.block.stepId == nil ? 1 : 0",
      NOTES),
     ("Notes weekday a day too far", A + "NotesView.swift", "if days > 0, days <= 6 {", "if days > 0, days <= 7 {", NOTES),
+    ("Notes box under the menu bar", A + "NoteBox.swift", "let top = visible.maxY - visible.height / 4",
+     "let top = visible.maxY - 8", NOTES),
     ("Notes banner without task", A + "NoteBox.swift",
      "text = String(localized: \"Saved. Back to: \\(context.title)\\(context.detail)\")",
      "text = String(localized: \"Saved.\"); _ = context", NOTES),

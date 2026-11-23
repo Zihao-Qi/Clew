@@ -21,11 +21,11 @@ final class PeekController {
     private var model: AppModel?
     /// The collection row under the pointer, and a view behind each row (its frame on
     /// screen is read when the panel opens).
-    private var currentRow: Source?
-    private var rowViews: [Source: WeakView] = [:]
+    private var currentRow: PeekKey?
+    private var rowViews: [PeekKey: WeakView] = [:]
     struct WeakView { weak var view: NSView? }
     private var panel: PeekPanel?
-    private var shown: Source?
+    private var shown: PeekKey?
     private var timer: Timer?
     /// Counts the menu becoming key: a deferred "menu closed" from before is stale.
     private var epoch = 0
@@ -100,7 +100,7 @@ final class PeekController {
     /// so `visibleRect` is the whole window for every row (then the first row in the
     /// dictionary won everywhere). The collection rows are outside the list's scroll
     /// view, so nothing hides part of them.
-    func row(at point: NSPoint) -> Source? {
+    func row(at point: NSPoint) -> PeekKey? {
         for (source, anchor) in rowViews {
             guard let view = anchor.view, let window = view.window, window === menuWindow,
                   !view.isHiddenOrHasHiddenAncestor else { continue }
@@ -109,7 +109,7 @@ final class PeekController {
         return nil
     }
 
-    fileprivate func rowView(_ source: Source, _ view: NSView) { rowViews[source] = WeakView(view: view) }
+    fileprivate func rowView(_ key: PeekKey, _ view: NSView) { rowViews[key] = WeakView(view: view) }
 
     func rowClicked() { apply { $0.rowClicked() } }
     func dragChanged(_ active: Bool) { apply { $0.dragChanged(active) } }
@@ -121,10 +121,18 @@ final class PeekController {
 
     /// The lists changed: one with nothing left closes its panel.
     func collectionsChanged(_ summaries: [CollectionSummary]) {
-        for summary in summaries where summary.toWatch == 0 { apply { $0.emptied(summary.source) } }
-        if let shown, !summaries.contains(where: { $0.source == shown }) { apply { $0.emptied(shown) } }
+        for summary in summaries where summary.toWatch == 0 { apply { $0.emptied(.collection(summary.source)) } }
+        if case .collection(let source)? = shown, !summaries.contains(where: { $0.source == source }) {
+            apply { $0.emptied(.collection(source)) }
+        }
         // Still open with a different count: fit the panel to it (Gemini review).
         if let shown, state.open == shown, !show(shown) { apply { $0.emptied(shown) } }
+    }
+
+    /// The open notes changed (SPEC "Notes"): none left closes the Notes peek.
+    func notesChanged(_ count: Int) {
+        if count == 0 { apply { $0.emptied(.notes) } }
+        if shown == .notes, state.open == .notes, !show(.notes) { apply { $0.emptied(.notes) } }
     }
 
     fileprivate func panelHover(_ inside: Bool) { apply { $0.panelHover(inside, now: Date()) } }
@@ -155,21 +163,20 @@ final class PeekController {
         }
     }
 
-    private func show(_ source: Source) -> Bool {
-        guard let model, let menu = menuWindow, let rowView = rowViews[source]?.view, let rowWindow = rowView.window,
-              let screen = menu.screen ?? NSScreen.main,
-              let page = model.collection(source) else { return false }
+    private func show(_ key: PeekKey) -> Bool {
+        guard let model, let menu = menuWindow, let rowView = rowViews[key]?.view, let rowWindow = rowView.window,
+              let screen = menu.screen ?? NSScreen.main else { return false }
         let row = rowWindow.convertToScreen(rowView.convert(rowView.bounds, to: nil))
-        let entries = page.inProgress + page.notStarted
-        guard !entries.isEmpty else { return false }
-        let lines = min(entries.count, Self.maxLines)
+        let count = PeekList(model: model, key: key).count
+        guard count > 0 else { return false }
+        let lines = min(count, Self.maxLines)
         let height = CGFloat(lines) * Self.lineHeight + 2 * PeekList.inset
         let place = peekFrame(menu: Self.rect(menu.frame), row: Self.rect(row), visible: Self.rect(screen.visibleFrame),
                               width: Self.width, height: height)
         state.placed(on: place.side)
         let panel = self.panel ?? PeekPanel()
         self.panel = panel
-        panel.show(PeekList(model: model, source: source))
+        panel.show(PeekList(model: model, key: key))
         panel.setFrame(NSRect(x: place.frame.x, y: place.frame.y, width: place.frame.width, height: place.frame.height),
                        display: true)
         if panel.parent !== menu {
@@ -250,32 +257,50 @@ final class PeekHostingView: NSHostingView<AnyView> {
 /// for VoiceOver). A title opens on the press. Same glass as the menu on macOS 26.
 struct PeekList: View {
     let model: AppModel
-    let source: Source
+    let key: PeekKey
+
+    init(model: AppModel, key: PeekKey) {
+        self.model = model
+        self.key = key
+    }
+
+    init(model: AppModel, source: Source) { self.init(model: model, key: .collection(source)) }
+
+    var count: Int {
+        if case .collection = key { return entries.count }
+        return model.openNotes.count
+    }
 
     static let inset: CGFloat = 6
     static let cornerRadius: CGFloat = 12
 
     var entries: [CollectionEntry] {
-        guard let page = model.collection(source) else { return [] }
+        guard case .collection(let source) = key, let page = model.collection(source) else { return [] }
         return page.inProgress + page.notStarted
     }
 
     var name: String {
-        source == .extensionX ? String(localized: "To read (\(entries.count))")
-                              : String(localized: "To watch (\(entries.count))")
+        switch key {
+        case .collection(.extensionX): String(localized: "To read (\(entries.count))")
+        case .collection: String(localized: "To watch (\(entries.count))")
+        case .notes: String(localized: "To sort (\(model.openNotes.count))")
+        }
     }
 
     var body: some View {
         // Reading `collections` re-renders the panel after every change, like the page.
         let _ = model.collections
-        let list = entries
         let content = ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                ForEach(list) { entry in PeekRow(entry: entry, model: model) }
+                if key == .notes {
+                    ForEach(model.openNotes) { note in NotePeekRow(note: note, model: model) }
+                } else {
+                    ForEach(entries) { entry in PeekRow(entry: entry, model: model) }
+                }
             }
         }
         // At most this tall; less when the screen is shorter (`peekFrame` cuts the panel).
-        .frame(maxHeight: CGFloat(min(list.count, PeekController.maxLines)) * PeekController.lineHeight)
+        .frame(maxHeight: CGFloat(min(count, PeekController.maxLines)) * PeekController.lineHeight)
         .padding(.vertical, Self.inset)
         .frame(width: PeekController.width, alignment: .topLeading)
         let shape = RoundedRectangle(cornerRadius: Self.cornerRadius, style: .continuous)
@@ -324,6 +349,36 @@ struct PeekRow: View {
     }
 }
 
+/// One note in the Notes peek: its first line; pressing it opens the Notes page.
+struct NotePeekRow: View {
+    let note: QuickNote
+    let model: AppModel
+
+    @State private var hovering = false
+    @State private var pressed = false
+
+    var body: some View {
+        Text(verbatim: QuickNote.taskTitle(note.text) ?? note.text)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .frame(maxWidth: .infinity, minHeight: PeekController.lineHeight, alignment: .leading)
+            .padding(.horizontal, 10)
+            .background(RoundedRectangle(cornerRadius: 4).fill(Color.primary.opacity(hovering ? 0.08 : 0)).padding(.horizontal, 4))
+            .contentShape(Rectangle())
+            .onHover { hovering = $0 }
+            .gesture(DragGesture(minimumDistance: 0).onChanged { _ in
+                guard !pressed else { return }
+                pressed = true
+                PeekController.shared.rowClicked()
+                model.notesPageRequest += 1
+            }.onEnded { _ in pressed = false })
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(verbatim: note.text))
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction(.default) { model.notesPageRequest += 1 }
+    }
+}
+
 /// Hands the list's window to the peek controller.
 struct PeekWindowReader: NSViewRepresentable {
     let model: AppModel
@@ -348,21 +403,24 @@ struct PeekWindowReader: NSViewRepresentable {
 
 /// Behind a collection row: lets the controller read the row's frame on screen.
 struct PeekRowAnchor: NSViewRepresentable {
-    let source: Source
+    let key: PeekKey
+
+    init(key: PeekKey) { self.key = key }
+    init(source: Source) { self.key = .collection(source) }
 
     func makeNSView(context: Context) -> AnchorView {
         let view = AnchorView()
-        view.source = source
+        view.key = key
         return view
     }
 
-    func updateNSView(_ view: AnchorView, context: Context) { view.source = source }
+    func updateNSView(_ view: AnchorView, context: Context) { view.key = key }
 
     final class AnchorView: NSView {
-        var source: Source?
+        var key: PeekKey?
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            if let source, window != nil { PeekController.shared.rowView(source, self) }
+            if let key, window != nil { PeekController.shared.rowView(key, self) }
         }
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
     }

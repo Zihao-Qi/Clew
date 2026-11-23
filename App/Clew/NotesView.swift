@@ -10,6 +10,8 @@ struct NotesView: View {
 
     @State private var showsDone = false
     @State private var editing: UUID?
+    /// The note under the pointer: → Today shows, and the Delete key deletes it.
+    @State private var hovered: UUID?
     @State private var draft = ""
     @State private var listHeight: CGFloat = 0
     private static let maxListHeight: CGFloat = 380
@@ -67,6 +69,15 @@ struct NotesView: View {
             }
         }
         .padding(12)
+        .background {
+            // The Delete key deletes the note under the pointer, as in the list.
+            Button("Delete") { if let hovered { model.deleteNote(hovered) } }
+                .keyboardShortcut(.delete, modifiers: [])
+                .opacity(0)
+                .frame(width: 0, height: 0)
+                .disabled(hovered == nil || editing != nil)
+                .accessibilityHidden(true)
+        }
         .debugFrame("notesPage")
         .onDisappear { model.lastDeletedNote = nil }
     }
@@ -81,46 +92,51 @@ struct NotesView: View {
 
     @ViewBuilder
     private func openRow(_ note: QuickNote) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            if editing == note.id {
-                NoteEditorField(text: $draft, placeholder: "", focusRequest: 1, maxLines: 6,
-                                onSubmit: { finishEditing(note, save: true) },
-                                onCancel: { finishEditing(note, save: false) })
-                    .accessibilityLabel(Text("Edit note"))
-                    .background(OutsideClickWatcher(onOutside: { finishEditing(note, save: true) }))
-                    .debugFrame("noteEdit:\(note.id)")
-            } else {
-                Text(verbatim: note.text)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
-                    .onTapGesture { startEditing(note) }
-                    .debugFrame("note:\(note.id)")
-            }
-            Text(verbatim: NoteTime.caption(note)).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-            HStack(spacing: 12) {
-                Spacer(minLength: 4)
-                Menu {
-                    Button("Today") { model.makeTask(fromNote: note.id, in: .today) }
-                    Button("Later") { model.makeTask(fromNote: note.id, in: .later) }
-                } label: { Text("Make a task").font(.caption) }
-                    .menuStyle(.borderlessButton)
-                    .controlSize(.small)
-                    .fixedSize()
-                    .accessibilityLabel(Text("Make a task"))
-                Button("Done") { model.setNoteDone(note.id, true) }
-                    .accessibilityLabel(Text("Done"))
-                Button { model.deleteNote(note.id) } label: { Image(systemName: "trash") }
-                    .help(Text("Delete"))
-                    .accessibilityLabel(Text("Delete"))
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            // Like a task's circle: it marks the note done (SPEC "Notes", 2026-11-23).
+            Button { model.setNoteDone(note.id, true) } label: {
+                Image(systemName: "circle").foregroundStyle(Color.secondary)
             }
             .buttonStyle(.borderless)
-            .font(.caption)
+            .accessibilityLabel(Text("Mark note done"))
+            .debugFrame("noteCircle:\(note.id)")
+            VStack(alignment: .leading, spacing: 3) {
+                if editing == note.id {
+                    NoteEditorField(text: $draft, placeholder: "", focusRequest: 1, maxLines: 6,
+                                    onSubmit: { finishEditing(note, save: true) },
+                                    onCancel: { finishEditing(note, save: false) })
+                        .accessibilityLabel(Text("Edit note"))
+                        .background(OutsideClickWatcher(onOutside: { finishEditing(note, save: true) }))
+                        .debugFrame("noteEdit:\(note.id)")
+                } else {
+                    Text(verbatim: note.text)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                        .onTapGesture { startEditing(note) }
+                        .debugFrame("note:\(note.id)")
+                }
+                Text(verbatim: NoteTime.caption(note)).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+            }
+            // While the pointer is on it: one click makes it a task in Today.
+            if hovered == note.id, editing == nil {
+                Button { model.makeTask(fromNote: note.id, in: .today) } label: { Text("→ Today") }
+                    .buttonStyle(.borderless)
+                    .font(.caption)
+                    .accessibilityLabel(Text("Add to Today"))
+                    .debugFrame("noteToday:\(note.id)")
+            }
+        }
+        .padding(.vertical, 3)
+        .contentShape(Rectangle())
+        .onHover { inside in
+            if inside { hovered = note.id } else if hovered == note.id { hovered = nil }
         }
         .contextMenu {
-            Button("Make a task in Today") { model.makeTask(fromNote: note.id, in: .today) }
-            Button("Make a task in Later") { model.makeTask(fromNote: note.id, in: .later) }
-            Button("Done") { model.setNoteDone(note.id, true) }
+            Button("Add to Today") { model.makeTask(fromNote: note.id, in: .today) }
+            Button("Add to Later") { model.makeTask(fromNote: note.id, in: .later) }
+            Button("Edit") { startEditing(note) }
+            Divider()
             Button("Delete", role: .destructive) { model.deleteNote(note.id) }
         }
         // While editing, VoiceOver reaches the field itself (review).
@@ -128,22 +144,26 @@ struct NotesView: View {
         .accessibilityLabel(editing == note.id ? Text("Edit note") : Text(verbatim: "\(note.text), \(NoteTime.caption(note))"))
         .accessibilityActions {
             Button("Edit") { startEditing(note) }
-            Button("Make a task in Today") { model.makeTask(fromNote: note.id, in: .today) }
-            Button("Make a task in Later") { model.makeTask(fromNote: note.id, in: .later) }
+            Button("Add to Today") { model.makeTask(fromNote: note.id, in: .today) }
+            Button("Add to Later") { model.makeTask(fromNote: note.id, in: .later) }
             Button("Done") { model.setNoteDone(note.id, true) }
             Button("Delete") { model.deleteNote(note.id) }
         }
-        Divider()
     }
 
     @ViewBuilder
     private func doneRow(_ note: QuickNote) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(verbatim: note.text)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            HStack(spacing: 12) {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Button { model.setNoteDone(note.id, false) } label: {
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.accentColor)
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel(Text("Not done"))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(verbatim: note.text)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 Group {
                     if let made = note.madeTo {
                         Text(verbatim: "\(NoteTime.caption(note)) · ") + (made == .today ? Text("→ Today") : Text("→ Later"))
@@ -151,18 +171,17 @@ struct NotesView: View {
                         Text(verbatim: NoteTime.caption(note))
                     }
                 }
-                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                Spacer(minLength: 4)
-                Button("Not done") { model.setNoteDone(note.id, false) }
-                Button { model.deleteNote(note.id) } label: { Image(systemName: "trash") }
-                    .help(Text("Delete"))
-                    .accessibilityLabel(Text("Delete"))
+                .font(.caption).foregroundStyle(.secondary).lineLimit(2)
             }
-            .buttonStyle(.borderless)
-            .font(.caption)
+        }
+        .padding(.vertical, 3)
+        .contentShape(Rectangle())
+        .onHover { inside in
+            if inside { hovered = note.id } else if hovered == note.id { hovered = nil }
         }
         .contextMenu {
             Button("Not done") { model.setNoteDone(note.id, false) }
+            Divider()
             Button("Delete", role: .destructive) { model.deleteNote(note.id) }
         }
         .accessibilityElement(children: .combine)
@@ -220,5 +239,65 @@ enum NoteTime {
             return date.formatted(.dateTime.month(.abbreviated).day())
         }
         return date.formatted(.dateTime.month(.abbreviated).day().year())
+    }
+}
+
+/// The Notes row, after the YouTube and X rows and in their style (SPEC "Notes",
+/// 2026-11-23): resting on it opens the same peek; a click opens the Notes page.
+struct NotesRowView: View {
+    let count: Int
+    let onOpen: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "square.and.pencil")
+                .font(.title3)
+                .foregroundStyle(.secondary)
+                .frame(width: TaskColumns.circleWidth)
+            Text("Notes")
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text("\(count) to sort")
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+            Image(systemName: "chevron.right")
+                .imageScale(.small)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 5)
+        .background {
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.primary.opacity(hovering ? 0.06 : 0))
+                .padding(.horizontal, 6)
+        }
+        .padding(.vertical, 2)
+        .contentShape(Rectangle())
+        .background(PeekRowAnchor(key: .notes))
+        .onTapGesture {
+            PeekController.shared.rowClicked()
+            onOpen()
+        }
+        .onHover { hovering = $0 }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Notes, \(count) to sort"))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction(.default, onOpen)
+        .debugFrame("notesRow")
+    }
+}
+
+/// A bottom-bar label: the icon close to its word (user, 2026-11-23).
+struct BarLabel: View {
+    let title: Text
+    let icon: String
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: icon)
+            title
+        }
     }
 }

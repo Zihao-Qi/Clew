@@ -49,9 +49,12 @@ final class NoteBox: NSObject, NSWindowDelegate {
         guard QuickNote.cleaned(state.text) != nil, let model else { return }
         guard model.addNote(state.text, during: state.context) else { return }
         Self.defaults.removeObject(forKey: Self.draftKey)
+        // The banner takes the box's place and size: it is the same box, saved.
+        state.savedText = state.text
+        let frame = panel?.frame
         state.text = ""
         closePanel()
-        showBanner()
+        showBanner(at: frame)
     }
 
     /// Esc, or a click elsewhere: the box closes and what was typed stays as the draft.
@@ -76,7 +79,7 @@ final class NoteBox: NSObject, NSWindowDelegate {
 
     // MARK: The banner
 
-    private func showBanner() {
+    private func showBanner(at frame: NSRect?) {
         let text: String
         if let context = state.context {
             text = String(localized: "Saved. Back to: \(context.title)\(context.detail)")
@@ -84,16 +87,23 @@ final class NoteBox: NSObject, NSWindowDelegate {
             text = String(localized: "Saved.")
         }
         state.banner = text
+        state.bannerShown += 1
         let banner = self.banner ?? makeBanner()
         self.banner = banner
-        place(banner, height: 64)
+        if let frame {
+            banner.setFrame(NSRect(x: frame.minX, y: frame.maxY - max(frame.height, 64), width: frame.width,
+                                   height: max(frame.height, 64)), display: false)
+        } else {
+            place(banner, height: 64)
+        }
         banner.alphaValue = 1
         banner.orderFrontRegardless()
         NSAccessibility.post(element: banner, notification: .announcementRequested,
                              userInfo: [.announcement: text, .priority: NSAccessibilityPriorityLevel.high.rawValue])
         bannerTask?.cancel()
         bannerTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(3))
+            // The sweep (about half a second), then 3 seconds of "Saved".
+            try? await Task.sleep(for: .seconds(3.6))
             guard !Task.isCancelled else { return }
             await NSAnimationContext.runAnimationGroup { $0.duration = 0.3; self?.banner?.animator().alphaValue = 0 }
             guard !Task.isCancelled else { return }   // a newer banner keeps showing
@@ -141,13 +151,15 @@ final class NoteBox: NSObject, NSWindowDelegate {
         panel.hasShadow = true
     }
 
-    /// Centred under the menu bar of the screen the pointer is on.
+    /// A quarter of the way down the screen the pointer is on, centred (user, 2026-11-23:
+    /// right under the menu bar it sat too high).
     private func place(_ panel: NSPanel, height: CGFloat) {
         let pointer = NSEvent.mouseLocation
         let screen = NSScreen.screens.first { NSMouseInRect(pointer, $0.frame, false) } ?? NSScreen.main
         guard let visible = screen?.visibleFrame else { return }
         let size = NSSize(width: 440, height: height)
-        panel.setFrame(NSRect(x: visible.midX - size.width / 2, y: visible.maxY - size.height - 8,
+        let top = visible.maxY - visible.height / 4
+        panel.setFrame(NSRect(x: visible.midX - size.width / 2, y: top - size.height,
                               width: size.width, height: size.height), display: false)
     }
 
@@ -200,6 +212,10 @@ final class NoteBoxState {
     var text = ""
     var context: NoteContext?
     var banner: String?
+    /// What was just saved: the sweep passes over it before "Saved" shows.
+    var savedText = ""
+    /// Bumped each time the banner shows, so its animation runs again.
+    var bannerShown = 0
     /// Bumped each time the box opens, so the field takes the keyboard again.
     var focusRequest = 0
 }
@@ -209,52 +225,122 @@ struct NoteBoxView: View {
     let state: NoteBoxState
 
     var body: some View {
-        NoteEditorField(text: Binding(get: { state.text }, set: { state.text = $0 }),
-                        placeholder: String(localized: "A thought to keep…"),
-                        focusRequest: state.focusRequest, maxLines: 4,
-                        onSubmit: { box.save() }, onCancel: { box.close() },
-                        onHeight: { box.resize(to: $0 + 28) })
-            .accessibilityLabel(Text("Note"))
-            .padding(14)
-            .frame(width: 440, alignment: .topLeading)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-            .debugFrame("noteBox")
+        VStack(alignment: .leading, spacing: 6) {
+            NoteEditorField(text: Binding(get: { state.text }, set: { state.text = $0 }),
+                            placeholder: String(localized: "A thought to keep…"),
+                            focusRequest: state.focusRequest, maxLines: 4,
+                            onSubmit: { box.save() }, onCancel: { box.close() },
+                            onHeight: { box.resize(to: $0 + (state.context == nil ? 28 : 48)) })
+                .accessibilityLabel(Text("Note"))
+            if let context = state.context {
+                // What it is written during (SPEC "Notes", 2026-11-23).
+                (Text("During: ") + Text(verbatim: context.title))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .padding(14)
+        .frame(width: 440, alignment: .topLeading)
+        .menuGlass(cornerRadius: 12)
+        .debugFrame("noteBox")
     }
 }
 
-/// "Saved. Back to: Write the intro": larger, tinted with the accent colour, easy to
-/// notice (user, 2026-11-22). A click closes it.
+/// The box, saved (SPEC "Notes", 2026-11-23): an accent band sweeps across what was
+/// typed, settles as the bar the timeline gives the block running now, and the text
+/// becomes "✓ Saved / Back to: <task>". A click closes it.
 struct NoteBannerView: View {
     let state: NoteBoxState
     let dismiss: () -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// 0 to 1: how far the band has swept; then it settles into the bar.
+    @State private var sweep: CGFloat = 0
+    @State private var settled = false
+    #if DEBUG
+    /// The debug render shows the settled banner (an image cannot wait for the sweep).
+    static var startSettled = false
+    #endif
+
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.title2)
-                .foregroundStyle(Color.accentColor)
-                .accessibilityHidden(true)
-            Group {
-                if let context = state.context {
-                    (Text("Saved. Back to: ") + Text(verbatim: context.title).bold() + Text(verbatim: context.detail))
-                } else {
-                    Text("Saved.")
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                // The band, sweeping left to right, then the thin bar on the left edge.
+                Rectangle()
+                    .fill(Color.accentColor.opacity(settled ? 1 : 0.22))
+                    .frame(width: settled ? 3 : geo.size.width * sweep)
+                Group {
+                    if settled {
+                        saved
+                    } else {
+                        Text(verbatim: state.savedText)
+                            .lineLimit(4)
+                            .padding(14)
+                    }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             }
-            .font(.title3)
-            .lineLimit(2)
-            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 16)
-        .frame(width: 440, height: 64)
-        .background(Color.accentColor.opacity(0.18), in: RoundedRectangle(cornerRadius: 12))
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .frame(width: 440)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))   // the bar keeps to the corners
+        .menuGlass(cornerRadius: 12)
         .contentShape(Rectangle())
         .onTapGesture(perform: dismiss)
+        .task(id: state.bannerShown) { await play() }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityHint(Text("Closes"))
         .debugFrame("noteBanner")
+    }
+
+    private var saved: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(Color.accentColor)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Saved").font(.title3.weight(.semibold))
+                if let context = state.context {
+                    (Text("Back to: ") + Text(verbatim: context.title).bold() + Text(verbatim: context.detail))
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+        }
+        .font(.title3)
+        .padding(.horizontal, 16)
+        .transition(.opacity)
+    }
+
+    private func play() async {
+        sweep = 0
+        settled = false
+        var still = reduceMotion
+        #if DEBUG
+        still = still || Self.startSettled
+        #endif
+        guard !still else {
+            settled = true
+            return
+        }
+        withAnimation(.easeInOut(duration: 0.45)) { sweep = 1 }
+        try? await Task.sleep(for: .milliseconds(470))
+        withAnimation(.easeOut(duration: 0.25)) { settled = true }
+    }
+}
+
+extension View {
+    /// The menu's own glass on macOS 26 (as the peek), the regular material before.
+    @ViewBuilder
+    func menuGlass(cornerRadius: CGFloat) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        if #available(macOS 26, *) {
+            self.glassEffect(.regular, in: shape)
+        } else {
+            self.background(.regularMaterial, in: shape).clipShape(shape)
+        }
     }
 }
 
