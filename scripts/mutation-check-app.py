@@ -1,0 +1,134 @@
+#!/usr/bin/env python3
+"""Mutation check for the app's debug checks (AGENTS.md rule 1 for App/Clew).
+
+Each entry breaks one rule in the app on purpose, rebuilds the Debug app, runs the
+named debug check and expects a FAIL. "SURVIVED" means no check noticed: add or fix a
+check. The source is always restored and the app rebuilt at the end. Each mutation
+rebuilds the app (about a minute), so this runs locally, not in CI; `--patterns` is
+fast and only checks that every entry still matches its source once.
+
+  python3 -I scripts/mutation-check-app.py .                 # all
+  python3 -I scripts/mutation-check-app.py . --only Notes    # names containing "Notes"
+  python3 -I scripts/mutation-check-app.py . --patterns
+"""
+import pathlib
+import subprocess
+import sys
+
+A = "App/Clew/"
+AI, NOTES, STEPS = "CLEW_AI_CHECK", "CLEW_NOTES_TEST", "CLEW_STEPS_TEST"
+
+M = [
+    # Memory (SPEC "Memory")
+    ("AI record while not ready", A + "AIModel.swift",
+     "                tick: UUID? = nil) {\n        guard isReady else { return }\n", "                tick: UUID? = nil) {\n", AI),
+    ("AI fetched title recorded", A + "AppModel.swift", "typed: task.titleOrigin == .typed,", "typed: true,", AI),
+    ("AI off keeps record", A + "AIModel.swift", "        jobGeneration += 1\n        memory.clearActivity()\n",
+     "        jobGeneration += 1\n", AI),
+    ("AI note not kept", A + "AIModel.swift", "        case .success(let notes): memory.replace(notes)\n",
+     "        case .success: break\n", AI),
+    ("AI answer ignores changes", A + "AIModel.swift",
+     "guard isReady, memory.notes.first(where: { $0.id == shown.id }) == shown else { return }",
+     "guard isReady else { return }", AI),
+    ("AI noticed without ready", A + "AppModel.swift",
+     "var noticedShown: [Note] { ai?.isReady == true ? noticed : [] }", "var noticedShown: [Note] { noticed }", AI),
+    ("AI suggest on a done task", A + "StepSuggestions.swift", "return canAddStep(row) && !row.isDone",
+     "return canAddStep(row)", AI),
+    # Steps and the timeline
+    ("Steps shown while dragged", A + "TodayListView.swift",
+     "if ((steps != nil && model.isUnfolded(row.id)) || adding) && dragging != row.id {",
+     "if (steps != nil && model.isUnfolded(row.id)) || adding {", STEPS),
+    ("Steps full height while folded", A + "TodayListView.swift",
+     "                    if showsSteps, let from = ids.firstIndex(of: row.id), let own = ownHeights[row.id],",
+     "                    if false, let from = ids.firstIndex(of: row.id), let own = ownHeights[row.id],", STEPS),
+    ("Steps old grip on short blocks", A + "DayTimelineView.swift",
+     "height < 29 ? (max(3, height / 4), 0) : (8, 4)", "(8, 4)", STEPS),
+    ("Steps placed steps hidden", A + "StepViews.swift",
+     "        let entries = steps.entries\n        guard let held",
+     "        let placed = model.timeline?.placedSteps ?? []\n        let entries = steps.entries.filter { !placed.contains($0.id) }\n        guard let held",
+     STEPS),
+    ("Steps task never leaves", A + "AppModel.swift",
+     "let placed = day.placedItems.union(day.tasksWithAllStepsPlaced(steps))", "let placed = day.placedItems", STEPS),
+    ("Steps done task refuses steps", A + "AppModel.swift",
+     "(row.progressAmount == 0 || (row.isDone && row.progressAmount == row.todayAmount))",
+     "!row.isDone && row.progressAmount == 0", STEPS),
+    ("Steps rename ignores outside clicks", A + "StepViews.swift",
+     "            .background(OutsideClickWatcher(onOutside: save))\n            // The step left the list",
+     "            // The step left the list", STEPS),
+    ("Steps empty title sent", A + "StepViews.swift", "if !trimmed.isEmpty, trimmed != step.title",
+     "if trimmed != step.title", STEPS),
+    # Notes (SPEC "Notes")
+    ("Notes shift-return submits", A + "NoteBox.swift", "if (textView as? NoteTextView)?.shiftHeld == true {",
+     "if false {", NOTES),
+    ("Notes draft dropped on Esc", A + "NoteBox.swift", "    func close() {\n        keepDraft()\n",
+     "    func close() {\n", NOTES),
+    ("Notes draft not restored", A + "NoteBox.swift",
+     "state.text = Self.defaults.string(forKey: Self.draftKey) ?? \"\"", "state.text = \"\"", NOTES),
+    ("Notes focus ignored", A + "NotesModel.swift", "timer.phase == .focus, !timer.isOver(at: now)",
+     "timer.phase == .focus, false", NOTES),
+    ("Notes done block chosen", A + "NotesModel.swift", "            guard taskNeeds else { return false }\n", "", NOTES),
+    ("Notes half goal skipped", A + "NotesModel.swift",
+     "row.item.progress.target != nil ? !row.isGoalReached : !row.isDone", "!row.isDone", NOTES),
+    ("Notes earliest start wins", A + "NotesModel.swift", "return (-b.block.start.timeIntervalSinceReferenceDate,",
+     "return (b.block.start.timeIntervalSinceReferenceDate,", NOTES),
+    ("Notes step before task", A + "NotesModel.swift", "b.block.stepId == nil ? 0 : 1", "b.block.stepId == nil ? 1 : 0",
+     NOTES),
+    ("Notes weekday a day too far", A + "NotesView.swift", "if days > 0, days <= 6 {", "if days > 0, days <= 7 {", NOTES),
+    ("Notes banner without task", A + "NoteBox.swift",
+     "text = String(localized: \"Saved. Back to: \\(context.title)\\(context.detail)\")",
+     "text = String(localized: \"Saved.\"); _ = context", NOTES),
+]
+
+repo = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else ".")
+binary = repo / "DerivedData/Build/Products/Debug/Clew.app/Contents/MacOS/Clew"
+
+
+def build() -> bool:
+    result = subprocess.run(["xcodebuild", "-project", "Clew.xcodeproj", "-scheme", "Clew", "-configuration", "Debug",
+                             "-derivedDataPath", "DerivedData", "build"], cwd=repo, capture_output=True, text=True)
+    return "BUILD SUCCEEDED" in result.stdout
+
+
+def run(check: str) -> list[str]:
+    try:
+        out = subprocess.run([str(binary)], env={"HOME": str(pathlib.Path.home()), check: "1"},
+                             capture_output=True, text=True, timeout=150).stdout
+    except subprocess.TimeoutExpired as e:
+        out = (e.stdout or b"").decode() if isinstance(e.stdout, bytes) else (e.stdout or "")
+        return ["TIMEOUT"] + [l for l in out.splitlines() if l.startswith("FAIL")]
+    return [l for l in out.splitlines() if l.startswith("FAIL")]
+
+
+if "--patterns" in sys.argv:
+    stale = [(name, (repo / path).read_text().count(old)) for name, path, old, _, _ in M
+             if (repo / path).read_text().count(old) != 1]
+    for name, count in stale:
+        print(f"{name:40} PATTERN NOT UNIQUE ({count})")
+    print(f"{len(M) - len(stale)} of {len(M)} patterns match once")
+    sys.exit(1 if stale else 0)
+
+only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else ""
+survived = 0
+for name, path, old, new, check in M:
+    if only and only not in name:
+        continue
+    f = repo / path
+    orig = f.read_text()
+    if orig.count(old) != 1:
+        print(f"{name:40} PATTERN NOT UNIQUE ({orig.count(old)})", flush=True)
+        survived += 1
+        continue
+    try:
+        f.write_text(orig.replace(old, new))
+        if not build():
+            print(f"{name:40} BUILD FAILED", flush=True)
+            survived += 1
+            continue
+        fails = run(check)
+        print(f"{name:40} {'KILLED' if fails else 'SURVIVED'}  {fails[:1]}", flush=True)
+        survived += 0 if fails else 1
+    finally:
+        f.write_text(orig)
+print("rebuilding the unmutated app…", flush=True)
+build()
+sys.exit(1 if survived else 0)
