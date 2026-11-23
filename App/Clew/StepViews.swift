@@ -176,7 +176,10 @@ struct StepsList: View {
             .accessibilityLabel(entry.isDone ? Text("Undo \(entry.step.title)") : Text("Mark \(entry.step.title) done"))
             .debugFrame("circle:\(entry.id)")
             if model.renamingStep == entry.id {
-                StepRenameLine(model: model, step: entry.step) { model.renamingStep = nil }
+                // Only its own rename ends: a late save never clears another step's (review).
+                StepRenameLine(model: model, step: entry.step) {
+                    if model.renamingStep == entry.id { model.renamingStep = nil }
+                }
             } else {
                 Text(entry.step.title)
                     .lineLimit(1)
@@ -262,6 +265,8 @@ struct StepRenameLine: View {
             .accessibilityLabel(Text("Rename \(step.title)"))
             .debugFrame("rename:\(step.id)")
             .background(OutsideClickWatcher(onOutside: save))
+            // The step left the list (deleted, folded, put on the timeline): the rename ends.
+            .onDisappear { if model.renamingStep == step.id { model.renamingStep = nil } }
             .onAppear {
                 text = step.title
                 DispatchQueue.main.async { focused = true }

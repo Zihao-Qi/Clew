@@ -232,7 +232,8 @@ extension Snapshot {
                     try await key("\r", code: 36)
                     try await Task.sleep(for: .milliseconds(300))
                     report("Backspace and an empty title keep the step and its title",
-                           shown().contains("Rest well") && model.allSteps(of: talk).contains { $0.id == rest.id })
+                           shown().contains("Rest well") && model.allSteps(of: talk).contains { $0.id == rest.id }
+                           && model.renamingStep == nil && model.notice == nil)
                     DebugFrames.hoverStep?(nil)
                     // A click elsewhere saves (review).
                     model.renamingStep = rest.id
