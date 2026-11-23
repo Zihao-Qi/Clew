@@ -1269,10 +1269,10 @@ stopped daily use, not adding features.
     under the menu bar, 440 points wide, above every app and on every Space, with one
     text field already focused (placeholder "A thought to keep…"). It wraps and grows
     to 4 lines (then scrolls), at most 1,000 characters. **Return** saves; **⇧Return**
-    starts a new line. Return with nothing but spaces does nothing. **Esc** closes it;
+    starts a new line. Return with nothing but spaces and line breaks does nothing. **Esc** closes it;
     so does clicking anywhere else. Either way what was typed is kept as a **draft**
     (in this Mac's preferences, so it survives quitting) and is back in the field the
-    next time the box opens; only spaces count as nothing. Pressing the shortcut while
+    next time the box opens; spaces and line breaks alone count as nothing. Pressing the shortcut while
     the box is open focuses it; while "Saved." shows, it opens the box again at once.
   - **Back to the task:** saving gives the front back to the app that was in front
     when the box opened (with Esc too; a click elsewhere already chose an app), and
@@ -1282,7 +1282,8 @@ stopped daily use, not adding features.
     when the box opens: the focus timer's task if a focus (not a break) is running and
     its time is not up ("… · 12 min left", minutes rounded up; "… · paused" while
     paused); else, with the timeline on, a block running now (its start passed, its end
-    not) whose task or step is not done (a reached goal counts as done); a step's block
+    not) that still needs something (a task not done today; a goal not reached; for a
+    step's block, neither its task nor its step done); a step's block
     names "Prepare the talk - Speech notes"; of several, the one that started last,
     then a task's own block before a step's, then the list's order and the steps'
     order; else none, and the banner reads "Saved."
