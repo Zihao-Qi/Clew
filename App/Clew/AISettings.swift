@@ -28,14 +28,14 @@ struct AISettings: View {
             Button("Forget", role: .destructive) { ai.forgetEverything() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This deletes all notes and what Clew has recorded. It can't be undone.")
+            Text("This deletes Clew's memory and what it has recorded. It can't be undone.")
         }
     }
 
     private var notes: some View {
         Section {
             if ai.memory.notes.isEmpty {
-                Text("No notes yet. Clew adds them as it learns how you work, and you can add your own.")
+                Text("Nothing in memory yet. Clew adds to it as it learns how you work, and you can add your own.")
                     .foregroundStyle(.secondary)
             }
             ForEach(ai.memory.shown) { note in
@@ -44,7 +44,7 @@ struct AISettings: View {
                         Text(verbatim: note.says)
                         Group {
                             if note.from == .you {
-                                if note.about.isEmpty { Text("Your note") } else { Text("\(note.about) · Your note") }
+                                if note.about.isEmpty { Text("Added by you") } else { Text("\(note.about) · Added by you") }
                             } else if note.confirmed != nil {
                                 if note.about.isEmpty { Text("You confirmed") } else { Text("\(note.about) · You confirmed") }
                             } else if note.about.isEmpty {
@@ -59,19 +59,19 @@ struct AISettings: View {
                     Spacer()
                     Button { editing = NoteDraft(note) } label: { Image(systemName: "pencil") }
                         .help(Text("Edit"))
-                        .accessibilityLabel(Text("Edit note \(note.says)"))
+                        .accessibilityLabel(Text("Edit memory \(note.says)"))
                     Button { ai.memory.delete(note.id) } label: { Image(systemName: "trash") }
                         .help(Text("Delete"))
-                        .accessibilityLabel(Text("Delete note \(note.says)"))
+                        .accessibilityLabel(Text("Delete memory \(note.says)"))
                 }
                 .buttonStyle(.borderless)
             }
             HStack {
-                Button("Add note") { editing = NoteDraft(nil) }
+                Button("Add to memory") { editing = NoteDraft(nil) }
                     .disabled(ai.memory.isFull)
-                    .accessibilityLabel(Text("Add a note"))
+                    .accessibilityLabel(Text("Add to memory"))
                 if ai.memory.isFull {
-                    Text("Clew keeps up to 40 notes.").font(.caption).foregroundStyle(.secondary)
+                    Text("Clew keeps up to 40 memories.").font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button("Forget everything") { forgetting = true }
@@ -79,9 +79,9 @@ struct AISettings: View {
                     .accessibilityLabel(Text("Forget everything Clew knows"))
             }
         } header: {
-            Text("What Clew knows")
+            Text("Memory")
         } footer: {
-            Text("Clew never changes a note you added or edited.")
+            Text("Clew never changes what you added or edited.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -114,7 +114,7 @@ struct AISettings: View {
                     Text(message).font(.callout).foregroundStyle(.secondary)
                 }
             } footer: {
-                Text("Clew can suggest small steps for a task and keep notes on how you work, using your ChatGPT plan. Nothing is sent until you sign in and ask. Clew works fully without it.")
+                Text("Clew can suggest small steps for a task and remember how you work, using your ChatGPT plan. Nothing is sent until you sign in and ask. Clew works fully without it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -179,7 +179,7 @@ struct AISettings: View {
                     Toggle(isOn: Binding(get: { ai.useAI }, set: { ai.useAI = $0 })) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Use AI")
-                            Text("Clew suggests steps and keeps notes on how you work, using your ChatGPT plan.")
+                            Text("Clew suggests steps and remembers how you work, using your ChatGPT plan.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -217,17 +217,17 @@ struct NoteEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(draft.noteId == nil ? "Add note" : "Edit note").font(.headline)
+            Text(draft.noteId == nil ? "Add to memory" : "Edit memory").font(.headline)
             Form {
                 TextField("About", text: $draft.about, prompt: Text("Writing"))
                     .onChange(of: draft.about) { _, v in if v.count > Memory.aboutLongest { draft.about = String(v.prefix(Memory.aboutLongest)) } }
                     .accessibilityLabel(Text("About"))
-                TextField("Note", text: $draft.says, prompt: Text("Goes better before noon"))
+                TextField("Memory", text: $draft.says, prompt: Text("Goes better before noon"))
                     .onChange(of: draft.says) { _, v in
                         let line = v.replacingOccurrences(of: "\n", with: " ")
                         if line.count > Memory.saysLongest || line != v { draft.says = String(line.prefix(Memory.saysLongest)) }
                     }
-                    .accessibilityLabel(Text("Note"))
+                    .accessibilityLabel(Text("Memory"))
             }
             HStack {
                 Spacer()
@@ -239,7 +239,7 @@ struct NoteEditor: View {
                 }
                 .keyboardShortcut(.defaultAction)
                 .disabled(draft.says.trimmingCharacters(in: .whitespaces).isEmpty)
-                .accessibilityLabel(Text("Save note"))
+                .accessibilityLabel(Text("Save memory"))
             }
         }
         .padding(20)

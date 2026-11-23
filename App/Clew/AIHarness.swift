@@ -286,7 +286,7 @@ extension Snapshot {
                                to: dir.appendingPathComponent("ai-settings-\(name)-\(look).png"))
                     }
                 }
-                // What Clew knows, with notes from Clew and from you (SPEC "Memory").
+                // Memory, with notes from Clew and from you (SPEC "Memory").
                 let known = testAI(MemorySession.signedIn(), RecordedAI(), "render-notes")
                 known.planNoteSeen = true
                 await known.refreshModels()
