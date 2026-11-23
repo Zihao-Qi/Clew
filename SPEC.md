@@ -1264,10 +1264,14 @@ stopped daily use, not adding features.
   person away; then Clew points back to the task. Notes are the person's own (Clew's
   AI notes are "Memory").
   - **Writing one:** the global shortcut **⌥⌘.** from any app, or **✎ Note** in the
-    menu's bottom bar, right after **+ Add** (the menu closes first). Both open the
-    **note box**: a small panel at the top of the screen the pointer is on, centred
-    under the menu bar, 440 points wide, above every app and on every Space, with one
-    text field already focused (placeholder "A thought to keep…"). It wraps and grows
+    menu's bottom bar, right after **+ Add** (the menu closes first; *changed*
+    2026-11-23, *user*: each button's icon sits close to its word and the two buttons
+    stand further apart, so they read as two). Both open the **note box**: a small
+    panel a quarter of the way down the screen the pointer is on, centred (*changed*
+    2026-11-23, *user*: right under the menu bar it sat too high), 440 points wide,
+    above every app and on every Space, drawn with the menu's own glass, with one text
+    field already focused (placeholder "A thought to keep…") and, when there is a task
+    (below), a quiet second line "During: Write the intro". It wraps and grows
     to 4 lines (then scrolls), at most 1,000 characters. **Return** saves; **⇧Return**
     starts a new line. Return with nothing but spaces and line breaks does nothing. **Esc** closes it;
     so does clicking anywhere else. Either way what was typed is kept as a **draft**
@@ -1276,9 +1280,13 @@ stopped daily use, not adding features.
     the box is open focuses it; while "Saved." shows, it opens the box again at once.
   - **Back to the task:** saving gives the front back to the app that was in front
     when the box opened (with Esc too; a click elsewhere already chose an app), and
-    the box stays 3 seconds as a banner that takes no keyboard, larger text, tinted
-    with the accent colour: "Saved. Back to: **Write the intro**", then fades; a click
-    on it closes it at once. VoiceOver announces the same text. **The task** is chosen
+    the box shows that the thought is safe (*changed* 2026-11-23, *user*: the tinted
+    banner looked unlike the app): a band of the accent colour sweeps across the box
+    from left to right (about half a second), settles as a thin accent bar on its left
+    edge (the mark of the block running now on the timeline), and the text becomes
+    "✓ Saved" over "Back to: **Write the intro**" (the ✓ a done task's filled circle).
+    It stays 3 seconds, takes no keyboard, then fades; a click on it closes it at once.
+    With Reduce Motion on, there is no sweep: the bar and text appear at once. VoiceOver announces the same text. **The task** is chosen
     when the box opens: the focus timer's task if a focus (not a break) is running and
     its time is not up ("… · 12 min left", minutes rounded up; "… · paused" while
     paused); else, with the timeline on, a block running now (its start passed, its end
@@ -1294,18 +1302,22 @@ stopped daily use, not adding features.
     and backups. **Never sent to AI**, and writing, editing, finishing or deleting one
     is never recorded as AI activity; a task made from a note is an ordinary typed
     task like any other.
-  - **The count:** while there are open notes (not done, not deleted), a quiet line
-    right above the bottom bar's divider, below every other line there (the
-    collection rows and the import-update line), on the list screen: "3 notes ›" ("1
-    note ›"); transient lines (Undo, a refused action) show above it. Clicking it opens
-    the **Notes** page; so does ✎'s right-click › **Show Notes**.
+  - **In the menu** (*changed* 2026-11-23, *user*: a line of its own was unlike the
+    rest): while there are open notes (not done, not deleted), a **Notes** row with
+    the YouTube and X rows, after them, in their style: a ✎ icon in the circle's place,
+    "Notes", "3 to sort" ("1 to sort") and ›. Resting the pointer on it opens the same
+    peek as theirs, listing the open notes' first lines, newest first; pressing one, or
+    clicking the row, opens the **Notes** page. VoiceOver: "Notes, 3 to sort".
   - **The Notes page** (a page like Add and the details; ‹ and Esc go back to the
     list): open notes newest first, each with its text and, in secondary text, its time
     and task: "10:42 · during Write the intro" (no task: just the time). Times use this
     Mac's clock format; a note from an earlier calendar day within the last 6 days
     shows its weekday ("Mon 10:42"), an older one its date ("Nov 12", with the year if
-    not this year). Each open note has **Make a task** (a small menu: **Today**,
-    **Later**), **Done** and **Delete**, as buttons and in its right-click. Below them,
+    not this year). *Changed* 2026-11-23 (*user*): a note's row works like a task's.
+    Its **circle** marks it done; **→ Today** shows at the row's end while the pointer
+    is on it (it makes a task in Today); its right-click has **Add to Today**, **Add to
+    Later**, **Edit** and **Delete**; the Delete key under the pointer deletes it.
+    Below them,
     **Done (N)**, folded each time the page opens and absent when there are none: the
     done notes, most recently done first, each with **Not done** and **Delete**, and
     "→ Today" / "→ Later" after one that made a task (where it was made, kept with the
@@ -1335,10 +1347,10 @@ stopped daily use, not adding features.
     a restored backup from before it), it becomes ⌥⌘., or none if the list's shortcut
     is ⌥⌘.; that choice is saved at once, so changing the list's shortcut later never
     turns ⌥⌘. on for notes by itself.
-  - **VoiceOver:** ✎ "Write a note" (with the action "Show Notes"); the count line
-    "3 notes, show notes"; the box's field "Note"; the banner as announced; ‹ "Back";
-    each note reads its text, time and task, with actions Edit (its field: "Edit
-    note"), Make a task in Today, Make a task in Later, Done, Delete; a done one also
+  - **VoiceOver:** ✎ "Write a note"; the Notes row "Notes, 3 to sort"; the box's field
+    "Note"; the banner as announced; ‹ "Back"; each note reads its text, time and task,
+    with actions Edit (its field: "Edit note"), Add to Today, Add to Later, Done,
+    Delete; a done one also
     reads "made a task in Today" / "in Later", with Not done and Delete; "Done (N)" is
     a collapsible heading; the recorder "Shortcut to write a note".
 
