@@ -83,6 +83,15 @@ M = [
      "try? await Task.sleep(for: .seconds(3.6))", NOTES),
     ("Notes sweep never settles", A + "NoteBox.swift",
      "withAnimation(.easeOut(duration: 0.25)) { state.settled = true }", "_ = 0", NOTES),
+    ("Notes title bar safe area", A + "NoteBox.swift", "        host.safeAreaRegions = []\n", "", NOTES),
+    ("Notes title bar separator", A + "NoteBox.swift", "        panel.titlebarSeparatorStyle = .none\n", "", NOTES),
+    ("Notes banner not the box's size", A + "NoteBox.swift", "            banner.setFrame(frame, display: false)",
+     "            banner.setFrame(NSRect(x: frame.minX, y: frame.maxY - max(frame.height, 64), width: frame.width, height: max(frame.height, 64)), display: false)",
+     NOTES),
+    ("Notes three lines", A + "NoteBox.swift", "focusRequest: state.focusRequest, maxLines: 4,",
+     "focusRequest: state.focusRequest, maxLines: 3,", NOTES),
+    ("Notes draft opens short", A + "NoteBox.swift", "        place(panel, height: 50)\n        fitNow(panel)\n",
+     "        place(panel, height: 50)\n", NOTES),
     ("Notes banner without task", A + "NoteBox.swift",
      "text = String(localized: \"Saved. Back to: \\(context.title)\\(context.detail)\")",
      "text = String(localized: \"Saved.\"); _ = context", NOTES),
@@ -124,7 +133,16 @@ signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt
 
 only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else ""
 survived = 0
+# What fails before anything is broken (a check this Mac cannot pass today) is not a
+# kill: only a failure the mutation adds counts.
+baseline: dict[str, set[str]] = {}
 try:
+    if not build():
+        sys.exit("FAIL: the unmutated app did not build")
+    for check in sorted({m[4] for m in M if not only or only in m[0]}):
+        baseline[check] = set(run(check))
+        if baseline[check]:
+            print(f"baseline {check}: {sorted(baseline[check])}", flush=True)
     for name, path, old, new, check in M:
         if only and only not in name:
             continue
@@ -140,7 +158,7 @@ try:
                 print(f"{name:40} BUILD FAILED", flush=True)
                 survived += 1
                 continue
-            fails = run(check)
+            fails = [f for f in run(check) if f not in baseline.get(check, set())]
             print(f"{name:40} {'KILLED' if fails else 'SURVIVED'}  {fails[:1]}", flush=True)
             survived += 0 if fails else 1
         finally:

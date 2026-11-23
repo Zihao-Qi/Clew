@@ -173,8 +173,27 @@ extension Snapshot {
                 }
                 let content = panel.contentView?.fittingSize.height ?? 0
                 report("the box is as tall as its content, with no gap", abs(panel.frame.height - content) < 1)
-                report("it grows to four lines, then scrolls", heights[3] > heights[0] + 30 && heights[4] == heights[3])
+                report("its title bar is fully hidden: no line, no buttons, content from the top", box.titleBarHidden)
+                report("it grows line by line to four lines, then scrolls",
+                       heights[1] > heights[0] && heights[2] > heights[1] && heights[3] > heights[2] && heights[4] == heights[3])
+                key("\u{1b}", code: 53)                         // kept as a draft
+                try await Task.sleep(for: .milliseconds(200))
+                box.open()
+                let atOpen = panel.frame.height                 // the first frame, before any delayed fit
+                try await Task.sleep(for: .milliseconds(300))
+                report("a four-line draft reopens at its full height at once",
+                       abs(atOpen - heights[3]) < 1 && abs(panel.frame.height - heights[3]) < 1)
+                box.state.text = ""
+                box.close()
+
+                // No task: one line, no During; saved at once, the banner is the box's frame.
+                try clew.stopFocus()
+                model.refresh()
+                box.open()
+                try await Task.sleep(for: .milliseconds(300))
+                type("short")
                 let boxFrame = panel.frame
+                report("one line with no task: a slim box", boxFrame.height < 56 && model.noteContext() == nil)
                 key("\r", code: 36)
                 try await Task.sleep(for: .milliseconds(300))
                 report("the banner takes exactly the box's frame", box.bannerFrame == boxFrame)

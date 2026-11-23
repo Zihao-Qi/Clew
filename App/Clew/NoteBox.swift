@@ -23,6 +23,16 @@ final class NoteBox: NSObject, NSWindowDelegate {
     var isBannerShown: Bool { banner?.isVisible == true }
     var bannerFrame: NSRect? { banner?.frame }
     #if DEBUG
+    /// For the debug check: the box's title bar is fully hidden.
+    var titleBarHidden: Bool {
+        guard let panel else { return false }
+        return panel.titlebarSeparatorStyle == .none
+            && [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton]
+                .allSatisfy { panel.standardWindowButton($0)?.isHidden ?? true }
+            && (panel.contentView as? NSHostingView<NoteBoxView>)?.safeAreaRegions.isEmpty == true
+    }
+    #endif
+    #if DEBUG
     /// The debug check types into the box directly (the app is not in front there).
     var panelForChecks: NSPanel? { panel }
     #endif
@@ -40,10 +50,10 @@ final class NoteBox: NSObject, NSWindowDelegate {
         state.focusRequest += 1
         let panel = self.panel ?? makePanel()
         self.panel = panel
-        // One line to start; then exactly as tall as what it holds (user, 2026-11-23).
+        // Exactly as tall as what it holds, from the first frame (user, 2026-11-23).
         place(panel, height: 50)
+        fitNow(panel)
         panel.makeKeyAndOrderFront(nil)
-        fitToContent()
     }
 
     /// Return: saves, then the banner. Nothing but spaces and line breaks does nothing.
@@ -53,6 +63,7 @@ final class NoteBox: NSObject, NSWindowDelegate {
         Self.defaults.removeObject(forKey: Self.draftKey)
         // The banner takes the box's place and size: it is the same box, saved.
         state.savedText = state.text
+        if let panel { fitNow(panel) }   // the size it has now, not one a moment old (review)
         let frame = panel?.frame
         state.text = ""
         closePanel()
@@ -184,17 +195,21 @@ final class NoteBox: NSObject, NSWindowDelegate {
 
     /// The box is exactly as tall as its content, keeping its top where it is: no gap
     /// between the panel and what it draws (user, 2026-11-23: a line showed above it).
+    /// The editor measured new text: the open box fits it (never a closed one, review).
     func fitToContent() {
-        DispatchQueue.main.async { [weak self] in
-            guard let self, let host = self.panel?.contentView else { return }
-            host.layoutSubtreeIfNeeded()
-            let height = host.fittingSize.height
-            if height > 0 { self.resize(to: height) }
-        }
+        guard let panel, panel.isVisible else { return }
+        fitNow(panel)
     }
 
-    func resize(to height: CGFloat) {
-        guard let panel, abs(panel.frame.height - height) > 0.5 else { return }
+    private func fitNow(_ panel: NSPanel) {
+        guard let host = panel.contentView else { return }
+        host.layoutSubtreeIfNeeded()
+        let height = host.fittingSize.height
+        if height > 0 { resize(panel, to: height) }
+    }
+
+    private func resize(_ panel: NSPanel, to height: CGFloat) {
+        guard abs(panel.frame.height - height) > 0.5 else { return }
         var frame = panel.frame
         let top = frame.maxY
         frame.size.height = height
