@@ -14,7 +14,9 @@ final class OpenShortcutHotkey {
         MenuBarExtraToggle.log.notice("open shortcut pressed")
         MenuBarExtraToggle.toggle()
     }
-    static let note = OpenShortcutHotkey(id: 2) { NoteBox.shared.open() }
+    static let note = OpenShortcutHotkey(id: 2) { noteAction?() }
+    /// Set by the app (the note box); this file also builds alone for its checks.
+    static var noteAction: (@MainActor () -> Void)?
     static var all: [OpenShortcutHotkey] { [shared, note] }
 
     @ObservationIgnored private let hotKeyID: EventHotKeyID

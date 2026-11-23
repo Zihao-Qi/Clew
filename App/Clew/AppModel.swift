@@ -119,6 +119,7 @@ final class AppModel {
             calendarSource = EventKitCalendar()
             OpenShortcutHotkey.shared.start()
             try? clew?.settleWriteNoteShortcut()
+            OpenShortcutHotkey.noteAction = { NoteBox.shared.open() }
             OpenShortcutHotkey.note.start()
             NoteBox.shared.model = self
             updates.start()
