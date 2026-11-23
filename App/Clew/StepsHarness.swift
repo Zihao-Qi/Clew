@@ -293,18 +293,38 @@ extension Snapshot {
                     let block = model.timeline?.blocks.first { $0.block.stepId == open.id }
                     report("a step dragged onto the hours becomes its block, named \"Task - Step\"",
                            block?.title == "Prepare the talk - \(open.step.title)" && block?.block.itemId == talk)
-                    report("… and leaves the list while its task stays",
-                           frame("step:\(open.id)") == nil && model.listRows.contains { $0.id == talk })
+                    report("… and stays listed with its time while its task stays (SPEC 2026-11-22)",
+                           frame("step:\(open.id)") != nil
+                           // The time shows until the block ends (a drop on a past hour ends it at once).
+                           && (frame("stepTime:\(open.id)") != nil) == ((block?.block.end ?? .distantPast) > Date())
+                           && model.listRows.contains { $0.id == talk })
                     if let block, let blockFrame = frame("block:\(block.id)") {
                         let back = frame("circle:\(milk)") ?? milkCircle
                         try await drag(from: NSPoint(x: blockFrame.midX, y: blockFrame.midY),
                                        to: NSPoint(x: 200, y: back.midY))
-                        report("dragged back onto the list, it returns to its task",
+                        report("dragged back onto the list, its block goes",
                                model.timeline?.blocks.contains { $0.block.stepId == open.id } == false
-                               && frame("step:\(open.id)") != nil)
+                               && frame("step:\(open.id)") != nil && frame("stepTime:\(open.id)") == nil)
                     } else {
                         report("the step's block is shown", false)
                     }
+                    // A block later today: the step shows its start beside it.
+                    model.placeStepAtNextQuarter(open.id)
+                    try await Task.sleep(for: .milliseconds(400))
+                    report("a step placed later today shows its time", frame("stepTime:\(open.id)") != nil
+                           && frame("step:\(open.id)") != nil)
+                    // Every open step on the timeline: the task's row leaves; one back, it returns.
+                    for entry in model.steps(of: talk)?.open ?? [] { model.placeStepAtNextQuarter(entry.id) }
+                    try await Task.sleep(for: .milliseconds(400))
+                    report("with every open step placed, the task leaves the list",
+                           !model.listRows.contains { $0.id == talk } && frame("circle:\(talk)") == nil)
+                    if let one = model.timeline?.blocks.first(where: { $0.block.itemId == talk && $0.block.stepId != nil }) {
+                        _ = model.removeBlock(one.id)
+                    }
+                    try await Task.sleep(for: .milliseconds(400))
+                    report("one step back, the task and its steps return",
+                           model.listRows.contains { $0.id == talk } && frame("circle:\(talk)") != nil)
+                    for b in model.timeline?.blocks ?? [] where b.block.itemId == talk { _ = model.removeBlock(b.id) }
                 } else {
                     report("an open step is shown", false)
                 }
@@ -398,7 +418,7 @@ extension Snapshot {
             }
             // On the timeline (SPEC 2026-11-21): a step's block "Task - Step" at the next
             // quarter hour, the task's own block with its count an hour later; the step
-            // leaves the unfolded list, the task stays.
+            // stays in the unfolded list with its time (SPEC 2026-11-22).
             try clew.setTimelineShown(true)
             let day = try clew.timeline()
             let quarter = day.start.addingTimeInterval((Date().timeIntervalSince(day.start) / 900).rounded(.down) * 900 + 900)

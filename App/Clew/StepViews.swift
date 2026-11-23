@@ -47,8 +47,8 @@ struct StepsList: View {
 
     /// The steps as drawn: the held order while a ticked step is under the pointer.
     private var shown: [TaskSteps.Entry] {
-        let placed = model.timelineShown ? model.timeline?.placedSteps ?? [] : []
-        let entries = steps.entries.filter { !placed.contains($0.id) }
+        // Placed steps stay listed, with their time (SPEC 2026-11-22).
+        let entries = steps.entries
         guard let held else { return entries }
         let rank = Dictionary(uniqueKeysWithValues: held.order.enumerated().map { ($1, $0) })
         return entries.enumerated().sorted { a, b in
@@ -188,6 +188,18 @@ struct StepsList: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityLabel(Text("\(entry.step.title), step of \(row.item.title)"))
                     .accessibilityAddTraits(entry.isDone ? .isSelected : [])
+                if model.timelineShown, let start = model.timeline?.nextStart(ofStep: entry.id, now: Date()) {
+                    // Its block's start, until the block ends (SPEC 2026-11-22).
+                    Text(start, format: .dateTime.hour().minute())
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .fixedSize()
+                        // Lined up with the task's count above it.
+                        .padding(.trailing, RowView.undoWidth + 4)
+                        .debugFrame("stepTime:\(entry.id)")
+                        .accessibilityLabel(Text("on the timeline at \(start.formatted(date: .omitted, time: .shortened))"))
+                }
             }
         }
         .padding(.leading, StepMetrics.leading)

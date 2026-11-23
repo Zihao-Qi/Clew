@@ -1064,8 +1064,14 @@ stopped daily use, not adding features.
   - **On the timeline:** drag a step from the unfolded list onto an hour (VoiceOver: a
     "Put on timeline" action on the step, at the next quarter hour for 30 minutes). A step
     of a Goals & Later task moves its task to Today first, as a row does. Its block reads
-    "Prepare the talk - Speech notes" and follows a task block's rules for the step: it
-    leaves the list while on the timeline; its end ticks the step (the last open step
+    "Prepare the talk - Speech notes" and follows a task block's rules for the step.
+    *Changed* 2026-11-22 (*user*): **a placed step stays in the list**, under its task,
+    with its block's start beside it ("10:30") until the block ends; ticking it there or
+    on the timeline is the same tick. **Once every open step of a task is on the
+    timeline**, the task's row leaves the list with all its steps, as a placed task does;
+    dragging any of those steps back onto the list brings the row and its steps back (done
+    steps stay done). A task with no open step (done) stays in the list as any done task.
+    Its end ticks the step (the last open step
     finishes the task); Not finished, moving its end and Remove block untick the step
     (and its task, as above); it skips when the step or its task is already done. Dropped
     anywhere on the list it returns to its task. Its right-click: Done / Undo (the step),

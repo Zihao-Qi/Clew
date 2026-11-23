@@ -48,8 +48,22 @@ public struct TimelineDay: Hashable, Sendable {
     public var placedItems: Set<UUID> {
         Set(blocks.filter { $0.block.releasedAt == nil && $0.block.stepId == nil }.map(\.block.itemId))
     }
-    /// Steps with a block today: they live on the timeline, not under their task.
+    /// Steps with a block today. They stay listed under their task (*changed* 2026-11-22).
     public var placedSteps: Set<UUID> { Set(blocks.compactMap(\.block.stepId)) }
+
+    /// Tasks whose every open step is on the timeline: their row leaves the list with its
+    /// steps, as a placed task's does (SPEC 2026-11-22). A task with no open step stays.
+    public func tasksWithAllStepsPlaced(_ steps: [UUID: TaskSteps]) -> Set<UUID> {
+        let placed = placedSteps
+        return Set(steps.compactMap { id, s in
+            !s.open.isEmpty && s.open.allSatisfy { placed.contains($0.id) } ? id : nil
+        })
+    }
+
+    /// The start of a step's block that has not ended, shown beside the step ("10:30").
+    public func nextStart(ofStep stepId: UUID, now: Date) -> Date? {
+        blocks.filter { $0.block.stepId == stepId && $0.block.end > now }.map(\.block.start).min()
+    }
 
     /// The start of the task's next block that has not ended, for its row ("10:00").
     public func nextStart(of itemId: UUID, now: Date) -> Date? {
