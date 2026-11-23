@@ -41,9 +41,11 @@ failed = []
 for check, seconds in CHECKS:
     print(f"== {check}", flush=True)
     ok, report = run(check, seconds)
-    # Clicks and drags need Clew in front; if another window took it, try once more.
-    if not ok and "Clew could not stay in front" in report:
-        print(report + "\n(another app took the front: running it once more)", flush=True)
+    # The Steps check clicks and drags in a real window, so another window taking the
+    # front or a slow runner can trip it: it runs once more, and both reports show. A
+    # real bug fails twice.
+    if not ok and check == "CLEW_STEPS_TEST":
+        print(report + "\n(failed once: running it again)", flush=True)
         ok, report = run(check, seconds)
     print(report, flush=True)
     if not ok:

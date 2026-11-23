@@ -33,6 +33,8 @@ extension Snapshot {
                 let steps = try ["slides", "notes", "practice"].map { try clew.addStep(taskId: talk, title: $0).id }
                 let milk = try clew.addItem(NewItem(title: "Buy milk", shape: .today)).id
                 AppModel.foldDefaults = UserDefaults(suiteName: "clew-steps-test")!
+                TodayListView.screenHeightForChecks = ProcessInfo.processInfo.environment["CLEW_SCREEN_HEIGHT"]
+                    .flatMap(Double.init).map { CGFloat($0) } ?? 1000
                 let model = AppModel(clew: clew, notify: false)
                 // AI signed in, as on a Mac that uses Suggest steps: its row action must not
                 // change any click (2026-11-22).

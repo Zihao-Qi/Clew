@@ -76,8 +76,17 @@ struct TodayListView: View {
 
     /// The rows may take what the screen has left after last week's card, the timeline
     /// and the footer.
+    #if DEBUG
+    /// The debug checks fix the screen's height, so a small CI display never makes the
+    /// list scroll rows out of view (2026-11-23).
+    static var screenHeightForChecks: CGFloat?
+    #endif
+
     private var rowsLimit: CGFloat {
-        let screen = NSScreen.main?.visibleFrame.height ?? 800
+        var screen = NSScreen.main?.visibleFrame.height ?? 800
+        #if DEBUG
+        if let fixed = Self.screenHeightForChecks { screen = fixed }
+        #endif
         let card = model.showsWeekCard ? weekCardHeight : 0
         return max(160, screen - card - (showsTimeline ? TimelineMetrics.height : 0) - 170)
     }
