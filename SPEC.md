@@ -1279,11 +1279,13 @@ stopped daily use, not adding features.
     the box stays 3 seconds as a banner that takes no keyboard, larger text, tinted
     with the accent colour: "Saved. Back to: **Write the intro**", then fades; a click
     on it closes it at once. VoiceOver announces the same text. **The task** is chosen
-    when the box opens: the focus timer's task if a focus (not a break) is running
-    ("… · 12 min left", minutes rounded up; "… · paused" while paused); else, with the
-    timeline on, the block running now (its start passed, its end not; a step's block
+    when the box opens: the focus timer's task if a focus (not a break) is running and
+    its time is not up ("… · 12 min left", minutes rounded up; "… · paused" while
+    paused); else, with the timeline on, a block running now (its start passed, its end
+    not) whose task or step is not done (a reached goal counts as done); a step's block
     names "Prepare the talk - Speech notes"; of several, the one that started last,
-    then the first in the list's order); else none, and the banner reads "Saved."
+    then a task's own block before a step's, then the list's order and the steps'
+    order; else none, and the banner reads "Saved."
   - **What a note keeps:** its text; when it was written; and the task it was written
     during (the same choice as above): which task and its title then. That title never
     changes afterwards, even if the task is renamed or deleted. Notes are the person's
@@ -1305,12 +1307,15 @@ stopped daily use, not adding features.
     **Later**), **Done** and **Delete**, as buttons and in its right-click. Below them,
     **Done (N)**, folded each time the page opens and absent when there are none: the
     done notes, most recently done first, each with **Not done** and **Delete**, and
-    "→ Today" / "→ Later" after one that made a task. Empty: "No notes. Press ⌥⌘. any
-    time to write one down." (the current shortcut; with none set: "Use ✎ Note any time
-    to write one down.").
-  - **Editing:** clicking an open note's text edits it in place: Return saves,
-    ⇧Return starts a new line, a click elsewhere saves, Esc keeps it as it was and
-    stays on the page; an empty text is not saved. The Delete key edits text there;
+    "→ Today" / "→ Later" after one that made a task (where it was made, kept with the
+    note: moving or deleting the task later does not change it; Not done clears it).
+    With no open notes the page says "No open notes. Press ⌥⌘. any time to write one
+    down." (the current shortcut; with none set: "No open notes. Use ✎ Note any time to
+    write one down."), above Done (N) if there is any.
+  - **Editing:** clicking an open note's text edits it in place, with the same 1,000
+    character limit: Return saves, ⇧Return starts a new line, a click elsewhere saves,
+    Esc keeps it as it was and stays on the page; a text of nothing but spaces and
+    line breaks is not saved (the note keeps its text and editing ends). The Delete key edits text there;
     the list's hover-Delete never acts on the Notes page. Done notes are not edited.
   - **Make a task** adds, in one step, a one-off task to Today or Later whose title is
     the note's first line that is not empty, trimmed, cut to the title limit as typing
@@ -1319,18 +1324,22 @@ stopped daily use, not adding features.
     **Not done** opens it again and forgets the task (the task stays). Deleting the
     task later changes nothing about the note.
   - **Done** keeps the note under Done. **Delete** is a tombstone, with "Deleted note
-    · Undo" for a few seconds, as for tasks; Undo brings it back as it was, open or done.
+    · Undo" for a few seconds at the bottom of the Notes page, as for tasks (it goes
+    with the page); Undo brings it back as it was, open or done.
   - **Shortcut in Settings › General:** a second recorder, "Write a note", under "Open
     the list", working the same way (record, clear). Each refuses the other's
     combination with "Already used to open the list." / "Already used to write a
     note."; a combination macOS or another app holds shows the same message as for the
-    list's. On first launch with this feature, if the list's shortcut is already ⌥⌘.,
-    the note's starts with none set.
+    list's. When the note's shortcut was never set (first launch with this feature, or
+    a restored backup from before it), it becomes ⌥⌘., or none if the list's shortcut
+    is ⌥⌘.; that choice is saved at once, so changing the list's shortcut later never
+    turns ⌥⌘. on for notes by itself.
   - **VoiceOver:** ✎ "Write a note" (with the action "Show Notes"); the count line
     "3 notes, show notes"; the box's field "Note"; the banner as announced; ‹ "Back";
-    each note reads its text, time and task, with actions Make a task in Today, Make a
-    task in Later, Done, Delete (done ones: Not done, Delete); "Done (N)" is a
-    collapsible heading; the recorder "Shortcut to write a note".
+    each note reads its text, time and task, with actions Edit (its field: "Edit
+    note"), Make a task in Today, Make a task in Later, Done, Delete; a done one also
+    reads "made a task in Today" / "in Later", with Not done and Delete; "Done (N)" is
+    a collapsible heading; the recorder "Shortcut to write a note".
 
 ## Open question
 
