@@ -71,7 +71,11 @@ struct NotesView: View {
         .padding(12)
         .background {
             // The Delete key deletes the note under the pointer, as in the list.
-            Button("Delete") { if let hovered { model.deleteNote(hovered) } }
+            Button("Delete") {
+                // Only a note still shown under the pointer (review).
+                if let hovered, visibleIds.contains(hovered) { model.deleteNote(hovered) }
+                hovered = nil
+            }
                 .keyboardShortcut(.delete, modifiers: [])
                 .opacity(0)
                 .frame(width: 0, height: 0)
@@ -79,7 +83,18 @@ struct NotesView: View {
                 .accessibilityHidden(true)
         }
         .debugFrame("notesPage")
+        // A note that left (done, deleted, made a task, folded away) is no longer under
+        // the pointer or being edited (review).
+        .onChange(of: visibleIds) { _, ids in
+            if let h = hovered, !ids.contains(h) { hovered = nil }
+            if let e = editing, !model.openNotes.contains(where: { $0.id == e }) { editing = nil }
+        }
         .onDisappear { model.lastDeletedNote = nil }
+    }
+
+    /// The notes shown on the page now: open ones, and done ones while Done is unfolded.
+    private var visibleIds: Set<UUID> {
+        Set(model.openNotes.map(\.id) + (showsDone ? model.doneNotes.map(\.id) : []))
     }
 
     private var emptyText: String {

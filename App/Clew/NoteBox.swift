@@ -87,6 +87,9 @@ final class NoteBox: NSObject, NSWindowDelegate {
             text = String(localized: "Saved.")
         }
         state.banner = text
+        // From the start: never a frame of the last banner's "Saved" (review).
+        state.sweep = 0
+        state.settled = false
         state.bannerShown += 1
         let banner = self.banner ?? makeBanner()
         self.banner = banner
@@ -96,7 +99,11 @@ final class NoteBox: NSObject, NSWindowDelegate {
         } else {
             place(banner, height: 64)
         }
-        banner.alphaValue = 1
+        // A fade still running from the last banner stops here (review).
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0
+            banner.animator().alphaValue = 1
+        }
         banner.orderFrontRegardless()
         NSAccessibility.post(element: banner, notification: .announcementRequested,
                              userInfo: [.announcement: text, .priority: NSAccessibilityPriorityLevel.high.rawValue])
@@ -214,6 +221,9 @@ final class NoteBoxState {
     var banner: String?
     /// What was just saved: the sweep passes over it before "Saved" shows.
     var savedText = ""
+    /// The banner's sweep (0 to 1) and whether it has settled into the bar.
+    var sweep: CGFloat = 0
+    var settled = false
     /// Bumped each time the banner shows, so its animation runs again.
     var bannerShown = 0
     /// Bumped each time the box opens, so the field takes the keyboard again.
@@ -255,9 +265,8 @@ struct NoteBannerView: View {
     let dismiss: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// 0 to 1: how far the band has swept; then it settles into the bar.
-    @State private var sweep: CGFloat = 0
-    @State private var settled = false
+    private var sweep: CGFloat { state.sweep }
+    private var settled: Bool { state.settled }
     #if DEBUG
     /// The debug render shows the settled banner (an image cannot wait for the sweep).
     static var startSettled = false
@@ -315,19 +324,19 @@ struct NoteBannerView: View {
     }
 
     private func play() async {
-        sweep = 0
-        settled = false
         var still = reduceMotion
         #if DEBUG
         still = still || Self.startSettled
         #endif
         guard !still else {
-            settled = true
+            state.settled = true
             return
         }
-        withAnimation(.easeInOut(duration: 0.45)) { sweep = 1 }
+        withAnimation(.easeInOut(duration: 0.45)) { state.sweep = 1 }
         try? await Task.sleep(for: .milliseconds(470))
-        withAnimation(.easeOut(duration: 0.25)) { settled = true }
+        // A newer save restarted it: that one settles in its own time (review).
+        guard !Task.isCancelled else { return }
+        withAnimation(.easeOut(duration: 0.25)) { state.settled = true }
     }
 }
 

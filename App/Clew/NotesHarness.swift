@@ -126,8 +126,9 @@ extension Snapshot {
                        && saved?.duringTitle == "Write the intro" && !box.isOpen)
                 report("then the banner: Saved. Back to: the task, with its minutes left",
                        box.isBannerShown && box.bannerText?.hasPrefix("Saved. Back to: Write the intro · ") == true)
-                report("the banner stays after the sweep", box.isBannerShown)
-                try await Task.sleep(for: .milliseconds(4300))
+                try await Task.sleep(for: .milliseconds(1000))
+                report("the banner stays after the sweep, settled", box.isBannerShown && box.state.settled)
+                try await Task.sleep(for: .milliseconds(3300))
                 report("the banner goes by itself after about 3.6 seconds (sweep and 3 s)", !box.isBannerShown)
 
                 box.open()
