@@ -5,31 +5,51 @@ import Foundation
 import Observation
 import os
 
-/// Registers the global shortcut that opens today's list. Carbon hotkeys work in the
-/// sandbox and need no Accessibility permission (SPEC Tech; decided 2026-11-11).
+/// Registers a global shortcut: the one that opens today's list, and the one that writes
+/// a note (SPEC "Notes"). Carbon hotkeys work in the sandbox and need no Accessibility
+/// permission (SPEC Tech; decided 2026-11-11). One Carbon handler serves both, by id.
 @Observable @MainActor
 final class OpenShortcutHotkey {
-    static let shared = OpenShortcutHotkey()
+    static let shared = OpenShortcutHotkey(id: 1) {
+        MenuBarExtraToggle.log.notice("open shortcut pressed")
+        MenuBarExtraToggle.toggle()
+    }
+    static let note = OpenShortcutHotkey(id: 2) { noteAction?() }
+    /// Set by the app (the note box); this file also builds alone for its checks.
+    static var noteAction: (@MainActor () -> Void)?
+    static var all: [OpenShortcutHotkey] { [shared, note] }
 
+    @ObservationIgnored private let hotKeyID: EventHotKeyID
+    @ObservationIgnored private let action: @MainActor () -> Void
     @ObservationIgnored private var started = false
     @ObservationIgnored private var suspended = false
     @ObservationIgnored private var current: OpenShortcut?
     @ObservationIgnored private var hotKeyRef: EventHotKeyRef?
-    @ObservationIgnored private var handlerRef: EventHandlerRef?
+    @ObservationIgnored private static var handlerRef: EventHandlerRef?
     /// Set when Carbon refuses the shortcut (often because another app owns it).
     private(set) var registrationError: String?
     private static let signature: OSType = 0x434C4557 // 'CLEW'
-    private static let hotKeyID = EventHotKeyID(signature: signature, id: 1)
 
     /// Stored as a static C function pointer so InstallEventHandler keeps a valid
     /// thunk for the process lifetime (an inline closure is not guaranteed to last).
-    private static let eventHandler: EventHandlerUPP = { _, _, _ in
-        MenuBarExtraToggle.log.notice("open shortcut pressed")
-        DispatchQueue.main.async { MenuBarExtraToggle.toggle() }
+    private static let eventHandler: EventHandlerUPP = { _, event, _ in
+        var pressed = EventHotKeyID()
+        let status = GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
+                                       nil, MemoryLayout<EventHotKeyID>.size, nil, &pressed)
+        guard status == noErr, pressed.signature == signature else { return OSStatus(eventNotHandledErr) }
+        let id = pressed.id
+        DispatchQueue.main.async { MainActor.assumeIsolated { fire(id) } }
         return noErr
     }
 
-    private init() {}
+    private static func fire(_ id: UInt32) {
+        all.first { $0.hotKeyID.id == id }?.action()
+    }
+
+    private init(id: UInt32, action: @escaping @MainActor () -> Void) {
+        hotKeyID = EventHotKeyID(signature: Self.signature, id: id)
+        self.action = action
+    }
 
     func start() {
         started = true
@@ -63,7 +83,7 @@ final class OpenShortcutHotkey {
     }
 
     private func installHandlerIfNeeded() {
-        guard handlerRef == nil else { return }
+        guard Self.handlerRef == nil else { return }
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
         let status = InstallEventHandler(
             GetApplicationEventTarget(),
@@ -71,10 +91,10 @@ final class OpenShortcutHotkey {
             1,
             &spec,
             nil,
-            &handlerRef
+            &Self.handlerRef
         )
         if status != noErr {
-            handlerRef = nil
+            Self.handlerRef = nil
             registrationError = Self.couldNotRegister
         }
     }
@@ -86,10 +106,10 @@ final class OpenShortcutHotkey {
             return
         }
         installHandlerIfNeeded()
-        guard handlerRef != nil else { return }
+        guard Self.handlerRef != nil else { return }
         var ref: EventHotKeyRef?
         let modifiers = carbonModifiers(shortcut)
-        let ident = Self.hotKeyID
+        let ident = hotKeyID
         let status = RegisterEventHotKey(shortcut.keyCode, modifiers, ident, GetApplicationEventTarget(), 0, &ref)
         if status == noErr {
             hotKeyRef = ref

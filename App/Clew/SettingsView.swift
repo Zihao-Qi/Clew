@@ -25,6 +25,9 @@ struct SettingsView: View {
     @State private var blockAlerts = true
     @State private var recordsTime = true
     @State private var weekCardOn = true
+    /// "Already used to …" under a shortcut that was refused (SPEC "Notes").
+    @State private var listShortcutRefusal: String?
+    @State private var noteShortcutRefusal: String?
     @State private var lastWeek: WeekRecap?
     /// Done so far (SPEC 2026-11-18): read with the pane's other numbers.
     @State private var doneSoFar: DoneSoFar?
@@ -120,15 +123,37 @@ struct SettingsView: View {
                 Section {
                     OpenShortcutRecorder(shortcut: Binding(
                         get: { model.openListShortcut },
-                        set: { model.setOpenListShortcut($0) }
+                        set: { listShortcutRefusal = model.setOpenListShortcut($0) }
                     ))
                 } header: {
                     Text("Open the list")
                 } footer: {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Opens or closes today's list from the keyboard, even when the menu is closed. The default is ⌘.")
-                        if let openListShortcutError = OpenShortcutHotkey.shared.registrationError {
+                        if let listShortcutRefusal {
+                            Text(listShortcutRefusal)
+                        } else if let openListShortcutError = OpenShortcutHotkey.shared.registrationError {
                             Text(openListShortcutError)
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Section {
+                    OpenShortcutRecorder(shortcut: Binding(
+                        get: { model.writeNoteShortcut },
+                        set: { noteShortcutRefusal = model.setWriteNoteShortcut($0) }
+                    ), name: Text("Shortcut to write a note"))
+                } header: {
+                    Text("Write a note")
+                } footer: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Opens a small box to write a thought down from any app, then points you back to your task. The default is ⌥⌘.")
+                        if let noteShortcutRefusal {
+                            Text(noteShortcutRefusal)
+                        } else if let error = OpenShortcutHotkey.note.registrationError {
+                            Text(error)
                         }
                     }
                     .font(.caption)

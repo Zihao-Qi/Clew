@@ -22,7 +22,35 @@ enum Schema {
         migrator.registerMigration("v13-priority", migrate: v13)
         migrator.registerMigration("v14-steps", migrate: v14)
         migrator.registerMigration("v15-step-blocks", migrate: v15)
+        migrator.registerMigration("v16-quick-notes", migrate: v16)
         return migrator
+    }
+
+    /// Notes (SPEC 2026-11-22): the person's own, definitions with tombstones; when and
+    /// during what a note was written never change.
+    private static func v16(_ db: Database) throws {
+        try db.execute(sql: """
+            CREATE TABLE quickNote (
+                id            TEXT PRIMARY KEY NOT NULL,
+                text          TEXT NOT NULL,
+                createdAt     DATETIME NOT NULL,
+                duringItemId  TEXT,
+                duringTitle   TEXT,
+                doneAt        DATETIME,
+                taskId        TEXT,
+                madeTo        TEXT CHECK (madeTo IN ('today', 'later')),
+                updatedAt     DATETIME NOT NULL,
+                deletedAt     DATETIME
+            );
+
+            CREATE TRIGGER quickNote_no_delete BEFORE DELETE ON quickNote
+            BEGIN SELECT RAISE(ABORT, 'notes are removed with a tombstone, never deleted'); END;
+
+            CREATE TRIGGER quickNote_fixed BEFORE UPDATE ON quickNote
+            WHEN NEW.id IS NOT OLD.id OR NEW.createdAt IS NOT OLD.createdAt
+              OR NEW.duringItemId IS NOT OLD.duringItemId OR NEW.duringTitle IS NOT OLD.duringTitle
+            BEGIN SELECT RAISE(ABORT, 'a note keeps when and during what it was written'); END;
+            """)
     }
 
     /// A step on the timeline (SPEC 2026-11-21): a block may be a step's, which it keeps;

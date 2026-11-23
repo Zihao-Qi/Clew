@@ -68,6 +68,14 @@ struct ClewApp: App {
         if ProcessInfo.processInfo.environment["CLEW_STEPS_RENDER"] != nil {
             Snapshot.renderStepsAndExit()
         }
+        if ProcessInfo.processInfo.environment["CLEW_NOTES_RENDER"] != nil {
+            Snapshot.renderNotesAndExit()
+        }
+        if ProcessInfo.processInfo.environment["CLEW_NOTES_TEST"] != nil {
+            _model = State(initialValue: AppModel(clew: nil, notify: false))
+            Snapshot.startNotesTest()
+            return
+        }
         if ProcessInfo.processInfo.environment["CLEW_STEPS_TEST"] != nil {
             _model = State(initialValue: AppModel(clew: nil, notify: false))
             Snapshot.startStepsTest()
@@ -152,6 +160,8 @@ enum Screen: Equatable {
     case place(UUID, block: UUID?)
     /// A calendar event's page: title, start, end (SPEC 2026-11-19).
     case event(CalendarEvent)
+    /// The person's notes (SPEC "Notes", 2026-11-22).
+    case notes
 
     enum Back: Equatable { case list, detail }
 }
@@ -186,6 +196,8 @@ struct RootView: View {
                     PlaceView(model: model, itemId: itemId, blockId: block) { screen = .list }
                 case .event(let event):
                     EventEditView(model: model, event: event) { screen = .list }
+                case .notes:
+                    NotesView(model: model) { screen = .list }
                 }
             }
         }

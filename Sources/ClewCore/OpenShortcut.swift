@@ -82,6 +82,8 @@ extension Clew {
             // Do not save a shortcut that would steal Quit or have no modifier.
             return
         }
+        // Never the note's (SPEC "Notes").
+        if let shortcut, shortcut == (try writeNoteShortcut()) { throw ClewError.shortcutTaken }
         let now = clockForQueries.now()
         let json: String
         if let shortcut {

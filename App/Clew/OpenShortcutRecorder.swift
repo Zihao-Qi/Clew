@@ -5,8 +5,12 @@ import SwiftUI
 /// Settings › General: shows the current shortcut, records a new one, or clears it.
 struct OpenShortcutRecorder: View {
     @Binding var shortcut: OpenShortcut?
+    /// What VoiceOver calls this recorder.
+    var name: Text = Text("Open the list shortcut")
 
     @State private var recording = false
+    @State private var token = UUID()
+    static let started = Notification.Name("ClewShortcutRecorderStarted")
 
     var body: some View {
         HStack {
@@ -45,28 +49,34 @@ struct OpenShortcutRecorder: View {
             }
         }
         .onDisappear { if recording { stopRecording() } }
+        .onReceive(NotificationCenter.default.publisher(for: Self.started)) { note in
+            if recording, (note.object as? UUID) != token { stopRecording() }
+        }
     }
 
     private var recorderAccessibilityLabel: Text {
         if recording {
             Text("Type a shortcut")
         } else if let shortcut {
-            Text("Open the list shortcut, \(shortcut.display)")
+            Text("\(name), \(shortcut.display)")
         } else {
-            Text("Open the list shortcut, \(Text("None"))")
+            Text("\(name), \(Text("None"))")
         }
     }
 
     private func startRecording() {
         guard !recording else { return }
+        // One recorder at a time: another one recording stops (review).
+        NotificationCenter.default.post(name: Self.started, object: token)
         recording = true
-        OpenShortcutHotkey.shared.suspend()
+        // Both shortcuts stand aside, so the keys reach the recorder (SPEC "Notes").
+        OpenShortcutHotkey.all.forEach { $0.suspend() }
     }
 
     private func stopRecording() {
         guard recording else { return }
         recording = false
-        OpenShortcutHotkey.shared.resume()
+        OpenShortcutHotkey.all.forEach { $0.resume() }
     }
 
     private func clear() {

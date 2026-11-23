@@ -703,12 +703,38 @@ struct TodayListView: View {
                     .accessibilityLabel(Text("YouTube import needs an update. Nothing was removed."))
             }
 
+            // Open notes (SPEC "Notes"): the last line above the bottom bar.
+            if !model.openNotes.isEmpty {
+                let count = model.openNotes.count
+                Button { screen = .notes } label: {
+                    (count == 1 ? Text("1 note") : Text("\(count) notes")) + Text(verbatim: " ›")
+                }
+                .buttonStyle(.borderless)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 6)
+                .accessibilityLabel(count == 1 ? Text("1 note, show notes") : Text("\(count) notes, show notes"))
+                .debugFrame("notesCount")
+            }
+
             Divider()
 
             HStack(spacing: 12) {
                 Button { screen = .add } label: { Label("Add", systemImage: "plus") }
                     .keyboardShortcut("n")
                     .accessibilityLabel(Text("Add an item"))
+                // Writes a note (SPEC "Notes"): the menu closes first, then the note box.
+                Button {
+                    MenuBarExtraToggle.closeMenu()
+                    DispatchQueue.main.async { NoteBox.shared.open() }
+                } label: { Label("Note", systemImage: "square.and.pencil") }
+                    .help(Text("Write a note"))
+                    .accessibilityLabel(Text("Write a note"))
+                    .accessibilityAction(named: Text("Show Notes")) { screen = .notes }
+                    .contextMenu { Button("Show Notes") { screen = .notes } }
+                    .debugFrame("noteButton")
                 Spacer()
                 // No "Later (N)" button or ⌘L: Later items are in Goals & Later (SPEC
                 // 2026-11-15).

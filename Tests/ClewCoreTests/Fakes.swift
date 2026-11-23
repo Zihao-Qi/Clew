@@ -33,6 +33,7 @@ final class FakeStore: ClewStore, @unchecked Sendable {
         var timeBlocks: [UUID: TimeBlock] = [:]
         var steps: [UUID: Step] = [:]
         var stepTicks: [UUID: StepTick] = [:]
+        var quickNotes: [UUID: QuickNote] = [:]
     }
 
     enum FactViolation: Error { case revoid, duplicate, missingItem, outOfRange }
@@ -151,7 +152,8 @@ final class FakeStore: ClewStore, @unchecked Sendable {
                 focusSessions: state.focusSessions.values.sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) },
                 timeBlocks: state.timeBlocks.values.sorted { ($0.placedAt, $0.id.uuidString) < ($1.placedAt, $1.id.uuidString) },
                 steps: state.steps.values.sorted { ($0.createdAt, $0.id.uuidString) < ($1.createdAt, $1.id.uuidString) },
-                stepTicks: state.stepTicks.values.sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) }
+                stepTicks: state.stepTicks.values.sorted { ($0.at, $0.id.uuidString) < ($1.at, $1.id.uuidString) },
+                quickNotes: state.quickNotes.values.sorted { ($0.createdAt, $0.id.uuidString) < ($1.createdAt, $1.id.uuidString) }
             )
         }
         func reminders() throws -> [Reminder] {
@@ -215,6 +217,19 @@ final class FakeStore: ClewStore, @unchecked Sendable {
             // As the foreign key on finishedCheckInId.
             if let c = tick.finishedCheckInId, state.checkIns[c] == nil { throw FactViolation.missingItem }
             state.stepTicks[tick.id] = tick
+        }
+        func quickNotes() throws -> [QuickNote] {
+            state.quickNotes.values.filter { $0.deletedAt == nil }
+                .sorted { ($0.createdAt, $0.id.uuidString) < ($1.createdAt, $1.id.uuidString) }
+        }
+        func quickNote(id: UUID) throws -> QuickNote? { state.quickNotes[id] }
+        func save(_ note: QuickNote) throws {
+            // As the trigger: a note keeps when and during what it was written.
+            if let old = state.quickNotes[note.id], old.createdAt != note.createdAt
+                || old.duringItemId != note.duringItemId || old.duringTitle != note.duringTitle {
+                throw FactViolation.outOfRange
+            }
+            state.quickNotes[note.id] = note
         }
         func voidStepTick(id: UUID, at: Date) throws {
             guard var t = state.stepTicks[id] else { return }
