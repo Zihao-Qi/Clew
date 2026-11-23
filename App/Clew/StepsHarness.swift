@@ -313,6 +313,25 @@ extension Snapshot {
                     try await Task.sleep(for: .milliseconds(400))
                     report("a step placed later today shows its time", frame("stepTime:\(open.id)") != nil
                            && frame("step:\(open.id)") != nil)
+                    // A 15-minute block (user, 2026-11-22): dragged from its middle it moves;
+                    // its bottom edge still resizes it.
+                    if let short = model.timeline?.blocks.first(where: { $0.block.stepId == open.id }) {
+                        model.resizeBlock(short.id, minutes: 15)
+                        try await Task.sleep(for: .milliseconds(400))
+                        if let f = frame("block:\(short.id)"), let before = model.timeline?.blocks.first(where: { $0.id == short.id }) {
+                            try await drag(from: NSPoint(x: f.midX, y: f.midY), to: NSPoint(x: f.midX, y: f.midY - 60))
+                            let moved = model.timeline?.blocks.first { $0.id == short.id }
+                            report("a 15-minute block dragged from its middle moves, keeping its length",
+                                   moved?.block.minutes == 15 && (moved?.block.start ?? before.block.start) > before.block.start)
+                            try await Task.sleep(for: .milliseconds(300))
+                            let g = frame("block:\(short.id)") ?? f
+                            try await drag(from: NSPoint(x: g.midX, y: g.minY + 1), to: NSPoint(x: g.midX, y: g.minY - 29))
+                            report("… and its bottom edge resizes it",
+                                   (model.timeline?.blocks.first { $0.id == short.id }?.block.minutes ?? 15) > 15)
+                        } else {
+                            report("a 15-minute block is shown", false)
+                        }
+                    }
                     // Every open step on the timeline: the task's row leaves; one back, it returns.
                     for entry in model.steps(of: talk)?.open ?? [] { model.placeStepAtNextQuarter(entry.id) }
                     try await Task.sleep(for: .milliseconds(400))

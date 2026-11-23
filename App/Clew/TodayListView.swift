@@ -345,17 +345,10 @@ struct TodayListView: View {
                 .accessibilityHidden(true)
         } else if let lifted, let row = model.row(lifted.itemId) {
             ZStack(alignment: .topLeading) {
-                VStack(alignment: .leading, spacing: 0) {
-                    RowView(row: row, model: model, onEdit: {}, onOpen: {}, isDragged: true,
-                            steps: model.steps(of: row.id), unfolded: model.isUnfolded(row.id))
-                    // A task's steps go with it (SPEC 2026-11-21).
-                    if let steps = model.steps(of: row.id), model.isUnfolded(row.id), lifted.blockId == nil {
-                        StepsList(model: model, row: row, steps: steps, adding: false, onAddClose: {}, onOpen: {},
-                                  hoveredStep: .constant(nil))
-                            .padding(.bottom, 2)
-                            .background(Color(nsColor: .windowBackgroundColor))
-                    }
-                }
+                // Only the task's own row: its steps go with it, but are not drawn on the
+                // card (user, 2026-11-22).
+                RowView(row: row, model: model, onEdit: {}, onOpen: {}, isDragged: true,
+                        steps: model.steps(of: row.id), unfolded: false)
                     .frame(width: lifted.frame.width, alignment: .leading)
                     .opacity(lifted.overTimeline ? 0 : 1)
                 LiftedBlockCard(title: lifted.title, start: lifted.start, minutes: lifted.minutes)

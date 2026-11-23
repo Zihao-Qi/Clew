@@ -135,6 +135,10 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
   second when it's finished. Levels come from lifetime totals.
 - Opt-in AI help beyond Suggest steps and Memory: an evening line, "fits today" from Goals & Later,
   a reader (see docs/AGENT.md, v2 2026-11-22).
+- **Quick note** (*user*, 2026-11-22, to discuss): a button in the menu to write down an
+  idea that comes up mid-task in a few keystrokes, so the fear of forgetting it does not
+  pull the person away; after saving, a gentle nudge back to the task in progress; notes
+  easy to look through later; and help turning a note into a future task.
 - Sync with Dayflow (its local JSON API: `GET /api/day`, `PATCH /api/tasks/:id`).
 - iPhone, iCloud sync, Obsidian export.
 
@@ -675,7 +679,9 @@ stopped daily use, not adding features.
     onto an hour (the timeline scrolls when the drag nears its top or bottom edge): the
     task **leaves the list and lives on the timeline** for the day, as a **30-minute
     block** snapped to 15 minutes. Drag a block to move it and its bottom edge to resize
-    it (15 minutes at least, ending at 4 a.m. at the latest). **Dragging a block back
+    it (15 minutes at least, ending at 4 a.m. at the latest). The bottom-edge grip takes at
+    most a quarter of a short block (reaching further below it instead), so a 15-minute
+    block or event is easy to move too (*user*, 2026-11-22). **Dragging a block back
     onto the list** removes it; a task with no blocks left is back in the list, in the
     gap it was dropped in (*changed* 2026-11-15: dropped in Goals & Later, an item
     moved to Today moves back, an unticked once task or link moves to Later, and
@@ -1025,7 +1031,8 @@ stopped daily use, not adding features.
     in your order (*changed* for steps only: ticking moves a step; rows still never move
     on a tick). A step ticked out of order moves up once the pointer leaves it, so no
     other step slides under the pointer (*user*, 2026-11-21). Each task remembers on this Mac whether it is unfolded (a setting of this
-    Mac, not part of the task). Dragging the task's row carries its steps.
+    Mac, not part of the task). Dragging the task's row carries its steps; the dragged
+    card shows only the task's own row (*user*, 2026-11-22).
   - **Clicks on any row** (*changed*: a click opened the details): a click unfolds or
     folds a task with steps and does nothing on other rows; **a double-click opens the
     details** and leaves the task folded or unfolded as it was (the first click's change
