@@ -224,6 +224,23 @@ extension Snapshot {
                     try await Task.sleep(for: .milliseconds(300))
                     report("Esc keeps the old title", shown().contains("Rest well") && !shown().contains("nope")
                            && frame("rename:\(rest.id)") == nil)
+                    // Backspace edits the title, never deletes the step; an empty title is not saved.
+                    model.renamingStep = rest.id
+                    DebugFrames.hoverStep?(rest.id)   // the pointer stays over the step, as after a right-click
+                    try await Task.sleep(for: .milliseconds(400))
+                    try await key("\u{7f}", code: 51)
+                    try await key("\r", code: 36)
+                    try await Task.sleep(for: .milliseconds(300))
+                    report("Backspace and an empty title keep the step and its title",
+                           shown().contains("Rest well") && model.allSteps(of: talk).contains { $0.id == rest.id })
+                    DebugFrames.hoverStep?(nil)
+                    // A click elsewhere saves (review).
+                    model.renamingStep = rest.id
+                    try await Task.sleep(for: .milliseconds(400))
+                    try await type("Rested")
+                    try await mouse(NSPoint(x: 200, y: 20))
+                    try await Task.sleep(for: .milliseconds(400))
+                    report("a click elsewhere saves", shown().contains("Rested") && model.renamingStep == nil)
                 } else {
                     report("a step to rename", false)
                 }

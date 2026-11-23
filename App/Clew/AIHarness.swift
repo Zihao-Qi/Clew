@@ -107,6 +107,11 @@ extension Snapshot {
                 report("models listed, the first by default", ai.model == "gpt-6.2-sol")
                 report("✨ for a one-off task", model.canSuggestSteps(talk))
                 report("no ✨ for a habit", !model.canSuggestSteps(habit))
+                if let row = model.row(talk) { model.tap(row) }
+                report("no ✨ on a done task, though a step may still be added",
+                       !model.canSuggestSteps(talk) && model.row(talk).map(model.canAddStep) == true)
+                if let row = model.row(talk) { model.tap(row) }
+                ai.memory.clearActivity()
                 let input = model.suggestInput(talk)
                 report("sends the title and steps", input?.title == "Prepare the talk" && input?.steps.map(\.name) == ["Slides"])
 

@@ -89,8 +89,16 @@ extension Clew {
         for t in try w.stepTicks(taskIds: [taskId]) {
             guard let made = t.finishedCheckInId, finishing.contains(made) else { continue }
             try w.voidStepTick(id: t.id, at: now)
-            try w.insert(StepTick(id: newID(), stepId: t.stepId, taskId: taskId, localDay: t.localDay, at: t.at,
-                                  source: t.source, finishedCheckInId: nil))
+            let plain = StepTick(id: newID(), stepId: t.stepId, taskId: taskId, localDay: t.localDay, at: t.at,
+                                 source: t.source, finishedCheckInId: nil)
+            try w.insert(plain)
+            // A step block whose end made that tick follows it, so it still reads ticked
+            // and Not finished, Move and Remove still untick the step (review).
+            for var b in try w.timeBlocks(from: t.localDay) where b.stepTickId == t.id {
+                b.stepTickId = plain.id
+                b.updatedAt = now
+                try w.save(b)
+            }
         }
         for c in ticks { try w.voidCheckIn(id: c.id, at: now, reason: "undo") }
     }

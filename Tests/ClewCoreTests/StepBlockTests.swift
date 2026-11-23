@@ -178,4 +178,24 @@ private func at(_ d: Int, _ h: Int, _ m: Int = 0) -> Date {
         }
         #expect(titles == ["Prepare the talk - notes"])
     }
+
+    /// SPEC 2026-11-22: a task its last step's block finished, reopened by a new step: the
+    /// step stays done, its block still reads ticked, and Not finished still unticks it.
+    @Test func reopeningKeepsTheFinishingStepsBlockTicked() throws {
+        let (id, steps) = try talk()
+        try clew.tickStep(id: steps[0])
+        try clew.tickStep(id: steps[1])
+        let b = try clew.placeStepOnTimeline(stepId: steps[2], start: at(10, 10))
+        try settle(at: at(10, 10, 30))
+        let finishing = try #require(store.state.stepTicks.values.first { $0.stepId == steps[2] && $0.voidedAt == nil })
+        clock.set(at(10, 11))                                     // later: the tick keeps its own time
+        try clew.addStep(taskId: id, title: "rehearse")
+        #expect(try !taskDone(id) && shown(id) == ["✓slides", "✓notes", "✓practice", "rehearse"])
+        let live = store.state.stepTicks.values.filter { $0.stepId == steps[2] && $0.voidedAt == nil }
+        #expect(live.count == 1 && live.first?.at == finishing.at && live.first?.finishedCheckInId == nil)
+        #expect(store.state.stepTicks[finishing.id]?.voidedAt != nil)
+        #expect(try shownBlock(b.id)?.state == .ticked)
+        try clew.blockNotFinished(id: b.id)
+        #expect(try shown(id) == ["✓slides", "✓notes", "practice", "rehearse"])
+    }
 }

@@ -261,9 +261,10 @@ struct StepRenameLine: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityLabel(Text("Rename \(step.title)"))
             .debugFrame("rename:\(step.id)")
+            .background(OutsideClickWatcher(onOutside: save))
             .onAppear {
                 text = step.title
-                focused = true
+                DispatchQueue.main.async { focused = true }
             }
             .onSubmit(save)
             .onExitCommand {
@@ -336,6 +337,7 @@ struct NewStepLine: View {
         .onDisappear { ask.cancel() }
         // The task became done or was deleted: nothing appears later.
         .onChange(of: canAdd) { _, now in if !now { ask.cancel() } }
+        .onChange(of: model.row(taskId)?.isDone) { _, done in if done == true { ask.cancel() } }
     }
 
     private func suggest() {
@@ -367,6 +369,8 @@ private struct StepFrames: PreferenceKey {
     static var frames: [String: CGRect] = [:]
     /// Add Step… on a task, as its menu item does (the harness cannot open a menu).
     static var addStep: ((UUID) -> Void)?
+    /// The pointer over a step, as hovering does (posted events do not move it).
+    static var hoverStep: ((UUID?) -> Void)?
     #endif
 }
 

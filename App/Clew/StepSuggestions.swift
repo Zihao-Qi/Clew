@@ -86,7 +86,8 @@ extension AppModel {
     /// ✨ shows only while signed in, the switch on, and a step can be added.
     func canSuggestSteps(_ taskId: UUID) -> Bool {
         guard let ai, ai.canSuggestSteps, let row = row(taskId) else { return false }
-        return canAddStep(row)
+        // Not on a done task (SPEC "Suggest steps"), though a step may be added to reopen it.
+        return canAddStep(row) && !row.isDone
     }
 }
 

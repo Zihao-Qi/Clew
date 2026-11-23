@@ -984,7 +984,8 @@ final class AppModel {
     /// Also on a task done today: adding a step reopens it (*changed* 2026-11-22, *user*).
     /// Never on a task done on an earlier day.
     func canAddStep(_ row: TodayRow) -> Bool {
-        Clew.canHaveSteps(row.item) && (row.progressAmount == 0 || row.isDone)
+        // Done today only: every tick is today's (review).
+        Clew.canHaveSteps(row.item) && (row.progressAmount == 0 || (row.isDone && row.progressAmount == row.todayAmount))
     }
 
     @discardableResult
@@ -993,6 +994,7 @@ final class AppModel {
         let reopened = row(taskId).flatMap { $0.isDone ? $0.lastTickToday?.id : nil }
         guard run({ try $0.addStep(taskId: taskId, title: title) }) else { return false }
         ai?.untick(reopened)
+        if reopened != nil, ratingPrompt?.itemId == taskId { ratingPrompt = nil }
         return true
     }
 
