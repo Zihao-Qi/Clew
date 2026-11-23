@@ -246,6 +246,9 @@ Settings › AI, edits any, adds their own and deletes any.
   and clears its *based on* and *confirmed*. The person's text is not checked.
 - **Shown at once** (*user*): a new or changed note appears in the list straight
   away, with no question; in the menu only through "What Clew noticed" below.
+- **Called Memory in the interface** (*user* 2026-11-22): "Notes" are the person's own
+  jottings (SPEC "Notes"), so Clew's notes are shown as **Memory** / memories. This
+  file and the code keep "notes".
 - **What Clew noticed** (AI-N, *user* 2026-11-22): once a week, last week's card
   (SPEC) shows up to 3 of Clew's notes the person has not answered, each with
   **True** and **Not really**, so the notes help the person understand themselves

@@ -76,7 +76,7 @@ An iPhone app later reuses Domain, Core and Store unchanged; only the UI target 
 The core split: **what you intend** is mutable; **what happened** is append-only.
 
 - **Definitions** (edited freely, soft-deleted): `Item`, `Reminder`, `Settings`,
-  `TimeBlock` (v1.2), `Step` (2026-11-21).
+  `TimeBlock` (v1.2), `Step` (2026-11-21), `QuickNote` (2026-11-22, SPEC "Notes").
 - **Facts** (inserted, never updated in substance; corrected by voiding):
   `CheckIn`, `Plan`, `GoalRound`, `LaterReview`, `DayReflection` (v1.2), `Award` (v1.3),
   `StepTick` (2026-11-21). (`WatchProgress` is
@@ -113,6 +113,9 @@ TimeBlock       id, itemId, localDay, start, minutes, placedAt, updatedAt, decid
 Step            id, taskId, title, sortKey, createdAt, updatedAt, deletedAt?   (2026-11-21) ← a definition:
                   a step of a once task or link; keeps its task (trigger)
 StepTick        id, stepId, taskId, localDay, at, source, finishedCheckInId?, voidedAt?   (2026-11-21) ← a fact
+QuickNote       id, text, createdAt, duringItemId?, duringTitle?, doneAt?, taskId?, updatedAt, deletedAt?
+                  (2026-11-22) ← a definition: the person's own note (SPEC "Notes"); text, done and
+                  task are mutable (latest updatedAt wins), Delete is a tombstone; exported and backed up
 ChangeLog       seq (monotonic), entity, entityId, op, at, source  (v1.1) ← for Gateway "changes since" and sync
 DayReflection   localDay (PK), valence (-1…1), bestItemId?, at, updatedAt  (v1.2)
 Award           id = hash(kind, itemId, milestone), kind (e.g. goal.finished),
