@@ -39,7 +39,8 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
 1. **Menu bar list.** A SwiftUI `MenuBarExtra`. The title shows `done/total` for today
    (*changed* 2026-11-18, *user*: or a ring; see "The menu bar ring").
    Click it to open today's list. No main window is required. A global shortcut also
-   opens the list (default **⌘.**, changeable in Settings › General). It uses a
+   opens the list (default **⌘.**, changeable in Settings › General), and a second one
+   writes a note (default **⌥⌘.**; see "Notes", 2026-11-22). They use a
    Carbon hotkey, so the sandbox stays on and Clew needs no Accessibility permission
    (2026-11-11). It opens the list through Clew's own menu bar item, in-process: by
    clicking it on macOS 14–26; on macOS 27, where that click does nothing (user,
@@ -135,10 +136,7 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
   second when it's finished. Levels come from lifetime totals.
 - Opt-in AI help beyond Suggest steps and Memory: an evening line, "fits today" from Goals & Later,
   a reader (see docs/AGENT.md, v2 2026-11-22).
-- **Quick note** (*user*, 2026-11-22, to discuss): a button in the menu to write down an
-  idea that comes up mid-task in a few keystrokes, so the fear of forgetting it does not
-  pull the person away; after saving, a gentle nudge back to the task in progress; notes
-  easy to look through later; and help turning a note into a future task.
+- Help turning notes into tasks with AI (see "Notes": suggestions to choose from only).
 - Sync with Dayflow (its local JSON API: `GET /api/day`, `PATCH /api/tasks/:id`).
 - iPhone, iCloud sync, Obsidian export.
 
@@ -1110,13 +1108,13 @@ stopped daily use, not adding features.
     **Use AI** (*changed* 2026-11-22, *user*: it replaces the switch **Suggest steps**;
     on means every AI job and Memory, off means none; signing in turns it on). Its line
     says in general what it does, not each field sent (*user*): "Clew suggests steps
-    and keeps notes on how you work, using your ChatGPT plan." Below it, **What Clew
-    knows** (see "Memory"). The
+    and remembers how you work, using your ChatGPT plan." Below it, **Memory** (see
+    "Memory"). The
     first time the person signs in, Settings shows once "You're using your ChatGPT
     plan" with **Got it** (OpenAI's rule). Declined plan permission: "Clew can't use
     your ChatGPT plan yet" with **Continue with ChatGPT** to ask again; a plan OpenAI
     says is not eligible: "AI isn't available on this ChatGPT plan." Signed out, one line
-    says what AI does: "Clew can suggest small steps for a task and keep notes on how you
+    says what AI does: "Clew can suggest small steps for a task and remember how you
     work, using your ChatGPT plan. Nothing is sent until you sign in and ask. Clew works fully without it." While the
     browser is open: "Waiting for the browser…" with **Cancel**; the browser's page after
     signing in says "You can close this tab and go back to Clew." A failed sign-in says
@@ -1173,21 +1171,26 @@ stopped daily use, not adding features.
 - **Memory (AI-M, 2026-11-22, *user*).** Clew keeps short notes about how the person
   works, so its suggestions fit them better, and shows every note
   (docs/AGENT.md §7). Only notes: no preferences, no settings, no categories.
+  - **Called Memory** (*changed* 2026-11-22, *user*): the person's own jottings are
+    "Notes" (see "Notes"), so in the interface Clew's are **memories**: the section is
+    **Memory**, a row is a memory, and the texts below say so. This spec and the code
+    keep calling them notes.
   - **A note:** what it is about (≤ 30 characters, like "Writing"), one line (≤ 100,
     "Goes better before noon"), from Clew or from you, and for Clew's notes what it is
     based on (≤ 100, "5 of 6 writing tasks ticked before 12"). At most 40.
-  - **Settings › AI › What Clew knows** (under Use AI while ready: signed in, plan
+  - **Settings › AI › Memory** (under Use AI while ready: signed in, plan
     permission, eligible, Use AI on; in any other state, while any notes are kept): one row per note, newest change first: the line, and in
     secondary text "Writing · 5 of 6 writing tasks ticked before 12" (Clew's) or
-    "Writing · Your note" (yours), with **Edit** ("Edit note <line>") and **Delete**
-    ("Delete note <line>"), which deletes at once. Then **Add note** (disabled at 40,
-    "Clew keeps up to 40 notes.") and **Forget everything**, which asks first: "Forget
-    everything Clew knows?" / "This deletes all notes and what Clew has recorded. It
-    can't be undone." with **Forget** and **Cancel**. No notes: "No notes yet. Clew adds
-    them as it learns how you work, and you can add your own." Footer: "Clew never
-    changes a note you added or edited."
-  - **Edit and Add** open a small sheet: **About** and **Note** fields, capped at 30
-    and 100 characters, with **Cancel** and **Save** (Save needs a note line). Saving
+    "Writing · Added by you" (yours), with **Edit** ("Edit memory <line>") and **Delete**
+    ("Delete memory <line>"), which deletes at once. Then **Add to memory** (disabled
+    at 40, "Clew keeps up to 40 memories.") and **Forget everything**, which asks first:
+    "Forget everything Clew knows?" / "This deletes Clew's memory and what it has
+    recorded. It can't be undone." with **Forget** and **Cancel**. Empty: "Nothing in
+    memory yet. Clew adds to it as it learns how you work, and you can add your own."
+    Footer: "Clew never changes what you added or edited."
+  - **Edit and Add** open a small sheet titled "Edit memory" / "Add to memory": **About**
+    and **Memory** fields, capped at 30 and 100 characters, with **Cancel** and **Save**
+    (Save needs the memory line). Saving
     makes the note yours and drops its "based on" (and its confirmation, see "What
     Clew noticed"). Your text is never checked or changed.
   - **How notes are made** (after each job, *user*): only while ready, Clew records
@@ -1255,6 +1258,89 @@ stopped daily use, not adding features.
     note).
   - No request is made to show them; nothing is sent when answering (the answer goes
     with the next job's request).
+
+- **Notes (2026-11-22, *user*).** A thought that comes up in the middle of a task is
+  written down in seconds and kept, so the fear of forgetting it does not pull the
+  person away; then Clew points back to the task. Notes are the person's own (Clew's
+  AI notes are "Memory").
+  - **Writing one:** the global shortcut **⌥⌘.** from any app, or **✎ Note** in the
+    menu's bottom bar, right after **+ Add** (the menu closes first). Both open the
+    **note box**: a small panel at the top of the screen the pointer is on, centred
+    under the menu bar, 440 points wide, above every app and on every Space, with one
+    text field already focused (placeholder "A thought to keep…"). It wraps and grows
+    to 4 lines (then scrolls), at most 1,000 characters. **Return** saves; **⇧Return**
+    starts a new line. Return with nothing but spaces and line breaks does nothing. **Esc** closes it;
+    so does clicking anywhere else. Either way what was typed is kept as a **draft**
+    (in this Mac's preferences, so it survives quitting) and is back in the field the
+    next time the box opens; spaces and line breaks alone count as nothing. Pressing the shortcut while
+    the box is open focuses it; while "Saved." shows, it opens the box again at once.
+  - **Back to the task:** saving gives the front back to the app that was in front
+    when the box opened (with Esc too; a click elsewhere already chose an app), and
+    the box stays 3 seconds as a banner that takes no keyboard, larger text, tinted
+    with the accent colour: "Saved. Back to: **Write the intro**", then fades; a click
+    on it closes it at once. VoiceOver announces the same text. **The task** is chosen
+    when the box opens: the focus timer's task if a focus (not a break) is running and
+    its time is not up ("… · 12 min left", minutes rounded up; "… · paused" while
+    paused); else, with the timeline on, a block running now (its start passed, its end
+    not) that still needs something (a task not done today; a goal not reached; for a
+    step's block, neither its task nor its step done); a step's block
+    names "Prepare the talk - Speech notes"; of several, the one that started last,
+    then a task's own block before a step's, then the list's order and the steps'
+    order; else none, and the banner reads "Saved."
+  - **What a note keeps:** its text; when it was written; and the task it was written
+    during (the same choice as above): which task and its title then. That title never
+    changes afterwards, even if the task is renamed or deleted. Notes are the person's
+    data: in Clew's database, in exports (older exports without notes still import)
+    and backups. **Never sent to AI**, and writing, editing, finishing or deleting one
+    is never recorded as AI activity; a task made from a note is an ordinary typed
+    task like any other.
+  - **The count:** while there are open notes (not done, not deleted), a quiet line
+    right above the bottom bar's divider, below every other line there (the
+    collection rows and the import-update line), on the list screen: "3 notes ›" ("1
+    note ›"); transient lines (Undo, a refused action) show above it. Clicking it opens
+    the **Notes** page; so does ✎'s right-click › **Show Notes**.
+  - **The Notes page** (a page like Add and the details; ‹ and Esc go back to the
+    list): open notes newest first, each with its text and, in secondary text, its time
+    and task: "10:42 · during Write the intro" (no task: just the time). Times use this
+    Mac's clock format; a note from an earlier calendar day within the last 6 days
+    shows its weekday ("Mon 10:42"), an older one its date ("Nov 12", with the year if
+    not this year). Each open note has **Make a task** (a small menu: **Today**,
+    **Later**), **Done** and **Delete**, as buttons and in its right-click. Below them,
+    **Done (N)**, folded each time the page opens and absent when there are none: the
+    done notes, most recently done first, each with **Not done** and **Delete**, and
+    "→ Today" / "→ Later" after one that made a task (where it was made, kept with the
+    note: moving or deleting the task later does not change it; Not done clears it).
+    With no open notes the page says "No open notes. Press ⌥⌘. any time to write one
+    down." (the current shortcut; with none set: "No open notes. Use ✎ Note any time to
+    write one down."), above Done (N) if there is any.
+  - **Editing:** clicking an open note's text edits it in place, with the same 1,000
+    character limit: Return saves, ⇧Return starts a new line, a click elsewhere saves,
+    Esc keeps it as it was and stays on the page; a text of nothing but spaces and
+    line breaks is not saved (the note keeps its text and editing ends). The Delete key edits text there;
+    the list's hover-Delete never acts on the Notes page. Done notes are not edited.
+  - **Make a task** adds, in one step, a one-off task to Today or Later whose title is
+    the note's first line that is not empty, trimmed, cut to the title limit as typing
+    it would be ("…" at 200), taken as plain text (a link in it is not fetched or made a
+    link task), typed by the person; the note becomes done and remembers that task.
+    **Not done** opens it again and forgets the task (the task stays). Deleting the
+    task later changes nothing about the note.
+  - **Done** keeps the note under Done. **Delete** is a tombstone, with "Deleted note
+    · Undo" for a few seconds at the bottom of the Notes page, as for tasks (it goes
+    with the page); Undo brings it back as it was, open or done.
+  - **Shortcut in Settings › General:** a second recorder, "Write a note", under "Open
+    the list", working the same way (record, clear). Each refuses the other's
+    combination with "Already used to open the list." / "Already used to write a
+    note."; a combination macOS or another app holds shows the same message as for the
+    list's. When the note's shortcut was never set (first launch with this feature, or
+    a restored backup from before it), it becomes ⌥⌘., or none if the list's shortcut
+    is ⌥⌘.; that choice is saved at once, so changing the list's shortcut later never
+    turns ⌥⌘. on for notes by itself.
+  - **VoiceOver:** ✎ "Write a note" (with the action "Show Notes"); the count line
+    "3 notes, show notes"; the box's field "Note"; the banner as announced; ‹ "Back";
+    each note reads its text, time and task, with actions Edit (its field: "Edit
+    note"), Make a task in Today, Make a task in Later, Done, Delete; a done one also
+    reads "made a task in Today" / "in Later", with Not done and Delete; "Done (N)" is
+    a collapsible heading; the recorder "Shortcut to write a note".
 
 ## Open question
 

@@ -246,6 +246,9 @@ Settings › AI, edits any, adds their own and deletes any.
   and clears its *based on* and *confirmed*. The person's text is not checked.
 - **Shown at once** (*user*): a new or changed note appears in the list straight
   away, with no question; in the menu only through "What Clew noticed" below.
+- **Called Memory in the interface** (*user* 2026-11-22): "Notes" are the person's own
+  jottings (SPEC "Notes"), so Clew's notes are shown as **Memory** / memories. This
+  file and the code keep "notes".
 - **What Clew noticed** (AI-N, *user* 2026-11-22): once a week, last week's card
   (SPEC) shows up to 3 of Clew's notes the person has not answered, each with
   **True** and **Not really**, so the notes help the person understand themselves
@@ -273,8 +276,8 @@ Nothing is sent until the person signs in. **One toggle, Use AI** (*user* 2026-1
 on turns on every job and memory, off turns them all off; there are no per-job
 switches. Signing in turns it on. **Continue with ChatGPT** (then the account's email,
 **Sign out**, **Manage usage**), the model with "Using ChatGPT plan" (the person
-chooses it, *user*), **Use AI**, and **What Clew knows**: the notes, each with
-**Edit** and **Delete**, then **Add note** and **Forget everything**; it is shown
+chooses it, *user*), **Use AI**, and **Memory**: the notes, each with
+**Edit** and **Delete**, then **Add to memory** and **Forget everything**; it is shown
 whenever Clew is ready (§7) and, in any other state, while any notes are kept.
 Signing out turns Use AI off. The toggle says
 generally what it does, not each field sent (*user*). Non-secret settings (issued app
