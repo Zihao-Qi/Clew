@@ -80,6 +80,10 @@ public protocol StoreReader {
     func step(id: UUID) throws -> Step?
     /// Live (not voided) step ticks of these tasks, oldest first.
     func stepTicks(taskIds: [UUID]) throws -> [StepTick]
+    /// Notes not deleted (SPEC "Notes"), oldest first.
+    func quickNotes() throws -> [QuickNote]
+    /// A note, deleted or not.
+    func quickNote(id: UUID) throws -> QuickNote?
 }
 
 /// Everything Clew stores, as it is stored.
@@ -96,11 +100,13 @@ public struct ExportRecords: Hashable, Sendable, Codable {
     public var timeBlocks: [TimeBlock]
     public var steps: [Step]
     public var stepTicks: [StepTick]
+    public var quickNotes: [QuickNote]
 
     public init(items: [Item], checkIns: [CheckIn], plans: [Plan], goalRounds: [GoalRound],
                 reminders: [Reminder] = [], settings: [SettingRecord] = [], laterReviews: [LaterReview] = [],
                 watchProgress: [WatchProgress] = [], focusSessions: [FocusSession] = [],
-                timeBlocks: [TimeBlock] = [], steps: [Step] = [], stepTicks: [StepTick] = []) {
+                timeBlocks: [TimeBlock] = [], steps: [Step] = [], stepTicks: [StepTick] = [],
+                quickNotes: [QuickNote] = []) {
         self.items = items
         self.checkIns = checkIns
         self.plans = plans
@@ -113,10 +119,12 @@ public struct ExportRecords: Hashable, Sendable, Codable {
         self.timeBlocks = timeBlocks
         self.steps = steps
         self.stepTicks = stepTicks
+        self.quickNotes = quickNotes
     }
 
     private enum CodingKeys: String, CodingKey {
         case items, checkIns, plans, goalRounds, reminders, settings, laterReviews, watchProgress, focusSessions, timeBlocks, steps, stepTicks
+        case quickNotes
     }
 
     /// `reminders` and `settings` arrived after the first exports; older files read as empty.
@@ -134,7 +142,8 @@ public struct ExportRecords: Hashable, Sendable, Codable {
             focusSessions: try c.decodeIfPresent([FocusSession].self, forKey: .focusSessions) ?? [],
             timeBlocks: try c.decodeIfPresent([TimeBlock].self, forKey: .timeBlocks) ?? [],
             steps: try c.decodeIfPresent([Step].self, forKey: .steps) ?? [],
-            stepTicks: try c.decodeIfPresent([StepTick].self, forKey: .stepTicks) ?? []
+            stepTicks: try c.decodeIfPresent([StepTick].self, forKey: .stepTicks) ?? [],
+            quickNotes: try c.decodeIfPresent([QuickNote].self, forKey: .quickNotes) ?? []
         )
     }
 }
@@ -170,6 +179,8 @@ public protocol StoreWriter: StoreReader {
     func insert(_ tick: StepTick) throws
     /// Sets `voidedAt`. Voids are monotonic: voiding twice is an error.
     func voidStepTick(id: UUID, at: Date) throws
+    /// Inserts, or replaces the row with the same id (when and during what never change).
+    func save(_ note: QuickNote) throws
 }
 
 /// A row of the `settings` table: a definition with last-writer-wins by `updatedAt`.

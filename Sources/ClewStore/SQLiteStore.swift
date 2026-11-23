@@ -52,7 +52,8 @@ public final class SQLiteStore: ClewStore {
         let observation = DatabaseRegionObservation(tracking: Table("item"), Table("checkIn"), Table("plan"), Table("goalRound"),
                                                      Table("reminder"), Table("settings"), Table("laterReview"),
                                                      Table("watchProgress"), Table("focusSession"),
-                                                     Table("timeBlock"), Table("step"), Table("stepTick"))
+                                                     Table("timeBlock"), Table("step"), Table("stepTick"),
+                                                     Table("quickNote"))
         let cancellable = observation.start(in: writer, onError: { _ in }, onChange: { _ in onChange() })
         return Observation(cancellable)
     }
@@ -232,7 +233,8 @@ private struct Access: StoreWriter {
             focusSessions: try Row.fetchAll(db, sql: "SELECT * FROM focusSession ORDER BY at, id").map(Self.focusSession),
             timeBlocks: try Row.fetchAll(db, sql: "SELECT * FROM timeBlock ORDER BY placedAt, id").map(Self.timeBlock),
             steps: try Row.fetchAll(db, sql: "SELECT * FROM step ORDER BY createdAt, id").map(Self.step),
-            stepTicks: try Row.fetchAll(db, sql: "SELECT * FROM stepTick ORDER BY at, id").map(Self.stepTick)
+            stepTicks: try Row.fetchAll(db, sql: "SELECT * FROM stepTick ORDER BY at, id").map(Self.stepTick),
+            quickNotes: try Row.fetchAll(db, sql: "SELECT * FROM quickNote ORDER BY createdAt, id").map(Self.quickNote)
         )
     }
 
@@ -334,6 +336,31 @@ private struct Access: StoreWriter {
 
     func step(id: UUID) throws -> Step? {
         try Row.fetchOne(db, sql: "SELECT * FROM step WHERE id = ?", arguments: [id.uuidString]).map(Self.step)
+    }
+
+    func quickNotes() throws -> [QuickNote] {
+        try Row.fetchAll(db, sql: "SELECT * FROM quickNote WHERE deletedAt IS NULL ORDER BY createdAt, id")
+            .map(Self.quickNote)
+    }
+
+    func quickNote(id: UUID) throws -> QuickNote? {
+        try Row.fetchOne(db, sql: "SELECT * FROM quickNote WHERE id = ?", arguments: [id.uuidString]).map(Self.quickNote)
+    }
+
+    func save(_ n: QuickNote) throws {
+        try db.execute(
+            sql: """
+                INSERT INTO quickNote (id, text, createdAt, duringItemId, duringTitle, doneAt, taskId, madeTo,
+                                       updatedAt, deletedAt)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET text = excluded.text, createdAt = excluded.createdAt,
+                    duringItemId = excluded.duringItemId, duringTitle = excluded.duringTitle,
+                    doneAt = excluded.doneAt, taskId = excluded.taskId, madeTo = excluded.madeTo,
+                    updatedAt = excluded.updatedAt, deletedAt = excluded.deletedAt
+                """,
+            arguments: [n.id.uuidString, n.text, n.createdAt, n.duringItemId?.uuidString, n.duringTitle, n.doneAt,
+                        n.taskId?.uuidString, n.madeTo?.rawValue, n.updatedAt, n.deletedAt]
+        )
     }
 
     func stepTicks(taskIds: [UUID]) throws -> [StepTick] {
@@ -633,6 +660,23 @@ private struct Access: StoreWriter {
             releasedAt: row["releasedAt"],
             stepId: try optionalUUID(row, "stepId", table: t),
             stepTickId: try optionalUUID(row, "stepTickId", table: t)
+        )
+    }
+
+    private static func quickNote(_ row: Row) throws -> QuickNote {
+        let t = "quickNote"
+        let madeTo: String? = row["madeTo"]
+        return QuickNote(
+            id: try uuid(row, "id", table: t),
+            text: try required(row, "text", table: t),
+            createdAt: try required(row, "createdAt", table: t),
+            duringItemId: try optionalUUID(row, "duringItemId", table: t),
+            duringTitle: row["duringTitle"],
+            doneAt: row["doneAt"],
+            taskId: try optionalUUID(row, "taskId", table: t),
+            madeTo: madeTo.flatMap(QuickNote.MadeTo.init(rawValue:)),
+            updatedAt: try required(row, "updatedAt", table: t),
+            deletedAt: row["deletedAt"]
         )
     }
 

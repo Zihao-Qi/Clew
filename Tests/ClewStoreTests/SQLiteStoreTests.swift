@@ -471,6 +471,33 @@ private func sampleCheckIn(_ item: Item, _ d: String = "2026-11-11", amount: Int
         #expect(all.steps.map(\.id) == [step.id] && all.stepTicks.map(\.id) == [tick.id])
     }
 
+    @Test func notesRoundTripKeepWhenAndDuringWhatAndAreTombstoned() throws {
+        // SPEC "Notes" (2026-11-22): the person's notes, definitions with tombstones.
+        let store = try SQLiteStore.inMemory()
+        let task = sampleItem(.once)
+        var note = QuickNote(id: UUID(), text: "Call the bank\nabout the card", createdAt: t0, duringItemId: task.id,
+                             duringTitle: "Write the intro", updatedAt: t0)
+        try store.write { w in try w.insert(task); try w.save(note) }
+        #expect(try store.read { try $0.quickNotes() } == [note])
+        note.text = "Call the bank"; note.doneAt = t0 + 60; note.taskId = task.id; note.madeTo = .later
+        note.updatedAt = t0 + 60
+        try store.write { try $0.save(note) }
+        #expect(try store.read { try $0.quickNote(id: note.id) } == note)
+        for assignment in ["createdAt = '2030-01-01 00:00:00.000'", "duringItemId = NULL", "duringTitle = 'x'",
+                           "madeTo = 'nowhere'"] {
+            #expect(throws: DatabaseError.self) {
+                try store.writer.write { try $0.execute(sql: "UPDATE quickNote SET \(assignment) WHERE id = ?",
+                                                        arguments: [note.id.uuidString]) }
+            }
+        }
+        #expect(throws: DatabaseError.self) { try store.writer.write { try $0.execute(sql: "DELETE FROM quickNote") } }
+        note.deletedAt = t0 + 90
+        try store.write { try $0.save(note) }
+        #expect(try store.read { try $0.quickNotes() }.isEmpty)
+        #expect(try store.read { try $0.quickNote(id: note.id) }?.deletedAt != nil)
+        #expect(try store.read { try $0.allRecords() }.quickNotes.map(\.id) == [note.id])
+    }
+
     @Test func aStepsBlockKeepsItsStepAndRecordsItsTick() throws {
         // SPEC 2026-11-21: a step's block round-trips with its step and step tick; its step
         // never changes.

@@ -3,6 +3,8 @@ import Foundation
 
 public enum ClewError: Error, Equatable, Sendable {
     case emptyTitle
+    /// The other global shortcut already uses it (SPEC "Notes").
+    case shortcutTaken
     case titleTooLong(max: Int)
     case invalidURL
     case invalidTarget
