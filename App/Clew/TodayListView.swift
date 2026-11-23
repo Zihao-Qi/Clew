@@ -33,7 +33,7 @@ struct TodayListView: View {
     @State private var dragScrollStart: CGFloat = 0
     @State private var lastPointerY: CGFloat = 0
     @State private var listScroll: Timer?
-    private var listScrolls: Bool { rowsHeight > rowsLimit }
+    private var listScrolls: Bool { (rowsHeightAtDrag ?? rowsHeight) > rowsLimit }
     /// How far the list has scrolled since the drag began: the frozen row frames are
     /// measured against the pointer moved by this much.
     private var scrolledSinceDrag: CGFloat { listScrolls ? scroller.offset - dragScrollStart : 0 }
@@ -58,6 +58,12 @@ struct TodayListView: View {
     /// One task row's height, steps left out: a block coming down from the timeline
     /// becomes one row, whatever the first task holds.
     @State private var rowHeight: CGFloat = 34
+    /// Each task's own row height, its steps left out: a dragged task is this tall while
+    /// its steps fold (user, 2026-11-22).
+    @State private var ownHeights: [UUID: CGFloat] = [:]
+    /// The rows' height when a drag began: folding the dragged task's steps never switches
+    /// the list between scrolling and not mid-drag, which would cancel the drag (review).
+    @State private var rowsHeightAtDrag: CGFloat?
     /// The timeline's name box (SPEC 2026-11-13). It lives with the list: leaving the list
     /// (Add, Later, Settings, details) drops it.
     @State private var newTask: NewTaskDraft?
@@ -181,12 +187,20 @@ struct TodayListView: View {
     }
 
     private func endDrag() {
+        let draggedId = dragging
         listEdgeScroll(nil)
         scrollAtEdge(nil)
         lifted = nil
         dragging = nil
         dragTranslation = 0
         dragSlot = nil
+        // The folded steps come back: the rows are as tall as before the drag, so the list
+        // never flips out of scrolling for a frame (review). An Add Step line that closed
+        // stays closed, and the next measure corrects the height.
+        if let id = draggedId, let saved = rowsHeightAtDrag, sequence.contains(id), model.steps(of: id) != nil, model.isUnfolded(id) {
+            rowsHeight = saved
+        }
+        rowsHeightAtDrag = nil
     }
 
     // MARK: Dragging a row
@@ -198,7 +212,19 @@ struct TodayListView: View {
             .updating($rowDragLive) { _, live, _ in live = true }
             .onChanged { value in
                 if dragging == nil {
-                    dragFrames = ids.map { rowFrames[$0] ?? .zero }
+                    var frames = ids.map { rowFrames[$0] ?? .zero }
+                    // A dragged task's steps (and an open Add Step line) fold while it moves
+                    // (user, 2026-11-22): it is as tall as its own row, the rows below close up.
+                    let showsSteps = (model.steps(of: row.id) != nil && model.isUnfolded(row.id)) || addingStep == row.id
+                    if showsSteps, let from = ids.firstIndex(of: row.id), let own = ownHeights[row.id],
+                       frames[from].height > own + 1 {
+                        let cut = frames[from].height - own
+                        frames[from].size.height = own
+                        for k in frames.indices where k > from { frames[k].origin.y -= cut }
+                    }
+                    if addingStep == row.id { addingStep = nil; suggestingStep = nil }
+                    rowsHeightAtDrag = rowsHeight
+                    dragFrames = frames
                     dragScrollStart = scroller.offset
                     dragging = row.id
                 }
@@ -345,17 +371,10 @@ struct TodayListView: View {
                 .accessibilityHidden(true)
         } else if let lifted, let row = model.row(lifted.itemId) {
             ZStack(alignment: .topLeading) {
-                VStack(alignment: .leading, spacing: 0) {
-                    RowView(row: row, model: model, onEdit: {}, onOpen: {}, isDragged: true,
-                            steps: model.steps(of: row.id), unfolded: model.isUnfolded(row.id))
-                    // A task's steps go with it (SPEC 2026-11-21).
-                    if let steps = model.steps(of: row.id), model.isUnfolded(row.id), lifted.blockId == nil {
-                        StepsList(model: model, row: row, steps: steps, adding: false, onAddClose: {}, onOpen: {},
-                                  hoveredStep: .constant(nil))
-                            .padding(.bottom, 2)
-                            .background(Color(nsColor: .windowBackgroundColor))
-                    }
-                }
+                // Only the task's own row: its steps go with it, but are not drawn on the
+                // card (user, 2026-11-22).
+                RowView(row: row, model: model, onEdit: {}, onOpen: {}, isDragged: true,
+                        steps: model.steps(of: row.id), unfolded: false)
                     .frame(width: lifted.frame.width, alignment: .leading)
                     .opacity(lifted.overTimeline ? 0 : 1)
                 LiftedBlockCard(title: lifted.title, start: lifted.start, minutes: lifted.minutes)
@@ -458,8 +477,11 @@ struct TodayListView: View {
                         Button("Suggest steps") { startAddingStep(row.id, suggest: true) }
                     }
                 }
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { if steps == nil { rowHeight = $0 } }
-            if (steps != nil && model.isUnfolded(row.id)) || adding {
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
+                    if steps == nil { rowHeight = $0 }
+                    ownHeights[row.id] = $0
+                }
+            if ((steps != nil && model.isUnfolded(row.id)) || adding) && dragging != row.id {
                 StepsList(model: model, row: row, steps: steps ?? TaskSteps(taskId: row.id, entries: []),
                           adding: adding, suggestOnOpen: suggestingStep == row.id,
                           onAddClose: { if addingStep == row.id { addingStep = nil; suggestingStep = nil } },
@@ -606,7 +628,7 @@ struct TodayListView: View {
             }
             if !sequence.isEmpty {
                 Group {
-                    if rowsHeight > rowsLimit {
+                    if listScrolls {
                         // Long lists scroll together rather than pushing the menu past the
                         // screen (SPEC 2026-11-15: Today and Goals & Later).
                         ScrollView(.vertical) {

@@ -29,6 +29,14 @@ enum TimelineMetrics {
     /// The current time sits this far down when the menu opens: 2 of the 6 hours behind
     /// it, 4 ahead (user, 2026-11-11).
     static let quartersBeforeNow = 8
+
+    /// A bottom-edge grip for a block or event of this drawn height: 12 points (user,
+    /// 2026-11-11: 6 was hard to hit). Only the part over the block takes clicks, so on a
+    /// block under 30 minutes it is a strip of a quarter of the block at its bottom edge,
+    /// and the rest moves it (user, 2026-11-22: a 15-minute block only resized).
+    static func grip(height: CGFloat) -> (inside: CGFloat, below: CGFloat) {
+        height < 29 ? (max(3, height / 4), 0) : (8, 4)
+    }
     static let quarter = Clew.blockStepMinutes
 
     static func y(_ date: Date, in day: TimelineDay) -> CGFloat {
@@ -612,10 +620,10 @@ struct TimelineBlockView: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: 4))
             .overlay(alignment: .topLeading) { label }
-            // The grip reaches 4 points below the block, placed by layout (not a visual
-            // offset), so the hover, the cursor and the drag all use the same strip.
+            // The grip is placed by layout (not a visual offset), so the hover, the cursor
+            // and the drag all use the same strip (TimelineMetrics.grip).
             .overlay(alignment: .bottom) {
-                if block.canChange { resizeHandle.alignmentGuide(.bottom) { $0[.bottom] - 4 } }
+                if block.canChange { resizeHandle.alignmentGuide(.bottom) { $0[.bottom] - gripBelow } }
             }
             .frame(height: max(height - 1, 6))
             // While dragged, the lifted card draws it, over the hours or over the list.
@@ -768,11 +776,13 @@ struct TimelineBlockView: View {
         return nil
     }
 
-    /// The bottom edge's grip: 12 points tall, reaching 4 below the block, so it is easy
-    /// to catch (user, 2026-11-11: 6 points was hard to hit).
+    var gripInside: CGFloat { TimelineMetrics.grip(height: max(height - 1, 6)).inside }
+    var gripBelow: CGFloat { TimelineMetrics.grip(height: max(height - 1, 6)).below }
+
+    /// The bottom edge's grip: 12 points tall on a block of 30 minutes or more.
     private var resizeHandle: some View {
         Color.clear
-            .frame(height: 12)
+            .frame(height: gripInside + gripBelow)
             .overlay {
                 if onEdge || resizeBy != 0 {
                     Capsule().fill(Color.accentColor.opacity(0.8)).frame(width: 24, height: 3)
@@ -1002,7 +1012,9 @@ struct TimelineEventView: View {
     var body: some View {
         if editable {
             card
-                .overlay(alignment: .bottom) { grip.alignmentGuide(.bottom) { $0[.bottom] - 4 } }
+                .overlay(alignment: .bottom) {
+                    grip.alignmentGuide(.bottom) { $0[.bottom] - TimelineMetrics.grip(height: Self.height(start, end)).below }
+                }
                 .contentShape(Rectangle())
                 .onTapGesture(perform: onOpen)
                 .gesture(drag(resize: false, $moving))
@@ -1015,10 +1027,10 @@ struct TimelineEventView: View {
         }
     }
 
-    /// The bottom edge's grip, as a block's: 12 points, reaching 4 below the event.
+    /// The bottom edge's grip, as a block's (TimelineMetrics.grip).
     private var grip: some View {
         Color.clear
-            .frame(height: 12)
+            .frame(height: { let g = TimelineMetrics.grip(height: Self.height(start, end)); return g.inside + g.below }())
             .overlay {
                 if onEdge || resizing {
                     Capsule().fill(EventColor.of(event).opacity(0.8)).frame(width: 24, height: 3)
