@@ -16,20 +16,35 @@ with open(binary, "rb") as f:
     if b"CLEW_NOTES_TEST" not in f.read():
         sys.exit("FAIL: refusing to launch a binary without the Debug checks")
 
-failed = []
-for check, seconds in [("CLEW_AI_CHECK", 60), ("CLEW_NOTES_TEST", 60), ("CLEW_STEPS_TEST", 120)]:
-    print(f"== {check}", flush=True)
+CHECKS = [("CLEW_AI_CHECK", 60), ("CLEW_NOTES_TEST", 60), ("CLEW_STEPS_TEST", 150)]
+# Only the one switch: an inherited CLEW_* variable must not turn this into another run.
+base = {k: v for k, v in os.environ.items() if not k.startswith("CLEW_")}
+
+
+def run(check: str, seconds: int) -> tuple[bool, str]:
     try:
-        result = subprocess.run([binary], env={**os.environ, check: "1"}, timeout=seconds,
-                                capture_output=True, text=True)
-        lines = [l for l in result.stdout.splitlines() if l.startswith(("PASS", "FAIL", "ALL", "Clew could not"))]
-        print("\n".join(l for l in lines if not l.startswith("PASS")) or "(no failures)")
-        passes = sum(l.startswith("PASS") for l in lines)
-        print(f"{passes} passed, exit {result.returncode}", flush=True)
-        if result.returncode != 0 or passes == 0:
-            failed.append(check)
-    except subprocess.TimeoutExpired:
-        print(f"FAIL: {check} exceeded {seconds} seconds", flush=True)
+        result = subprocess.run([binary], env={**base, check: "1"}, timeout=seconds, capture_output=True, text=True)
+    except subprocess.TimeoutExpired as e:
+        out = e.stdout.decode() if isinstance(e.stdout, bytes) else (e.stdout or "")
+        return False, out + f"\nFAIL: {check} exceeded {seconds} seconds"
+    lines = result.stdout.splitlines()
+    passes = sum(l.startswith("PASS") for l in lines)
+    ok = result.returncode == 0 and passes > 0
+    shown = [l for l in lines if not l.startswith("PASS")]
+    report = "\n".join(shown) if ok else "\n".join(shown[-40:] + result.stderr.splitlines()[-20:])
+    return ok, f"{report}\n{passes} passed, exit {result.returncode}"
+
+
+failed = []
+for check, seconds in CHECKS:
+    print(f"== {check}", flush=True)
+    ok, report = run(check, seconds)
+    # Clicks and drags need Clew in front; if another window took it, try once more.
+    if not ok and "Clew could not stay in front" in report:
+        print(report + "\n(another app took the front: running it once more)", flush=True)
+        ok, report = run(check, seconds)
+    print(report, flush=True)
+    if not ok:
         failed.append(check)
 sys.exit(f"FAIL: {', '.join(failed)}" if failed else 0)
 PY

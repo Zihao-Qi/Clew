@@ -1,0 +1,23 @@
+# Mistakes that kept coming back (2026-11-22): stale § references, harnesses touching
+# real data, icon buttons without a VoiceOver label, stale app mutation entries. Runs on
+# every change, Markdown-only ones too (renumbering docs is when references go stale).
+name: Lint
+on:
+  pull_request:
+  push:
+    branches: [main]
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint self-test (each check still catches its bad samples)
+        run: python3 -I scripts/lint.py . --self-test
+      - name: Lint
+        run: python3 -I scripts/lint.py .
+      - name: Every app mutation entry still matches its source
+        run: python3 -I scripts/mutation-check-app.py . --patterns

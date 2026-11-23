@@ -12,6 +12,7 @@ fast and only checks that every entry still matches its source once.
   python3 -I scripts/mutation-check-app.py . --patterns
 """
 import pathlib
+import signal
 import subprocess
 import sys
 
@@ -90,13 +91,16 @@ def build() -> bool:
 
 
 def run(check: str) -> list[str]:
+    """What noticed the mutation: FAIL lines, a crash or a hang. Empty: nothing did."""
     try:
-        out = subprocess.run([str(binary)], env={"HOME": str(pathlib.Path.home()), check: "1"},
-                             capture_output=True, text=True, timeout=150).stdout
-    except subprocess.TimeoutExpired as e:
-        out = (e.stdout or b"").decode() if isinstance(e.stdout, bytes) else (e.stdout or "")
-        return ["TIMEOUT"] + [l for l in out.splitlines() if l.startswith("FAIL")]
-    return [l for l in out.splitlines() if l.startswith("FAIL")]
+        result = subprocess.run([str(binary)], env={"HOME": str(pathlib.Path.home()), check: "1"},
+                                capture_output=True, text=True, timeout=150)
+    except subprocess.TimeoutExpired:
+        return ["TIMEOUT"]
+    fails = [l for l in result.stdout.splitlines() if l.startswith("FAIL")]
+    if result.returncode != 0 and not fails:
+        fails = [f"exit {result.returncode} (crashed or stopped)"]
+    return fails
 
 
 if "--patterns" in sys.argv:
@@ -107,28 +111,35 @@ if "--patterns" in sys.argv:
     print(f"{len(M) - len(stale)} of {len(M)} patterns match once")
     sys.exit(1 if stale else 0)
 
+# A SIGTERM restores the sources and rebuilds too, as Ctrl-C does.
+signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
+
 only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else ""
 survived = 0
-for name, path, old, new, check in M:
-    if only and only not in name:
-        continue
-    f = repo / path
-    orig = f.read_text()
-    if orig.count(old) != 1:
-        print(f"{name:40} PATTERN NOT UNIQUE ({orig.count(old)})", flush=True)
-        survived += 1
-        continue
-    try:
-        f.write_text(orig.replace(old, new))
-        if not build():
-            print(f"{name:40} BUILD FAILED", flush=True)
+try:
+    for name, path, old, new, check in M:
+        if only and only not in name:
+            continue
+        f = repo / path
+        orig = f.read_text()
+        if orig.count(old) != 1:
+            print(f"{name:40} PATTERN NOT UNIQUE ({orig.count(old)})", flush=True)
             survived += 1
             continue
-        fails = run(check)
-        print(f"{name:40} {'KILLED' if fails else 'SURVIVED'}  {fails[:1]}", flush=True)
-        survived += 0 if fails else 1
-    finally:
-        f.write_text(orig)
-print("rebuilding the unmutated app…", flush=True)
-build()
+        try:
+            f.write_text(orig.replace(old, new))
+            if not build():
+                print(f"{name:40} BUILD FAILED", flush=True)
+                survived += 1
+                continue
+            fails = run(check)
+            print(f"{name:40} {'KILLED' if fails else 'SURVIVED'}  {fails[:1]}", flush=True)
+            survived += 0 if fails else 1
+        finally:
+            f.write_text(orig)
+finally:
+    print("rebuilding the unmutated app…", flush=True)
+    if not build():
+        print("FAIL: the unmutated app did not build", flush=True)
+        survived += 1
 sys.exit(1 if survived else 0)
