@@ -207,6 +207,58 @@ extension Snapshot {
                 try await Task.sleep(for: .milliseconds(300))
                 report("Esc closes it and drops what was typed",
                        frame("newStep:\(talk)") == nil && !shown().contains("dropped"))
+                // Rename in place (SPEC 2026-11-22): Return saves, Esc keeps the old title.
+                if let rest = model.allSteps(of: talk).first(where: { $0.step.title == "rest" }) {
+                    model.renamingStep = rest.id
+                    try await Task.sleep(for: .milliseconds(400))
+                    report("Rename turns the step into an edit line", frame("rename:\(rest.id)") != nil)
+                    try await type("Rest well")
+                    try await key("\r", code: 36)
+                    try await Task.sleep(for: .milliseconds(300))
+                    report("Return saves the new title", shown().contains("Rest well") && !shown().contains("rest")
+                           && model.renamingStep == nil)
+                    model.renamingStep = rest.id
+                    try await Task.sleep(for: .milliseconds(400))
+                    try await type("nope")
+                    try await key("\u{1b}", code: 53)
+                    try await Task.sleep(for: .milliseconds(300))
+                    report("Esc keeps the old title", shown().contains("Rest well") && !shown().contains("nope")
+                           && frame("rename:\(rest.id)") == nil)
+                    // Backspace edits the title, never deletes the step; an empty title is not saved.
+                    model.renamingStep = rest.id
+                    DebugFrames.hoverStep?(rest.id)   // the pointer stays over the step, as after a right-click
+                    try await Task.sleep(for: .milliseconds(400))
+                    try await key("\u{7f}", code: 51)
+                    try await key("\r", code: 36)
+                    try await Task.sleep(for: .milliseconds(300))
+                    report("Backspace and an empty title keep the step and its title",
+                           shown().contains("Rest well") && model.allSteps(of: talk).contains { $0.id == rest.id }
+                           && model.renamingStep == nil && model.notice == nil)
+                    DebugFrames.hoverStep?(nil)
+                    // A click elsewhere saves (review).
+                    model.renamingStep = rest.id
+                    try await Task.sleep(for: .milliseconds(400))
+                    try await type("Rested")
+                    try await mouse(NSPoint(x: 200, y: 20))
+                    try await Task.sleep(for: .milliseconds(400))
+                    report("a click elsewhere saves", shown().contains("Rested") && model.renamingStep == nil)
+                } else {
+                    report("a step to rename", false)
+                }
+                // A task done today takes a new step and is open again (SPEC 2026-11-22).
+                if let row = model.row(talk), !row.isDone { model.tap(row) }
+                try await Task.sleep(for: .milliseconds(300))
+                let wasDone = model.row(talk)?.isDone == true
+                report("Add Step… is offered on a task done today", wasDone && model.row(talk).map(model.canAddStep) == true)
+                DebugFrames.addStep?(talk)
+                try await Task.sleep(for: .milliseconds(400))
+                try await type("more")
+                try await key("\r", code: 36)
+                try await Task.sleep(for: .milliseconds(300))
+                report("Add Step… on a done task adds the step and reopens it",
+                       wasDone && model.row(talk)?.isDone == false && shown().last == "more")
+                try await key("\r", code: 36)
+                try await Task.sleep(for: .milliseconds(300))
                 // On the timeline (SPEC 2026-11-21): a step dragged up onto the hours becomes
                 // a block "Task - Step" and leaves the list; dragged back down, it returns.
                 try clew.setTimelineShown(true)

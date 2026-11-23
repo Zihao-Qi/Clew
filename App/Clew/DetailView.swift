@@ -478,6 +478,8 @@ struct DetailSteps: View {
             // The task got done (its last step, its circle): the line goes and drops its text (review),
             // and no suggestion appears later.
             .onChange(of: canAdd) { _, now in if !now { adding = false; newStep = ""; ask.cancel() } }
+            // Suggestions are for an open task (SPEC "Suggest steps"): finishing it drops them.
+            .onChange(of: model.row(task.id)?.isDone) { _, done in if done == true { ask.cancel() } }
             // Leaving the details or the rollover drops them too (SPEC "Suggest steps").
             .onDisappear { ask.cancel() }
             .onChange(of: model.today?.day) { ask.cancel() }

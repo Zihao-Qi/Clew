@@ -477,7 +477,8 @@ struct TodayListView: View {
             .offset(y: offset(for: row.id, at: ids.firstIndex(of: row.id) ?? 0, in: ids))
             // The lifted card draws the dragged row, here or over the hours.
             .opacity(dragging == row.id ? 0 : 1)
-            .gesture(drag(row, in: ids))
+            // While a step is renamed in place, its edit line keeps the pointer (review).
+            .gesture(drag(row, in: ids), including: model.renamingStep == nil ? .all : .subviews)
     }
 
     /// Where a row's circle starts: the "Goals & Later" label lines up with it.
@@ -740,7 +741,7 @@ struct TodayListView: View {
                 .frame(width: 0, height: 0)
                 // While the name box is open, the keyboard edits the name.
                 .disabled((hoveredItem == nil && hoveredStep == nil) || dragging != nil || lifted != nil || newTask != nil
-                          || addingStep != nil)
+                          || addingStep != nil || model.renamingStep != nil)
                 .accessibilityHidden(true)
         }
         // One space for the timeline and the rows, so a row can be dragged onto an hour.
@@ -759,16 +760,18 @@ struct TodayListView: View {
         .onAppear {
             #if DEBUG
             DebugFrames.addStep = { startAddingStep($0) }
+            DebugFrames.hoverStep = { hoveredStep = $0 }
             #endif
         }
         // The rollover closes Add Step…'s line (SPEC 2026-11-21).
-        .onChange(of: model.today?.day) { addingStep = nil }
+        .onChange(of: model.today?.day) { addingStep = nil; model.renamingStep = nil }
         .onDisappear {
             // Leaving the list mid-drag (⌘N, ⌘,) ends the drag and its timers (review).
             endDrag()
             PeekController.shared.listLeft()
             // Leaving the list ends last week's card for this week.
             model.dropWeekCard()
+            model.renamingStep = nil
         }
     }
 }

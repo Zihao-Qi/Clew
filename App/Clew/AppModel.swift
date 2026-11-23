@@ -396,6 +396,7 @@ final class AppModel {
     func menuClosed() {
         menuSessionOpen = false
         menuCloses += 1
+        renamingStep = nil
         closeWeekCard()
         // A refusal line never greets the next opening or the next day (SPEC 2026-11-17).
         notice = nil
@@ -972,16 +973,30 @@ final class AppModel {
         Set((foldDefaults.stringArray(forKey: unfoldedKey) ?? []).compactMap(UUID.init(uuidString:)))
     }
     func isUnfolded(_ id: UUID) -> Bool { unfolded.contains(id) }
+    /// The step being renamed in the list (right-click › Rename, SPEC 2026-11-22).
+    var renamingStep: UUID?
     func setUnfolded(_ id: UUID, _ on: Bool) {
         guard on != unfolded.contains(id) else { return }
         if on { unfolded.insert(id) } else { unfolded.remove(id) }
         Self.foldDefaults.set(unfolded.map(\.uuidString).sorted(), forKey: Self.unfoldedKey)
     }
 
-    func canAddStep(_ row: TodayRow) -> Bool { Clew.canHaveSteps(row.item) && !row.isDone && row.progressAmount == 0 }
+    /// Also on a task done today: adding a step reopens it (*changed* 2026-11-22, *user*).
+    /// Never on a task done on an earlier day.
+    func canAddStep(_ row: TodayRow) -> Bool {
+        // Done today only: every tick is today's (review).
+        Clew.canHaveSteps(row.item) && (row.progressAmount == 0 || (row.isDone && row.progressAmount == row.todayAmount))
+    }
 
     @discardableResult
-    func addStep(to taskId: UUID, title: String) -> Bool { run { try $0.addStep(taskId: taskId, title: title) } }
+    func addStep(to taskId: UUID, title: String) -> Bool {
+        // Reopening undoes the task's tick: its unsent memory events go too.
+        let reopened = row(taskId).flatMap { $0.isDone ? $0.lastTickToday?.id : nil }
+        guard run({ try $0.addStep(taskId: taskId, title: title) }) else { return false }
+        ai?.untick(reopened)
+        if reopened != nil, ratingPrompt?.itemId == taskId { ratingPrompt = nil }
+        return true
+    }
 
     /// + or Add all on a suggestion: added as typing it would, and remembered (SPEC "Memory").
     @discardableResult
