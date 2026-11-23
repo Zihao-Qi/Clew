@@ -6,7 +6,7 @@ import SwiftUI
 /// steps first, in the order they were done, then the open ones in your order; each with
 /// its own circle. Open steps reorder by dragging within their task, or go onto an hour
 /// of the timeline when dragged up there (the list draws that card). A step on the
-/// timeline is not listed. A click on a step does nothing; a double-click opens its task's
+/// timeline stays listed with its time (SPEC 2026-11-22). A click on a step does nothing; a double-click opens its task's
 /// details.
 struct StepsList: View {
     let model: AppModel
@@ -47,8 +47,8 @@ struct StepsList: View {
 
     /// The steps as drawn: the held order while a ticked step is under the pointer.
     private var shown: [TaskSteps.Entry] {
-        let placed = model.timelineShown ? model.timeline?.placedSteps ?? [] : []
-        let entries = steps.entries.filter { !placed.contains($0.id) }
+        // Placed steps stay listed, with their time (SPEC 2026-11-22).
+        let entries = steps.entries
         guard let held else { return entries }
         let rank = Dictionary(uniqueKeysWithValues: held.order.enumerated().map { ($1, $0) })
         return entries.enumerated().sorted { a, b in
@@ -154,7 +154,7 @@ struct StepsList: View {
                 t.disablesAnimations = true
                 withTransaction(t) {
                     if overTimeline, let draggedEntry, onTimelineDrop(draggedEntry) {
-                        // Placed: it leaves the list.
+                        // Placed: it stays listed with its time; its task leaves once every open step is placed.
                     } else if let dragging, let from = openIds.firstIndex(of: dragging), let to = dragSlot, to != from {
                         model.moveStep(dragging, toOpenIndex: to)
                     }
@@ -188,6 +188,18 @@ struct StepsList: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityLabel(Text("\(entry.step.title), step of \(row.item.title)"))
                     .accessibilityAddTraits(entry.isDone ? .isSelected : [])
+                if model.timelineShown, let start = model.timeline?.nextStart(ofStep: entry.id, now: Date()) {
+                    // Its block's start, until the block ends (SPEC 2026-11-22).
+                    Text(start, format: .dateTime.hour().minute())
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .fixedSize()
+                        // Lined up with the task's count above it.
+                        .padding(.trailing, RowView.undoWidth + 4)
+                        .debugFrame("stepTime:\(entry.id)")
+                        .accessibilityLabel(Text("on the timeline at \(start.formatted(date: .omitted, time: .shortened))"))
+                }
             }
         }
         .padding(.leading, StepMetrics.leading)
@@ -239,7 +251,9 @@ struct StepsList: View {
             Button("Rename") { model.renamingStep = entry.id }
             Button("Delete") { model.deleteStep(entry.step) }
             // Nothing needs a drag (SPEC 2026-11-21): the next quarter hour, 30 minutes.
-            if !entry.isDone, model.timelineShown, model.timeline != nil {
+            // Not for a step already planned: its block offers Move to… (review).
+            if !entry.isDone, model.timelineShown, let day = model.timeline,
+               day.nextStart(ofStep: entry.id, now: Date()) == nil {
                 Button("Put on timeline") { model.placeStepAtNextQuarter(entry.id) }
             }
         }

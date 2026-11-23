@@ -76,9 +76,12 @@ final class AppModel {
     private(set) var blockAlerts = true
     /// The list's rows: today's tasks minus those on the timeline (SPEC 2026-11-10: a
     /// placed task lives on the timeline only). `today` keeps them all, for done/total.
+    /// A task whose every open step is on the timeline leaves too (SPEC 2026-11-22).
     var listRows: [TodayRow] {
         let rows = today?.rows ?? []
-        guard timelineShown, let placed = timeline?.placedItems, !placed.isEmpty else { return rows }
+        guard timelineShown, let day = timeline else { return rows }
+        let placed = day.placedItems.union(day.tasksWithAllStepsPlaced(steps))
+        guard !placed.isEmpty else { return rows }
         return rows.filter { !placed.contains($0.id) }
     }
     /// Today's row for a task, wherever it is shown (Goals & Later too).
