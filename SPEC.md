@@ -1073,7 +1073,9 @@ stopped daily use, not adding features.
     "Put on timeline" action on the step, at the next quarter hour for 30 minutes). A step
     of a Goals & Later task moves its task to Today first, as a row does. Its block reads
     "Prepare the talk - Speech notes" and follows a task block's rules for the step.
-    *Changed* 2026-11-22 (*user*): **a placed step stays in the list**, under its task,
+    A done step can go onto the timeline too (*user*, 2026-11-22), to show when it was
+    done: it keeps its place in the list, and its block shows done and ticks nothing (it
+    skips, as for a done task). *Changed* 2026-11-22 (*user*): **a placed step stays in the list**, under its task,
     with its block's start beside it ("10:30") until the block ends; ticking it there or
     on the timeline is the same tick. **Once every open step of a task is on the
     timeline**, the task's row leaves the list with all its steps, as a placed task does;

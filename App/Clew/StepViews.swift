@@ -120,9 +120,18 @@ struct StepsList: View {
         DragGesture(minimumDistance: 3, coordinateSpace: .named(listSpace ?? space))
             .updating($dragLive) { _, live, _ in live = true }
             .onChanged { value in
-                // Done steps stay where they are; the drag still belongs to the step, never
-                // to its task's row.
-                guard !entry.isDone else { return }
+                // Done steps keep their place in the list, but may go onto the timeline
+                // (user, 2026-11-22); the drag still belongs to the step, never its task's row.
+                if entry.isDone {
+                    if dragging == nil {
+                        dragFrames = []
+                        dragging = entry.id
+                        draggedEntry = entry
+                    }
+                    let over = onTimelineDrag(entry, value.location)
+                    if over != overTimeline { overTimeline = over }
+                    return
+                }
                 if dragging == nil {
                     dragFrames = openIds.map { frames[$0] ?? .zero }
                     dragging = entry.id
@@ -251,8 +260,9 @@ struct StepsList: View {
             Button("Rename") { model.renamingStep = entry.id }
             Button("Delete") { model.deleteStep(entry.step) }
             // Nothing needs a drag (SPEC 2026-11-21): the next quarter hour, 30 minutes.
-            // Not for a step already planned: its block offers Move to… (review).
-            if !entry.isDone, model.timelineShown, let day = model.timeline,
+            // Not for a step already planned: its block offers Move to… (review). Done steps
+            // too (user, 2026-11-22).
+            if model.timelineShown, let day = model.timeline,
                day.nextStart(ofStep: entry.id, now: Date()) == nil {
                 Button("Put on timeline") { model.placeStepAtNextQuarter(entry.id) }
             }

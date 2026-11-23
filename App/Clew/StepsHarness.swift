@@ -308,6 +308,34 @@ extension Snapshot {
                     } else {
                         report("the step's block is shown", false)
                     }
+                    // Done things onto the hours (user, 2026-11-22): a done step and a done task.
+                    let hours = NSPoint(x: 200, y: window.frame.height - 28 - 90)
+                    if let doneStep = model.allSteps(of: talk).first(where: \.isDone),
+                       let f = frame("step:\(doneStep.id)") {
+                        try await drag(from: NSPoint(x: f.midX, y: f.midY), to: hours)
+                        let b = model.timeline?.blocks.first { $0.block.stepId == doneStep.id }
+                        report("a done step dragged onto the hours gets a block and stays done and listed",
+                               b != nil && model.allSteps(of: talk).first { $0.id == doneStep.id }?.isDone == true
+                               && frame("step:\(doneStep.id)") != nil)
+                        if let b { _ = model.removeBlock(b.id) }
+                    } else {
+                        report("a done step is shown", false)
+                    }
+                    if let milkRow = model.row(milk), !milkRow.isDone { model.tap(milkRow) }
+                    model.setUnfolded(talk, false)                // so "Buy milk" is in view
+                    try await Task.sleep(for: .milliseconds(400))
+                    if let c = frame("circle:\(milk)"), c.minY > 0 {
+                        try await drag(from: NSPoint(x: 200, y: c.midY), to: hours)
+                        let b = model.timeline?.blocks.first { $0.block.itemId == milk }
+                        report("a done task dragged onto the hours gets a block and stays done",
+                               b != nil && model.row(milk)?.isDone == true)
+                        if let b { _ = model.removeBlock(b.id) }
+                        if let milkRow = model.row(milk), milkRow.isDone { model.tap(milkRow) }
+                    } else {
+                        report("a done task is shown", false)
+                    }
+                    model.setUnfolded(talk, true)
+                    try await Task.sleep(for: .milliseconds(400))
                     // A block later today: the step shows its start beside it.
                     model.placeStepAtNextQuarter(open.id)
                     try await Task.sleep(for: .milliseconds(400))
