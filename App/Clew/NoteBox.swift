@@ -21,6 +21,17 @@ final class NoteBox: NSObject, NSWindowDelegate {
 
     var isOpen: Bool { panel?.isVisible == true }
     var isBannerShown: Bool { banner?.isVisible == true }
+    var bannerFrame: NSRect? { banner?.frame }
+    #if DEBUG
+    /// For the debug check: the box's title bar is fully hidden.
+    var titleBarHidden: Bool {
+        guard let panel else { return false }
+        return panel.titlebarSeparatorStyle == .none
+            && [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton]
+                .allSatisfy { panel.standardWindowButton($0)?.isHidden ?? true }
+            && (panel.contentView as? NSHostingView<NoteBoxView>)?.safeAreaRegions.isEmpty == true
+    }
+    #endif
     #if DEBUG
     /// The debug check types into the box directly (the app is not in front there).
     var panelForChecks: NSPanel? { panel }
@@ -39,8 +50,9 @@ final class NoteBox: NSObject, NSWindowDelegate {
         state.focusRequest += 1
         let panel = self.panel ?? makePanel()
         self.panel = panel
-        // One line to start; the editor measures its text and sets the height (review).
+        // Exactly as tall as what it holds, from the first frame (user, 2026-11-23).
         place(panel, height: 50)
+        fitNow(panel)
         panel.makeKeyAndOrderFront(nil)
     }
 
@@ -51,6 +63,7 @@ final class NoteBox: NSObject, NSWindowDelegate {
         Self.defaults.removeObject(forKey: Self.draftKey)
         // The banner takes the box's place and size: it is the same box, saved.
         state.savedText = state.text
+        if let panel { fitNow(panel) }   // the size it has now, not one a moment old (review)
         let frame = panel?.frame
         state.text = ""
         closePanel()
@@ -94,8 +107,8 @@ final class NoteBox: NSObject, NSWindowDelegate {
         let banner = self.banner ?? makeBanner()
         self.banner = banner
         if let frame {
-            banner.setFrame(NSRect(x: frame.minX, y: frame.maxY - max(frame.height, 64), width: frame.width,
-                                   height: max(frame.height, 64)), display: false)
+            // Exactly the box's frame: the same box, saved (user, 2026-11-23: it was narrower).
+            banner.setFrame(frame, display: false)
         } else {
             place(banner, height: 64)
         }
@@ -109,8 +122,9 @@ final class NoteBox: NSObject, NSWindowDelegate {
                              userInfo: [.announcement: text, .priority: NSAccessibilityPriorityLevel.high.rawValue])
         bannerTask?.cancel()
         bannerTask = Task { [weak self] in
-            // The sweep (about half a second), then 3 seconds of "Saved".
-            try? await Task.sleep(for: .seconds(3.6))
+            // The sweep (about half a second), then 1.5 seconds of "Saved" (user,
+            // 2026-11-23: 3 seconds was too long).
+            try? await Task.sleep(for: .seconds(2.0))
             guard !Task.isCancelled else { return }
             await NSAnimationContext.runAnimationGroup { $0.duration = 0.3; self?.banner?.animator().alphaValue = 0 }
             guard !Task.isCancelled else { return }   // a newer banner keeps showing
@@ -128,11 +142,20 @@ final class NoteBox: NSObject, NSWindowDelegate {
     // MARK: Windows
 
     private func makePanel() -> NotePanel {
+        // Titled: a borderless panel never takes the keyboard while Clew is not in front.
+        // Its title bar is hidden: no separator line, no buttons (user, 2026-11-23: a line
+        // showed above the box), and the content draws from the very top.
         let panel = NotePanel(contentRect: NSRect(x: 0, y: 0, width: 440, height: 90),
                               styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView], backing: .buffered,
                               defer: true)
         configure(panel)
-        panel.contentView = NSHostingView(rootView: NoteBoxView(box: self, state: state))
+        panel.titlebarSeparatorStyle = .none
+        for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+            panel.standardWindowButton(button)?.isHidden = true
+        }
+        let host = NSHostingView(rootView: NoteBoxView(box: self, state: state))
+        host.safeAreaRegions = []
+        panel.contentView = host
         panel.delegate = self
         return panel
     }
@@ -170,9 +193,23 @@ final class NoteBox: NSObject, NSWindowDelegate {
                               width: size.width, height: size.height), display: false)
     }
 
-    /// The box grows with its text, keeping its top where it is.
-    func resize(to height: CGFloat) {
-        guard let panel else { return }
+    /// The box is exactly as tall as its content, keeping its top where it is: no gap
+    /// between the panel and what it draws (user, 2026-11-23: a line showed above it).
+    /// The editor measured new text: the open box fits it (never a closed one, review).
+    func fitToContent() {
+        guard let panel, panel.isVisible else { return }
+        fitNow(panel)
+    }
+
+    private func fitNow(_ panel: NSPanel) {
+        guard let host = panel.contentView else { return }
+        host.layoutSubtreeIfNeeded()
+        let height = host.fittingSize.height
+        if height > 0 { resize(panel, to: height) }
+    }
+
+    private func resize(_ panel: NSPanel, to height: CGFloat) {
+        guard abs(panel.frame.height - height) > 0.5 else { return }
         var frame = panel.frame
         let top = frame.maxY
         frame.size.height = height
@@ -240,7 +277,7 @@ struct NoteBoxView: View {
                             placeholder: String(localized: "A thought to keep…"),
                             focusRequest: state.focusRequest, maxLines: 4,
                             onSubmit: { box.save() }, onCancel: { box.close() },
-                            onHeight: { box.resize(to: $0 + (state.context == nil ? 28 : 48)) })
+                            onHeight: { _ in box.fitToContent() })
                 .accessibilityLabel(Text("Note"))
             if let context = state.context {
                 // What it is written during (SPEC "Notes", 2026-11-23).

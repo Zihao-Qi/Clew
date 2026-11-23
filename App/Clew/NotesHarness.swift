@@ -126,10 +126,10 @@ extension Snapshot {
                        && saved?.duringTitle == "Write the intro" && !box.isOpen)
                 report("then the banner: Saved. Back to: the task, with its minutes left",
                        box.isBannerShown && box.bannerText?.hasPrefix("Saved. Back to: Write the intro · ") == true)
-                try await Task.sleep(for: .milliseconds(1000))
+                try await Task.sleep(for: .milliseconds(900))
                 report("the banner stays after the sweep, settled", box.isBannerShown && box.state.settled)
-                try await Task.sleep(for: .milliseconds(3300))
-                report("the banner goes by itself after about 3.6 seconds (sweep and 3 s)", !box.isBannerShown)
+                try await Task.sleep(for: .milliseconds(1700))
+                report("the banner goes by itself after about 2 seconds (sweep and 1.5 s)", !box.isBannerShown)
 
                 box.open()
                 try await Task.sleep(for: .milliseconds(300))
@@ -159,6 +159,45 @@ extension Snapshot {
                     model.undoDeleteNote()
                     report("… done, under Done", model.doneNotes.first?.id == note.id)
                 }
+                // Five lines: the box is exactly as tall as what it draws (no gap, no line
+                // above it), stops growing at four lines; saved, the banner is the same frame.
+                box.open()
+                try await Task.sleep(for: .milliseconds(300))
+                var heights: [CGFloat] = []
+                for line in ["one", "two", "three", "four", "five"] {
+                    if !heights.isEmpty { key("\r", code: 36, shift: true) }
+                    type(line)
+                    try await Task.sleep(for: .milliseconds(150))
+                    heights.append(panel.frame.height)
+                }
+                let content = panel.contentView?.fittingSize.height ?? 0
+                report("the box is as tall as its content, with no gap", abs(panel.frame.height - content) < 1)
+                report("its title bar is fully hidden: no line, no buttons, content from the top", box.titleBarHidden)
+                report("it grows line by line to four lines, then scrolls",
+                       heights[1] > heights[0] && heights[2] > heights[1] && heights[3] > heights[2] && heights[4] == heights[3])
+                key("\u{1b}", code: 53)                         // kept as a draft
+                try await Task.sleep(for: .milliseconds(200))
+                box.open()
+                let atOpen = panel.frame.height                 // the first frame, before any delayed fit
+                try await Task.sleep(for: .milliseconds(300))
+                report("a four-line draft reopens at its full height at once",
+                       abs(atOpen - heights[3]) < 1 && abs(panel.frame.height - heights[3]) < 1)
+                box.state.text = ""
+                box.close()
+
+                // No task: one line, no During; saved at once, the banner is the box's frame.
+                try clew.stopFocus()
+                model.refresh()
+                box.open()
+                try await Task.sleep(for: .milliseconds(300))
+                type("short")
+                let boxFrame = panel.frame
+                report("one line with no task: a slim box", boxFrame.height < 56 && model.noteContext() == nil)
+                key("\r", code: 36)
+                try await Task.sleep(for: .milliseconds(300))
+                report("the banner takes exactly the box's frame", box.bannerFrame == boxFrame)
+                box.closeBanner()
+
                 report("the two shortcuts never clash",
                        model.setWriteNoteShortcut(.default) == "Already used to open the list."
                        && model.setOpenListShortcut(.writeNoteDefault) == "Already used to write a note.")
