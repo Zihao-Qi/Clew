@@ -343,6 +343,8 @@ struct NoteBannerView: View {
     #if DEBUG
     /// The debug render shows the settled banner (an image cannot wait for the sweep).
     static var startSettled = false
+    /// The debug check sweeps even on a Mac with Reduce Motion on (as CI's may be).
+    static var sweepAlways = false
     #endif
 
     var body: some View {
@@ -358,6 +360,7 @@ struct NoteBannerView: View {
                     } else {
                         // Just as it was typed: the same size and place.
                         NoteTextShown(text: state.savedText, scrolledBy: state.savedScroll, maxLines: 4)
+                            .id(state.bannerShown)   // new for each banner (review: a reused one lost its scroll; not reproduced here)
                             .debugFrame("sweptText")
                             .padding(14)
                     }
@@ -376,6 +379,7 @@ struct NoteBannerView: View {
         .accessibilityLabel(Text(verbatim: state.banner ?? ""))
         .accessibilityAddTraits(.isButton)
         .accessibilityHint(Text("Closes"))
+        .accessibilityAction(.default, dismiss)
         .debugFrame("noteBanner")
     }
 
@@ -404,6 +408,9 @@ struct NoteBannerView: View {
         let shown = state.bannerShown
         var still = reduceMotion
         #if DEBUG
+        still = still && !Self.sweepAlways
+        #endif
+        #if DEBUG
         still = still || Self.startSettled
         #endif
         guard !still else {
@@ -431,7 +438,6 @@ extension View {
     }
 }
 
-/// A plain text editor for notes: Return submits, ⇧Return starts a new line at the cursor,
 /// What was typed, drawn just as the note field draws it (same text view, font and line
 /// height), at most `maxLines` lines: on Return nothing moves or changes size.
 struct NoteTextShown: NSViewRepresentable {
@@ -498,6 +504,7 @@ struct NoteTextShown: NSViewRepresentable {
     }
 }
 
+/// A plain text editor for notes: Return submits, ⇧Return starts a new line at the cursor,
 /// Esc cancels; at most 1,000 characters; grows to `maxLines` lines, then scrolls.
 struct NoteEditorField: NSViewRepresentable {
     @Binding var text: String

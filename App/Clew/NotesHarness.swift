@@ -24,6 +24,8 @@ extension Snapshot {
                 let defaults = UserDefaults(suiteName: "clew-notes-test")!
                 defaults.removePersistentDomain(forName: "clew-notes-test")
                 NoteBox.defaults = defaults
+                NoteBannerView.sweepAlways = true
+                print("  Reduce Motion on this Mac:", NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
                 NoteBox.shared.model = model
                 try clew.settleWriteNoteShortcut()
                 model.refresh()
@@ -235,7 +237,6 @@ extension Snapshot {
                 report("scrolled up and saved: the band sweeps over the same first four lines",
                        box.scrolledBy.banner.map { abs($0) < 1 } == true)
                 box.closeBanner()
-
                 // No task: one line, no During; saved at once, the banner is the box's frame.
                 try clew.stopFocus()
                 model.refresh()
