@@ -24,6 +24,8 @@ extension Snapshot {
                 let defaults = UserDefaults(suiteName: "clew-notes-test")!
                 defaults.removePersistentDomain(forName: "clew-notes-test")
                 NoteBox.defaults = defaults
+                NoteBannerView.sweepAlways = true
+                print("  Reduce Motion on this Mac:", NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
                 NoteBox.shared.model = model
                 try clew.settleWriteNoteShortcut()
                 model.refresh()
@@ -111,6 +113,17 @@ extension Snapshot {
                     panel.sendEvent(e)
                 }
                 func type(_ text: String) { for c in text { key(String(c), code: 0) } }
+                /// The banner's copy of the text, as the banner showing now drew it.
+                @MainActor func sweptNow() -> CGRect? { DebugFrames.frames["sweptText\(box.state.bannerShown)"] }
+                /// Return, then wait until the banner's copy of the text is drawn (a slow Mac
+                /// takes longer), at most until the sweep settles.
+                @MainActor func returnUntilSwept() async throws {
+                    key("\r", code: 36)
+                    for _ in 0..<20 where sweptNow() == nil {
+                        try await Task.sleep(for: .milliseconds(20))
+                    }
+                    try await Task.sleep(for: .milliseconds(30))   // one more frame for the scroll
+                }
                 let oneLine = panel.frame.height
                 type("Call the bank")
                 try await Task.sleep(for: .milliseconds(150))
@@ -121,7 +134,14 @@ extension Snapshot {
                 try await Task.sleep(for: .milliseconds(200))
                 report("⇧Return starts a new line", box.state.text == "Call the bank\nabout the card" && box.isOpen)
                 report("the box grows with its lines", panel.frame.height > oneLine + 10)
-                key("\r", code: 36)
+                let typed = DebugFrames.frames["noteText"]
+                let lineHeight = box.textAndField.map { $0.text.height / 2 } ?? 0
+                try await returnUntilSwept()
+                let swept = sweptNow()
+                print("  typed", typed as Any, "swept", swept as Any)
+                report("while the band sweeps, the text stays the same size and place (user, 2026-11-24)",
+                       typed != nil && swept != nil && abs(typed!.minY - swept!.minY) < 1 && abs(typed!.minX - swept!.minX) < 1
+                       && abs(typed!.height - swept!.height) < 1)
                 try await Task.sleep(for: .milliseconds(300))
                 let saved = model.openNotes.first
                 report("Return saves it with the task it was written during",
@@ -131,6 +151,11 @@ extension Snapshot {
                        box.isBannerShown && box.bannerText?.hasPrefix("Saved. Back to: Write the intro · ") == true)
                 try await Task.sleep(for: .milliseconds(900))
                 report("the banner stays after the sweep, settled", box.isBannerShown && box.state.settled)
+                let title = DebugFrames.frames["savedTitle"], back = DebugFrames.frames["backTo"]
+                report("Saved and Back to are the typed text's size, one line each",
+                       title.map { abs($0.height - lineHeight) < 1.5 } == true && back.map { abs($0.height - lineHeight) < 1.5 } == true)
+                let whole = DebugFrames.frames["noteBanner"]
+                report("… and fit inside the banner", whole != nil && [title, back].allSatisfy { $0.map { whole!.contains($0) } == true })
                 try await Task.sleep(for: .milliseconds(1700))
                 report("the banner goes by itself after about 2 seconds (sweep and 1.5 s)", !box.isBannerShown)
 
@@ -188,9 +213,53 @@ extension Snapshot {
                 try await Task.sleep(for: .milliseconds(300))
                 report("a four-line draft reopens at its full height at once",
                        abs(atOpen - heights[3]) < 1 && abs(panel.frame.height - heights[3]) < 1)
-                box.state.text = ""
-                box.close()
-
+                // Saved past four lines: the band sweeps over the same last four lines.
+                let field = box.scrolledBy.field ?? 0
+                try await returnUntilSwept()
+                let banner = box.scrolledBy.banner
+                print("  field scrolled", field, "banner", banner as Any)
+                report("five lines saved: the band sweeps over the same last four lines",
+                       field > 10 && banner.map { abs($0 - field) < 1 } == true)
+                box.closeBanner()
+                // Scrolled back up before saving: the band sweeps over the first four.
+                box.open()
+                try await Task.sleep(for: .milliseconds(300))
+                for (i, line) in ["one", "two", "three", "four", "five"].enumerated() {
+                    if i > 0 { key("\r", code: 36, shift: true) }
+                    type(line)
+                }
+                try await Task.sleep(for: .milliseconds(150))
+                if let scroll = NoteBox.scrollView(in: panel.contentView) {
+                    scroll.contentView.scroll(to: .zero)
+                    scroll.reflectScrolledClipView(scroll.contentView)
+                }
+                let returned = Date()
+                try await returnUntilSwept()
+                let sweptFrom = Date()                          // its sweep began just before
+                print("  scrolled-up banner drawn after", sweptFrom.timeIntervalSince(returned), "s")
+                print("  scrolled up: banner", box.scrolledBy.banner as Any)
+                report("scrolled up and saved: the band sweeps over the same first four lines",
+                       box.scrolledBy.banner.map { abs($0) < 1 } == true)
+                box.closeBanner()
+                // That banner closed mid-sweep; a one-line note saved just after it would have
+                // settled: the old text never settles over the new (review).
+                box.open()
+                try await Task.sleep(for: .milliseconds(300))
+                type("x")
+                let small = DebugFrames.frames["noteText"]
+                let wait = 0.55 - Date().timeIntervalSince(sweptFrom)   // just after it would have settled
+                if wait > 0 { try await Task.sleep(for: .seconds(wait)) }
+                try await returnUntilSwept()
+                let after = sweptNow()
+                var copies: Set<Int> = []
+                for _ in 0..<8 {                                // through the old one's would-be settle
+                    copies.insert(box.bannerTextViews)
+                    try await Task.sleep(for: .milliseconds(25))
+                }
+                print("  saved just after a closed sweep (waited \(wait) s): typed", small as Any, "swept", after as Any, "copies", copies)
+                report("a banner closed mid-sweep never settles over the next note",
+                       wait > 0 && small != nil && small == after && copies == [1])   // wait > 0: it really was mid-sweep
+                box.closeBanner()
                 // No task: one line, no During; saved at once, the banner is the box's frame.
                 try clew.stopFocus()
                 model.refresh()
@@ -199,8 +268,15 @@ extension Snapshot {
                 type("short")
                 let boxFrame = panel.frame
                 report("one line with no task: a slim box", boxFrame.height < 56 && model.noteContext() == nil)
-                key("\r", code: 36)
-                try await Task.sleep(for: .milliseconds(300))
+                let short = DebugFrames.frames["noteText"]
+                try await returnUntilSwept()
+                let shortSwept = sweptNow()
+                print("  one line typed", short as Any, "swept", shortSwept as Any)
+                report("one line: the text stays the same size and place too",
+                       short != nil && short == shortSwept)
+                try await Task.sleep(for: .milliseconds(800))
+                let slim = DebugFrames.frames["noteBanner"], slimTitle = DebugFrames.frames["savedTitle"]
+                report("… and Saved fits the slim banner", slim != nil && slimTitle.map { slim!.contains($0) } == true)
                 report("the banner takes exactly the box's frame", box.bannerFrame == boxFrame)
                 box.closeBanner()
 

@@ -18,6 +18,9 @@ final class NoteBox: NSObject, NSWindowDelegate {
     /// Where the draft is kept: this Mac's preferences, so it survives quitting.
     static var defaults = UserDefaults.standard
     static let draftKey = "noteDraft"
+    /// One size for the box and its banner: what was typed, "Saved" and "Back to"
+    /// (user, 2026-11-24: the text changed size on Return).
+    static let textFont = NSFont.systemFont(ofSize: NSFont.systemFontSize + 2)
 
     var isOpen: Bool { panel?.isVisible == true }
     var isBannerShown: Bool { banner?.isVisible == true }
@@ -30,6 +33,19 @@ final class NoteBox: NSObject, NSWindowDelegate {
             && [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton]
                 .allSatisfy { panel.standardWindowButton($0)?.isHidden ?? true }
             && (panel.contentView as? NSHostingView<NoteBoxView>)?.safeAreaRegions.isEmpty == true
+    }
+
+    /// For the debug check: how far the note field and the banner's copy of the text are
+    /// scrolled.
+    var scrolledBy: (field: CGFloat?, banner: CGFloat?) {
+        (Self.scrollView(in: panel?.contentView)?.contentView.bounds.minY,
+         Self.scrollView(in: banner?.contentView)?.contentView.bounds.minY)
+    }
+
+    /// For the debug check: the copies of typed text the banner draws (one while it sweeps).
+    var bannerTextViews: Int {
+        func count(_ view: NSView) -> Int { (view is NSTextView ? 1 : 0) + view.subviews.reduce(0) { $0 + count($1) } }
+        return banner?.contentView.map(count) ?? 0
     }
 
     /// For the debug check: where the typed text is drawn, against the field showing it
@@ -51,6 +67,13 @@ final class NoteBox: NSObject, NSWindowDelegate {
     var panelForChecks: NSPanel? { panel }
     #endif
     var bannerText: String? { state.banner }
+
+    /// The scroll view inside a window's content: the note field's, or the banner's copy.
+    static func scrollView(in view: NSView?) -> NSScrollView? {
+        guard let view else { return nil }
+        if let found = view as? NSScrollView { return found }
+        return view.subviews.lazy.compactMap { scrollView(in: $0) }.first
+    }
 
     /// The shortcut or ✎ Note: opens the box (or focuses it); a showing banner gives way.
     func open() {
@@ -77,6 +100,8 @@ final class NoteBox: NSObject, NSWindowDelegate {
         Self.defaults.removeObject(forKey: Self.draftKey)
         // The banner takes the box's place and size: it is the same box, saved.
         state.savedText = state.text
+        // Scrolled as the field was (past four lines): nothing moves on Return (review).
+        state.savedScroll = Self.scrollView(in: panel?.contentView)?.contentView.bounds.minY ?? 0
         if let panel { fitNow(panel) }   // the size it has now, not one a moment old (review)
         let frame = panel?.frame
         state.text = ""
@@ -272,6 +297,8 @@ final class NoteBoxState {
     var banner: String?
     /// What was just saved: the sweep passes over it before "Saved" shows.
     var savedText = ""
+    /// How far the field was scrolled when it was saved.
+    var savedScroll: CGFloat = 0
     /// The banner's sweep (0 to 1) and whether it has settled into the bar.
     var sweep: CGFloat = 0
     var settled = false
@@ -292,6 +319,7 @@ struct NoteBoxView: View {
                             focusRequest: state.focusRequest, maxLines: 4,
                             onSubmit: { box.save() }, onCancel: { box.close() },
                             onHeight: { _ in box.fitToContent() })
+                .debugFrame("noteText")
                 .accessibilityLabel(Text("Note"))
             if let context = state.context {
                 // What it is written during (SPEC "Notes", 2026-11-23).
@@ -321,6 +349,8 @@ struct NoteBannerView: View {
     #if DEBUG
     /// The debug render shows the settled banner (an image cannot wait for the sweep).
     static var startSettled = false
+    /// The debug check sweeps even on a Mac with Reduce Motion on (as CI's may be).
+    static var sweepAlways = false
     #endif
 
     var body: some View {
@@ -334,12 +364,14 @@ struct NoteBannerView: View {
                     if settled {
                         saved
                     } else {
-                        Text(verbatim: state.savedText)
-                            .lineLimit(4)
+                        // Just as it was typed: the same size and place.
+                        NoteTextShown(text: state.savedText, scrolledBy: state.savedScroll, maxLines: 4)
+                            .debugFrame("sweptText\(state.bannerShown)")   // one per banner, for the debug check
+                            .id(state.bannerShown)   // new for each banner (review: a reused one lost its scroll; not reproduced here)
                             .padding(14)
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: settled ? .leading : .topLeading)
             }
         }
         .frame(width: 440)
@@ -348,9 +380,12 @@ struct NoteBannerView: View {
         .contentShape(Rectangle())
         .onTapGesture(perform: dismiss)
         .task(id: state.bannerShown) { await play() }
-        .accessibilityElement(children: .combine)
+        // What it says, from the first frame (review: the swept text has no label).
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: state.banner ?? ""))
         .accessibilityAddTraits(.isButton)
         .accessibilityHint(Text("Closes"))
+        .accessibilityAction(.default, dismiss)
         .debugFrame("noteBanner")
     }
 
@@ -360,16 +395,17 @@ struct NoteBannerView: View {
                 .foregroundStyle(Color.accentColor)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Saved").font(.title3.weight(.semibold))
+                Text("Saved").fontWeight(.semibold)
+                    .debugFrame("savedTitle")
                 if let context = state.context {
                     (Text("Back to: ") + Text(verbatim: context.title).bold() + Text(verbatim: context.detail))
-                        .font(.body)
                         .foregroundStyle(.secondary)
+                        .debugFrame("backTo")
                         .lineLimit(2)
                 }
             }
         }
-        .font(.title3)
+        .font(Font(NoteBox.textFont))
         .padding(.horizontal, 16)
         .transition(.opacity)
     }
@@ -378,7 +414,7 @@ struct NoteBannerView: View {
         let shown = state.bannerShown
         var still = reduceMotion
         #if DEBUG
-        still = still || Self.startSettled
+        still = (still && !Self.sweepAlways) || Self.startSettled
         #endif
         guard !still else {
             state.settled = true
@@ -386,8 +422,9 @@ struct NoteBannerView: View {
         }
         withAnimation(.easeInOut(duration: 0.45)) { state.sweep = 1 }
         try? await Task.sleep(for: .milliseconds(470))
-        // A newer save restarted it: that one settles in its own time (review).
-        guard !Task.isCancelled, state.bannerShown == shown else { return }
+        // A newer save restarted it: that one settles in its own time; a closed banner
+        // never settles behind the next note (review).
+        guard !Task.isCancelled, state.bannerShown == shown, state.banner != nil else { return }
         withAnimation(.easeOut(duration: 0.25)) { state.settled = true }
     }
 }
@@ -402,6 +439,72 @@ extension View {
         } else {
             self.background(.regularMaterial, in: shape).clipShape(shape)
         }
+    }
+}
+
+/// What was typed, drawn just as the note field draws it (same text view, font and line
+/// height), at most `maxLines` lines: on Return nothing moves or changes size.
+struct NoteTextShown: NSViewRepresentable {
+    let text: String
+    var scrolledBy: CGFloat = 0
+    var maxLines = 4
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let start = NSRect(x: 0, y: 0, width: 412, height: 22)
+        let scroll = NSScrollView(frame: start)
+        scroll.drawsBackground = false
+        scroll.automaticallyAdjustsContentInsets = false
+        scroll.contentInsets = NSEdgeInsetsZero
+        scroll.hasVerticalScroller = false
+        let view = NSTextView(frame: start)
+        view.isEditable = false
+        view.isSelectable = false
+        view.drawsBackground = false
+        view.font = NoteBox.textFont
+        view.textContainerInset = .zero
+        view.textContainer?.lineFragmentPadding = 0
+        view.isVerticallyResizable = true
+        view.isHorizontallyResizable = false
+        view.autoresizingMask = [.width]
+        view.textContainer?.widthTracksTextView = true
+        view.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
+        view.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        view.setAccessibilityElement(false)
+        scroll.setAccessibilityElement(false)
+        scroll.documentView = view
+        return scroll
+    }
+
+    func updateNSView(_ scroll: NSScrollView, context: Context) {
+        guard let view = scroll.documentView as? NSTextView else { return }
+        if view.string != text { view.string = text }
+        settle(scroll)
+    }
+
+    /// Laid out at its width and scrolled as the field was, before it is drawn.
+    private func settle(_ scroll: NSScrollView) {
+        guard let view = scroll.documentView as? NSTextView, let layout = view.layoutManager,
+              let container = view.textContainer else { return }
+        layout.ensureLayout(for: container)
+        view.sizeToFit()
+        let most = max(0, view.frame.height - scroll.contentView.bounds.height)
+        scroll.contentView.scroll(to: NSPoint(x: 0, y: min(max(0, scrolledBy), most)))
+        scroll.reflectScrolledClipView(scroll.contentView)
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView scroll: NSScrollView, context: Context) -> CGSize? {
+        let width = proposal.width.flatMap { $0.isFinite && $0 > 0 ? $0 : nil } ?? 412
+        guard let view = scroll.documentView as? NSTextView, let layout = view.layoutManager,
+              let container = view.textContainer else { return nil }
+        if abs(view.frame.width - width) > 0.5 { view.setFrameSize(NSSize(width: width, height: view.frame.height)) }
+        container.containerSize = NSSize(width: width, height: .greatestFiniteMagnitude)
+        layout.ensureLayout(for: container)
+        let line = layout.defaultLineHeight(for: NoteBox.textFont)
+        let used = max(line, layout.usedRect(for: container).height)
+        let height = max(min(used, line * CGFloat(maxLines)).rounded(.up), 22)   // as the field: at least 22
+        scroll.setFrameSize(NSSize(width: width, height: height))
+        settle(scroll)
+        return CGSize(width: width, height: height)
     }
 }
 
@@ -438,7 +541,7 @@ struct NoteEditorField: NSViewRepresentable {
         view.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
         scroll.documentView = view
         view.delegate = context.coordinator
-        view.font = .systemFont(ofSize: NSFont.systemFontSize + 2)
+        view.font = NoteBox.textFont
         view.drawsBackground = false
         view.isRichText = false
         view.allowsUndo = true
