@@ -113,12 +113,13 @@ extension Snapshot {
                     panel.sendEvent(e)
                 }
                 func type(_ text: String) { for c in text { key(String(c), code: 0) } }
+                /// The banner's copy of the text, as the banner showing now drew it.
+                @MainActor func sweptNow() -> CGRect? { DebugFrames.frames["sweptText\(box.state.bannerShown)"] }
                 /// Return, then wait until the banner's copy of the text is drawn (a slow Mac
                 /// takes longer), at most until the sweep settles.
                 @MainActor func returnUntilSwept() async throws {
-                    DebugFrames.frames["sweptText"] = nil
                     key("\r", code: 36)
-                    for _ in 0..<20 where DebugFrames.frames["sweptText"] == nil {
+                    for _ in 0..<20 where sweptNow() == nil {
                         try await Task.sleep(for: .milliseconds(20))
                     }
                     try await Task.sleep(for: .milliseconds(30))   // one more frame for the scroll
@@ -136,7 +137,7 @@ extension Snapshot {
                 let typed = DebugFrames.frames["noteText"]
                 let lineHeight = box.textAndField.map { $0.text.height / 2 } ?? 0
                 try await returnUntilSwept()
-                let swept = DebugFrames.frames["sweptText"]
+                let swept = sweptNow()
                 print("  typed", typed as Any, "swept", swept as Any)
                 report("while the band sweeps, the text stays the same size and place (user, 2026-11-24)",
                        typed != nil && swept != nil && abs(typed!.minY - swept!.minY) < 1 && abs(typed!.minX - swept!.minX) < 1
@@ -232,8 +233,10 @@ extension Snapshot {
                     scroll.contentView.scroll(to: .zero)
                     scroll.reflectScrolledClipView(scroll.contentView)
                 }
-                let sweptFrom = Date()
+                let returned = Date()
                 try await returnUntilSwept()
+                let sweptFrom = Date()                          // its sweep began just before
+                print("  scrolled-up banner drawn after", sweptFrom.timeIntervalSince(returned), "s")
                 print("  scrolled up: banner", box.scrolledBy.banner as Any)
                 report("scrolled up and saved: the band sweeps over the same first four lines",
                        box.scrolledBy.banner.map { abs($0) < 1 } == true)
@@ -244,12 +247,18 @@ extension Snapshot {
                 try await Task.sleep(for: .milliseconds(300))
                 type("x")
                 let small = DebugFrames.frames["noteText"]
-                let wait = 0.55 - Date().timeIntervalSince(sweptFrom)   // just after it would settle
+                let wait = 0.55 - Date().timeIntervalSince(sweptFrom)   // just after it would have settled
                 if wait > 0 { try await Task.sleep(for: .seconds(wait)) }
                 try await returnUntilSwept()
-                let after = DebugFrames.frames["sweptText"]
-                print("  saved just after a closed sweep: typed", small as Any, "swept", after as Any)
-                report("a banner closed mid-sweep never settles over the next note", small != nil && small == after)
+                let after = sweptNow()
+                var copies: Set<Int> = []
+                for _ in 0..<8 {                                // through the old one's would-be settle
+                    copies.insert(box.bannerTextViews)
+                    try await Task.sleep(for: .milliseconds(25))
+                }
+                print("  saved just after a closed sweep (waited \(wait) s): typed", small as Any, "swept", after as Any, "copies", copies)
+                report("a banner closed mid-sweep never settles over the next note",
+                       wait > 0 && small != nil && small == after && copies == [1])   // wait > 0: it really was mid-sweep
                 box.closeBanner()
                 // No task: one line, no During; saved at once, the banner is the box's frame.
                 try clew.stopFocus()
@@ -261,7 +270,7 @@ extension Snapshot {
                 report("one line with no task: a slim box", boxFrame.height < 56 && model.noteContext() == nil)
                 let short = DebugFrames.frames["noteText"]
                 try await returnUntilSwept()
-                let shortSwept = DebugFrames.frames["sweptText"]
+                let shortSwept = sweptNow()
                 print("  one line typed", short as Any, "swept", shortSwept as Any)
                 report("one line: the text stays the same size and place too",
                        short != nil && short == shortSwept)

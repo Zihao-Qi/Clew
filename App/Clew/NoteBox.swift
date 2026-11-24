@@ -42,6 +42,12 @@ final class NoteBox: NSObject, NSWindowDelegate {
          Self.scrollView(in: banner?.contentView)?.contentView.bounds.minY)
     }
 
+    /// For the debug check: the copies of typed text the banner draws (one while it sweeps).
+    var bannerTextViews: Int {
+        func count(_ view: NSView) -> Int { (view is NSTextView ? 1 : 0) + view.subviews.reduce(0) { $0 + count($1) } }
+        return banner?.contentView.map(count) ?? 0
+    }
+
     /// For the debug check: where the typed text is drawn, against the field showing it
     /// (in the field's coordinates). Fully inside means it is all visible.
     var textAndField: (text: NSRect, field: NSRect)? {
@@ -360,8 +366,8 @@ struct NoteBannerView: View {
                     } else {
                         // Just as it was typed: the same size and place.
                         NoteTextShown(text: state.savedText, scrolledBy: state.savedScroll, maxLines: 4)
+                            .debugFrame("sweptText\(state.bannerShown)")   // one per banner, for the debug check
                             .id(state.bannerShown)   // new for each banner (review: a reused one lost its scroll; not reproduced here)
-                            .debugFrame("sweptText")
                             .padding(14)
                     }
                 }
