@@ -106,6 +106,8 @@ M = [
      "let height = min(used, line * CGFloat(maxLines)).rounded(.up)", NOTES),
     ("Notes saved in another size", A + "NoteBox.swift", "        .font(Font(NoteBox.textFont))\n        .padding(.horizontal, 16)",
      "        .font(.body)\n        .padding(.horizontal, 16)", NOTES),
+    ("Notes closed banner settles", A + "NoteBox.swift", "state.bannerShown == shown, state.banner != nil else",
+     "state.bannerShown == shown else", NOTES),
     ("Notes banner without task", A + "NoteBox.swift",
      "text = String(localized: \"Saved. Back to: \\(context.title)\\(context.detail)\")",
      "text = String(localized: \"Saved.\"); _ = context", NOTES),

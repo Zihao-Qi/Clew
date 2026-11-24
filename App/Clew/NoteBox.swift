@@ -408,10 +408,7 @@ struct NoteBannerView: View {
         let shown = state.bannerShown
         var still = reduceMotion
         #if DEBUG
-        still = still && !Self.sweepAlways
-        #endif
-        #if DEBUG
-        still = still || Self.startSettled
+        still = (still && !Self.sweepAlways) || Self.startSettled
         #endif
         guard !still else {
             state.settled = true
@@ -419,8 +416,9 @@ struct NoteBannerView: View {
         }
         withAnimation(.easeInOut(duration: 0.45)) { state.sweep = 1 }
         try? await Task.sleep(for: .milliseconds(470))
-        // A newer save restarted it: that one settles in its own time (review).
-        guard !Task.isCancelled, state.bannerShown == shown else { return }
+        // A newer save restarted it: that one settles in its own time; a closed banner
+        // never settles behind the next note (review).
+        guard !Task.isCancelled, state.bannerShown == shown, state.banner != nil else { return }
         withAnimation(.easeOut(duration: 0.25)) { state.settled = true }
     }
 }

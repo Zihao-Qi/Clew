@@ -232,10 +232,24 @@ extension Snapshot {
                     scroll.contentView.scroll(to: .zero)
                     scroll.reflectScrolledClipView(scroll.contentView)
                 }
+                let sweptFrom = Date()
                 try await returnUntilSwept()
                 print("  scrolled up: banner", box.scrolledBy.banner as Any)
                 report("scrolled up and saved: the band sweeps over the same first four lines",
                        box.scrolledBy.banner.map { abs($0) < 1 } == true)
+                box.closeBanner()
+                // That banner closed mid-sweep; a one-line note saved just after it would have
+                // settled: the old text never settles over the new (review).
+                box.open()
+                try await Task.sleep(for: .milliseconds(300))
+                type("x")
+                let small = DebugFrames.frames["noteText"]
+                let wait = 0.55 - Date().timeIntervalSince(sweptFrom)   // just after it would settle
+                if wait > 0 { try await Task.sleep(for: .seconds(wait)) }
+                try await returnUntilSwept()
+                let after = DebugFrames.frames["sweptText"]
+                print("  saved just after a closed sweep: typed", small as Any, "swept", after as Any)
+                report("a banner closed mid-sweep never settles over the next note", small != nil && small == after)
                 box.closeBanner()
                 // No task: one line, no During; saved at once, the banner is the box's frame.
                 try clew.stopFocus()
