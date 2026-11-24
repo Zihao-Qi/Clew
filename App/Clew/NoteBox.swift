@@ -31,6 +31,20 @@ final class NoteBox: NSObject, NSWindowDelegate {
                 .allSatisfy { panel.standardWindowButton($0)?.isHidden ?? true }
             && (panel.contentView as? NSHostingView<NoteBoxView>)?.safeAreaRegions.isEmpty == true
     }
+
+    /// For the debug check: where the typed text is drawn, against the field showing it
+    /// (in the field's coordinates). Fully inside means it is all visible.
+    var textAndField: (text: NSRect, field: NSRect)? {
+        func find(_ view: NSView) -> NSTextView? {
+            if let text = view as? NoteTextView { return text }
+            return view.subviews.lazy.compactMap(find).first
+        }
+        guard let host = panel?.contentView, let view = find(host), let scroll = view.enclosingScrollView,
+              let layout = view.layoutManager, let container = view.textContainer else { return nil }
+        layout.ensureLayout(for: container)
+        let used = layout.usedRect(for: container).offsetBy(dx: view.textContainerOrigin.x, dy: view.textContainerOrigin.y)
+        return (scroll.convert(used, from: view), scroll.bounds)
+    }
     #endif
     #if DEBUG
     /// The debug check types into the box directly (the app is not in front there).
@@ -408,6 +422,10 @@ struct NoteEditorField: NSViewRepresentable {
         let start = NSRect(x: 0, y: 0, width: 412, height: 22)
         let scroll = NSScrollView(frame: start)
         scroll.drawsBackground = false
+        // No room left for the box's hidden title bar: the text starts at the top
+        // (user, 2026-11-23: it sat at the bottom, almost hidden).
+        scroll.automaticallyAdjustsContentInsets = false
+        scroll.contentInsets = NSEdgeInsetsZero
         scroll.hasVerticalScroller = false
         scroll.autohidesScrollers = true
         let view = NoteTextView(frame: start)

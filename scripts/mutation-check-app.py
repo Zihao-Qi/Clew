@@ -92,6 +92,8 @@ M = [
      "focusRequest: state.focusRequest, maxLines: 3,", NOTES),
     ("Notes draft opens short", A + "NoteBox.swift", "        place(panel, height: 50)\n        fitNow(panel)\n",
      "        place(panel, height: 50)\n", NOTES),
+    ("Notes text under the title bar", A + "NoteBox.swift", "        scroll.automaticallyAdjustsContentInsets = false\n",
+     "", NOTES),
     ("Notes banner without task", A + "NoteBox.swift",
      "text = String(localized: \"Saved. Back to: \\(context.title)\\(context.detail)\")",
      "text = String(localized: \"Saved.\"); _ = context", NOTES),
