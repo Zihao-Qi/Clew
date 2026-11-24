@@ -111,6 +111,16 @@ extension Snapshot {
                     panel.sendEvent(e)
                 }
                 func type(_ text: String) { for c in text { key(String(c), code: 0) } }
+                /// Return, then wait until the banner's copy of the text is drawn (a slow Mac
+                /// takes longer), at most until the sweep settles.
+                @MainActor func returnUntilSwept() async throws {
+                    DebugFrames.frames["sweptText"] = nil
+                    key("\r", code: 36)
+                    for _ in 0..<20 where DebugFrames.frames["sweptText"] == nil {
+                        try await Task.sleep(for: .milliseconds(20))
+                    }
+                    try await Task.sleep(for: .milliseconds(30))   // one more frame for the scroll
+                }
                 let oneLine = panel.frame.height
                 type("Call the bank")
                 try await Task.sleep(for: .milliseconds(150))
@@ -123,9 +133,9 @@ extension Snapshot {
                 report("the box grows with its lines", panel.frame.height > oneLine + 10)
                 let typed = DebugFrames.frames["noteText"]
                 let lineHeight = box.textAndField.map { $0.text.height / 2 } ?? 0
-                key("\r", code: 36)
-                try await Task.sleep(for: .milliseconds(120))
+                try await returnUntilSwept()
                 let swept = DebugFrames.frames["sweptText"]
+                print("  typed", typed as Any, "swept", swept as Any)
                 report("while the band sweeps, the text stays the same size and place (user, 2026-11-24)",
                        typed != nil && swept != nil && abs(typed!.minY - swept!.minY) < 1 && abs(typed!.minX - swept!.minX) < 1
                        && abs(typed!.height - swept!.height) < 1)
@@ -202,9 +212,9 @@ extension Snapshot {
                        abs(atOpen - heights[3]) < 1 && abs(panel.frame.height - heights[3]) < 1)
                 // Saved past four lines: the band sweeps over the same last four lines.
                 let field = box.scrolledBy.field ?? 0
-                key("\r", code: 36)
-                try await Task.sleep(for: .milliseconds(150))
+                try await returnUntilSwept()
                 let banner = box.scrolledBy.banner
+                print("  field scrolled", field, "banner", banner as Any)
                 report("five lines saved: the band sweeps over the same last four lines",
                        field > 10 && banner.map { abs($0 - field) < 1 } == true)
                 box.closeBanner()
@@ -220,8 +230,8 @@ extension Snapshot {
                     scroll.contentView.scroll(to: .zero)
                     scroll.reflectScrolledClipView(scroll.contentView)
                 }
-                key("\r", code: 36)
-                try await Task.sleep(for: .milliseconds(150))
+                try await returnUntilSwept()
+                print("  scrolled up: banner", box.scrolledBy.banner as Any)
                 report("scrolled up and saved: the band sweeps over the same first four lines",
                        box.scrolledBy.banner.map { abs($0) < 1 } == true)
                 box.closeBanner()
@@ -235,9 +245,9 @@ extension Snapshot {
                 let boxFrame = panel.frame
                 report("one line with no task: a slim box", boxFrame.height < 56 && model.noteContext() == nil)
                 let short = DebugFrames.frames["noteText"]
-                key("\r", code: 36)
-                try await Task.sleep(for: .milliseconds(120))
+                try await returnUntilSwept()
                 let shortSwept = DebugFrames.frames["sweptText"]
+                print("  one line typed", short as Any, "swept", shortSwept as Any)
                 report("one line: the text stays the same size and place too",
                        short != nil && short == shortSwept)
                 try await Task.sleep(for: .milliseconds(800))
