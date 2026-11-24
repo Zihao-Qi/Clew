@@ -121,7 +121,15 @@ extension Snapshot {
                 try await Task.sleep(for: .milliseconds(200))
                 report("⇧Return starts a new line", box.state.text == "Call the bank\nabout the card" && box.isOpen)
                 report("the box grows with its lines", panel.frame.height > oneLine + 10)
+                let typed = DebugFrames.frames["noteText"]
+                let lineHeight = box.textAndField.map { $0.text.height / 2 } ?? 0
                 key("\r", code: 36)
+                try await Task.sleep(for: .milliseconds(120))
+                let swept = DebugFrames.frames["sweptText"]
+                report("while the band sweeps, the text stays the same size and place (user, 2026-11-24)",
+                       typed != nil && swept != nil && abs(typed!.minY - swept!.minY) < 1 && abs(typed!.minX - swept!.minX) < 1
+                       && abs(typed!.height - swept!.height) < 1)
+                try await Task.sleep(for: .milliseconds(180))
                 try await Task.sleep(for: .milliseconds(300))
                 let saved = model.openNotes.first
                 report("Return saves it with the task it was written during",
@@ -131,6 +139,9 @@ extension Snapshot {
                        box.isBannerShown && box.bannerText?.hasPrefix("Saved. Back to: Write the intro · ") == true)
                 try await Task.sleep(for: .milliseconds(900))
                 report("the banner stays after the sweep, settled", box.isBannerShown && box.state.settled)
+                let title = DebugFrames.frames["savedTitle"], back = DebugFrames.frames["backTo"]
+                report("Saved and Back to are the typed text's size, one line each",
+                       title.map { abs($0.height - lineHeight) < 1.5 } == true && back.map { abs($0.height - lineHeight) < 1.5 } == true)
                 try await Task.sleep(for: .milliseconds(1700))
                 report("the banner goes by itself after about 2 seconds (sweep and 1.5 s)", !box.isBannerShown)
 
@@ -188,8 +199,14 @@ extension Snapshot {
                 try await Task.sleep(for: .milliseconds(300))
                 report("a four-line draft reopens at its full height at once",
                        abs(atOpen - heights[3]) < 1 && abs(panel.frame.height - heights[3]) < 1)
-                box.state.text = ""
-                box.close()
+                // Saved past four lines: the band sweeps over the same last four lines.
+                let field = box.scrolledBy.field ?? 0
+                key("\r", code: 36)
+                try await Task.sleep(for: .milliseconds(150))
+                let banner = box.scrolledBy.banner
+                report("five lines saved: the band sweeps over the same last four lines",
+                       field > 10 && banner.map { abs($0 - field) < 1 } == true)
+                box.closeBanner()
 
                 // No task: one line, no During; saved at once, the banner is the box's frame.
                 try clew.stopFocus()

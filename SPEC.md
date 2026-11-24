@@ -1285,6 +1285,9 @@ stopped daily use, not adding features.
     from left to right (about half a second), settles as a thin accent bar on its left
     edge (the mark of the block running now on the timeline), and the text becomes
     "✓ Saved" over "Back to: **Write the intro**" (the ✓ a done task's filled circle).
+    One text size throughout (*changed* 2026-11-24, *user*: the text changed size on
+    Return): while the band sweeps, what was typed stays exactly as it was, in the
+    same size and place; "Saved" is that size in bold, "Back to" that size in grey.
     It stays about 1.5 seconds after the sweep (*changed* 2026-11-23, *user*: 3 seconds
     was too long), takes no keyboard, then fades; a click on it closes it at once. It
     is exactly the box's size and place.

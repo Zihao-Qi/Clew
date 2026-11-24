@@ -18,6 +18,9 @@ final class NoteBox: NSObject, NSWindowDelegate {
     /// Where the draft is kept: this Mac's preferences, so it survives quitting.
     static var defaults = UserDefaults.standard
     static let draftKey = "noteDraft"
+    /// One size for the box and its banner: what was typed, "Saved" and "Back to"
+    /// (user, 2026-11-24: the text changed size on Return).
+    static let textFont = NSFont.systemFont(ofSize: NSFont.systemFontSize + 2)
 
     var isOpen: Bool { panel?.isVisible == true }
     var isBannerShown: Bool { banner?.isVisible == true }
@@ -34,6 +37,17 @@ final class NoteBox: NSObject, NSWindowDelegate {
 
     /// For the debug check: where the typed text is drawn, against the field showing it
     /// (in the field's coordinates). Fully inside means it is all visible.
+    /// For the debug check: how far the note field and the banner's copy of the text are
+    /// scrolled (past four lines both show the end).
+    var scrolledBy: (field: CGFloat?, banner: CGFloat?) {
+        func scroll(in view: NSView?) -> NSScrollView? {
+            guard let view else { return nil }
+            if let found = view as? NSScrollView { return found }
+            return view.subviews.lazy.compactMap { scroll(in: $0) }.first
+        }
+        return (scroll(in: panel?.contentView)?.contentView.bounds.minY, scroll(in: banner?.contentView)?.contentView.bounds.minY)
+    }
+
     var textAndField: (text: NSRect, field: NSRect)? {
         func find(_ view: NSView) -> NSTextView? {
             if let text = view as? NoteTextView { return text }
@@ -292,6 +306,7 @@ struct NoteBoxView: View {
                             focusRequest: state.focusRequest, maxLines: 4,
                             onSubmit: { box.save() }, onCancel: { box.close() },
                             onHeight: { _ in box.fitToContent() })
+                .debugFrame("noteText")
                 .accessibilityLabel(Text("Note"))
             if let context = state.context {
                 // What it is written during (SPEC "Notes", 2026-11-23).
@@ -334,12 +349,13 @@ struct NoteBannerView: View {
                     if settled {
                         saved
                     } else {
-                        Text(verbatim: state.savedText)
-                            .lineLimit(4)
+                        // Just as it was typed: the same size and place.
+                        NoteTextShown(text: state.savedText, maxLines: 4)
+                            .debugFrame("sweptText")
                             .padding(14)
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: settled ? .leading : .topLeading)
             }
         }
         .frame(width: 440)
@@ -360,16 +376,17 @@ struct NoteBannerView: View {
                 .foregroundStyle(Color.accentColor)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Saved").font(.title3.weight(.semibold))
+                Text("Saved").fontWeight(.semibold)
+                    .debugFrame("savedTitle")
                 if let context = state.context {
                     (Text("Back to: ") + Text(verbatim: context.title).bold() + Text(verbatim: context.detail))
-                        .font(.body)
                         .foregroundStyle(.secondary)
+                        .debugFrame("backTo")
                         .lineLimit(2)
                 }
             }
         }
-        .font(.title3)
+        .font(Font(NoteBox.textFont))
         .padding(.horizontal, 16)
         .transition(.opacity)
     }
@@ -406,6 +423,57 @@ extension View {
 }
 
 /// A plain text editor for notes: Return submits, ⇧Return starts a new line at the cursor,
+/// What was typed, drawn just as the note field draws it (same text view, font and line
+/// height), at most `maxLines` lines: on Return nothing moves or changes size.
+struct NoteTextShown: NSViewRepresentable {
+    let text: String
+    var maxLines = 4
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let start = NSRect(x: 0, y: 0, width: 412, height: 22)
+        let scroll = NSScrollView(frame: start)
+        scroll.drawsBackground = false
+        scroll.automaticallyAdjustsContentInsets = false
+        scroll.contentInsets = NSEdgeInsetsZero
+        scroll.hasVerticalScroller = false
+        let view = NSTextView(frame: start)
+        view.isEditable = false
+        view.isSelectable = false
+        view.drawsBackground = false
+        view.font = NoteBox.textFont
+        view.textContainerInset = .zero
+        view.textContainer?.lineFragmentPadding = 0
+        view.isVerticallyResizable = true
+        view.isHorizontallyResizable = false
+        view.autoresizingMask = [.width]
+        view.textContainer?.widthTracksTextView = true
+        view.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
+        view.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        view.setAccessibilityElement(false)
+        scroll.documentView = view
+        return scroll
+    }
+
+    func updateNSView(_ scroll: NSScrollView, context: Context) {
+        guard let view = scroll.documentView as? NSTextView, view.string != text else { return }
+        view.string = text
+        // Past four lines the field showed its end: so does this.
+        DispatchQueue.main.async { view.scrollToEndOfDocument(nil) }
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView scroll: NSScrollView, context: Context) -> CGSize? {
+        let width = proposal.width.flatMap { $0.isFinite && $0 > 0 ? $0 : nil } ?? 412
+        guard let view = scroll.documentView as? NSTextView, let layout = view.layoutManager,
+              let container = view.textContainer else { return nil }
+        if abs(view.frame.width - width) > 0.5 { view.setFrameSize(NSSize(width: width, height: view.frame.height)) }
+        container.containerSize = NSSize(width: width, height: .greatestFiniteMagnitude)
+        layout.ensureLayout(for: container)
+        let line = layout.defaultLineHeight(for: NoteBox.textFont)
+        let used = max(line, layout.usedRect(for: container).height)
+        return CGSize(width: width, height: min(used, line * CGFloat(maxLines)).rounded(.up))
+    }
+}
+
 /// Esc cancels; at most 1,000 characters; grows to `maxLines` lines, then scrolls.
 struct NoteEditorField: NSViewRepresentable {
     @Binding var text: String
@@ -438,7 +506,7 @@ struct NoteEditorField: NSViewRepresentable {
         view.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
         scroll.documentView = view
         view.delegate = context.coordinator
-        view.font = .systemFont(ofSize: NSFont.systemFontSize + 2)
+        view.font = NoteBox.textFont
         view.drawsBackground = false
         view.isRichText = false
         view.allowsUndo = true
