@@ -113,6 +113,9 @@ extension Snapshot {
                 func type(_ text: String) { for c in text { key(String(c), code: 0) } }
                 let oneLine = panel.frame.height
                 type("Call the bank")
+                try await Task.sleep(for: .milliseconds(150))
+                report("the text shows in full at the top of its field (user, 2026-11-23: it sat at the bottom)",
+                       box.textAndField.map { $0.field.contains($0.text.insetBy(dx: 0.5, dy: 0.5)) && $0.text.minY - $0.field.minY < 1 } == true)
                 key("\r", code: 36, shift: true)
                 type("about the card")
                 try await Task.sleep(for: .milliseconds(200))
@@ -164,14 +167,17 @@ extension Snapshot {
                 box.open()
                 try await Task.sleep(for: .milliseconds(300))
                 var heights: [CGFloat] = []
+                var fourShown = false
                 for line in ["one", "two", "three", "four", "five"] {
                     if !heights.isEmpty { key("\r", code: 36, shift: true) }
                     type(line)
                     try await Task.sleep(for: .milliseconds(150))
                     heights.append(panel.frame.height)
+                    if line == "four" { fourShown = box.textAndField.map { $0.field.contains($0.text.insetBy(dx: 0.5, dy: 0.5)) } == true }
                 }
                 let content = panel.contentView?.fittingSize.height ?? 0
                 report("the box is as tall as its content, with no gap", abs(panel.frame.height - content) < 1)
+                report("four lines show in full", fourShown)
                 report("its title bar is fully hidden: no line, no buttons, content from the top", box.titleBarHidden)
                 report("it grows line by line to four lines, then scrolls",
                        heights[1] > heights[0] && heights[2] > heights[1] && heights[3] > heights[2] && heights[4] == heights[3])
