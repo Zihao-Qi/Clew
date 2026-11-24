@@ -35,19 +35,15 @@ final class NoteBox: NSObject, NSWindowDelegate {
             && (panel.contentView as? NSHostingView<NoteBoxView>)?.safeAreaRegions.isEmpty == true
     }
 
-    /// For the debug check: where the typed text is drawn, against the field showing it
-    /// (in the field's coordinates). Fully inside means it is all visible.
     /// For the debug check: how far the note field and the banner's copy of the text are
-    /// scrolled (past four lines both show the end).
+    /// scrolled.
     var scrolledBy: (field: CGFloat?, banner: CGFloat?) {
-        func scroll(in view: NSView?) -> NSScrollView? {
-            guard let view else { return nil }
-            if let found = view as? NSScrollView { return found }
-            return view.subviews.lazy.compactMap { scroll(in: $0) }.first
-        }
-        return (scroll(in: panel?.contentView)?.contentView.bounds.minY, scroll(in: banner?.contentView)?.contentView.bounds.minY)
+        (Self.scrollView(in: panel?.contentView)?.contentView.bounds.minY,
+         Self.scrollView(in: banner?.contentView)?.contentView.bounds.minY)
     }
 
+    /// For the debug check: where the typed text is drawn, against the field showing it
+    /// (in the field's coordinates). Fully inside means it is all visible.
     var textAndField: (text: NSRect, field: NSRect)? {
         func find(_ view: NSView) -> NSTextView? {
             if let text = view as? NoteTextView { return text }
@@ -65,6 +61,13 @@ final class NoteBox: NSObject, NSWindowDelegate {
     var panelForChecks: NSPanel? { panel }
     #endif
     var bannerText: String? { state.banner }
+
+    /// The scroll view inside a window's content: the note field's, or the banner's copy.
+    static func scrollView(in view: NSView?) -> NSScrollView? {
+        guard let view else { return nil }
+        if let found = view as? NSScrollView { return found }
+        return view.subviews.lazy.compactMap { scrollView(in: $0) }.first
+    }
 
     /// The shortcut or ✎ Note: opens the box (or focuses it); a showing banner gives way.
     func open() {
@@ -91,6 +94,8 @@ final class NoteBox: NSObject, NSWindowDelegate {
         Self.defaults.removeObject(forKey: Self.draftKey)
         // The banner takes the box's place and size: it is the same box, saved.
         state.savedText = state.text
+        // Scrolled as the field was (past four lines): nothing moves on Return (review).
+        state.savedScroll = Self.scrollView(in: panel?.contentView)?.contentView.bounds.minY ?? 0
         if let panel { fitNow(panel) }   // the size it has now, not one a moment old (review)
         let frame = panel?.frame
         state.text = ""
@@ -286,6 +291,8 @@ final class NoteBoxState {
     var banner: String?
     /// What was just saved: the sweep passes over it before "Saved" shows.
     var savedText = ""
+    /// How far the field was scrolled when it was saved.
+    var savedScroll: CGFloat = 0
     /// The banner's sweep (0 to 1) and whether it has settled into the bar.
     var sweep: CGFloat = 0
     var settled = false
@@ -350,7 +357,7 @@ struct NoteBannerView: View {
                         saved
                     } else {
                         // Just as it was typed: the same size and place.
-                        NoteTextShown(text: state.savedText, maxLines: 4)
+                        NoteTextShown(text: state.savedText, scrolledBy: state.savedScroll, maxLines: 4)
                             .debugFrame("sweptText")
                             .padding(14)
                     }
@@ -364,7 +371,9 @@ struct NoteBannerView: View {
         .contentShape(Rectangle())
         .onTapGesture(perform: dismiss)
         .task(id: state.bannerShown) { await play() }
-        .accessibilityElement(children: .combine)
+        // What it says, from the first frame (review: the swept text has no label).
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: state.banner ?? ""))
         .accessibilityAddTraits(.isButton)
         .accessibilityHint(Text("Closes"))
         .debugFrame("noteBanner")
@@ -427,6 +436,7 @@ extension View {
 /// height), at most `maxLines` lines: on Return nothing moves or changes size.
 struct NoteTextShown: NSViewRepresentable {
     let text: String
+    var scrolledBy: CGFloat = 0
     var maxLines = 4
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -450,15 +460,26 @@ struct NoteTextShown: NSViewRepresentable {
         view.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
         view.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         view.setAccessibilityElement(false)
+        scroll.setAccessibilityElement(false)
         scroll.documentView = view
         return scroll
     }
 
     func updateNSView(_ scroll: NSScrollView, context: Context) {
-        guard let view = scroll.documentView as? NSTextView, view.string != text else { return }
-        view.string = text
-        // Past four lines the field showed its end: so does this.
-        DispatchQueue.main.async { view.scrollToEndOfDocument(nil) }
+        guard let view = scroll.documentView as? NSTextView else { return }
+        if view.string != text { view.string = text }
+        settle(scroll)
+    }
+
+    /// Laid out at its width and scrolled as the field was, before it is drawn.
+    private func settle(_ scroll: NSScrollView) {
+        guard let view = scroll.documentView as? NSTextView, let layout = view.layoutManager,
+              let container = view.textContainer else { return }
+        layout.ensureLayout(for: container)
+        view.sizeToFit()
+        let most = max(0, view.frame.height - scroll.contentView.bounds.height)
+        scroll.contentView.scroll(to: NSPoint(x: 0, y: min(max(0, scrolledBy), most)))
+        scroll.reflectScrolledClipView(scroll.contentView)
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView scroll: NSScrollView, context: Context) -> CGSize? {
@@ -470,7 +491,10 @@ struct NoteTextShown: NSViewRepresentable {
         layout.ensureLayout(for: container)
         let line = layout.defaultLineHeight(for: NoteBox.textFont)
         let used = max(line, layout.usedRect(for: container).height)
-        return CGSize(width: width, height: min(used, line * CGFloat(maxLines)).rounded(.up))
+        let height = max(min(used, line * CGFloat(maxLines)).rounded(.up), 22)   // as the field: at least 22
+        scroll.setFrameSize(NSSize(width: width, height: height))
+        settle(scroll)
+        return CGSize(width: width, height: height)
     }
 }
 

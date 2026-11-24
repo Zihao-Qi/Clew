@@ -129,7 +129,6 @@ extension Snapshot {
                 report("while the band sweeps, the text stays the same size and place (user, 2026-11-24)",
                        typed != nil && swept != nil && abs(typed!.minY - swept!.minY) < 1 && abs(typed!.minX - swept!.minX) < 1
                        && abs(typed!.height - swept!.height) < 1)
-                try await Task.sleep(for: .milliseconds(180))
                 try await Task.sleep(for: .milliseconds(300))
                 let saved = model.openNotes.first
                 report("Return saves it with the task it was written during",
@@ -142,6 +141,8 @@ extension Snapshot {
                 let title = DebugFrames.frames["savedTitle"], back = DebugFrames.frames["backTo"]
                 report("Saved and Back to are the typed text's size, one line each",
                        title.map { abs($0.height - lineHeight) < 1.5 } == true && back.map { abs($0.height - lineHeight) < 1.5 } == true)
+                let whole = DebugFrames.frames["noteBanner"]
+                report("… and fit inside the banner", whole != nil && [title, back].allSatisfy { $0.map { whole!.contains($0) } == true })
                 try await Task.sleep(for: .milliseconds(1700))
                 report("the banner goes by itself after about 2 seconds (sweep and 1.5 s)", !box.isBannerShown)
 
@@ -207,6 +208,23 @@ extension Snapshot {
                 report("five lines saved: the band sweeps over the same last four lines",
                        field > 10 && banner.map { abs($0 - field) < 1 } == true)
                 box.closeBanner()
+                // Scrolled back up before saving: the band sweeps over the first four.
+                box.open()
+                try await Task.sleep(for: .milliseconds(300))
+                for (i, line) in ["one", "two", "three", "four", "five"].enumerated() {
+                    if i > 0 { key("\r", code: 36, shift: true) }
+                    type(line)
+                }
+                try await Task.sleep(for: .milliseconds(150))
+                if let scroll = NoteBox.scrollView(in: panel.contentView) {
+                    scroll.contentView.scroll(to: .zero)
+                    scroll.reflectScrolledClipView(scroll.contentView)
+                }
+                key("\r", code: 36)
+                try await Task.sleep(for: .milliseconds(150))
+                report("scrolled up and saved: the band sweeps over the same first four lines",
+                       box.scrolledBy.banner.map { abs($0) < 1 } == true)
+                box.closeBanner()
 
                 // No task: one line, no During; saved at once, the banner is the box's frame.
                 try clew.stopFocus()
@@ -216,8 +234,15 @@ extension Snapshot {
                 type("short")
                 let boxFrame = panel.frame
                 report("one line with no task: a slim box", boxFrame.height < 56 && model.noteContext() == nil)
+                let short = DebugFrames.frames["noteText"]
                 key("\r", code: 36)
-                try await Task.sleep(for: .milliseconds(300))
+                try await Task.sleep(for: .milliseconds(120))
+                let shortSwept = DebugFrames.frames["sweptText"]
+                report("one line: the text stays the same size and place too",
+                       short != nil && short == shortSwept)
+                try await Task.sleep(for: .milliseconds(800))
+                let slim = DebugFrames.frames["noteBanner"], slimTitle = DebugFrames.frames["savedTitle"]
+                report("… and Saved fits the slim banner", slim != nil && slimTitle.map { slim!.contains($0) } == true)
                 report("the banner takes exactly the box's frame", box.bannerFrame == boxFrame)
                 box.closeBanner()
 
