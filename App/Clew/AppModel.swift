@@ -105,6 +105,8 @@ final class AppModel {
     /// What next?'s pick being shown (SPEC "What next?"): its row in the list, or with no
     /// row its one block on the timeline, highlighted for about a second; `revealRequests`
     /// asks the list (or the block) to scroll and to take VoiceOver.
+    /// What next?'s kept answer and panel, alive across openings of the menu.
+    let whatNext = WhatNextAsk()
     private(set) var highlightedRow: UUID?
     private(set) var highlightedBlock: UUID?
     private(set) var revealRequests = 0
@@ -412,6 +414,8 @@ final class AppModel {
         // The one refresh of an opening, on any screen: the menu shows today as it is
         // now (SPEC 2026-11-19). Blocks settle first, so a Sunday block that ended counts.
         refresh()
+        // What next? is asked ahead, so Next shows its answer at once (SPEC "What next?").
+        whatNext.askAhead(self)
         guard onList, let clew else { return }
         guard let due = try? clew.weekCardDue() else { return }
         let notes = ai.map { $0.isReady ? Memory.noticed($0.memory.notes) : [] } ?? []

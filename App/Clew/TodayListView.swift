@@ -96,7 +96,7 @@ struct TodayListView: View {
     /// Last week's card's height, for `rowsLimit`.
     @State private var weekCardHeight: CGFloat = 0
     /// What next? (SPEC "What next?"): its panel above the bottom bar.
-    @State private var whatNext = WhatNextAsk()
+    private var whatNext: WhatNextAsk { model.whatNext }
     @State private var nextPanelHeight: CGFloat = 0
     @AccessibilityFocusState private var voiceOverRow: UUID?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -769,16 +769,15 @@ struct TodayListView: View {
                     .help(Text("Write a note"))
                     .accessibilityLabel(Text("Write a note"))
                     .debugFrame("noteButton")
-                Spacer()
-                // What next? (SPEC "What next?"): ✨ just left of the gear, icon only.
+                // What next? (SPEC "What next?"): last in the group, so it moves nothing.
                 // While its panel shows it stays to close it, but not once AI is gone.
                 if model.canAskWhatNext || (whatNext.isOpen && model.ai?.isReady == true) {
-                    Button { whatNext.toggle(model) } label: { Image(systemName: "sparkles") }
+                    Button { whatNext.toggle(model) } label: { BarLabel(title: Text("Next"), icon: "signpost.right") }
                         .help(Text("What next?"))
                         .accessibilityLabel(Text("What next?"))
                         .debugFrame("whatNextButton")
-                        .padding(.trailing, -8)   // closer to the gear than the bar's groups
                 }
+                Spacer()
                 // No "Later (N)" button or ⌘L: Later items are in Goals & Later (SPEC
                 // 2026-11-15).
                 // One click straight to Settings; Quit lives there. The menu closes first,
@@ -1529,7 +1528,7 @@ private struct WhatNextHooks: View {
         Color.clear
             .onChange(of: WhatNextWatch(model)) { ask.update(model) }
             .onChange(of: model.menuCloses) { ask.close() }
-            .onChange(of: model.today?.day) { ask.close() }
+            .onChange(of: model.today?.day) { ask.drop() }   // the rollover drops the kept answer
             .onChange(of: screen) { if screen != .list { ask.close() } }
             .onDisappear { ask.close() }
             .onChange(of: model.revealRequests) { reveal() }

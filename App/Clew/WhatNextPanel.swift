@@ -4,8 +4,9 @@ import ClewCore
 import ClewDomain
 import SwiftUI
 
-/// What next? (SPEC "What next?", AI-4): asking, the answer, or a short failure. Never
-/// kept: anything that closes the panel drops the answer.
+/// What next? (SPEC "What next?", AI-4): asked ahead when the menu opens, its answer kept
+/// in memory for the same open tasks (2 hours at most), and the panel: asking, the
+/// answer, or a short failure.
 @MainActor @Observable
 final class WhatNextAsk {
     enum State: Equatable {
@@ -18,69 +19,158 @@ final class WhatNextAsk {
         case signInEnded
     }
 
+    /// An answer kept for later presses: for which open tasks, day and ready period.
+    struct Kept {
+        let key: String
+        let day: LocalDay?
+        let generation: Int
+        let at: Date
+        let picks: [WhatNext.Pick]
+    }
+
+    static let keptFor: TimeInterval = 2 * 3600
+
     private(set) var state: State = .idle
-    @ObservationIgnored private var task: Task<Void, Never>?
-    @ObservationIgnored private var generation = 0
+    @ObservationIgnored private(set) var kept: Kept?
+    /// A background failure the person sees when they press Next.
+    @ObservationIgnored private var keptFailure: State?
+    @ObservationIgnored private var request: Task<Void, Never>?
+    @ObservationIgnored private(set) var requestKey: String?
+    @ObservationIgnored private var requestGeneration = 0
+    @ObservationIgnored private var panelGeneration = 0
     #if DEBUG
     /// The debug render's state.
     static var preset: State?
     init() { state = Self.preset ?? .idle }
+    func showForRender(_ shown: State) { state = shown }
     #endif
 
     var isOpen: Bool { state != .idle }
+    var isAsking: Bool { request != nil }
 
-    /// ✨: asks, or closes what shows (the person chose to).
-    func toggle(_ model: AppModel) {
-        if isOpen { closeByPerson(model) } else { ask(model) }
+    /// The menu opened: ask in the background unless the kept answer still fits.
+    func askAhead(_ model: AppModel, now: Date = Date()) {
+        guard model.canAskWhatNext else { return }
+        let key = model.whatNextKey()
+        if let kept = usable(model, now: now), kept.key == key { return }
+        if request != nil, requestKey == key { return }
+        start(model, key: key, now: now)
     }
 
-    func ask(_ model: AppModel) {
-        guard let ai = model.ai, model.canAskWhatNext else { return }
-        let made = model.whatNextRequest()
-        reset()
-        let mine = generation
-        state = .asking
-        task = Task {
+    /// The kept answer, if it is from today, this ready period and less than 2 hours old.
+    private func usable(_ model: AppModel, now: Date) -> Kept? {
+        guard let kept, kept.day == model.today?.day, kept.generation == model.ai?.generation,
+              now.timeIntervalSince(kept.at) < Self.keptFor else { return nil }
+        return kept
+    }
+
+    private func start(_ model: AppModel, key: String, now: Date) {
+        guard let ai = model.ai else { return }
+        request?.cancel()
+        requestGeneration += 1
+        let mine = requestGeneration
+        let generation = ai.generation
+        let day = model.today?.day
+        requestKey = key
+        let made = model.whatNextRequest(now: now)
+        request = Task {
             let result = await ai.whatNext(made.input, job: WhatNext(ids: made.ids, titles: made.titles))
-            guard mine == generation, !Task.isCancelled else { return }
+            guard mine == requestGeneration else { return }
+            request = nil
+            requestKey = nil
+            // This request's own ended sign-in still shows, though it ended ready (SPEC).
+            if case .failure(let failure) = result, failure.provider == .signInEnded {
+                if state == .asking { landed(model, result) } else { keptFailure = .signInEnded }
+                return
+            }
+            guard generation == ai.generation else { return }   // ready was lost meanwhile
             switch result {
             case .success(let picks):
-                // A task ticked while asking leaves; none left closes quietly (not a failure).
-                let open = model.whatNextOpenIds
-                let kept = picks.filter { open.contains($0.itemId) }
-                guard let firstPick = picks.first, !kept.isEmpty else { reset(); return }
-                state = .shown(picks: kept, first: firstPick.itemId)
-            case .failure(let failure) where failure.provider == .usageLimit:
-                state = .usageLimit
-            case .failure(let failure) where failure.provider == .signInEnded:
-                state = .signInEnded
-                await closeLater(mine)
-            case .failure:
-                state = .failed
-                await closeLater(mine)
+                kept = Kept(key: key, day: day, generation: generation, at: now, picks: picks)
+                keptFailure = nil
+            case .failure(let failure) where failure.provider == .usageLimit: keptFailure = .usageLimit
+            case .failure(let failure) where failure.provider == .signInEnded: keptFailure = .signInEnded
+            case .failure: break   // silent in the background
             }
+            if state == .asking { landed(model, result) }
         }
     }
 
-    private func closeLater(_ mine: Int) async {
-        try? await Task.sleep(for: .seconds(5))
-        if mine == generation, state == .failed || state == .signInEnded { reset() }
+    /// A request finished while the panel waits for it.
+    private func landed(_ model: AppModel, _ result: Result<[WhatNext.Pick], JobFailure>) {
+        keptFailure = nil
+        switch result {
+        case .success(let picks):
+            // Tasks ticked meanwhile leave; none left closes quietly (not a failure).
+            let open = model.whatNextOpenIds
+            let left = picks.filter { open.contains($0.itemId) }
+            guard let firstPick = picks.first, !left.isEmpty else { return close() }
+            state = .shown(picks: left, first: firstPick.itemId)
+        case .failure(let failure) where failure.provider == .usageLimit:
+            state = .usageLimit
+        case .failure(let failure) where failure.provider == .signInEnded:
+            state = .signInEnded
+            closeLater()
+        case .failure:
+            state = .failed
+            closeLater()
+        }
     }
 
-    /// Cancel, Not now, Esc, ✨: an answer still showing counts as dismissed.
+    /// Next: closes what shows (the person chose to), or shows the kept answer at once,
+    /// or waits for (or starts) a request.
+    func toggle(_ model: AppModel, now: Date = Date()) {
+        if isOpen { return closeByPerson(model) }
+        guard model.canAskWhatNext else { return }
+        panelGeneration += 1
+        if let kept = usable(model, now: now) {
+            let open = model.whatNextOpenIds
+            let left = kept.picks.filter { open.contains($0.itemId) }
+            if let firstPick = kept.picks.first, !left.isEmpty {
+                state = .shown(picks: left, first: firstPick.itemId)
+                return
+            }
+        }
+        if let failure = keptFailure {
+            keptFailure = nil
+            state = failure
+            if failure == .signInEnded { closeLater() }
+            return
+        }
+        if request == nil { start(model, key: model.whatNextKey(), now: now) }
+        state = .asking
+    }
+
+    private func closeLater() {
+        let mine = panelGeneration
+        Task {
+            try? await Task.sleep(for: .seconds(5))
+            if mine == panelGeneration, state == .failed || state == .signInEnded { close() }
+        }
+    }
+
+    /// Cancel, Not now, Esc, Next: an answer still showing counts as dismissed.
     func closeByPerson(_ model: AppModel) {
         if case .shown = state { model.ai?.recordNextDismissed() }
-        reset()
+        close()
     }
 
-    /// Closings the person did not choose: nothing is recorded.
-    func close() { reset() }
-
-    private func reset() {
-        generation += 1
-        task?.cancel()
-        task = nil
+    /// Closings the person did not choose: nothing is recorded. A request under way
+    /// finishes into the kept answer.
+    func close() {
+        panelGeneration += 1
         state = .idle
+    }
+
+    /// Losing ready, the rollover, Forget everything: the kept answer and any request go.
+    func drop() {
+        requestGeneration += 1
+        request?.cancel()
+        request = nil
+        requestKey = nil
+        kept = nil
+        keptFailure = nil
+        close()
     }
 
     /// Another task becomes the pick; the old pick takes its place under "Or:".
@@ -97,28 +187,31 @@ final class WhatNextAsk {
               let row = model.row(pick.itemId) else { return }
         model.ai?.recordNext(task: row.item.title, typed: row.item.titleOrigin == .typed, focus: true,
                              other: pick.itemId != first)
-        reset()
+        close()
         model.startFocus(row, minutes: 25)
     }
 
     /// The pick's title: the panel closes and the list goes to the task.
-    func open(_ model: AppModel) {
+    func goTo(_ model: AppModel) {
         guard case .shown(let picks, let first) = state, let pick = picks.first,
               let row = model.row(pick.itemId) else { return }
         model.ai?.recordNext(task: row.item.title, typed: row.item.titleOrigin == .typed, focus: false,
                              other: pick.itemId != first)
-        reset()
+        close()
         model.requestReveal(pick.itemId)
     }
 
-    /// Keeps the panel in step with the list (SPEC "What next?": Asking, While it shows).
+    /// Keeps the panel in step with the list (SPEC "What next?": Pressing Next, While it shows).
     func update(_ model: AppModel) {
         let ready = model.ai?.canSuggestSteps == true
+        // A request that ended the sign-in is let land, so its message shows (SPEC).
+        let landing = model.ai?.ended == true && request != nil
+        if !ready, !landing, state != .signInEnded, kept != nil || request != nil { drop() }
         switch state {
         case .idle:
             break
         case .asking:
-            if !model.canAskWhatNext { close() }
+            if !model.canAskWhatNext, !landing { close() }
         case .failed, .usageLimit:
             if !ready || model.focus != nil { close() }
         case .signInEnded:
@@ -177,6 +270,14 @@ extension AppModel {
             free = WhatNext.freeMinutes(now: now, busy: busy)
         }
         return WhatNext.input(candidates, at: now, calendar: .current, freeMinutes: free)
+    }
+
+    /// What the kept answer is for: the open tasks as sent, without the time.
+    func whatNextKey() -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let tasks = whatNextRequest().input.tasks
+        return String(decoding: (try? encoder.encode(tasks)) ?? Data(), as: UTF8.self)
     }
 
     static func end(_ block: TimelineBlock) -> Date {
@@ -276,7 +377,7 @@ struct WhatNextPanel: View {
         let others = picks.dropFirst().compactMap { p in model.row(p.itemId).map { (p.itemId, $0.item.title) } }
         return VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                ClickableText(text: title, bold: true) { ask.open(model) }
+                ClickableText(text: title, bold: true) { ask.goTo(model) }
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .accessibilityLabel(Text("Go to \(title)"))
