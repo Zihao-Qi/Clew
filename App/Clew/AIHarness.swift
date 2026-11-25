@@ -405,8 +405,10 @@ extension Snapshot {
         try await until { ask.state == .asking }
         try await until { ask.state != .asking }
         report("nothing that passes: Couldn't choose", ask.state == .failed)
-        try await Task.sleep(for: .milliseconds(5300))
-        report("…for 5 seconds, then it closes", ask.state == .idle)
+        let failedAt = Date()
+        for _ in 0..<80 where ask.state == .failed { try await Task.sleep(for: .milliseconds(100)) }
+        let shownFor = Date().timeIntervalSince(failedAt)
+        report("…for 5 seconds, then it closes", ask.state == .idle && shownFor >= 4.8)
         transport.reply(429, [#"{"error":{"code":"subscription_sharing_usage_limit_exceeded"}}"#])
         ask.toggle(model)
         try await until { ask.state != .asking }

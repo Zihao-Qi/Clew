@@ -280,14 +280,14 @@ struct WhatNextPanel: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .accessibilityLabel(Text("Go to \(title)"))
-                    .accessibilitySortPriority(2)
+                    .accessibilitySortPriority(1)
                     .debugFrame("whatNextTitle")
                 Spacer(minLength: 8)
                 if model.whatNextCanFocus(pick.itemId) {
                     Button { ask.focus(model) } label: { Label("Focus 25 min", systemImage: "play.fill") }
                         .fixedSize()
                         .accessibilityLabel(Text("Focus 25 minutes on \(title)"))
-                        .accessibilitySortPriority(1)
+                        .accessibilitySortPriority(2)
                         .debugFrame("whatNextFocus")
                 }
             }
@@ -296,7 +296,7 @@ struct WhatNextPanel: View {
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityLabel(Text("Suggested: \(title). \(pick.reason)"))
-                .accessibilitySortPriority(3)   // read first, then Go to and Focus
+                .accessibilitySortPriority(3)   // read first, then Focus, Go to, the others, Not now
             if !others.isEmpty {
                 HStack(spacing: 4) {
                     Text("Or:").foregroundStyle(.secondary).fixedSize()
@@ -313,6 +313,8 @@ struct WhatNextPanel: View {
                 notNow
             }
         }
+        // Its order stays inside the panel, never above the list's rows (review).
+        .accessibilityElement(children: .contain)
     }
 }
 

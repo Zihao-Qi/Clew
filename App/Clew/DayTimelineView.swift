@@ -569,7 +569,6 @@ struct DayTimelineView: View {
 /// to remove; right-click for the same without dragging.
 struct TimelineBlockView: View {
     let model: AppModel
-    @AccessibilityFocusState private var voiceOver: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let block: TimelineBlock
     let day: TimelineDay
@@ -627,14 +626,7 @@ struct TimelineBlockView: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: 4))
             // What next?'s pick, shown for about a second (SPEC "What next?"): this block only.
-            .overlay {
-                RoundedRectangle(cornerRadius: 4).fill(Color.accentColor.opacity(0.18))
-                    .opacity(model.highlightedBlock == block.id ? 1 : 0)
-                    .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: model.highlightedBlock == block.id)
-                    .allowsHitTesting(false)
-            }
-            .accessibilityFocused($voiceOver)
-            .onChange(of: model.revealRequests) { if model.revealedBlock == block.id { voiceOver = true } }
+            .modifier(BlockHighlight(on: model.highlightedBlock == block.id, reduceMotion: reduceMotion))
             .overlay(alignment: .topLeading) { label }
             // The grip is placed by layout (not a visual offset), so the hover, the cursor
             // and the drag all use the same strip (TimelineMetrics.grip).
@@ -685,6 +677,8 @@ struct TimelineBlockView: View {
                     }
                 }
             }
+            // After the element is made, so VoiceOver can be moved to it (review).
+            .modifier(RevealFocus(model: model, blockId: block.id))
     }
 
     private var range: String {
@@ -1245,5 +1239,32 @@ private struct FloatingCard: ViewModifier {
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }
+    }
+}
+
+/// What next?'s pick on the timeline: a tint for about a second, fading unless Reduce
+/// Motion is on (SPEC "What next?").
+private struct BlockHighlight: ViewModifier {
+    let on: Bool
+    let reduceMotion: Bool
+    func body(content: Content) -> some View {
+        content.overlay {
+            RoundedRectangle(cornerRadius: 4).fill(Color.accentColor.opacity(0.18))
+                .opacity(on ? 1 : 0)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: on)
+                .allowsHitTesting(false)
+        }
+    }
+}
+
+/// Moves VoiceOver to the block What next? goes to.
+private struct RevealFocus: ViewModifier {
+    let model: AppModel
+    let blockId: UUID
+    @AccessibilityFocusState private var focused: Bool
+    func body(content: Content) -> some View {
+        content
+            .accessibilityFocused($focused)
+            .onChange(of: model.revealRequests) { if model.revealedBlock == blockId { focused = true } }
     }
 }
