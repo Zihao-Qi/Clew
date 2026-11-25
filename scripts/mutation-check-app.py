@@ -246,6 +246,7 @@ M = [m for m in M if not only or only in m[0]]
 # --changed: only the entries whose pattern overlaps a line this branch changed.
 if "--changed" in sys.argv:
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+    sys.dont_write_bytecode = True   # no __pycache__ left in the tree
     from mutation_changed import changed_lines, touches
     lines = changed_lines(repo)
     M = [m for m in M if touches(repo, m[1], m[2], lines)]

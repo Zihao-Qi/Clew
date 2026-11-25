@@ -1033,27 +1033,29 @@ if len(sys.argv) > 2 and sys.argv[2] == "--patterns":
 args = sys.argv[2:]
 if "--only" in args:
     i = args.index("--only")
-    if i + 1 >= len(args):
+    if i + 1 >= len(args) or args[i + 1].startswith("--"):
         sys.exit("FAIL: --only needs a name")
     only = args.pop(i + 1)
     args.pop(i)
     M = [m for m in M if only in m[0]]
-if "--changed" in args:
-    args.remove("--changed")
+changed = "--changed" in args
+listing = "--list" in args
+args = [a for a in args if a not in ("--changed", "--list")]
+if any(not a.isdigit() for a in args):
+    sys.exit(f"FAIL: unknown arguments {args}")
+if changed:
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+    sys.dont_write_bytecode = True   # no __pycache__ left in the tree
     from mutation_changed import changed_lines, touches
     lines = changed_lines(repo)
     M = [m for m in M if touches(repo, m[1], m[2], lines)]
     print(f"--changed: {len(M)} entries touch this branch's changes", flush=True)
-if "--list" in args:   # what would run, without testing anything
-    args.remove("--list")
-    for m in M:
-        print(" ", m[0])
-    sys.exit(0)
-if any(not a.isdigit() for a in args):
-    sys.exit(f"FAIL: unknown arguments {args}")
 lo = int(args[0]) if args else 0
 hi = int(args[1]) if len(args) > 1 else len(M)
+if listing:   # what would run, without testing anything
+    for m in M[lo:hi]:
+        print(" ", m[0])
+    sys.exit(0)
 results = []
 for name, path, old, new, flt in M[lo:hi]:
     f = repo / path

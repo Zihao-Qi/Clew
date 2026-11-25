@@ -9,3 +9,4 @@ DerivedData/
 *.xcuserstate
 Clew.xcodeproj/
 dist/
+__pycache__/
