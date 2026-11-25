@@ -114,7 +114,7 @@ struct AISettings: View {
                     Text(message).font(.callout).foregroundStyle(.secondary)
                 }
             } footer: {
-                Text("Clew can suggest small steps for a task and remember how you work, using your ChatGPT plan. Nothing is sent until you sign in and ask. Clew works fully without it.")
+                Text("Clew can suggest small steps for a task, help you choose what's next and remember how you work, using your ChatGPT plan. Nothing is sent until you sign in and ask. Clew works fully without it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -179,7 +179,7 @@ struct AISettings: View {
                     Toggle(isOn: Binding(get: { ai.useAI }, set: { ai.useAI = $0 })) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Use AI")
-                            Text("Clew suggests steps and remembers how you work, using your ChatGPT plan.")
+                            Text("Clew suggests steps, helps you choose what's next and remembers how you work, using your ChatGPT plan.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }

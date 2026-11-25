@@ -624,6 +624,12 @@ struct TimelineBlockView: View {
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 4))
+            // What next?'s pick, shown for about a second (SPEC "What next?").
+            .overlay {
+                if model.highlighted == block.block.itemId {
+                    RoundedRectangle(cornerRadius: 4).fill(Color.accentColor.opacity(0.18))
+                }
+            }
             .overlay(alignment: .topLeading) { label }
             // The grip is placed by layout (not a visual offset), so the hover, the cursor
             // and the drag all use the same strip (TimelineMetrics.grip).

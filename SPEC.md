@@ -1276,10 +1276,11 @@ stopped daily use, not adding features.
     running, paused, at Time's up, or on a break), and Today has at least 2 open
     tasks. Pressing it while its panel shows closes the panel (an answer, a failure)
     or cancels the request (asking).
-  - **The panel** sits just above the bottom bar, over the end of the list and the
-    timeline (it moves no rows), as wide as the list, with the menu's glass. Clicks
-    elsewhere in the menu work as usual and leave it open (a row may be ticked
-    behind it, see "While it shows").
+  - **The panel** sits just above the bottom bar, as wide as the list, on a faint
+    card: the menu grows to fit it, so it covers nothing and no row moves (a panel
+    over the list let the rows show through its text). Clicks elsewhere in the menu
+    work as usual and leave it open (a row may be ticked meanwhile, see "While it
+    shows").
   - **Asking:** the panel shows "Choosing…" with a small spinner and **Cancel**; ✨
     stays as it is (one spinner). At most 30 seconds. Cancel, Esc, ✨, the menu
     closing, leaving the list (Add, details, Settings), the rollover, losing ready

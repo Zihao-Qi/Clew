@@ -245,11 +245,22 @@ final class AIModel {
     /// Suggest steps for a task (SPEC "Suggest steps"), with the notes and recent
     /// activity (SPEC "Memory"). Suggestions are never kept; a note change may be.
     func suggestSteps(_ input: SuggestSteps.Input) async -> Result<[String], JobFailure> {
+        await run(SuggestSteps(), input: input)
+    }
+
+    /// What next? (SPEC "What next?"): picks from Today's open tasks. Never kept.
+    func whatNext(_ input: WhatNext.Input, job: WhatNext) async -> Result<[WhatNext.Pick], JobFailure> {
+        await run(job, input: input)
+    }
+
+    /// One job with the notes and recent activity; a failure that ends the sign-in or
+    /// the plan's permission is handled here.
+    private func run<J: Job>(_ job: J, input: J.Input) async -> Result<J.Output, JobFailure> {
         guard canSuggestSteps, let model else { return .failure(JobFailure(provider: .notSignedIn)) }
         let log = self.log
         let mine = jobGeneration
         let context = MemoryContext(notes: memory.notes, events: memory.activity.newestFirst)
-        let run = await Agent.run(SuggestSteps(), input: input, memory: context, model: model,
+        let run = await Agent.run(job, input: input, memory: context, model: model,
                                   provider: provider) { record in
             #if DEBUG
             log.debug("job=\(record.job, privacy: .public) model=\(record.model, privacy: .public) bytes=\(record.inputBytes) seconds=\(record.seconds, format: .fixed(precision: 1)) outcome=\(record.outcome, privacy: .public) note=\(record.note ?? "-", privacy: .public) request=\(record.requestId ?? "-", privacy: .public)")
@@ -285,6 +296,18 @@ final class AIModel {
         guard isReady else { return }
         memory.record(ActivityEvent.make(kind, at: Date(), calendar: .current, task: task, typed: typed,
                                          step: step, value: value, tick: tick))
+    }
+
+    /// What next?'s pick taken (▶ Focus or its title), or its answer dismissed (§7).
+    func recordNext(task: String, typed: Bool, focus: Bool, other: Bool) {
+        guard isReady else { return }
+        memory.record(ActivityEvent.chosen(task: task, typed: typed, focus: focus, other: other, at: Date(),
+                                           calendar: .current))
+    }
+
+    func recordNextDismissed() {
+        guard isReady else { return }
+        memory.record(ActivityEvent.dismissedNext(at: Date(), calendar: .current))
     }
 
     func untick(_ tick: UUID?) {
