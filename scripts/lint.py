@@ -13,6 +13,13 @@ Checks:
   a11y     every icon-only Button in App/Clew has an .accessibilityLabel (AGENTS.md
            rule 8; new icon buttons kept arriving without one). A deliberate exception
            carries `// lint: no-label <reason>` on the Button's line.
+  switches every CLEW_* switch named in the app, its checks, scripts or CI is in
+           DebugSwitches.known: a Debug build stops on any other, so a stale build
+           never runs as the real Clew (2026-11-24, one did).
+  waits    a debug harness never reads a SwiftUI-reported frame (DebugFrames,
+           sweptNow(), scrolledBy) on the line right after a fixed Task.sleep: SwiftUI
+           reports later on a slower Mac (three CI failures, 2026-11-24). Wait for the
+           value instead, or say why the wait is enough: `// waited: <why>`.
 """
 import pathlib
 import re
@@ -102,6 +109,51 @@ def check_harness(files: dict[str, str]) -> list[str]:
             if missing:
                 line_no = uncommented.count("\n", 0, m.start()) + 1
                 found.append(f"{path}:{line_no}: a debug harness makes an AIModel with the real {', '.join(missing)}")
+    return found
+
+
+# --- switches ---------------------------------------------------------------------
+
+SWITCHES_FILE = "App/Clew/DebugSwitches.swift"
+SWITCH = re.compile(r"\bCLEW_[A-Z0-9_]+\b")
+
+
+def check_switches(files: dict[str, str]) -> list[str]:
+    listed = files.get(SWITCHES_FILE)
+    if listed is None:
+        return [f"{SWITCHES_FILE}: missing (the Debug build's list of known switches)"]
+    known = set(SWITCH.findall(listed))
+    found = []
+    for path, text in files.items():
+        if path == SWITCHES_FILE or path.endswith("lint.py") or path.endswith(".md"):
+            continue
+        for line_no, line in enumerate(text.splitlines(), 1):
+            for name in SWITCH.findall(line):
+                if name not in known:
+                    found.append(f"{path}:{line_no}: {name} is not in {SWITCHES_FILE} (a Debug build would refuse it)")
+    return found
+
+
+# --- waits ------------------------------------------------------------------------
+
+LATE = re.compile(r"DebugFrames\.frames\[|sweptNow\(\)|scrolledBy")
+
+
+def check_waits(files: dict[str, str]) -> list[str]:
+    found = []
+    for path, text in files.items():
+        if "Harness" not in pathlib.Path(path).name:
+            continue
+        lines = text.splitlines()
+        for i, line in enumerate(lines):
+            if "Task.sleep(" not in code(line):
+                continue
+            j = i + 1
+            while j < len(lines) and not code(lines[j]).strip():
+                j += 1
+            if j < len(lines) and LATE.search(code(lines[j])) and "// waited:" not in lines[j]:
+                found.append(f"{path}:{j + 1}: reads a SwiftUI-reported value right after a fixed sleep: "
+                             "wait for it, or add `// waited: <why>`")
     return found
 
 
@@ -198,8 +250,11 @@ def check_a11y(files: dict[str, str]) -> list[str]:
 
 def repo_files(root: pathlib.Path) -> dict[str, str]:
     files = {}
-    for pattern in ["Sources/**/*.swift", "App/**/*.swift", "Tests/**/*.swift", "docs/*.md", "SPEC.md", "AGENTS.md"]:
+    for pattern in ["Sources/**/*.swift", "App/**/*.swift", "Tests/**/*.swift", "docs/*.md", "SPEC.md", "AGENTS.md",
+                    "scripts/*.py", "scripts/*.sh", ".github/workflows/*.yml"]:
         for p in root.glob(pattern):
+            if p.name == "lint.py":
+                continue   # its own samples are meant to fail
             files[str(p.relative_to(root))] = p.read_text(encoding="utf-8")
     return files
 
@@ -207,7 +262,8 @@ def repo_files(root: pathlib.Path) -> dict[str, str]:
 def lint(root: pathlib.Path) -> list[str]:
     files = repo_files(root)
     docs = {name: (root / path).read_text(encoding="utf-8") for name, path in DOCS.items()}
-    return check_docrefs(files, docs) + check_harness(files) + check_a11y(files)
+    return (check_docrefs(files, docs) + check_harness(files) + check_a11y(files) + check_switches(files)
+            + check_waits(files))
 
 
 def self_test() -> int:
@@ -287,6 +343,27 @@ def self_test() -> int:
             "Button { add() } label: { Label(\"Add\", systemImage: \"plus\") }\n"}), 0),
         ("a11y exception", check_a11y({"App/Clew/V.swift":
             "Button { go() } label: { Image(systemName: \"x\") } // lint: no-label decorative\n"}), 0),
+        ("switches unknown", check_switches({SWITCHES_FILE: '"CLEW_A"', "App/Clew/X.swift": 'env["CLEW_B"]'}), 1),
+        ("switches in a script", check_switches({SWITCHES_FILE: '"CLEW_A"', "scripts/x.py": 'X = "CLEW_C"'}), 1),
+        ("switches known", check_switches({SWITCHES_FILE: '"CLEW_A", "CLEW_B"', "App/Clew/X.swift": 'env["CLEW_B"]',
+                                           "ci.yml": "CLEW_A=1"}), 0),
+        ("switches no list", check_switches({"App/Clew/X.swift": "x"}), 1),
+        ("waits frame after sleep", check_waits({"App/Clew/XHarness.swift":
+            "try await Task.sleep(for: .milliseconds(120))\nlet f = DebugFrames.frames[\"a\"]\n"}), 1),
+        ("waits after a blank line", check_waits({"App/Clew/XHarness.swift":
+            "try await Task.sleep(for: .milliseconds(120))\n\nlet b = box.scrolledBy.banner\n"}), 1),
+        ("waits swept after sleep", check_waits({"App/Clew/XHarness.swift":
+            "try await Task.sleep(for: .seconds(1))\nlet s = sweptNow()\n"}), 1),
+        ("waits said why", check_waits({"App/Clew/XHarness.swift":
+            "try await Task.sleep(for: .seconds(1))\nlet s = sweptNow()   // waited: settled long ago\n"}), 0),
+        ("waits after a wait helper", check_waits({"App/Clew/XHarness.swift":
+            "try await Task.sleep(for: .seconds(1))\ntry await untilDrawn()\nlet s = sweptNow()\n"}), 0),
+        ("waits window frame", check_waits({"App/Clew/XHarness.swift":
+            "try await Task.sleep(for: .seconds(1))\nlet h = panel.frame.height\n"}), 0),
+        ("waits elsewhere", check_waits({"App/Clew/V.swift":
+            "try await Task.sleep(for: .seconds(1))\nlet f = DebugFrames.frames[\"a\"]\n"}), 0),
+        ("waits commented sleep", check_waits({"App/Clew/XHarness.swift":
+            "// try await Task.sleep(for: .seconds(1))\nlet f = DebugFrames.frames[\"a\"]\n"}), 0),
     ]
     failed = 0
     for name, found, expected in cases:
