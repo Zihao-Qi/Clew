@@ -83,6 +83,8 @@ final class NoteBox: NSObject, NSWindowDelegate {
             return
         }
         state.context = model?.noteContext()
+        watchQuit()
+        pauseFocusForNote()
         state.text = Self.defaults.string(forKey: Self.draftKey) ?? ""
         state.focusRequest += 1
         let panel = self.panel ?? makePanel()
@@ -127,6 +129,44 @@ final class NoteBox: NSObject, NSWindowDelegate {
         panel?.delegate = nil
         panel?.orderOut(nil)
         panel?.delegate = self
+        resumeFocusAfterNote()
+    }
+
+    // MARK: The focus stops while a note is written (SPEC "Notes", 2026-11-24, user)
+
+    /// The focus this box paused: started again when the box closes (saved or not).
+    private var pausedFocus: (item: UUID, started: Date)?
+    private var quitObserver: NSObjectProtocol?
+
+    /// Quitting with the box open keeps the draft and starts the focus again (review:
+    /// it stayed paused; the panel's resign-key comes too late then).
+    private func watchQuit() {
+        guard quitObserver == nil else { return }
+        quitObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.panel?.isVisible == true else { return }
+                self.keepDraft()
+                self.resumeFocusAfterNote()
+            }
+        }
+    }
+
+    /// A running focus (not a break, not one already paused, its time not up) stops.
+    private func pauseFocusForNote() {
+        guard pausedFocus == nil, let model, let timer = model.focus, timer.phase == .focus,
+              !timer.isPaused, !timer.isOver(at: Date()) else { return }
+        model.pauseFocus()
+        if model.focus?.isPaused == true { pausedFocus = (timer.itemId, timer.startedAt) }
+    }
+
+    /// Only the focus this box stopped starts again, and only if it is still paused.
+    private func resumeFocusAfterNote() {
+        guard let paused = pausedFocus else { return }
+        pausedFocus = nil
+        guard let model, let timer = model.focus, timer.itemId == paused.item, timer.startedAt == paused.started,
+              timer.isPaused else { return }
+        model.resumeFocus()
     }
 
     // MARK: The banner
@@ -308,6 +348,17 @@ final class NoteBoxState {
     var focusRequest = 0
 }
 
+/// "During: Write the intro", under the note: in the box and in the banner's sweep.
+struct NoteDuringLine: View {
+    let title: String
+    var body: some View {
+        (Text("During: ") + Text(verbatim: title))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+    }
+}
+
 struct NoteBoxView: View {
     let box: NoteBox
     let state: NoteBoxState
@@ -323,10 +374,8 @@ struct NoteBoxView: View {
                 .accessibilityLabel(Text("Note"))
             if let context = state.context {
                 // What it is written during (SPEC "Notes", 2026-11-23).
-                (Text("During: ") + Text(verbatim: context.title))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                NoteDuringLine(title: context.title)
+                    .debugFrame("noteDuring")
             }
         }
         .padding(14)
@@ -356,19 +405,33 @@ struct NoteBannerView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                // The band, sweeping left to right, then the thin bar on the left edge.
+                // The band sweeps left to right and fades where it is; the thin bar on the
+                // left edge fades in. Nothing goes back (user, 2026-11-24: it felt like a
+                // failed save).
                 Rectangle()
-                    .fill(Color.accentColor.opacity(settled ? 1 : 0.22))
-                    .frame(width: settled ? 3 : geo.size.width * sweep)
+                    .fill(Color.accentColor.opacity(0.22))
+                    .frame(width: geo.size.width * sweep)
+                    .opacity(settled ? 0 : 1)
+                    .debugFrame("band\(state.bannerShown)")
+                Rectangle()
+                    .fill(Color.accentColor)
+                    .frame(width: 3)
+                    .opacity(settled ? 1 : 0)
                 Group {
                     if settled {
                         saved
                     } else {
-                        // Just as it was typed: the same size and place.
-                        NoteTextShown(text: state.savedText, scrolledBy: state.savedScroll, maxLines: 4)
-                            .debugFrame("sweptText\(state.bannerShown)")   // one per banner, for the debug check
-                            .id(state.bannerShown)   // new for each banner (review: a reused one lost its scroll; not reproduced here)
-                            .padding(14)
+                        // Just as it was typed, During and all: the same size and place.
+                        VStack(alignment: .leading, spacing: 6) {
+                            NoteTextShown(text: state.savedText, scrolledBy: state.savedScroll, maxLines: 4)
+                                .debugFrame("sweptText\(state.bannerShown)")   // one per banner, for the debug check
+                                .id(state.bannerShown)   // new for each banner (review: a reused one lost its scroll; not reproduced here)
+                            if let context = state.context {
+                                NoteDuringLine(title: context.title)
+                                    .debugFrame("sweptDuring\(state.bannerShown)")
+                            }
+                        }
+                        .padding(14)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: settled ? .leading : .topLeading)
@@ -395,7 +458,7 @@ struct NoteBannerView: View {
                 .foregroundStyle(Color.accentColor)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Saved").fontWeight(.semibold)
+                Text("Saved")   // not bold (user, 2026-11-24)
                     .debugFrame("savedTitle")
                 if let context = state.context {
                     (Text("Back to: ") + Text(verbatim: context.title).bold() + Text(verbatim: context.detail))

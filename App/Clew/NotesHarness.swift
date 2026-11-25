@@ -100,6 +100,7 @@ extension Snapshot {
                 try await Task.sleep(for: .milliseconds(400))
                 guard let panel = box.panelForChecks else { report("the box opens", false); exit(1) }
                 report("the box opens and takes the keyboard", box.isOpen && panel.isKeyWindow)
+                report("writing a note stops the running focus (user, 2026-11-24)", model.focus?.isPaused == true)
                 if let visible = panel.screen?.visibleFrame {
                     report("it opens a quarter of the way down the screen, centred",
                            abs(panel.frame.maxY - (visible.maxY - visible.height / 4)) < 2
@@ -119,7 +120,8 @@ extension Snapshot {
                 /// takes longer), at most until the sweep settles.
                 @MainActor func returnUntilSwept() async throws {
                     key("\r", code: 36)
-                    for _ in 0..<20 where sweptNow() == nil {
+                    // Drawn, and inside the banner (a slow Mac lays it out a frame later).
+                    for _ in 0..<20 where (sweptNow()?.minY ?? -1) < 0 {
                         try await Task.sleep(for: .milliseconds(20))
                     }
                     try await Task.sleep(for: .milliseconds(30))   // one more frame for the scroll
@@ -135,23 +137,43 @@ extension Snapshot {
                 report("⇧Return starts a new line", box.state.text == "Call the bank\nabout the card" && box.isOpen)
                 report("the box grows with its lines", panel.frame.height > oneLine + 10)
                 let typed = DebugFrames.frames["noteText"]
+                let during = DebugFrames.frames["noteDuring"]
                 let lineHeight = box.textAndField.map { $0.text.height / 2 } ?? 0
                 try await returnUntilSwept()
                 let swept = sweptNow()
+                let sweptDuring = DebugFrames.frames["sweptDuring\(box.state.bannerShown)"]
+                report("saved, the focus runs again", model.focus?.isPaused == false)
+                report("while the band sweeps, During stays where it was", during != nil && during == sweptDuring)
+                /// The band's width through the sweep and after: it never goes back.
+                var bandWidths: [CGFloat] = []
+                @MainActor func sampleBand(_ ms: Int) async throws {
+                    for _ in 0..<(ms / 40) {
+                        if let w = DebugFrames.frames["band\(box.state.bannerShown)"]?.width { bandWidths.append(w) }
+                        try await Task.sleep(for: .milliseconds(40))
+                    }
+                }
                 print("  typed", typed as Any, "swept", swept as Any)
                 report("while the band sweeps, the text stays the same size and place (user, 2026-11-24)",
                        typed != nil && swept != nil && abs(typed!.minY - swept!.minY) < 1 && abs(typed!.minX - swept!.minX) < 1
                        && abs(typed!.height - swept!.height) < 1)
-                try await Task.sleep(for: .milliseconds(300))
+                try await sampleBand(300)
                 let saved = model.openNotes.first
                 report("Return saves it with the task it was written during",
                        saved?.text == "Call the bank\nabout the card" && saved?.duringItemId == intro
                        && saved?.duringTitle == "Write the intro" && !box.isOpen)
                 report("then the banner: Saved. Back to: the task, with its minutes left",
                        box.isBannerShown && box.bannerText?.hasPrefix("Saved. Back to: Write the intro · ") == true)
-                try await Task.sleep(for: .milliseconds(900))
+                try await sampleBand(880)
                 report("the banner stays after the sweep, settled", box.isBannerShown && box.state.settled)
+                print("  band widths", bandWidths.map { Int($0) })
+                report("the band sweeps across and never goes back (user, 2026-11-24)",
+                       bandWidths.count > 5 && zip(bandWidths, bandWidths.dropFirst()).allSatisfy { $1 >= $0 - 0.5 }
+                       && (bandWidths.last ?? 0) > 400)
                 let title = DebugFrames.frames["savedTitle"], back = DebugFrames.frames["backTo"]
+                let regular = (String(localized: "Saved") as NSString)
+                    .size(withAttributes: [.font: NoteBox.textFont]).width
+                print("  Saved width", title?.width as Any, "regular", regular)
+                report("Saved is not bold", title.map { abs($0.width - regular.rounded(.up)) < 1 || abs($0.width - regular) < 1 } == true)
                 report("Saved and Back to are the typed text's size, one line each",
                        title.map { abs($0.height - lineHeight) < 1.5 } == true && back.map { abs($0.height - lineHeight) < 1.5 } == true)
                 let whole = DebugFrames.frames["noteBanner"]
@@ -170,6 +192,73 @@ extension Snapshot {
                 try await Task.sleep(for: .milliseconds(200))
                 report("Esc closes it and keeps the draft",
                        !box.isOpen && defaults.string(forKey: NoteBox.draftKey) == "   half a thought" && model.openNotes.count == 1)
+                report("closed without saving, the focus runs again", model.focus?.isPaused == false)
+                // A focus already paused stays paused.
+                try clew.pauseFocus()
+                model.refresh()
+                box.open()
+                try await Task.sleep(for: .milliseconds(200))
+                box.close()
+                report("a focus paused before the note stays paused", model.focus?.isPaused == true)
+                try clew.resumeFocus()
+                model.refresh()
+                // Opened twice, then closed: one pause, one restart.
+                box.open()
+                box.open()
+                try await Task.sleep(for: .milliseconds(200))
+                box.close()
+                report("opened again while open, then closed: the focus runs", model.focus?.isPaused == false)
+                // A different focus by the time it closes is left as it is.
+                box.open()
+                try await Task.sleep(for: .milliseconds(200))
+                try clew.stopFocus()
+                try clew.startFocus(itemId: talk, minutes: 25)
+                try clew.pauseFocus()
+                model.refresh()
+                box.close()
+                report("a focus changed meanwhile is left paused", model.focus?.itemId == talk && model.focus?.isPaused == true)
+                try clew.stopFocus()
+                try clew.startFocus(itemId: intro, minutes: 25)
+                model.refresh()
+                // A click elsewhere: another window takes the keyboard.
+                box.open()
+                try await Task.sleep(for: .milliseconds(300))
+                let elsewhere = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 120, height: 80), styleMask: [.titled],
+                                         backing: .buffered, defer: false)
+                elsewhere.isReleasedWhenClosed = false
+                elsewhere.makeKeyAndOrderFront(nil)
+                try await Task.sleep(for: .milliseconds(300))
+                report("a click elsewhere closes the box and the focus runs again", !box.isOpen && model.focus?.isPaused == false)
+                elsewhere.orderOut(nil)
+                box.close()
+                // A focus whose time is up, and a break, are not paused (a clock of their own).
+                final class MovableClock: Clock, @unchecked Sendable {
+                    var date = Date()
+                    func now() -> Date { date }
+                }
+                let clock = MovableClock()
+                let late = Clew(store: try SQLiteStore.inMemory(), clock: clock, zones: SystemTimeZone())
+                try late.closeCalendarPrompt()
+                let long = try late.addItem(NewItem(title: "Long task", shape: .today)).id
+                let lateModel = AppModel(clew: late, notify: false)
+                clock.date = Date().addingTimeInterval(-30 * 60)
+                try late.startFocus(itemId: long, minutes: 25)
+                clock.date = Date()
+                lateModel.refresh()
+                box.model = lateModel
+                box.open()
+                try await Task.sleep(for: .milliseconds(200))
+                let overPaused = lateModel.focus?.isPaused
+                box.close()
+                try late.startBreak()
+                lateModel.refresh()
+                box.open()
+                try await Task.sleep(for: .milliseconds(200))
+                let breakPaused = lateModel.focus?.isPaused
+                box.close()
+                box.model = model
+                report("a focus whose time is up is not paused", overPaused == false)
+                report("a break is not paused", lateModel.focus?.phase == .rest && breakPaused == false)
                 box.open()
                 try await Task.sleep(for: .milliseconds(300))
                 report("the draft is back when it opens again", box.state.text == "   half a thought")
@@ -279,6 +368,48 @@ extension Snapshot {
                 report("… and Saved fits the slim banner", slim != nil && slimTitle.map { slim!.contains($0) } == true)
                 report("the banner takes exactly the box's frame", box.bannerFrame == boxFrame)
                 box.closeBanner()
+
+                // The band fades where it is and the bar shows on the left edge, settled.
+                @MainActor func renderBanner(settled: Bool, sweep: CGFloat) -> NSBitmapImageRep? {
+                    let shown = NoteBoxState()
+                    shown.banner = "Saved."
+                    shown.settled = settled
+                    shown.sweep = sweep
+                    let host = NSHostingView(rootView: NoteBannerView(state: shown) {}.frame(height: 60))
+                    host.frame = NSRect(x: 0, y: 0, width: 440, height: 60)
+                    host.layoutSubtreeIfNeeded()
+                    guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { return nil }
+                    host.cacheDisplay(in: host.bounds, to: rep)
+                    return rep
+                }
+                func color(_ rep: NSBitmapImageRep?, x: CGFloat, y: CGFloat) -> [CGFloat] {
+                    guard let rep, let c = rep.colorAt(x: Int(x * CGFloat(rep.pixelsWide) / 440),
+                                                       y: Int(y * CGFloat(rep.pixelsHigh) / 60))?.usingColorSpace(.sRGB)
+                    else { return [] }
+                    return [c.redComponent, c.greenComponent, c.blueComponent, c.alphaComponent]
+                }
+                func near(_ a: [CGFloat], _ b: [CGFloat]) -> Bool { a.count == 4 && b.count == 4 && zip(a, b).allSatisfy { abs($0 - $1) < 0.03 } }
+                NoteBannerView.startSettled = true
+                let done = renderBanner(settled: true, sweep: 1), plain = renderBanner(settled: true, sweep: 0)
+                NoteBannerView.startSettled = false
+                let unsettled = renderBanner(settled: false, sweep: 0)
+                print("  settled right", color(done, x: 430, y: 56), "no band", color(plain, x: 430, y: 56),
+                      "left bar", color(done, x: 1, y: 30), "no bar", color(unsettled, x: 1, y: 30))
+                report("settled, the band is gone and the bar is on the left edge",
+                       near(color(done, x: 430, y: 56), color(plain, x: 430, y: 56))
+                       && !near(color(done, x: 1, y: 30), color(unsettled, x: 1, y: 30)))
+
+                // Quitting with the box open: the draft is kept and the focus runs again.
+                try clew.startFocus(itemId: intro, minutes: 25)
+                model.refresh()
+                box.open()
+                try await Task.sleep(for: .milliseconds(300))
+                type("as Clew quits")
+                NotificationCenter.default.post(name: NSApplication.willTerminateNotification, object: NSApp)
+                report("quitting with the box open keeps the draft and starts the focus again",
+                       model.focus?.isPaused == false && defaults.string(forKey: NoteBox.draftKey)?.hasSuffix("as Clew quits") == true)
+                box.state.text = ""
+                box.close()
 
                 report("the two shortcuts never clash",
                        model.setWriteNoteShortcut(.default) == "Already used to open the list."
