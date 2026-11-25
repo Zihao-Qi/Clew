@@ -119,6 +119,11 @@ struct NotesView: View {
         .onChange(of: model.ai?.canSuggestFromNotes) { asks.update(model) }
         .onChange(of: model.notesAccessChanges) { accessChanged() }
         .onChange(of: model.menuCloses) { asks.dropAll() }
+        // The note being edited, from one place (review: switching or a note leaving
+        // left it wrong): its request stops, what shows under it goes, Sort skips it.
+        .onChange(of: editing) { _, now in
+            if let now { asks.editing(now) } else { asks.doneEditing() }
+        }
         .onChange(of: model.today?.day) { asks.dropAll() }
         .onAppear { lastAccess = model.ai?.notesAccess }
         .onChange(of: model.doneNotes.map(\.id)) { reconcile() }
@@ -309,7 +314,6 @@ struct NotesView: View {
 
     private func startEditing(_ note: QuickNote) {
         guard editing != note.id else { return }
-        asks.editing(note.id)   // its request stops, what shows under it goes
         // Another note being edited saves first, as a click elsewhere would (review).
         if let other = editing, let open = model.openNotes.first(where: { $0.id == other }) {
             finishEditing(open, save: true)
@@ -323,7 +327,6 @@ struct NotesView: View {
     private func finishEditing(_ note: QuickNote, save: Bool) {
         guard editing == note.id else { return }
         editing = nil
-        asks.doneEditing()
         if save, draft != note.text { model.editNote(note.id, draft) }
     }
 }
