@@ -102,6 +102,12 @@ import Testing
         #expect(keeps("t1", "Start the ADHD paper's abstract"))
         #expect(!keeps("t2", "ADHD tips in a few minutes"))          // a fetched title allows nothing
         #expect(!keeps("t1", "Than most people, this is quick"))      // the title doesn't carry it
+        // Only the pick's own title: another typed task's title allows nothing.
+        let two = [WhatNext.Candidate(itemId: intro, title: "Read ADHD paper", typed: true, kind: .once),
+                   WhatNext.Candidate(itemId: anna, title: "Call mum", typed: true, kind: .once)]
+        let sentTwo = WhatNext.input(two, at: now, calendar: calendar, freeMinutes: nil)
+        let job2 = WhatNext(ids: sentTwo.ids, titles: sentTwo.titles)
+        #expect((try? job2.validate(#"{"picks":[{"id":"t2","reason":"ADHD paper can wait"}]}"#, input: sentTwo.input).get()) == nil)
     }
 
     @Test func refusesAnythingButTheSchema() {

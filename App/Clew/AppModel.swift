@@ -102,19 +102,29 @@ final class AppModel {
     /// Today's calendar events laid out with the blocks (SPEC "Calendar events"), while
     /// calendar events are on and Clew may read Calendar.
     private(set) var calendarEvents: TimelineEvents?
-    /// What next?'s pick being shown in the list or on the timeline (SPEC "What next?"):
-    /// highlighted for about a second; `revealRequests` asks the list to scroll to it.
-    var highlighted: UUID?
+    /// What next?'s pick being shown (SPEC "What next?"): its row in the list, or with no
+    /// row its one block on the timeline, highlighted for about a second; `revealRequests`
+    /// asks the list (or the block) to scroll and to take VoiceOver.
+    private(set) var highlightedRow: UUID?
+    private(set) var highlightedBlock: UUID?
     private(set) var revealRequests = 0
     private(set) var revealing: UUID?
-    func requestReveal(_ itemId: UUID) {
+    private(set) var revealedBlock: UUID?
+    func requestReveal(_ itemId: UUID, now: Date = Date()) {
         revealing = itemId
+        if listRows.contains(where: { $0.id == itemId }) {
+            highlightedRow = itemId
+            revealedBlock = nil
+        } else {
+            highlightedRow = nil
+            revealedBlock = whatNextBlock(itemId, now: now)?.id
+        }
+        highlightedBlock = revealedBlock
         revealRequests += 1
-        highlighted = itemId
         let mine = revealRequests
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(1))
-            if revealRequests == mine { highlighted = nil }
+            if revealRequests == mine { highlightedRow = nil; highlightedBlock = nil }
         }
     }
     private(set) var calendarShown = false

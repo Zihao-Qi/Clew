@@ -88,13 +88,16 @@ struct TodayListView: View {
         if let fixed = Self.screenHeightForChecks { screen = fixed }
         #endif
         let card = model.showsWeekCard ? weekCardHeight : 0
-        return max(160, screen - card - (showsTimeline ? TimelineMetrics.height : 0) - 170)
+        // What next?'s panel takes room above the bar while it shows (review).
+        let panel = whatNext.isOpen ? nextPanelHeight : 0
+        return max(160, screen - card - panel - (showsTimeline ? TimelineMetrics.height : 0) - 170)
     }
 
     /// Last week's card's height, for `rowsLimit`.
     @State private var weekCardHeight: CGFloat = 0
     /// What next? (SPEC "What next?"): its panel above the bottom bar.
     @State private var whatNext = WhatNextAsk()
+    @State private var nextPanelHeight: CGFloat = 0
     @AccessibilityFocusState private var voiceOverRow: UUID?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -495,8 +498,8 @@ struct TodayListView: View {
                     ownHeights[row.id] = $0
                 }
                 // What next?'s pick, shown for about a second (SPEC "What next?").
-                .background(model.highlighted == row.id ? Color.accentColor.opacity(0.18) : .clear)
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: model.highlighted == row.id)
+                .background(model.highlightedRow == row.id ? Color.accentColor.opacity(0.18) : .clear)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: model.highlightedRow == row.id)
                 .accessibilityFocused($voiceOverRow, equals: row.id)
             if ((steps != nil && model.isUnfolded(row.id)) || adding) && dragging != row.id {
                 StepsList(model: model, row: row, steps: steps ?? TaskSteps(taskId: row.id, entries: []),
@@ -578,7 +581,8 @@ struct TodayListView: View {
                 scroller.offset = min(max(target, 0), scroller.maxOffset)
             }
             voiceOverRow = itemId
-        } else if let day = model.timeline, let block = model.whatNextBlock(itemId) {
+        } else if let day = model.timeline, let id = model.revealedBlock,
+                  let block = day.blocks.first(where: { $0.id == id }) {
             let visible = Int(TimelineMetrics.height) / TimelineMetrics.quarter
             let quarter = Int(block.block.start.timeIntervalSince(day.start) / 60) / TimelineMetrics.quarter
             topQuarter = min(max(quarter - 1, 0), max(TimelineMetrics.quarters(day) - visible, 0))
@@ -747,6 +751,7 @@ struct TodayListView: View {
             if whatNext.isOpen {
                 WhatNextPanel(ask: whatNext, model: model)
                     .padding(.bottom, 6)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { nextPanelHeight = $0 }
             }
 
             Divider()
@@ -766,7 +771,8 @@ struct TodayListView: View {
                     .debugFrame("noteButton")
                 Spacer()
                 // What next? (SPEC "What next?"): ✨ just left of the gear, icon only.
-                if model.canAskWhatNext || whatNext.isOpen {
+                // While its panel shows it stays to close it, but not once AI is gone.
+                if model.canAskWhatNext || (whatNext.isOpen && model.ai?.isReady == true) {
                     Button { whatNext.toggle(model) } label: { Image(systemName: "sparkles") }
                         .help(Text("What next?"))
                         .accessibilityLabel(Text("What next?"))

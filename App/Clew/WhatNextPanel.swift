@@ -115,12 +115,14 @@ final class WhatNextAsk {
     func update(_ model: AppModel) {
         let ready = model.ai?.canSuggestSteps == true
         switch state {
-        case .idle, .signInEnded:
-            break   // the ended sign-in's message stays its 5 seconds
+        case .idle:
+            break
         case .asking:
             if !model.canAskWhatNext { close() }
         case .failed, .usageLimit:
             if !ready || model.focus != nil { close() }
+        case .signInEnded:
+            if model.focus != nil { close() }
         case .shown(var picks, let first):
             guard ready, model.focus == nil else { return close() }
             let open = model.whatNextOpenIds
@@ -222,15 +224,15 @@ struct WhatNextPanel: View {
             case .failed:
                 failure(Text("Couldn't choose. Try again."))
             case .usageLimit:
-                HStack(spacing: 8) {
-                    Text("ChatGPT usage limit reached").foregroundStyle(.secondary)
+                // As Suggest steps says it: the text, then the link in the accent colour.
+                failure(Text("ChatGPT usage limit reached")) {
                     Link("Manage usage", destination: ChatGPT.usageURL)
+                        .buttonStyle(.link)
                         .simultaneousGesture(TapGesture().onEnded { ask.close() })
                         .accessibilityLabel(Text("Manage ChatGPT usage"))
-                    Spacer()
-                    notNow
                 }
             case .signInEnded:
+                // The ended sign-in's message stays its 5 seconds, though ready is gone.
                 failure(Text("OpenAI ended Clew's sign-in. Sign in again in Settings › AI."))
             }
         }
@@ -250,11 +252,16 @@ struct WhatNextPanel: View {
         .debugFrame("whatNextPanel")
     }
 
-    private func failure(_ text: Text) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+    /// A failure's line (it may wrap), anything to act on, then Not now on its own line,
+    /// as the answer's.
+    private func failure(_ text: Text, @ViewBuilder action: () -> some View = { EmptyView() }) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
             text.foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            Spacer()
-            notNow
+            HStack {
+                action()
+                Spacer()
+                notNow
+            }
         }
     }
 
@@ -273,11 +280,14 @@ struct WhatNextPanel: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .accessibilityLabel(Text("Go to \(title)"))
+                    .accessibilitySortPriority(2)
                     .debugFrame("whatNextTitle")
                 Spacer(minLength: 8)
                 if model.whatNextCanFocus(pick.itemId) {
                     Button { ask.focus(model) } label: { Label("Focus 25 min", systemImage: "play.fill") }
+                        .fixedSize()
                         .accessibilityLabel(Text("Focus 25 minutes on \(title)"))
+                        .accessibilitySortPriority(1)
                         .debugFrame("whatNextFocus")
                 }
             }
@@ -286,9 +296,10 @@ struct WhatNextPanel: View {
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityLabel(Text("Suggested: \(title). \(pick.reason)"))
+                .accessibilitySortPriority(3)   // read first, then Go to and Focus
             if !others.isEmpty {
                 HStack(spacing: 4) {
-                    Text("Or:").foregroundStyle(.secondary)
+                    Text("Or:").foregroundStyle(.secondary).fixedSize()
                     ForEach(Array(others.enumerated()), id: \.element.0) { i, other in
                         if i > 0 { Text(verbatim: "·").foregroundStyle(.secondary).accessibilityHidden(true) }
                         ClickableText(text: other.1, bold: false) { ask.choose(other.0) }
@@ -320,9 +331,7 @@ private struct ClickableText: View {
                 .foregroundStyle(.primary)
         }
         .buttonStyle(.plain)
-        .onHover { inside in
-            hovering = inside
-            if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
-        }
+        .onHover { hovering = $0 }
+        .modifier(LinkPointer())   // the hand comes and goes with the view (review: a push leaked)
     }
 }

@@ -128,7 +128,7 @@ public struct WhatNext: Job {
         return Int(next.timeIntervalSince(now) / 60)
     }
 
-    static func hhmm(_ date: Date, _ calendar: Calendar) -> String {
+    public static func hhmm(_ date: Date, _ calendar: Calendar) -> String {
         let c = calendar.dateComponents([.hour, .minute], from: date)
         return String(format: "%02d:%02d", c.hour ?? 0, c.minute ?? 0)
     }

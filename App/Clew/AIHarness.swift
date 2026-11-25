@@ -325,10 +325,20 @@ extension Snapshot {
         ask.open(model)
         let opened = ai.memory.activity.events.last
         report("the title closes it and goes to the task, highlighted",
-               ask.state == .idle && model.revealing == intro && model.highlighted == intro)
+               ask.state == .idle && model.revealing == intro && model.highlightedRow == intro
+               && model.highlightedBlock == nil)
         report("…remembered: open, the first pick", opened?.kind == .nextChosen && opened?.how == "open" && opened?.other == nil)
         try await Task.sleep(for: .milliseconds(1200))
-        report("the highlight goes after about a second", model.highlighted == nil)
+        report("the highlight goes after about a second", model.highlightedRow == nil)
+        transport.reply(200, RecordedAI.picks([("t1", "A"), ("t2", "B")]))
+        ask.toggle(model)
+        try await until { ask.state != .asking }
+        ai.memory.clearActivity()
+        ask.choose(anna)
+        ask.open(model)
+        report("the title of another chosen task: remembered as not the first pick",
+               model.revealing == anna && ai.memory.activity.events.last?.other == true
+               && ai.memory.activity.events.last?.how == "open")
         transport.reply(200, RecordedAI.picks([("t1", "Mornings suit writing"), ("t2", "Quick")]))
         ask.toggle(model)
         try await until { ask.state != .asking }
@@ -395,7 +405,8 @@ extension Snapshot {
         try await until { ask.state == .asking }
         try await until { ask.state != .asking }
         report("nothing that passes: Couldn't choose", ask.state == .failed)
-        ask.closeByPerson(model)
+        try await Task.sleep(for: .milliseconds(5300))
+        report("…for 5 seconds, then it closes", ask.state == .idle)
         transport.reply(429, [#"{"error":{"code":"subscription_sharing_usage_limit_exceeded"}}"#])
         ask.toggle(model)
         try await until { ask.state != .asking }
@@ -420,7 +431,7 @@ extension Snapshot {
         otherModel.useAI(ai2)
         await ai2.refreshModels()
         ai2.record(.taskTicked, task: "Earlier", typed: true)
-        t2.reply(200, RecordedAI.picks([("t1", "A")]))
+        t2.reply(200, RecordedAI.picks([("t2", "A")]))
         let ask2 = WhatNextAsk()
         ask2.toggle(otherModel)
         try await until { ask2.state != .asking }
@@ -429,25 +440,51 @@ extension Snapshot {
                sent?.last?["untrusted"] as? Bool == true && sent?.first?["untrusted"] == nil
                && ((t2.lastInput["memory"] as? [String: Any])?["activity"] as? [Any])?.isEmpty == true
                && ai2.memory.activity.events.count == 1)
+        ask2.open(otherModel)
+        let fetched = ai2.memory.activity.events.last
+        report("choosing a fetched task remembers it as a link, never its title",
+               fetched?.kind == .nextChosen && fetched?.task == nil && fetched?.link == true)
+        t2.reply(200, RecordedAI.picks([("t2", "A")]))
+        ask2.toggle(otherModel)
+        try await until { ask2.state != .asking }
+        ask2.focus(otherModel)
+        let focused = ai2.memory.activity.events.last
+        report("…with ▶ Focus too", focused?.how == "focus" && focused?.task == nil && focused?.link == true)
+        try other.stopFocus()
 
-        // ▶ Focus only where its timer can show.
-        let steps = Clew(store: try SQLiteStore.inMemory(), clock: SystemClock(), zones: SystemTimeZone())
+        // ▶ Focus only where its timer can show. A clock of its own: today at noon.
+        final class Noon: Clock, @unchecked Sendable {
+            let date: Date
+            init() {
+                date = Calendar.current.date(bySettingHour: 12, minute: 0, second: 0, of: Date())!
+            }
+            func now() -> Date { date }
+        }
+        let noon = Noon()
+        let steps = Clew(store: try SQLiteStore.inMemory(), clock: noon, zones: SystemTimeZone())
         try steps.closeCalendarPrompt()
         try steps.setTimelineShown(true)
         let talk = try steps.addItem(NewItem(title: "Prepare the talk", shape: .today)).id
         let notes = try steps.addStep(taskId: talk, title: "Speech notes").id
         let own = try steps.addItem(NewItem(title: "Email Anna", shape: .today)).id
-        let start = Date(timeIntervalSince1970: (Date().timeIntervalSince1970 / 900).rounded(.down) * 900 + 3600)
+        let start = noon.date.addingTimeInterval(3600)
         try steps.placeStepOnTimeline(stepId: notes, start: start, minutes: 30)
         try steps.placeOnTimeline(itemId: own, start: start, minutes: 30)
+        let ended = try steps.addItem(NewItem(title: "Water the plants", shape: .today)).id
+        let earlier = try steps.placeOnTimeline(itemId: ended, start: noon.date.addingTimeInterval(-3 * 3600), minutes: 30)
         let stepsModel = AppModel(clew: steps, notify: false)
         stepsModel.refresh()
         report("no ▶ Focus for a task off the list only through its steps' blocks",
                !stepsModel.whatNextCanFocus(talk) && stepsModel.whatNextCanFocus(own))
-        report("its title goes to its next block", stepsModel.whatNextBlock(talk)?.block.stepId == notes)
-        let request = stepsModel.whatNextRequest()
+        report("its title goes to its next block", stepsModel.whatNextBlock(talk, now: noon.date)?.block.stepId == notes)
+        report("…or, all ended, its latest block today", stepsModel.whatNextBlock(ended, now: noon.date)?.id == earlier.id)
+        stepsModel.requestReveal(talk, now: noon.date)
+        report("going to a task on the timeline highlights that one block, not a row",
+               stepsModel.highlightedRow == nil && stepsModel.highlightedBlock != nil
+               && stepsModel.timeline?.blocks.first { $0.id == stepsModel.highlightedBlock }?.block.stepId == notes)
+        let request = stepsModel.whatNextRequest(now: noon.date)
         report("a placed task's block start and the free minutes are sent",
-               request.input.tasks.first?.block != nil && request.input.freeMinutes != nil)
+               request.input.tasks.first?.block == WhatNext.hhmm(start, .current) && request.input.freeMinutes == 60)
     }
 
     /// `CLEW_AI_RENDER=1`: Settings › AI signed out, signed in (with the one-time note),

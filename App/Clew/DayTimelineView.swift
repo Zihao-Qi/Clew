@@ -569,6 +569,8 @@ struct DayTimelineView: View {
 /// to remove; right-click for the same without dragging.
 struct TimelineBlockView: View {
     let model: AppModel
+    @AccessibilityFocusState private var voiceOver: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let block: TimelineBlock
     let day: TimelineDay
     let space: String
@@ -624,12 +626,15 @@ struct TimelineBlockView: View {
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 4))
-            // What next?'s pick, shown for about a second (SPEC "What next?").
+            // What next?'s pick, shown for about a second (SPEC "What next?"): this block only.
             .overlay {
-                if model.highlighted == block.block.itemId {
-                    RoundedRectangle(cornerRadius: 4).fill(Color.accentColor.opacity(0.18))
-                }
+                RoundedRectangle(cornerRadius: 4).fill(Color.accentColor.opacity(0.18))
+                    .opacity(model.highlightedBlock == block.id ? 1 : 0)
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: model.highlightedBlock == block.id)
+                    .allowsHitTesting(false)
             }
+            .accessibilityFocused($voiceOver)
+            .onChange(of: model.revealRequests) { if model.revealedBlock == block.id { voiceOver = true } }
             .overlay(alignment: .topLeading) { label }
             // The grip is placed by layout (not a visual offset), so the hover, the cursor
             // and the drag all use the same strip (TimelineMetrics.grip).
