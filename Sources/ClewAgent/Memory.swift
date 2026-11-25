@@ -35,6 +35,8 @@ public struct ActivityEvent: Codable, Sendable, Equatable, Identifiable {
         case taskTicked, stepTicked, rated, focusEnded, suggestionAdded, suggestionsDismissed, suggestedStepDeleted
         /// The person's answer in "What Clew noticed" (AI-N).
         case noteConfirmed, noteRejected
+        /// What next? (AI-4): its pick taken, or its answer dismissed.
+        case nextChosen, nextDismissed
     }
     public var id: UUID
     public var kind: Kind
@@ -50,6 +52,9 @@ public struct ActivityEvent: Codable, Sendable, Equatable, Identifiable {
     public var tick: UUID?
     /// The note's line, for `noteConfirmed` and `noteRejected` only.
     public var note: String?
+    /// `nextChosen`: "focus" or "open", and whether the task was not the answer's first pick.
+    public var how: String? = nil
+    public var other: Bool? = nil
 
     static let weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 
@@ -75,10 +80,27 @@ public struct ActivityEvent: Codable, Sendable, Equatable, Identifiable {
         return event
     }
 
+    /// What next?'s pick taken (SPEC "What next?"): how, and whether it was not the
+    /// answer's first pick; the task as any event carries it.
+    public static func chosen(task: String, typed: Bool, focus: Bool, other: Bool, at date: Date,
+                              calendar: Calendar, id: UUID = UUID()) -> ActivityEvent {
+        var event = make(.nextChosen, at: date, calendar: calendar, task: task, typed: typed, id: id)
+        event.how = focus ? "focus" : "open"
+        event.other = other ? true : nil
+        return event
+    }
+
+    /// What next?'s answer dismissed: no task.
+    public static func dismissedNext(at date: Date, calendar: Calendar, id: UUID = UUID()) -> ActivityEvent {
+        var event = make(.nextDismissed, at: date, calendar: calendar, task: "", typed: true, id: id)
+        event.task = nil
+        return event
+    }
+
     /// What a request carries: no ids, no tick.
     struct Sent: Encodable {
         let event: ActivityEvent
-        enum Keys: String, CodingKey { case kind, weekday, time, task, link, step, value, note }
+        enum Keys: String, CodingKey { case kind, weekday, time, task, link, step, value, note, how, other }
         func encode(to encoder: Encoder) throws {
             var c = encoder.container(keyedBy: Keys.self)
             try c.encode(event.kind.rawValue, forKey: .kind)
@@ -89,6 +111,8 @@ public struct ActivityEvent: Codable, Sendable, Equatable, Identifiable {
             try c.encodeIfPresent(event.step, forKey: .step)
             try c.encodeIfPresent(event.value, forKey: .value)
             try c.encodeIfPresent(event.note, forKey: .note)
+            try c.encodeIfPresent(event.how, forKey: .how)
+            if event.other == true { try c.encode(true, forKey: .other) }
         }
     }
 }
