@@ -66,6 +66,9 @@ final class AIModel {
     /// Bumped whenever ready is lost or everything is forgotten: a running request's note
     /// change is then dropped.
     @ObservationIgnored private var jobGeneration = 0
+    /// Changes when ready is lost or everything is forgotten: what was kept for a ready
+    /// period (What next?'s answer) is then stale.
+    var generation: Int { jobGeneration }
     @ObservationIgnored private let store: SessionStore
     @ObservationIgnored private let transport: HTTPTransport
     @ObservationIgnored private let account: ChatGPTAccount

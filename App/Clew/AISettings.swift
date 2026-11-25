@@ -114,7 +114,7 @@ struct AISettings: View {
                     Text(message).font(.callout).foregroundStyle(.secondary)
                 }
             } footer: {
-                Text("Clew can suggest small steps for a task, help you choose what's next and remember how you work, using your ChatGPT plan. Nothing is sent until you sign in and ask. Clew works fully without it.")
+                Text("Clew can suggest small steps for a task, help you choose what's next and remember how you work, using your ChatGPT plan. Nothing is sent until you sign in. Clew works fully without it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

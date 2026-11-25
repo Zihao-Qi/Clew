@@ -171,7 +171,7 @@ address or any page's content.
 | **Suggest steps** | Add Step… and Details' Steps (SPEC "Suggest steps") | asks for 3–5 to-do items of 2–5 words, the first a 2-minute start; keeps up to 5 that pass (1–80 characters, no repeats) | AI-1 |
 | **Evening line** | the 21:00 summary | one line ≤ 120 characters naming something done | AI-2 |
 | **Fits today** | Goals & Later | ≤ 3 items with a free slot on today's timeline and a reason ≤ 80 | AI-3 |
-| **What next?** | ✨ in the list's bottom bar (SPEC "What next?") | 1–3 picks from Today's open tasks, each an id and a reason ≤ 80, the first shown as the pick | AI-4 |
+| **What next?** | Next in the list's bottom bar, asked ahead when the menu opens (SPEC "What next?") | 1–3 picks from Today's open tasks, each an id and a reason ≤ 80, the first shown as the pick | AI-4 |
 | *every job* | its own place | may also return one note (§7) | AI-M |
 | What Clew noticed | last week's card | no request: shows Clew's unanswered notes, True / Not really (§7) | AI-N |
 | Reader | later | §11 | later |
@@ -311,7 +311,8 @@ in the Keychain. The full text is in SPEC "Suggest steps" and "Memory".
 ## 10. Privacy
 
 - Off by default; nothing is sent until the person signs in (which turns Use AI on)
-  and a job runs (for now, only when they ask for suggestions or press What next?).
+  and a job runs: when they ask for suggestions, and What next? when the menu opens
+  with something new (asked ahead, at most once per change or every 2 hours).
 - Each job sends only the input it declares (§6) plus the notes and activity (§7).
   Settings › AI says in general what AI does, not each field (*user* 2026-11-22);
   SPEC and this file list them exactly.
@@ -326,8 +327,8 @@ in the Keychain. The full text is in SPEC "Suggest steps" and "Memory".
   memory (§7), as each job needs. Each job declares what it reads (§10).
 - **Memory, a main direction:** designed in §7 (AI-M). Later: the calendar and
   timeline as activity, and a daily pass if notes come too rarely.
-- **Emotional support:** maybe, not decided. If ever, within §1.4 and the support
-  nudge's limits below.
+- **Emotional support** (*user* 2026-11-25): not a feature of its own; at most a
+  subtle part of how Clew talks (§1.4), later.
 - **Other providers:** yes, behind ClewAI's `Provider` (§2): Apple's on-device model,
   an API key or another service, for people without a ChatGPT plan or as a fallback.
 
@@ -364,6 +365,10 @@ first jobs have earned their place.
   one pick with a reason and up to 2 others, ▶ Focus for 25 minutes, the pick's title
   scrolls to its row; nothing changes without ▶ Focus. It reads Today's open tasks,
   the time, the free minutes on today's timeline (never an event's title) and memory.
+- **2026-11-25 (*user*)**: What next? is asked ahead when the menu opens (pressing it
+  felt slow): only when Today's open tasks changed or the kept answer is 2 hours old,
+  kept in memory only. Its button is **Next** in the bar's left group. Emotional
+  support is not a feature of its own: at most a subtle part of how Clew talks, later.
 - Superseded 2026-11-22: the bundled `clew-agent` helper, Codex OAuth reuse, the
   monthly token cap (the plan's own limits apply), the Gateway's `AgentOutput` records
   for AI-1 (Suggest steps keeps nothing; memory notes have their own file, §7).

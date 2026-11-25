@@ -16,6 +16,8 @@ final class RecordedAI: HTTPTransport, @unchecked Sendable {
     private(set) var lastInput: [String: Any] = [:]
 
     func reply(_ status: Int, _ lines: [String]) { lock.withLock { replies.append((status, lines)) } }
+    /// Drops replies no request took (a cancelled one may never ask).
+    func clearReplies() { lock.withLock { replies.removeAll() } }
     static func picks(_ picks: [(String, String)], note: [String: Any]? = nil) -> [String] {
         answer(["picks": picks.map { ["id": $0.0, "reason": $0.1] }, "note": note ?? NSNull()])
     }
@@ -291,6 +293,7 @@ extension Snapshot {
         func until(_ done: @escaping () -> Bool) async throws {
             for _ in 0..<100 where !done() { try await Task.sleep(for: .milliseconds(20)) }
         }
+        ask.drop()
         transport.reply(200, RecordedAI.picks([("t2", "Quick, and it clears your head"), ("t1", "Mornings suit writing"),
                                                ("t3", "Two minutes")]))
         ai.record(.taskTicked, task: "Earlier", typed: true)
@@ -318,11 +321,12 @@ extension Snapshot {
         model.refresh()
 
         // The title goes to the task; Not now; Cancel.
+        ask.drop()
         transport.reply(200, RecordedAI.picks([("t1", "Mornings suit writing"), ("t2", "Quick")]))
         ask.toggle(model)
         try await until { ask.state != .asking }
         ai.memory.clearActivity()
-        ask.open(model)
+        ask.goTo(model)
         let opened = ai.memory.activity.events.last
         report("the title closes it and goes to the task, highlighted",
                ask.state == .idle && model.revealing == intro && model.highlightedRow == intro
@@ -330,15 +334,17 @@ extension Snapshot {
         report("…remembered: open, the first pick", opened?.kind == .nextChosen && opened?.how == "open" && opened?.other == nil)
         try await Task.sleep(for: .milliseconds(1200))
         report("the highlight goes after about a second", model.highlightedRow == nil)
+        ask.drop()
         transport.reply(200, RecordedAI.picks([("t1", "A"), ("t2", "B")]))
         ask.toggle(model)
         try await until { ask.state != .asking }
         ai.memory.clearActivity()
         ask.choose(anna)
-        ask.open(model)
+        ask.goTo(model)
         report("the title of another chosen task: remembered as not the first pick",
                model.revealing == anna && ai.memory.activity.events.last?.other == true
                && ai.memory.activity.events.last?.how == "open")
+        ask.drop()
         transport.reply(200, RecordedAI.picks([("t1", "Mornings suit writing"), ("t2", "Quick")]))
         ask.toggle(model)
         try await until { ask.state != .asking }
@@ -347,13 +353,16 @@ extension Snapshot {
         report("Not now closes it and is remembered as dismissed",
                ask.state == .idle && ai.memory.activity.events.map(\.kind) == [.nextDismissed])
         ai.memory.clearActivity()
+        ask.drop()
         transport.reply(200, RecordedAI.picks([("t1", "Late")]))
         ask.toggle(model)
         ask.closeByPerson(model)
+        let recordedOnCancel = !ai.memory.activity.events.isEmpty   // before the request carries anything off
         try await Task.sleep(for: .milliseconds(300))
-        report("Cancel: nothing appears later, nothing remembered", ask.state == .idle && ai.memory.activity.events.isEmpty)
+        report("Cancel: nothing appears later, nothing remembered", ask.state == .idle && !recordedOnCancel)
 
         // While it shows: tasks leaving, focus starting, ready lost.
+        ask.drop()
         transport.reply(200, RecordedAI.picks([("t1", "A"), ("t2", "B")]))
         ask.toggle(model)
         try await until { ask.state != .asking }
@@ -367,6 +376,7 @@ extension Snapshot {
         report("none left: it closes", ask.state == .idle)
         if let row = model.row(intro) { model.tap(row) }
         if let row = model.row(anna) { model.tap(row) }
+        ask.drop()
         transport.reply(200, RecordedAI.picks([("t1", "A"), ("t2", "B")]))
         ask.toggle(model)
         try await until { ask.state != .asking }
@@ -376,6 +386,7 @@ extension Snapshot {
         report("a focus starting elsewhere closes it", ask.state == .idle)
         try clew.stopFocus()
         model.refresh()
+        ask.drop()
         transport.reply(200, RecordedAI.picks([("t1", "A"), ("t2", "B")]))
         ask.toggle(model)
         try await until { ask.state != .asking }
@@ -385,12 +396,14 @@ extension Snapshot {
         ai.useAI = true
 
         // Ticked while asking; open tasks below 2 while asking.
+        ask.drop()
         transport.reply(200, RecordedAI.picks([("t1", "A")]))
         ask.toggle(model)
         if let row = model.row(intro) { model.tap(row) }
         try await until { ask.state != .asking }
         report("a task ticked while asking leaves: none left closes quietly", ask.state == .idle)
         if let row = model.row(intro) { model.tap(row) }
+        ask.drop()
         transport.reply(200, RecordedAI.picks([("t1", "A")]))
         ask.toggle(model)
         if let row = model.row(anna) { model.tap(row) }
@@ -400,6 +413,7 @@ extension Snapshot {
         for id in [anna, rent] { if let row = model.row(id) { model.tap(row) } }
 
         // Failures.
+        ask.drop()
         transport.reply(200, RecordedAI.picks([("t9", "Not a task")]))
         ask.toggle(model)
         try await until { ask.state == .asking }
@@ -409,16 +423,208 @@ extension Snapshot {
         for _ in 0..<80 where ask.state == .failed { try await Task.sleep(for: .milliseconds(100)) }
         let shownFor = Date().timeIntervalSince(failedAt)
         report("…for 5 seconds, then it closes", ask.state == .idle && shownFor >= 4.8)
+        ask.drop()
         transport.reply(429, [#"{"error":{"code":"subscription_sharing_usage_limit_exceeded"}}"#])
         ask.toggle(model)
         try await until { ask.state != .asking }
         report("usage limit", ask.state == .usageLimit)
         ask.closeByPerson(model)
+        ask.drop()
         transport.reply(200, [#"data: {"type":"response.failed","response":{"error":{"code":"subscription_sharing_invalid_user"}}}"#])
         ask.toggle(model)
         try await until { ask.state != .asking }
         ask.update(model)
         report("an ended sign-in: its message stays though ready is lost", ask.state == .signInEnded && !ai.useAI)
+
+        // Asked ahead when the menu opens; the kept answer shows at once (SPEC "What next?").
+        ask.drop()
+        for id in [intro, anna, rent] where model.row(id)?.isDone == true { if let row = model.row(id) { model.tap(row) } }
+        let aheadAI = testAI(MemorySession.signedIn(), transport, "next-ahead")   // the last one was signed out
+        model.useAI(aheadAI)
+        await aheadAI.refreshModels()
+        let ahead = model.whatNext
+        ahead.drop()
+        let before = transport.asked
+        transport.reply(200, RecordedAI.picks([("t1", "Mornings suit writing"), ("t2", "Quick")]))
+        model.menuClosed()
+        model.menuOpened(onList: true)
+        try await until { !ahead.isAsking }
+        report("opening the menu asks once in the background", transport.asked == before + 1 && ahead.state == .idle)
+        ahead.toggle(model)
+        report("Next shows the kept answer at once", {
+            if case .shown(let p, _) = ahead.state { return p.first?.itemId == intro } else { return false } }())
+        ahead.close()
+        model.menuClosed()
+        model.menuOpened(onList: true)
+        report("nothing new: nothing is sent again", transport.asked == before + 1 && !ahead.isAsking)
+        if let row = model.row(intro) { model.tap(row) }
+        ahead.toggle(model)
+        report("a task ticked with the menu open: the kept answer shows without it, nothing sent", {
+            if case .shown(let p, _) = ahead.state { return p.map(\.itemId) == [anna] } else { return false } }()
+            && transport.asked == before + 1)
+        ahead.close()
+        transport.reply(200, RecordedAI.picks([("t1", "Quick")]))
+        model.menuClosed()
+        model.menuOpened(onList: true)
+        try await until { !ahead.isAsking }
+        report("something new at the next opening: asked again", transport.asked == before + 2)
+        if let row = model.row(intro) { model.tap(row) }
+        transport.reply(200, RecordedAI.picks([("t1", "Later")]))
+        ahead.askAhead(model)
+        try await until { !ahead.isAsking }
+        let afterTick = transport.asked
+        ahead.askAhead(model, now: Date().addingTimeInterval(2 * 3600 + 60))
+        try await until { !ahead.isAsking }
+        report("an answer 2 hours old is asked again", transport.asked == afterTick + 1)
+        ahead.drop()
+        transport.reply(429, [#"{"error":{"code":"subscription_sharing_usage_limit_exceeded"}}"#])
+        ahead.askAhead(model)
+        try await until { !ahead.isAsking }
+        let quiet = ahead.state == .idle
+        let asked429 = transport.asked
+        model.menuClosed()
+        model.menuOpened(onList: true)
+        let notAgain = transport.asked == asked429 && !ahead.isAsking
+        ahead.toggle(model)
+        report("a background usage limit is silent, then shows when Next is pressed",
+               quiet && ahead.state == .usageLimit && transport.asked == asked429)
+        report("…and nothing more is asked ahead until then", notAgain)
+        ahead.close()
+        transport.reply(200, RecordedAI.picks([("t1", "A")]))
+        ahead.toggle(model)   // the failure was shown once: Next asks again
+        try await until { ahead.state == .asking }
+        try await until { ahead.state != .asking }
+        ahead.close()
+        aheadAI.useAI = false
+        ahead.update(model)
+        report("losing ready drops the kept answer at once", ahead.kept == nil)
+        ahead.askAhead(model)   // ready is lost: nothing asked
+        aheadAI.useAI = true
+        transport.reply(200, RecordedAI.picks([("t1", "A")]))
+        ahead.askAhead(model)
+        try await until { !ahead.isAsking }
+        aheadAI.useAI = false   // lost again, but nothing tells the panel this time
+        aheadAI.useAI = true
+        let droppedAsked = transport.asked
+        transport.reply(200, RecordedAI.picks([("t1", "A")]))
+        model.menuClosed()
+        model.menuOpened(onList: true)
+        try await until { !ahead.isAsking }
+        report("losing ready drops the kept answer: asked again at the next opening", transport.asked == droppedAsked + 1)
+        try clew.startFocus(itemId: rent, minutes: 10)
+        model.refresh()
+        ahead.drop()
+        let focusAsked = transport.asked
+        model.menuClosed()
+        model.menuOpened(onList: true)
+        report("nothing asked ahead while a focus timer exists", transport.asked == focusAsked && !ahead.isAsking)
+        try clew.stopFocus()
+        model.refresh()
+        // Only on the list, where Next is.
+        ahead.drop()
+        let offList = transport.asked
+        model.menuClosed()
+        model.menuOpened(onList: false)
+        report("nothing asked ahead when the menu opens on another page", transport.asked == offList && !ahead.isAsking)
+        // Closing the menu closes the panel at once.
+        transport.reply(200, RecordedAI.picks([("t1", "A")]))
+        ahead.toggle(model)
+        try await until { ahead.state != .asking }
+        model.menuClosed()
+        report("closing the menu closes the panel at once", ahead.state == .idle)
+        // All the kept picks closed (two tasks still open): Next asks now.
+        if let row = model.row(intro) { model.tap(row) }
+        let allClosed = transport.asked
+        transport.reply(200, RecordedAI.picks([("t1", "C")]))
+        ahead.toggle(model)
+        let waiting = ahead.state == .asking
+        try await until { transport.asked > allClosed }
+        report("every kept pick closed: Next asks now", waiting && transport.asked == allClosed + 1)
+        try await until { ahead.state != .asking }
+        ahead.close()
+        if let row = model.row(intro) { model.tap(row) }
+        // Other background failures are silent; Next then asks now.
+        ahead.drop()
+        transport.reply(200, RecordedAI.picks([("t9", "Not a task")]))
+        ahead.askAhead(model)
+        try await until { !ahead.isAsking }
+        let silent = ahead.state == .idle
+        let afterBad = transport.asked
+        transport.reply(200, RecordedAI.picks([("t1", "A")]))
+        ahead.toggle(model)
+        let askingNow = ahead.state == .asking
+        try await until { transport.asked > afterBad }
+        report("a background failure is silent; Next asks now", silent && askingNow && transport.asked == afterBad + 1)
+        try await until { ahead.state != .asking }
+        ahead.close()
+        // Forget everything: a waiting panel is never left on Choosing…, and the kept answer goes.
+        ahead.drop()
+        transport.reply(200, RecordedAI.picks([("t1", "A")]))
+        ahead.toggle(model)
+        aheadAI.forgetEverything()
+        try await until { ahead.state == .asking && ahead.isAsking }
+        try await until { !ahead.isAsking }
+        try await Task.sleep(for: .milliseconds(100))
+        report("Forget everything while asking: the panel closes, nothing kept", ahead.state == .idle && ahead.kept == nil)
+        // A request from before Forget everything is not waited for: Next asks anew.
+        ahead.drop()
+        transport.reply(200, RecordedAI.picks([("t1", "Old")]))
+        transport.reply(200, RecordedAI.picks([("t1", "New")]))
+        ahead.toggle(model)
+        aheadAI.forgetEverything()
+        ahead.close()
+        ahead.toggle(model)
+        try await until { ahead.state != .asking }
+        report("after Forget everything, Next asks anew instead of waiting for the old answer", {
+            if case .shown = ahead.state { return true } else { return false } }())
+        ahead.close()
+        transport.clearReplies()
+        // A usage limit met in the background goes with losing ready, like the kept answer.
+        ahead.drop()
+        transport.reply(429, [#"{"error":{"code":"subscription_sharing_usage_limit_exceeded"}}"#])
+        ahead.askAhead(model)
+        try await until { !ahead.isAsking }
+        let limited = ahead.usageLimited
+        aheadAI.useAI = false   // nothing tells the panel (the list may not be showing)
+        aheadAI.useAI = true
+        let afterLimit = transport.asked
+        transport.reply(200, RecordedAI.picks([("t1", "A")]))
+        model.menuClosed()
+        model.menuOpened(onList: true)
+        try await until { !ahead.isAsking }
+        report("a background usage limit goes with the ready period: asked ahead again after it",
+               limited && transport.asked == afterLimit + 1)
+        // A sign-in ended in the background: Next goes; nothing lingers for the next sign-in.
+        ahead.drop()
+        transport.reply(200, [#"data: {"type":"response.failed","response":{"error":{"code":"subscription_sharing_invalid_user"}}}"#])
+        ahead.askAhead(model)
+        try await until { !ahead.isAsking }
+        ahead.update(model)
+        report("a sign-in ended in the background: Next goes, nothing kept or waiting",
+               !model.canAskWhatNext && ahead.state == .idle && ahead.kept == nil && !ahead.usageLimited)
+
+        // The rollover drops the kept answer (a clock of its own).
+        final class Movable: Clock, @unchecked Sendable {
+            var date = Date()
+            func now() -> Date { date }
+        }
+        let clock = Movable()
+        let days = Clew(store: try SQLiteStore.inMemory(), clock: clock, zones: SystemTimeZone())
+        try days.closeCalendarPrompt()
+        try days.setTimelineShown(false)
+        for title in ["Write the intro", "Reply to Anna"] { _ = try days.addItem(NewItem(title: title, shape: .today)) }
+        let daysModel = AppModel(clew: days, notify: false)
+        let t3 = RecordedAI()
+        let ai3 = testAI(MemorySession.signedIn(), t3, "next-days")
+        daysModel.useAI(ai3)
+        await ai3.refreshModels()
+        t3.reply(200, RecordedAI.picks([("t1", "A")]))
+        daysModel.whatNext.askAhead(daysModel)
+        try await until { !daysModel.whatNext.isAsking }
+        let hadKept = daysModel.whatNext.kept != nil
+        clock.date = clock.date.addingTimeInterval(86_400)
+        daysModel.refresh()
+        report("the rollover drops the kept answer", hadKept && daysModel.whatNext.kept == nil)
 
         // A fetched title: sent marked untrusted, and then no record is sent.
         let other = Clew(store: try SQLiteStore.inMemory(), clock: SystemClock(), zones: SystemTimeZone())
@@ -433,8 +639,8 @@ extension Snapshot {
         otherModel.useAI(ai2)
         await ai2.refreshModels()
         ai2.record(.taskTicked, task: "Earlier", typed: true)
-        t2.reply(200, RecordedAI.picks([("t2", "A")]))
         let ask2 = WhatNextAsk()
+        t2.reply(200, RecordedAI.picks([("t2", "A")]))
         ask2.toggle(otherModel)
         try await until { ask2.state != .asking }
         let sent = t2.lastInput["tasks"] as? [[String: Any]]
@@ -442,10 +648,11 @@ extension Snapshot {
                sent?.last?["untrusted"] as? Bool == true && sent?.first?["untrusted"] == nil
                && ((t2.lastInput["memory"] as? [String: Any])?["activity"] as? [Any])?.isEmpty == true
                && ai2.memory.activity.events.count == 1)
-        ask2.open(otherModel)
+        ask2.goTo(otherModel)
         let fetched = ai2.memory.activity.events.last
         report("choosing a fetched task remembers it as a link, never its title",
                fetched?.kind == .nextChosen && fetched?.task == nil && fetched?.link == true)
+        ask2.drop()
         t2.reply(200, RecordedAI.picks([("t2", "A")]))
         ask2.toggle(otherModel)
         try await until { ask2.state != .asking }
@@ -588,7 +795,7 @@ extension Snapshot {
                     ("asking", .asking), ("failed", .failed), ("limit", .usageLimit), ("ended", .signInEnded),
                 ]
                 for (name, state) in nextStates {
-                    WhatNextAsk.preset = state
+                    model.whatNext.showForRender(state)
                     for (look, appearance) in looks {
                         render(RootView(model: model, screen: .list), appearance: appearance,
                                to: dir.appendingPathComponent("ai-next-\(name)-\(look).png"))

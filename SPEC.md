@@ -101,7 +101,8 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
    whether a newer release exists (see "About and updates"). Only while signed in to
    ChatGPT in Settings › AI with **Use AI** on (2026-11-22), Clew sends what "Suggest
    steps", "What next?" and "Memory" list to OpenAI, when the person asks for
-   suggestions or presses What next?.
+   suggestions, and when the menu opens with something new for What next? (asked
+   ahead, 2026-11-25).
 9. **Launch at login** (`SMAppService`), toggled in a small Settings window.
 10. **Task details.** Double-clicking a row opens its details (*changed* 2026-11-21,
     *user*: a click unfolds a task with steps; see "Steps in a task"); so does
@@ -1118,7 +1119,7 @@ stopped daily use, not adding features.
     your ChatGPT plan yet" with **Continue with ChatGPT** to ask again; a plan OpenAI
     says is not eligible: "AI isn't available on this ChatGPT plan." Signed out, one line
     says what AI does: "Clew can suggest small steps for a task, help you choose what's
-    next and remember how you work, using your ChatGPT plan. Nothing is sent until you sign in and ask. Clew works fully without it." While the
+    next and remember how you work, using your ChatGPT plan. Nothing is sent until you sign in. Clew works fully without it." (*changed* 2026-11-25: What next? asks ahead.) While the
     browser is open: "Waiting for the browser…" with **Cancel**; the browser's page after
     signing in says "You can close this tab and go back to Clew." A failed sign-in says
     "Couldn't sign in. Try again." (or that it was cancelled in the browser, or that
@@ -1270,24 +1271,39 @@ stopped daily use, not adding features.
   - **Open tasks:** rows on Today (not Goals & Later) that still need something today,
     as for Notes: a task or habit not done today; a goal not yet reached (a +1 today
     leaves it open). Tasks placed on the timeline count too.
-  - **The button:** ✨ (`sparkles`, as Suggest steps) in the list's bottom bar, just
-    left of the Settings gear, icon only; hover and VoiceOver: "What next?". It shows
-    only while AI is ready with a model (see "Memory"), no focus timer exists (none
+  - **The button:** **Next** (*changed* 2026-11-25, *user*: it was ✨ beside the gear),
+    in the bottom bar's left group after Add and Note, in their style: an icon
+    (`signpost.right`) and the word; hover and VoiceOver: "What next?". It shows only
+    while AI is ready with a model (see "Memory"), no focus timer exists (none
     running, paused, at Time's up, or on a break), and Today has at least 2 open
-    tasks. Pressing it while its panel shows closes the panel (an answer, a failure)
-    or cancels the request (asking).
+    tasks; being last in its group, its coming and going moves neither Add nor Note.
+    Pressing it while its panel shows closes the panel.
   - **The panel** sits just above the bottom bar, as wide as the list, on a faint
     card: the menu grows to fit it, so it covers nothing and no row moves (a panel
     over the list let the rows show through its text). Clicks elsewhere in the menu
     work as usual and leave it open (a row may be ticked meanwhile, see "While it
     shows").
-  - **Asking:** the panel shows "Choosing…" with a small spinner and **Cancel**; ✨
-    stays as it is (one spinner). At most 30 seconds. Cancel, Esc, ✨, the menu
-    closing, leaving the list (Add, details, Settings), the rollover, losing ready
-    (other than this request's own ended sign-in, below), a focus timer starting, and
-    open tasks dropping below 2 close it and cancel the request; nothing appears later. Each ✨ is one request; an answer is never kept
-    for a later tap. VoiceOver: "Choosing what's next", **Cancel** ("Cancel What
-    next?").
+  - **Asked ahead** (*changed* 2026-11-25, *user*: pressing it felt slow): when the
+    menu opens on the list and Next would show, Clew asks in the background, unless
+    it already has an answer for the same open tasks (the same tasks, titles, kinds,
+    progress, priorities, step counts and blocks) that is less than 2 hours old; then
+    nothing is sent. An answer that arrives after the menu closed is kept for the next opening.
+    The kept answer lives in memory only (never on disk) and goes with losing ready,
+    the rollover and Forget everything. A background request that fails shows
+    nothing, except a usage limit: it shows when Next is next pressed (unless a kept
+    answer can show instead), and nothing more is asked ahead until then. A sign-in
+    OpenAI ended in the background turns Use AI off, so Next goes and Settings › AI
+    says "Sign in again".
+  - **Pressing Next** shows the kept answer at once, without the tasks no longer
+    open (ticked, deleted, moved); if none are left, or there is no answer, it asks
+    now. While a request is under way (asked ahead or now) the panel shows
+    "Choosing…" with a small spinner and **Cancel**, and the answer fills in when it
+    arrives. At most 30 seconds. Cancel, Esc, Next, the menu closing, leaving the
+    list (Add, details, Settings), the rollover, losing ready (other than this
+    request's own ended sign-in, below), a focus timer starting, and open tasks
+    dropping below 2 close the panel; a request still under way finishes into the
+    kept answer (losing ready and the rollover drop it). VoiceOver: "Choosing what's
+    next", **Cancel** ("Cancel What next?").
   - **The answer** replaces "Choosing…":
 
     ```
@@ -1312,7 +1328,7 @@ stopped daily use, not adding features.
       today if all have ended, highlighted the same way.
     - **Another task** becomes the pick, with its own reason; the old pick takes its
       place under "Or:".
-    - **Not now**, Esc and ✨ close it.
+    - **Not now**, Esc and Next close it.
 
     Nothing is ticked, moved or reordered: only ▶ Focus changes anything, and only
     when pressed.
@@ -1322,7 +1338,7 @@ stopped daily use, not adding features.
     on Today does not close it while a shown task is open). The menu closing, leaving
     the list, the rollover, losing ready (except the ended sign-in message below) or a
     focus timer starting close it.
-  - **VoiceOver:** ✨ "What next?"; the answer reads "Suggested: <title>. <reason>",
+  - **VoiceOver:** Next reads "What next?"; the answer reads "Suggested: <title>. <reason>",
     then **Focus 25 minutes on <title>**, "Go to <title>" (moves VoiceOver to the row
     or block), each other "Choose <title>", and **Not now**. Esc closes it. A failure
     is read as its text.
@@ -1348,20 +1364,20 @@ stopped daily use, not adding features.
     the pick's own typed title carries is allowed, a fetched one's is not). A pick
     that fails is dropped and the next moves up; none left is a failure.
   - **When it fails:** the panel shows "Couldn't choose. Try again." with **Not now**
-    for 5 seconds, then closes; no retry by itself (✨ asks again once it has closed).
+    for 5 seconds, then closes; no retry by itself (Next asks again once it has closed).
     Usage limit: "ChatGPT usage limit reached" with **Manage usage**
     (chatgpt.com/settings/usage, which also closes the panel) and **Not now**, until
     closed. A sign-in OpenAI has ended: "OpenAI ended Clew's sign-in. Sign in again in
-    Settings › AI." with **Not now** for 5 seconds, then the panel closes; Use AI turns off (✨ goes) and
+    Settings › AI." with **Not now** for 5 seconds, then the panel closes; Use AI turns off (Next goes) and
     Settings › AI says "Sign in again". Offline or no answer in 30 seconds: "Couldn't
     choose. Try again." Esc closes any of these.
   - **Remembered** (see "Memory"): ▶ Focus or the title on a pick is activity
     `nextChosen` (`"how": "focus"` or `"open"`; `"other": true` when the task chosen
     was not the answer's first pick), with the task as other events carry it (its
-    title only if typed, else `"link": true`); Not now, Esc and ✨ on an answer are
+    title only if typed, else `"link": true`); Not now, Esc and Next on an answer are
     `nextDismissed` (no task). Cancel while asking, failures, and closings the person
     did not choose (the menu closing, the rollover, a task leaving, …) record nothing.
-  - **Kept:** nothing; the answer lives only while the panel shows.
+  - **Kept:** the last answer, in memory only, as above; nothing on disk.
 
 - **Notes (2026-11-22, *user*).** A thought that comes up in the middle of a task is
   written down in seconds and kept, so the fear of forgetting it does not pull the
