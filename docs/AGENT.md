@@ -112,7 +112,7 @@ streamed answer in 3.0 s. No helper process, no JavaScript.
   it), the same job is asked once more without it for that model, with the JSON shape
   in the instructions, and Clew remembers that model as needing it. Never
   `previous_response_id`, `temperature`, `max_output_tokens`, `metadata`, `user` or
-  any field on OpenAI's refused list. 30 seconds without an answer is a failure.
+  any field on OpenAI's refused list. 30 seconds without an answer is a failure (Notes to tasks' Sort: 60).
   Success is `response.completed` only; `response.failed`, `response.incomplete` or a
   stream that just ends are failures. OpenAI's request id is kept in the debug log.
 - **Models**: `GET /v1/models`, items with `visibility == "list"`, shown by
@@ -161,7 +161,7 @@ address or any page's content.
    so a fetched title cannot carry banned text through. The list lives in
    code with a test per phrase.
 5. On any failure the job returns nothing: the plain behaviour, the job's short
-   failure line ("Couldn't suggest steps. Try again.", "Couldn't choose. Try again."), and in a debug build the reason as a code ("tooLong",
+   failure line ("Couldn't suggest steps. Try again.", "Couldn't choose. Try again.", "Couldn't suggest a task. Try again."), and in a debug build the reason as a code ("tooLong",
    "banned", "duplicate", "schema"), never any of the answer's text.
 
 ## 6. Jobs
@@ -171,7 +171,7 @@ address or any page's content.
 | **Suggest steps** | Add Step… and Details' Steps (SPEC "Suggest steps") | asks for 3–5 to-do items of 2–5 words, the first a 2-minute start; keeps up to 5 that pass (1–80 characters, no repeats) | AI-1 |
 | **Evening line** | the 21:00 summary | one line ≤ 120 characters naming something done | AI-2 |
 | **Fits today** | Goals & Later | ≤ 3 items with a free slot on today's timeline and a reason ≤ 80 | AI-3 |
-| **Notes to tasks** | ✨ on a note, Sort with ✨ on the Notes page (SPEC "Notes to tasks"), as Settings › AI › Notes allows | a title ≤ 80, Today or Later, a reason ≤ 80, 0–5 steps only when the note lists them; for Sort, one per note id | AI-5 |
+| **Notes to tasks** | ✨ on a note, Sort with ✨ on the Notes page (SPEC "Notes to tasks"), as Settings › AI › Notes allows | a task (a title ≤ 80, Today or Later, a reason ≤ 80, 0–5 steps only when the note lists them) or a thought; for Sort, one per note id (q1…q20) | AI-5 |
 | **What next?** | Next in the list's bottom bar, asked ahead when the menu opens (SPEC "What next?") | 1–3 picks from Today's open tasks, each an id and a reason ≤ 80, the first shown as the pick | AI-4 |
 | *every job* | its own place | may also return one note (§7) | AI-M |
 | What Clew noticed | last week's card | no request: shows Clew's unanswered notes, True / Not really (§7) | AI-N |
@@ -286,16 +286,18 @@ Settings › AI, edits any, adds their own and deletes any.
 
 Nothing is sent until the person signs in. **One toggle, Use AI** (*user* 2026-11-22):
 on turns on every job and memory, off turns them all off; there are no per-job
-switches. Signing in turns it on. **Continue with ChatGPT** (then the account's email,
+switches. Signing in turns it on. Under it, **Notes** says what may be read from the
+person's notes (*user* 2026-11-25: Off, the note you ask about, all your open notes);
+it is a privacy choice, not a job switch (SPEC "Notes to tasks"). **Continue with ChatGPT** (then the account's email,
 **Sign out**, **Manage usage**), the model with "Using ChatGPT plan" (the person
 chooses it, *user*), **Use AI**, and **Memory**: the notes, each with
 **Edit** and **Delete**, then **Add to memory** and **Forget everything**; it is shown
 whenever Clew is ready (§7) and, in any other state, while any notes are kept.
 Signing out turns Use AI off. The toggle says
 generally what it does, not each field sent (*user*). Non-secret settings (issued app
-id, host id, email, account id, model, the toggle, "Got it") are this Mac's
+id, host id, email, account id, model, the toggle, the Notes choice, "Got it") are this Mac's
 preferences, not Clew's data, so they are not exported or backed up; the tokens are
-in the Keychain. The full text is in SPEC "Suggest steps" and "Memory".
+in the Keychain. The full text is in SPEC "Suggest steps", "Memory" and "Notes to tasks".
 
 ## 9. Debug log and evals
 
@@ -305,7 +307,9 @@ in the Keychain. The full text is in SPEC "Suggest steps" and "Memory".
 - **Evals**: fixed inputs with expected *properties* (Suggest steps: 3–5 items, under
   the caps, the first short, none repeating an existing step, no banned words; What
   next?: 1–3 picks, each one of the given ids, no repeats, reasons under the cap, no
-  banned words, in the tasks' language), run
+  banned words, in the tasks' language; Notes to tasks: a task or a thought, steps
+  only for a note that lists them, Later unless the note means today, no banned
+  words, in the note's language), run
   against the live model on request and against recorded answers in CI. Each must fail
   against a deliberately broken prompt or validator (AGENTS.md rule 1).
 
@@ -316,7 +320,8 @@ in the Keychain. The full text is in SPEC "Suggest steps" and "Memory".
   with something new (asked ahead, at most once per change or every 2 hours).
 - Notes (the person's own jottings) are sent only as Settings › AI › Notes allows:
   never (Off), the one note the person presses ✨ on (the default), or all open notes
-  (Sort with ✨, and What next?'s context). Using a note is never recorded as activity.
+  (Sort with ✨, and What next?'s context). Using a note is never recorded as activity,
+  and a request that carries a note never changes Memory (its note change is ignored).
 - Each job sends only the input it declares (§6) plus the notes and activity (§7).
   Settings › AI says in general what AI does, not each field (*user* 2026-11-22);
   SPEC and this file list them exactly.

@@ -136,7 +136,7 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
 
 - **Daruma goals and badges.** Paint one eye when a counted goal starts and the
   second when it's finished. Levels come from lifetime totals.
-- Opt-in AI help beyond Suggest steps, Memory and What next?: an evening line, "fits today" from Goals & Later,
+- Opt-in AI help beyond Suggest steps, Memory, What next? and Notes to tasks: an evening line, "fits today" from Goals & Later,
   a reader (see docs/AGENT.md, v2 2026-11-22).
 - Sync with Dayflow (its local JSON API: `GET /api/day`, `PATCH /api/tasks/:id`).
 - iPhone, iCloud sync, Obsidian export.
@@ -1110,15 +1110,15 @@ stopped daily use, not adding features.
     **Use AI** (*changed* 2026-11-22, *user*: it replaces the switch **Suggest steps**;
     on means every AI job and Memory, off means none; signing in turns it on). Its line
     says in general what it does, not each field sent (*user*): "Clew suggests steps,
-    helps you choose what's next and remembers how you work, using your ChatGPT plan."
-    (*changed* 2026-11-25 for What next?) Below it, **Notes** (see "Notes to tasks")
+    helps you choose what's next, turns notes into tasks and remembers how you work,
+    using your ChatGPT plan." (*changed* 2026-11-25 for What next? and Notes to tasks) Below it, **Notes** (see "Notes to tasks")
     and **Memory** (see "Memory"). The
     first time the person signs in, Settings shows once "You're using your ChatGPT
     plan" with **Got it** (OpenAI's rule). Declined plan permission: "Clew can't use
     your ChatGPT plan yet" with **Continue with ChatGPT** to ask again; a plan OpenAI
     says is not eligible: "AI isn't available on this ChatGPT plan." Signed out, one line
     says what AI does: "Clew can suggest small steps for a task, help you choose what's
-    next and remember how you work, using your ChatGPT plan. Nothing is sent until you sign in. Clew works fully without it." (*changed* 2026-11-25: What next? asks ahead.) While the
+    next, turn notes into tasks and remember how you work, using your ChatGPT plan. Nothing is sent until you sign in. Clew works fully without it." (*changed* 2026-11-25: What next? asks ahead.) While the
     browser is open: "Waiting for the browser…" with **Cancel**; the browser's page after
     signing in says "You can close this tab and go back to Clew." A failed sign-in says
     "Couldn't sign in. Try again." (or that it was cancelled in the browser, or that
@@ -1167,7 +1167,7 @@ stopped daily use, not adding features.
     again". Offline or no answer in 30 seconds: "Couldn't suggest steps. Try again."
   - **Kept:** in the Keychain, the sign-in's tokens; in this Mac's preferences (not in
     Clew's data, so not in exports or backups), the issued app id, this Mac's host id,
-    the account's email and id, the model, the toggle and the one-time note's "Got it".
+    the account's email and id, the model, the toggle, the Notes choice (see "Notes to tasks") and the one-time note's "Got it".
     No suggestions are kept (the notes are, see "Memory"). A debug build logs each request's job, size, model,
     time, outcome and OpenAI's request id, never its text or any token.
 
@@ -1285,8 +1285,8 @@ stopped daily use, not adding features.
   - **Asked ahead** (*changed* 2026-11-25, *user*: pressing it felt slow): when the
     menu opens on the list and Next would show, Clew asks in the background, unless
     it already has an answer for the same open tasks (the same tasks, titles, kinds,
-    progress, priorities, step counts and blocks) that is less than 2 hours old; then
-    nothing is sent. An answer that arrives after the menu closed is kept for the next opening.
+    progress, priorities, step counts and blocks, and the open notes it sends, if any)
+    that is less than 2 hours old; then nothing is sent. An answer that arrives after the menu closed is kept for the next opening.
     The kept answer lives in memory only (never on disk) and goes with losing ready,
     the rollover and Forget everything. A background request that fails shows
     nothing, except a usage limit: it shows when Next is next pressed (unless a kept
@@ -1351,7 +1351,8 @@ stopped daily use, not adding features.
     minutes free from now until the next block that has not ended or, when calendar
     events are shown, the next timed event on the timeline today (0 if one is under
     way, left out if none remain; all-day and declined events and unticked calendars'
-    events do not count; never an event's title); and
+    events do not count; never an event's title); with Settings › AI › Notes on All
+    your open notes, up to 10 open notes (see "Notes to tasks"); and
     the notes and recent activity (see "Memory"). If any task sent has a fetched
     title, no activity is sent (it waits) and a note change in the answer is ignored
     (docs/AGENT.md §4, §7). The instruction: choose what to do now, from these only,
@@ -1378,30 +1379,39 @@ stopped daily use, not adding features.
     did not choose (the menu closing, the rollover, a task leaving, …) record nothing.
   - **Kept:** the last answer, in memory only, as above; nothing on disk.
 
-- **Notes to tasks (AI-5, 2026-11-25, *user*).** A note written in a hurry ("bank card??")
-  becomes a clear task in one click: Clew suggests the task, where it goes and, only
-  when the note itself lists steps, its steps. Choosing only, no typing (docs/AGENT.md
-  §1.3). Nothing is made without a click.
-  - **What Clew may read** (*user*): in Settings › AI, under Use AI, **Notes** with three
-    choices: **Off** (no ✨ on the Notes page; no note is ever sent), **The note you ask
-    about** (the default: ✨ on each note sends that one note, nothing else) and **All
-    your open notes** (✨ on each note, **Sort with ✨** for all of them, and What next?
-    may read them, below). It shows only while signed in; it is kept in this Mac's
-    preferences with the other AI settings, never in Clew's data. Its line: "What Clew
-    may read from your notes, and only when it helps you sort them or choose what's
-    next."
-  - **Where and when:** on the Notes page, only while AI is ready (see "Memory") and
-    Notes is not Off. Each open note's row shows **✨** on hover beside **→ Today**
-    ("Suggest a task", VoiceOver "Suggest a task for this note"), and its right-click
-    has **Suggest a Task…**. With All your open notes, **Sort with ✨** sits at the top
-    of the page while there are 2 or more open notes ("Suggest tasks for all open
-    notes" to VoiceOver). Done notes have neither.
-  - **Asking:** under the note, a small spinner with **Cancel** (for Sort with ✨: at
-    the top, "Sorting…" and Cancel; each open note waits). At most 30 seconds (Sort:
-    60). Cancel, Esc, leaving the Notes page, the menu closing, the rollover, losing
-    ready, Notes turned Off (or, for Sort, set to the one note), and the note being
-    edited, done or deleted cancel it; nothing appears later. A note being edited has
-    no ✨ until editing ends. Each ✨ or Sort is one request; nothing is kept.
+- **Notes to tasks (AI-5, 2026-11-25, *user*; Gemini Neon review).** A note written in a
+  hurry ("bank card??") becomes a clear task in one click: Clew suggests the task,
+  where it goes and, only when the note itself lists steps, its steps. Choosing only,
+  no typing (docs/AGENT.md §1.3). Nothing is made without a click.
+  - **What Clew may read** (*user*): in Settings › AI, just under Use AI (shown with it:
+    signed in with plan permission and eligible; dimmed while Use AI is off), **Notes**
+    with three choices: **Off** (no ✨ on the Notes page; no note is ever sent), **The
+    note you ask about** (the default: ✨ on a note sends that one note, nothing else)
+    and **All your open notes** (also **Sort with ✨**, and What next? may read them,
+    below). Its line: "Off: Clew never reads your notes. The note you ask about: only
+    the note you press ✨ on. All your open notes: also to sort them and to help
+    choose what's next." Kept in this Mac's preferences with the other AI settings,
+    never in Clew's data. Changing it (or losing ready) ends what it no longer allows
+    at once: a request under way is cancelled and suggestions shown go; lowered from
+    All, What next?'s kept answer is dropped too.
+  - **Where and when:** on the Notes page, only while AI is ready with a model (see
+    "Memory") and Notes is not Off. Each open note's row shows **✨** on hover beside
+    **→ Today** ("Suggest a task", VoiceOver "Suggest a task for this note"), its
+    right-click has **Suggest a Task…**, and the row has a "Suggest a task" VoiceOver
+    action. With All your open notes and 2 or more open notes, **Sort with ✨** sits at
+    the top of the page, right-aligned on the title's line ("Suggest tasks for all open
+    notes" to VoiceOver). Done notes and a note being edited have neither.
+  - **One request at a time on the page:** while one is under way, ✨ and Sort with ✨
+    are dimmed. Pressing ✨ on a note replaces that note's suggestion (from ✨ or from
+    Sort); Sort with ✨ replaces every suggestion shown.
+  - **Asking:** for ✨, under the note, a small spinner with **Cancel** (VoiceOver
+    "Suggesting a task", "Cancel suggestion"); for Sort, at the top, "Sorting…" with
+    **Cancel** ("Sorting your notes", "Cancel sorting"), and the notes stay as they
+    are until the answer fills in. At most 30 seconds (Sort: 60). Cancel, Esc, leaving
+    the Notes page, the menu closing, the rollover, losing ready and the Notes setting
+    no longer allowing it cancel it; nothing appears later. For ✨, the note being
+    edited, done, deleted or turned into a task cancels it too; for Sort, such a note
+    just gets nothing when the answer arrives (as do notes written after it was sent).
   - **The suggestion** appears under its note, in the style of Suggest steps' rows:
 
     ```
@@ -1409,52 +1419,67 @@ stopped daily use, not adding features.
        ○ Find the card's last 4 digits
        ○ Call the number on the back
      Errands go well in the afternoon
-     [Add to Today]  Add to Later  Not now
+     [Add to Today]  Add to Later   Not now
     ```
 
     The task's title (bold), its steps if the note lists any (dotted circles, in
-    order), the reason in secondary text, then **Add to Today**, **Add to Later** (the
-    one Clew suggests is the default button, shown first) and **Not now**. **Add to
-    Today** / **Add to Later** makes, in one click, a one-off task with that title and
-    those steps, as Make a task does today (the note becomes done and remembers the
-    task and where); the task and steps count as typed by the person (only their click
-    makes them). **Not now** and Esc drop the suggestion; the note stays as it was. A
-    note that is not a task (a reflection, a quote) gets no suggestion: "This looks
-    like a thought to keep." with **OK**.
-  - **Sort with ✨** fills every open note's place with its own suggestion (or the
+    order), the reason in secondary text, then **Add to Today**, **Add to Later** and
+    **Not now**, always in this order (the right-click's); the one Clew suggests is the
+    highlighted default button. **Add to Today** / **Add to Later** makes, in one click,
+    a one-off task with that title and those steps, as Make a task does today (the note
+    becomes done and remembers the task and where); the task and steps count as typed
+    by the person (only their click makes them). **Not now** drops the suggestion; the
+    note stays as it was. A note that is not a task (a reflection, a quote) gets "This
+    looks like a thought to keep." with **OK** instead. A suggestion (or that line)
+    goes when its note is edited, done, deleted or turned into a task another way,
+    and with leaving the page, the menu closing, the rollover, losing ready or the
+    Notes setting no longer allowing it.
+  - **Esc** first cancels what is asking or drops the suggestions shown, staying on
+    the page; with nothing to drop, it goes back to the list as before.
+  - **Sort with ✨** fills each open note's place with its own suggestion (or the
     thought line) at once; each is accepted or dropped on its own, and the rest stay.
-    Notes written or edited after the request was sent get none. Leaving the page
-    drops what is left.
-  - **What next? with All your open notes:** its request also carries the open notes
-    (below), so a note can shape a pick's reason ("you noted the bank call"); picks
-    are still only Today's tasks. With the other choices What next? sends no note.
-  - **VoiceOver:** the suggestion reads "Suggested task: <title>. <steps, if any>.
-    <reason>", then **Add to Today: <title>**, **Add to Later: <title>** and **Not
-    now**; the thought line reads its text and **OK**. Sort with ✨ announces "Suggested
-    tasks for <n> notes" when it fills in.
+    VoiceOver announces "Suggestions for 3 notes" ("Suggestion for 1 note"; thoughts
+    count). Notes the answer leaves out, or that changed meanwhile, get nothing.
+  - **What next? with All your open notes:** its request also carries up to 10 open
+    notes (below), so a note can shape a pick's reason ("you noted the bank call");
+    picks are still only Today's tasks. Those notes are part of what decides whether
+    the kept answer still fits (see "What next?"). With the other choices What next?
+    sends no note.
   - **What is sent:** for ✨ on a note: that note's text (all of it, up to its 1,000
-    characters) and, if it was written during a task, that task's title then, as the
-    note keeps it; for Sort: every open note (up to 20, newest first) with a short id
-    for this request (n1…n20), its text and its task's title; for What next? with All
-    your open notes: up to 10 open notes, newest first, their text cut to 200
-    characters. With them, as every AI request, Clew's notes and recent activity (see
-    "Memory"), and the instruction to reply in the note's language. A note is the
-    person's own text (typed), so nothing in it is marked untrusted; a task title it
-    carries from a fetched page is (docs/AGENT.md §4), and then no activity is sent.
-  - **Checked before showing** (docs/AGENT.md §5): the title trimmed, 1–80 characters,
-    one line; where: Today or Later; the reason 1–80 characters, one line; steps 0–5,
-    each cleaned as Suggest steps' (1–80 characters, no repeats); no banned words (a
-    phrase the note itself carries is allowed). For Sort: each id from the request,
-    no repeats, ids the answer leaves out get nothing. A suggestion that fails is
-    dropped; for ✨ that is a failure; for Sort only that note gets nothing.
+    characters); for Sort: every open note (up to 20, newest first) with a short id for
+    this request (q1…q20) and its text; for What next? with All your open notes: up to
+    10 open notes, newest first, their text cut to 200 characters. Never the task a
+    note was written during (its title may be a fetched page's). With them: the weekday
+    and the time (`HH:mm`), and, as every AI request, Clew's notes and recent activity
+    (see "Memory"). A note is the person's own typed text, so nothing is marked
+    untrusted. The instruction: turn the note into one short, concrete task (a verb
+    first where natural); steps only when the note itself lists them; Today only when
+    the note says or clearly means today, else Later; a short, kind reason, never
+    pushy; a note that is not a task is a thought; reply in the note's language (for
+    Sort, each note's own).
+  - **Checked before showing** (docs/AGENT.md §5): a task: the title trimmed, 1–80
+    characters, no line break (refused, not joined); where: Today or Later; the reason
+    trimmed, 1–80 characters, no line break; steps cleaned as Suggest steps' (a leading
+    "1." or "-" and a final period removed), each 1–80 characters with no line break,
+    no repeats (ignoring case and spaces), the first 5 that pass kept, one that fails
+    just dropped; no banned words (a phrase the note itself carries is allowed). A
+    thought: valid as it is (nothing to check). For Sort: each id from the request, no
+    repeats; a note whose suggestion fails gets nothing. A ✨ with nothing that passes,
+    or a Sort with none that pass, is a failure; a Sort whose notes all changed
+    meanwhile ends quietly.
   - **When it fails:** under the note, "Couldn't suggest a task. Try again." (Sort: at
-    the top, "Couldn't sort your notes. Try again.") for 5 seconds; usage limit:
-    "ChatGPT usage limit reached" with **Manage usage**; a sign-in OpenAI ended: Use AI
-    turns off (✨ goes) and Settings › AI says "Sign in again". No retry by itself.
+    the top, "Couldn't sort your notes. Try again.") for 5 seconds, for a bad answer,
+    offline, or no answer in 30 seconds (Sort 60); usage limit: "ChatGPT usage limit
+    reached" with **Manage usage** (chatgpt.com/settings/usage; VoiceOver "Manage
+    ChatGPT usage") and **Not now**, in the same place, until dismissed, Esc or leaving
+    the page; a sign-in OpenAI ended: Use AI turns off, so ✨ and every suggestion go
+    from the page, and Settings › AI says "Sign in again". No retry by itself: ✨ or
+    Sort asks again.
   - **Remembered:** nothing about notes: turning a note into a task, dropping a
-    suggestion or sorting is never recorded as AI activity, so notes never shape
-    Memory through activity. (With All your open notes, Clew's own note change in an
-    answer may still draw on what the request carried, as any answer may.)
+    suggestion, a thought line or sorting is never recorded as AI activity. And a
+    request that carries a note (✨, Sort, What next? with All your open notes) never
+    changes Memory: the note change in its answer is ignored, so notes never shape
+    Memory (the recent activity it carried still counts as sent).
   - **Kept:** nothing; suggestions live only while shown.
 
 - **Notes (2026-11-22, *user*).** A thought that comes up in the middle of a task is
