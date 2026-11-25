@@ -14,10 +14,14 @@ public protocol Job: Sendable {
     /// True when the input carries text the person did not type (§4): then no activity
     /// is sent and the answer's note change is ignored (§7).
     func untrusted(_ input: Input) -> Bool
+    /// True when the input carries one of the person's notes (SPEC "Notes to tasks"): the
+    /// same as untrusted for memory, so notes never shape it.
+    func carriesNotes(_ input: Input) -> Bool
 }
 
 extension Job {
     public func untrusted(_ input: Input) -> Bool { false }
+    public func carriesNotes(_ input: Input) -> Bool { false }
 }
 
 /// Why a job showed nothing. Debug codes only, never any of the answer's text (§5).
@@ -80,7 +84,8 @@ public enum Agent {
     public static func run<J: Job>(_ job: J, input: J.Input, memory: MemoryContext?, model: String,
                                    provider: Provider, timeout: Duration = .seconds(30),
                                    log: @Sendable (JobRecord) -> Void = { _ in }) async -> JobRun<J.Output> {
-        let untrusted = job.untrusted(input)
+        // Untrusted text or a person's note: no activity sent, no note change kept.
+        let untrusted = job.untrusted(input) || job.carriesNotes(input)
         var memory = memory
         if untrusted { memory?.events = [] }   // they wait for a job with typed input
         let encoder = JSONEncoder()
