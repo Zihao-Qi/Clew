@@ -1353,7 +1353,7 @@ stopped daily use, not adding features.
     events are shown, the next timed event on the timeline today (0 if one is under
     way, left out if none remain; all-day and declined events and unticked calendars'
     events do not count; never an event's title); with Settings › AI › Notes on All
-    your open notes, up to 10 open notes (see "Notes to tasks"); and
+    your open notes, up to 20 open notes (see "Notes to tasks"); and
     the notes and recent activity (see "Memory"). If any task sent has a fetched
     title, or any open note is sent (see "Notes to tasks"), no activity is sent (it
     waits) and a note change in the answer is ignored (docs/AGENT.md §4, §7). The instruction: choose what to do now, from these only,
@@ -1452,7 +1452,7 @@ stopped daily use, not adding features.
   - **Sort with ✨** fills each open note's place with its own suggestion (or the
     thought line) at once; each is accepted or dropped on its own, and the rest stay.
     Notes the answer leaves out, or that changed meanwhile, get nothing.
-  - **What next? with All your open notes:** its request also carries up to 10 open
+  - **What next? with All your open notes:** its request also carries up to 20 open
     notes (below), so a note can shape a pick's reason ("you noted the bank call");
     picks are still only Today's tasks. Those notes are part of what decides whether
     the kept answer still fits (see "What next?"). With the other choices What next?
@@ -1460,7 +1460,8 @@ stopped daily use, not adding features.
   - **What is sent:** for ✨ on a note: that note's text (all of it, up to its 1,000
     characters); for Sort: every open note (up to 20, newest first) with a short id for
     this request (q1…q20) and its text; for What next? with All your open notes: up to
-    10 open notes, newest first, their text cut to 200 characters. Never the task a
+    20 open notes, newest first (as Sort; *user* 2026-11-25: 10 could miss older
+    ones), their text cut to 200 characters. Never the task a
     note was written during (its title may be a fetched page's). With them: the weekday
     and the time (`HH:mm`), and Clew's notes, but no recent activity: it waits for a
     request without notes (see "Memory"). A note is the person's own typed text, so a note is never marked untrusted. The instruction: turn the note into one short, concrete task (a verb
