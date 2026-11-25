@@ -122,7 +122,7 @@ streamed answer in 3.0 s. No helper process, no JavaScript.
   inside it as `response.failed`): usage limit (`subscription_sharing_usage_limit_exceeded`,
   429) shows "ChatGPT usage limit reached · Manage usage" and nothing else is asked
   until the person presses ✨ again; `…_usage_unavailable`, `…_user_unavailable` and
-  503 are "Couldn't suggest steps"; `subscription_sharing_invalid_user` ends the
+  503 are the job's plain failure line ("Couldn't suggest steps", "Couldn't choose"); `subscription_sharing_invalid_user` ends the
   sign-in only after a refresh confirms it; `…_route_not_supported`, `chatpass_v2_…`
   and `invalid_client` are bugs (debug log, plain failure).
 - **OpenAI's interface rules**: a **Continue with ChatGPT** button; the first time the
@@ -160,8 +160,8 @@ address or any page's content.
    schedule" does not let "behind schedule" through). Untrusted titles allow nothing,
    so a fetched title cannot carry banned text through. The list lives in
    code with a test per phrase.
-5. On any failure the job returns nothing: the plain behaviour, a short "Couldn't
-   suggest steps" line, and in a debug build the reason as a code ("tooLong",
+5. On any failure the job returns nothing: the plain behaviour, the job's short
+   failure line ("Couldn't suggest steps. Try again.", "Couldn't choose. Try again."), and in a debug build the reason as a code ("tooLong",
    "banned", "duplicate", "schema"), never any of the answer's text.
 
 ## 6. Jobs
