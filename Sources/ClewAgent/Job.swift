@@ -24,6 +24,8 @@ extension Job {
 public struct JobFailure: Error, Equatable, Sendable {
     public enum Reason: String, Sendable, Codable {
         case schema, tooLong, empty, banned, duplicate, none
+        /// What next?: an id not in the request; a reason with a line break.
+        case unknownId, lineBreak
     }
     /// The provider's error, if the request failed.
     public var provider: ProviderError?

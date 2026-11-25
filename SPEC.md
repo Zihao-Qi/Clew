@@ -100,7 +100,8 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
    Settings › About (off by default, 2026-11-13), Clew also asks GitHub once a day
    whether a newer release exists (see "About and updates"). Only while signed in to
    ChatGPT in Settings › AI with **Use AI** on (2026-11-22), Clew sends what "Suggest
-   steps" and "Memory" list to OpenAI, when the person asks for suggestions.
+   steps", "What next?" and "Memory" list to OpenAI, when the person asks for
+   suggestions or presses What next?.
 9. **Launch at login** (`SMAppService`), toggled in a small Settings window.
 10. **Task details.** Double-clicking a row opens its details (*changed* 2026-11-21,
     *user*: a click unfolds a task with steps; see "Steps in a task"); so does
@@ -134,7 +135,7 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
 
 - **Daruma goals and badges.** Paint one eye when a counted goal starts and the
   second when it's finished. Levels come from lifetime totals.
-- Opt-in AI help beyond Suggest steps and Memory: an evening line, "fits today" from Goals & Later,
+- Opt-in AI help beyond Suggest steps, Memory and What next?: an evening line, "fits today" from Goals & Later,
   a reader (see docs/AGENT.md, v2 2026-11-22).
 - Help turning notes into tasks with AI (see "Notes": suggestions to choose from only).
 - Sync with Dayflow (its local JSON API: `GET /api/day`, `PATCH /api/tasks/:id`).
@@ -878,7 +879,8 @@ stopped daily use, not adding features.
     Calendar** (Google, iCloud, Exchange too, once added in System Settings › Internet
     Accounts); Settings › Calendar lists them with checkboxes, and Clew remembers only
     the ones unticked, so a new calendar shows by default. Events are read live: never
-    saved, exported or sent anywhere. Clew writes to a calendar only when you change an
+    saved or exported, and never sent anywhere, except that What next? sends the
+    minutes free before the next one (never its title; *changed* 2026-11-25, *user*). Clew writes to a calendar only when you change an
     event on the timeline (below).
     Access is asked only when "Show your calendar" on the timeline (or in Settings) is
     clicked; without it the timeline works with tasks alone. "Show your calendar" sits at
@@ -1107,15 +1109,16 @@ stopped daily use, not adding features.
     model (the plan's list, the first by default; the person chooses), and one toggle,
     **Use AI** (*changed* 2026-11-22, *user*: it replaces the switch **Suggest steps**;
     on means every AI job and Memory, off means none; signing in turns it on). Its line
-    says in general what it does, not each field sent (*user*): "Clew suggests steps
-    and remembers how you work, using your ChatGPT plan." Below it, **Memory** (see
+    says in general what it does, not each field sent (*user*): "Clew suggests steps,
+    helps you choose what's next and remembers how you work, using your ChatGPT plan."
+    (*changed* 2026-11-25 for What next?) Below it, **Memory** (see
     "Memory"). The
     first time the person signs in, Settings shows once "You're using your ChatGPT
     plan" with **Got it** (OpenAI's rule). Declined plan permission: "Clew can't use
     your ChatGPT plan yet" with **Continue with ChatGPT** to ask again; a plan OpenAI
     says is not eligible: "AI isn't available on this ChatGPT plan." Signed out, one line
-    says what AI does: "Clew can suggest small steps for a task and remember how you
-    work, using your ChatGPT plan. Nothing is sent until you sign in and ask. Clew works fully without it." While the
+    says what AI does: "Clew can suggest small steps for a task, help you choose what's
+    next and remember how you work, using your ChatGPT plan. Nothing is sent until you sign in and ask. Clew works fully without it." While the
     browser is open: "Waiting for the browser…" with **Cancel**; the browser's page after
     signing in says "You can close this tab and go back to Clew." A failed sign-in says
     "Couldn't sign in. Try again." (or that it was cancelled in the browser, or that
@@ -1197,7 +1200,8 @@ stopped daily use, not adding features.
     on this Mac what happens, with the weekday and time of day (never a date): the
     person ticks a task or a step (not imports' own ticks), a rating, focus time
     ended, a step added from a suggestion, suggestions dismissed, a suggested step
-    deleted later, a note confirmed or rejected (its line; see "What Clew noticed"). Titles and step names are included only for a task whose title the
+    deleted later, a note confirmed or rejected (its line; see "What Clew noticed"),
+    What next?'s pick taken or its answer dismissed (see "What next?"). Titles and step names are included only for a task whose title the
     person typed; a step they added with + or Add all counts as theirs. An event for
     a task with a fetched or imported title carries no text, only that it is a link.
     Unticking drops that tick's unsent events; a new rating replaces an unsent one. At
@@ -1258,6 +1262,106 @@ stopped daily use, not adding features.
     note).
   - No request is made to show them; nothing is sent when answering (the answer goes
     with the next job's request).
+
+- **What next? (AI-4, 2026-11-25, *user*; Gemini Neon review).** For the moment the
+  person opens the list and cannot choose: one tap shows one task to do now with a
+  short reason, and up to two others to choose from. Choosing only, no typing
+  (docs/AGENT.md §1.3).
+  - **Open tasks:** rows on Today (not Goals & Later) that still need something today,
+    as for Notes: a task or habit not done today; a goal not yet reached (a +1 today
+    leaves it open). Tasks placed on the timeline count too.
+  - **The button:** ✨ (`sparkles`, as Suggest steps) in the list's bottom bar, just
+    left of the Settings gear, icon only; hover and VoiceOver: "What next?". It shows
+    only while AI is ready with a model (see "Memory"), no focus timer exists (none
+    running, paused, at Time's up, or on a break), and Today has at least 2 open
+    tasks. Pressing it while its panel shows closes the panel (an answer, a failure)
+    or cancels the request (asking).
+  - **The panel** sits just above the bottom bar, as wide as the list, on a faint
+    card: the menu grows to fit it, so it covers nothing and no row moves (a panel
+    over the list let the rows show through its text). Clicks elsewhere in the menu
+    work as usual and leave it open (a row may be ticked meanwhile, see "While it
+    shows").
+  - **Asking:** the panel shows "Choosing…" with a small spinner and **Cancel**; ✨
+    stays as it is (one spinner). At most 30 seconds. Cancel, Esc, ✨, the menu
+    closing, leaving the list (Add, details, Settings), the rollover, losing ready
+    (other than this request's own ended sign-in, below), a focus timer starting, and
+    open tasks dropping below 2 close it and cancel the request; nothing appears later. Each ✨ is one request; an answer is never kept
+    for a later tap. VoiceOver: "Choosing what's next", **Cancel** ("Cancel What
+    next?").
+  - **The answer** replaces "Choosing…":
+
+    ```
+     Write the intro                ▶ Focus 25 min
+     Short, and mornings suit writing
+     Or: Reply to Anna · Pay rent
+                                          Not now
+    ```
+
+    The pick's title (one line, cut with …) and **▶ Focus 25 min** on the first line,
+    its reason under it in secondary text (up to 2 lines), then "Or:" and the other
+    tasks (none: no "Or:" line), then **Not now**. The pick's title and the others are
+    plain text that shows it can be clicked on hover (underline, pointing hand).
+    - **▶ Focus 25 min** starts a 25-minute focus on the pick, as Focus › 25 min in its
+      right-click menu, and closes the panel. A task off the list only because all its
+      open steps are on the timeline (no block of its own) has no ▶ Focus here: its
+      timer would have no row to show it; its title still goes to it.
+    - **The pick's title** closes the panel and scrolls to the task: its row in the
+      list, highlighted briefly (the accent at low opacity for about a second; at once
+      with Reduce Motion); for a task with no row because it is on the timeline, its
+      next block today that has not ended (its own or a step's), or its latest block
+      today if all have ended, highlighted the same way.
+    - **Another task** becomes the pick, with its own reason; the old pick takes its
+      place under "Or:".
+    - **Not now**, Esc and ✨ close it.
+
+    Nothing is ticked, moved or reordered: only ▶ Focus changes anything, and only
+    when pressed.
+  - **While it shows:** a task shown (or in the answer when it arrives) that stops being open (ticked, a goal reached,
+    deleted, moved to Goals & Later) leaves the panel; if it was the pick, the first
+    other becomes the pick; with none left the panel closes quietly (not a failure) (fewer than 2 open tasks
+    on Today does not close it while a shown task is open). The menu closing, leaving
+    the list, the rollover, losing ready (except the ended sign-in message below) or a
+    focus timer starting close it.
+  - **VoiceOver:** ✨ "What next?"; the answer reads "Suggested: <title>. <reason>",
+    then **Focus 25 minutes on <title>**, "Go to <title>" (moves VoiceOver to the row
+    or block), each other "Choose <title>", and **Not now**. Esc closes it. A failure
+    is read as its text.
+  - **What is sent:** up to 30 open tasks in Today's order (priorities first, as in
+    the list, wherever a task is placed), each with a short id for this request (t1…t30),
+    its title (a fetched title marked untrusted, docs/AGENT.md §4), its kind (once,
+    link, habit, or goal with its progress, "1 of 3"), whether it is a priority, its
+    steps as "2 of 5 done" (never their names), and, while the timeline is on, the
+    start (`HH:mm`) of its next block today that has not ended (its own or a step's);
+    the weekday and the time now (`HH:mm`); while the timeline is on, the whole
+    minutes free from now until the next block that has not ended or, when calendar
+    events are shown, the next timed event on the timeline today (0 if one is under
+    way, left out if none remain; all-day and declined events and unticked calendars'
+    events do not count; never an event's title); and
+    the notes and recent activity (see "Memory"). If any task sent has a fetched
+    title, no activity is sent (it waits) and a note change in the answer is ignored
+    (docs/AGENT.md §4, §7). The instruction: choose what to do now, from these only,
+    with a short, kind reason in the tasks' language, never pushy, urgent or
+    guilt-inducing.
+  - **Checked before showing** (docs/AGENT.md §5): picks taken in order, at most 3
+    kept: each an id from this request's tasks, not repeated; each reason trimmed,
+    1–80 characters, no line break (refused, not joined), no banned words (a phrase
+    the pick's own typed title carries is allowed, a fetched one's is not). A pick
+    that fails is dropped and the next moves up; none left is a failure.
+  - **When it fails:** the panel shows "Couldn't choose. Try again." with **Not now**
+    for 5 seconds, then closes; no retry by itself (✨ asks again once it has closed).
+    Usage limit: "ChatGPT usage limit reached" with **Manage usage**
+    (chatgpt.com/settings/usage, which also closes the panel) and **Not now**, until
+    closed. A sign-in OpenAI has ended: "OpenAI ended Clew's sign-in. Sign in again in
+    Settings › AI." with **Not now** for 5 seconds, then the panel closes; Use AI turns off (✨ goes) and
+    Settings › AI says "Sign in again". Offline or no answer in 30 seconds: "Couldn't
+    choose. Try again." Esc closes any of these.
+  - **Remembered** (see "Memory"): ▶ Focus or the title on a pick is activity
+    `nextChosen` (`"how": "focus"` or `"open"`; `"other": true` when the task chosen
+    was not the answer's first pick), with the task as other events carry it (its
+    title only if typed, else `"link": true`); Not now, Esc and ✨ on an answer are
+    `nextDismissed` (no task). Cancel while asking, failures, and closings the person
+    did not choose (the menu closing, the rollover, a task leaving, …) record nothing.
+  - **Kept:** nothing; the answer lives only while the panel shows.
 
 - **Notes (2026-11-22, *user*).** A thought that comes up in the middle of a task is
   written down in seconds and kept, so the fear of forgetting it does not pull the

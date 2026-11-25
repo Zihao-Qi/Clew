@@ -16,8 +16,13 @@ final class RecordedAI: HTTPTransport, @unchecked Sendable {
     private(set) var lastInput: [String: Any] = [:]
 
     func reply(_ status: Int, _ lines: [String]) { lock.withLock { replies.append((status, lines)) } }
+    static func picks(_ picks: [(String, String)], note: [String: Any]? = nil) -> [String] {
+        answer(["picks": picks.map { ["id": $0.0, "reason": $0.1] }, "note": note ?? NSNull()])
+    }
     static func steps(_ steps: [String], note: [String: Any]? = nil) -> [String] {
-        let answer: [String: Any] = ["steps": steps, "note": note ?? NSNull()]
+        answer(["steps": steps, "note": note ?? NSNull()])
+    }
+    static func answer(_ answer: [String: Any]) -> [String] {
         let text = String(decoding: try! JSONSerialization.data(withJSONObject: answer), as: UTF8.self)
         let delta = String(decoding: try! JSONSerialization.data(withJSONObject: ["type": "response.output_text.delta",
                                                                                   "delta": text]), as: UTF8.self)
@@ -244,12 +249,244 @@ extension Snapshot {
                 let had = lost.showsWeekCard
                 losing.useAI = false
                 report("losing ready removes the section and the notes-only card", had && !lost.showsWeekCard)
+                try await whatNextChecks(report)
             } catch {
                 report("setup: \(error)", false)
             }
             print(failures == 0 ? "ALL PASS" : "\(failures) FAILED"); fflush(stdout)
             exit(failures == 0 ? 0 : 1)
         }
+    }
+
+    /// What next? (SPEC "What next?"): when ✨ shows, what is sent, the answer's states
+    /// and choices, what closes it, and what is remembered.
+    @MainActor static func whatNextChecks(_ report: (String, Bool) -> Void) async throws {
+        let clew = Clew(store: try SQLiteStore.inMemory(), clock: SystemClock(), zones: SystemTimeZone())
+        try clew.closeCalendarPrompt()
+        try clew.setTimelineShown(false)
+        let intro = try clew.addItem(NewItem(title: "Write the intro", shape: .today)).id
+        let model = AppModel(clew: clew, notify: false)
+        let transport = RecordedAI()
+        let ai = testAI(MemorySession.signedIn(), transport, "next")
+        model.useAI(ai)
+        await ai.refreshModels()
+        report("no ✨ with one open task", !model.canAskWhatNext)
+        let anna = try clew.addItem(NewItem(title: "Reply to Anna", shape: .today)).id
+        let rent = try clew.addItem(NewItem(title: "Pay rent", shape: .today)).id
+        model.refresh()
+        report("✨ with two or more open tasks", model.canAskWhatNext)
+        ai.useAI = false
+        report("no ✨ when AI is not ready", !model.canAskWhatNext)
+        ai.useAI = true
+        try clew.startFocus(itemId: intro, minutes: 25)
+        try clew.pauseFocus()
+        model.refresh()
+        report("no ✨ while a focus timer exists, even paused", !model.canAskWhatNext)
+        try clew.stopFocus()
+        model.refresh()
+
+        // Asking, the answer, choosing another, ▶ Focus.
+        func asked() -> [String] { (transport.lastInput["tasks"] as? [[String: Any]])?.compactMap { $0["title"] as? String } ?? [] }
+        let ask = WhatNextAsk()
+        func until(_ done: @escaping () -> Bool) async throws {
+            for _ in 0..<100 where !done() { try await Task.sleep(for: .milliseconds(20)) }
+        }
+        transport.reply(200, RecordedAI.picks([("t2", "Quick, and it clears your head"), ("t1", "Mornings suit writing"),
+                                               ("t3", "Two minutes")]))
+        ai.record(.taskTicked, task: "Earlier", typed: true)
+        ask.toggle(model)
+        report("✨ asks: Choosing…", ask.state == .asking)
+        try await until { ask.state != .asking }
+        report("sends Today's open tasks with short ids", asked() == ["Write the intro", "Reply to Anna", "Pay rent"]
+               && (transport.lastInput["tasks"] as? [[String: Any]])?.first?["id"] as? String == "t1")
+        report("…and the record, all typed", ((transport.lastInput["memory"] as? [String: Any])?["activity"] as? [Any])?.count == 1)
+        guard case .shown(let picks, let first) = ask.state else { report("the answer shows", false); return }
+        report("the pick and two others, in order", picks.map(\.itemId) == [anna, intro, rent] && first == anna)
+        ask.choose(rent)
+        if case .shown(let now, _) = ask.state {
+            report("another becomes the pick, the old pick takes its place", now.map(\.itemId) == [rent, intro, anna])
+        }
+        ai.memory.clearActivity()
+        ask.focus(model)
+        report("▶ Focus 25 min starts a focus on the pick and closes",
+               model.focus?.itemId == rent && model.focus?.length == 25 * 60 && ask.state == .idle)
+        let chosen = ai.memory.activity.events.last
+        report("…remembered: nextChosen, focus, not the first pick",
+               chosen?.kind == .nextChosen && chosen?.how == "focus" && chosen?.other == true && chosen?.task == "Pay rent")
+        report("no ✨ once the focus runs", !model.canAskWhatNext)
+        try clew.stopFocus()
+        model.refresh()
+
+        // The title goes to the task; Not now; Cancel.
+        transport.reply(200, RecordedAI.picks([("t1", "Mornings suit writing"), ("t2", "Quick")]))
+        ask.toggle(model)
+        try await until { ask.state != .asking }
+        ai.memory.clearActivity()
+        ask.open(model)
+        let opened = ai.memory.activity.events.last
+        report("the title closes it and goes to the task, highlighted",
+               ask.state == .idle && model.revealing == intro && model.highlightedRow == intro
+               && model.highlightedBlock == nil)
+        report("…remembered: open, the first pick", opened?.kind == .nextChosen && opened?.how == "open" && opened?.other == nil)
+        try await Task.sleep(for: .milliseconds(1200))
+        report("the highlight goes after about a second", model.highlightedRow == nil)
+        transport.reply(200, RecordedAI.picks([("t1", "A"), ("t2", "B")]))
+        ask.toggle(model)
+        try await until { ask.state != .asking }
+        ai.memory.clearActivity()
+        ask.choose(anna)
+        ask.open(model)
+        report("the title of another chosen task: remembered as not the first pick",
+               model.revealing == anna && ai.memory.activity.events.last?.other == true
+               && ai.memory.activity.events.last?.how == "open")
+        transport.reply(200, RecordedAI.picks([("t1", "Mornings suit writing"), ("t2", "Quick")]))
+        ask.toggle(model)
+        try await until { ask.state != .asking }
+        ai.memory.clearActivity()
+        ask.closeByPerson(model)
+        report("Not now closes it and is remembered as dismissed",
+               ask.state == .idle && ai.memory.activity.events.map(\.kind) == [.nextDismissed])
+        ai.memory.clearActivity()
+        transport.reply(200, RecordedAI.picks([("t1", "Late")]))
+        ask.toggle(model)
+        ask.closeByPerson(model)
+        try await Task.sleep(for: .milliseconds(300))
+        report("Cancel: nothing appears later, nothing remembered", ask.state == .idle && ai.memory.activity.events.isEmpty)
+
+        // While it shows: tasks leaving, focus starting, ready lost.
+        transport.reply(200, RecordedAI.picks([("t1", "A"), ("t2", "B")]))
+        ask.toggle(model)
+        try await until { ask.state != .asking }
+        if let row = model.row(intro) { model.tap(row) }
+        ask.update(model)
+        if case .shown(let left, _) = ask.state {
+            report("a ticked pick leaves; the next becomes the pick", left.map(\.itemId) == [anna])
+        } else { report("a ticked pick leaves; the next becomes the pick", false) }
+        if let row = model.row(anna) { model.tap(row) }
+        ask.update(model)
+        report("none left: it closes", ask.state == .idle)
+        if let row = model.row(intro) { model.tap(row) }
+        if let row = model.row(anna) { model.tap(row) }
+        transport.reply(200, RecordedAI.picks([("t1", "A"), ("t2", "B")]))
+        ask.toggle(model)
+        try await until { ask.state != .asking }
+        try clew.startFocus(itemId: rent, minutes: 10)
+        model.refresh()
+        ask.update(model)
+        report("a focus starting elsewhere closes it", ask.state == .idle)
+        try clew.stopFocus()
+        model.refresh()
+        transport.reply(200, RecordedAI.picks([("t1", "A"), ("t2", "B")]))
+        ask.toggle(model)
+        try await until { ask.state != .asking }
+        ai.useAI = false
+        ask.update(model)
+        report("losing ready closes it", ask.state == .idle)
+        ai.useAI = true
+
+        // Ticked while asking; open tasks below 2 while asking.
+        transport.reply(200, RecordedAI.picks([("t1", "A")]))
+        ask.toggle(model)
+        if let row = model.row(intro) { model.tap(row) }
+        try await until { ask.state != .asking }
+        report("a task ticked while asking leaves: none left closes quietly", ask.state == .idle)
+        if let row = model.row(intro) { model.tap(row) }
+        transport.reply(200, RecordedAI.picks([("t1", "A")]))
+        ask.toggle(model)
+        if let row = model.row(anna) { model.tap(row) }
+        if let row = model.row(rent) { model.tap(row) }
+        ask.update(model)
+        report("open tasks dropping below 2 while asking close it", ask.state == .idle)
+        for id in [anna, rent] { if let row = model.row(id) { model.tap(row) } }
+
+        // Failures.
+        transport.reply(200, RecordedAI.picks([("t9", "Not a task")]))
+        ask.toggle(model)
+        try await until { ask.state == .asking }
+        try await until { ask.state != .asking }
+        report("nothing that passes: Couldn't choose", ask.state == .failed)
+        let failedAt = Date()
+        for _ in 0..<80 where ask.state == .failed { try await Task.sleep(for: .milliseconds(100)) }
+        let shownFor = Date().timeIntervalSince(failedAt)
+        report("…for 5 seconds, then it closes", ask.state == .idle && shownFor >= 4.8)
+        transport.reply(429, [#"{"error":{"code":"subscription_sharing_usage_limit_exceeded"}}"#])
+        ask.toggle(model)
+        try await until { ask.state != .asking }
+        report("usage limit", ask.state == .usageLimit)
+        ask.closeByPerson(model)
+        transport.reply(200, [#"data: {"type":"response.failed","response":{"error":{"code":"subscription_sharing_invalid_user"}}}"#])
+        ask.toggle(model)
+        try await until { ask.state != .asking }
+        ask.update(model)
+        report("an ended sign-in: its message stays though ready is lost", ask.state == .signInEnded && !ai.useAI)
+
+        // A fetched title: sent marked untrusted, and then no record is sent.
+        let other = Clew(store: try SQLiteStore.inMemory(), clock: SystemClock(), zones: SystemTimeZone())
+        try other.closeCalendarPrompt()
+        try other.setTimelineShown(false)
+        _ = try other.addItem(NewItem(title: "Write the intro", shape: .today))
+        _ = try other.addItem(NewItem(title: "A page", titleOrigin: .fetched, url: URL(string: "https://example.com/a"),
+                                      shape: .today))
+        let otherModel = AppModel(clew: other, notify: false)
+        let t2 = RecordedAI()
+        let ai2 = testAI(MemorySession.signedIn(), t2, "next-fetched")
+        otherModel.useAI(ai2)
+        await ai2.refreshModels()
+        ai2.record(.taskTicked, task: "Earlier", typed: true)
+        t2.reply(200, RecordedAI.picks([("t2", "A")]))
+        let ask2 = WhatNextAsk()
+        ask2.toggle(otherModel)
+        try await until { ask2.state != .asking }
+        let sent = t2.lastInput["tasks"] as? [[String: Any]]
+        report("a fetched title is sent marked untrusted, and no record goes with it",
+               sent?.last?["untrusted"] as? Bool == true && sent?.first?["untrusted"] == nil
+               && ((t2.lastInput["memory"] as? [String: Any])?["activity"] as? [Any])?.isEmpty == true
+               && ai2.memory.activity.events.count == 1)
+        ask2.open(otherModel)
+        let fetched = ai2.memory.activity.events.last
+        report("choosing a fetched task remembers it as a link, never its title",
+               fetched?.kind == .nextChosen && fetched?.task == nil && fetched?.link == true)
+        t2.reply(200, RecordedAI.picks([("t2", "A")]))
+        ask2.toggle(otherModel)
+        try await until { ask2.state != .asking }
+        ask2.focus(otherModel)
+        let focused = ai2.memory.activity.events.last
+        report("…with ▶ Focus too", focused?.how == "focus" && focused?.task == nil && focused?.link == true)
+        try other.stopFocus()
+
+        // ▶ Focus only where its timer can show. A clock of its own: today at noon.
+        final class Noon: Clock, @unchecked Sendable {
+            let date: Date
+            init() {
+                date = Calendar.current.date(bySettingHour: 12, minute: 0, second: 0, of: Date())!
+            }
+            func now() -> Date { date }
+        }
+        let noon = Noon()
+        let steps = Clew(store: try SQLiteStore.inMemory(), clock: noon, zones: SystemTimeZone())
+        try steps.closeCalendarPrompt()
+        try steps.setTimelineShown(true)
+        let talk = try steps.addItem(NewItem(title: "Prepare the talk", shape: .today)).id
+        let notes = try steps.addStep(taskId: talk, title: "Speech notes").id
+        let own = try steps.addItem(NewItem(title: "Email Anna", shape: .today)).id
+        let start = noon.date.addingTimeInterval(3600)
+        try steps.placeStepOnTimeline(stepId: notes, start: start, minutes: 30)
+        try steps.placeOnTimeline(itemId: own, start: start, minutes: 30)
+        let ended = try steps.addItem(NewItem(title: "Water the plants", shape: .today)).id
+        let earlier = try steps.placeOnTimeline(itemId: ended, start: noon.date.addingTimeInterval(-3 * 3600), minutes: 30)
+        let stepsModel = AppModel(clew: steps, notify: false)
+        stepsModel.refresh()
+        report("no ▶ Focus for a task off the list only through its steps' blocks",
+               !stepsModel.whatNextCanFocus(talk) && stepsModel.whatNextCanFocus(own))
+        report("its title goes to its next block", stepsModel.whatNextBlock(talk, now: noon.date)?.block.stepId == notes)
+        report("…or, all ended, its latest block today", stepsModel.whatNextBlock(ended, now: noon.date)?.id == earlier.id)
+        stepsModel.requestReveal(talk, now: noon.date)
+        report("going to a task on the timeline highlights that one block, not a row",
+               stepsModel.highlightedRow == nil && stepsModel.highlightedBlock != nil
+               && stepsModel.timeline?.blocks.first { $0.id == stepsModel.highlightedBlock }?.block.stepId == notes)
+        let request = stepsModel.whatNextRequest(now: noon.date)
+        report("a placed task's block start and the free minutes are sent",
+               request.input.tasks.first?.block == WhatNext.hhmm(start, .current) && request.input.freeMinutes == 60)
     }
 
     /// `CLEW_AI_RENDER=1`: Settings › AI signed out, signed in (with the one-time note),
@@ -340,6 +577,24 @@ extension Snapshot {
                            to: dir.appendingPathComponent("ai-detail-\(look).png"))
                 }
                 SuggestionAsk.preset = nil
+                // What next? (SPEC "What next?"): the list with its panel in each state.
+                let anna = try clew.addItem(NewItem(title: "Reply to Anna", shape: .today)).id
+                let rent = try clew.addItem(NewItem(title: "Pay rent before the weekend", shape: .today)).id
+                model.refresh()
+                let nextStates: [(String, WhatNextAsk.State)] = [
+                    ("shown", .shown(picks: [WhatNext.Pick(itemId: talk, reason: "Short steps, and mornings suit writing"),
+                                             WhatNext.Pick(itemId: anna, reason: "Two minutes"),
+                                             WhatNext.Pick(itemId: rent, reason: "Before the weekend")], first: talk)),
+                    ("asking", .asking), ("failed", .failed), ("limit", .usageLimit), ("ended", .signInEnded),
+                ]
+                for (name, state) in nextStates {
+                    WhatNextAsk.preset = state
+                    for (look, appearance) in looks {
+                        render(RootView(model: model, screen: .list), appearance: appearance,
+                               to: dir.appendingPathComponent("ai-next-\(name)-\(look).png"))
+                    }
+                }
+                WhatNextAsk.preset = nil
                 exit(0)
             } catch {
                 print("render failed:", error)

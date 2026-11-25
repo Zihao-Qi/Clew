@@ -88,11 +88,18 @@ struct TodayListView: View {
         if let fixed = Self.screenHeightForChecks { screen = fixed }
         #endif
         let card = model.showsWeekCard ? weekCardHeight : 0
-        return max(160, screen - card - (showsTimeline ? TimelineMetrics.height : 0) - 170)
+        // What next?'s panel takes room above the bar while it shows (review).
+        let panel = whatNext.isOpen ? nextPanelHeight : 0
+        return max(160, screen - card - panel - (showsTimeline ? TimelineMetrics.height : 0) - 170)
     }
 
     /// Last week's card's height, for `rowsLimit`.
     @State private var weekCardHeight: CGFloat = 0
+    /// What next? (SPEC "What next?"): its panel above the bottom bar.
+    @State private var whatNext = WhatNextAsk()
+    @State private var nextPanelHeight: CGFloat = 0
+    @AccessibilityFocusState private var voiceOverRow: UUID?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Above the list's top, the pointer is over the hours.
     private func isOverTimeline(_ y: CGFloat) -> Bool { showsTimeline && y < timelineGeo.viewport.maxY + 4 }
@@ -490,6 +497,10 @@ struct TodayListView: View {
                     if steps == nil { rowHeight = $0 }
                     ownHeights[row.id] = $0
                 }
+                // What next?'s pick, shown for about a second (SPEC "What next?").
+                .background(model.highlightedRow == row.id ? Color.accentColor.opacity(0.18) : .clear)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: model.highlightedRow == row.id)
+                .accessibilityFocused($voiceOverRow, equals: row.id)
             if ((steps != nil && model.isUnfolded(row.id)) || adding) && dragging != row.id {
                 StepsList(model: model, row: row, steps: steps ?? TaskSteps(taskId: row.id, entries: []),
                           adding: adding, suggestOnOpen: suggestingStep == row.id,
@@ -557,6 +568,25 @@ struct TodayListView: View {
                                    value: [Self.labelID: g.frame(in: .named(Self.listSpace))])
         })
         .offset(y: offset(for: Self.labelID, at: index, in: ids))
+    }
+
+    /// What next?'s pick: scroll its row into view (or, with no row, its block on the
+    /// timeline) and move VoiceOver there (SPEC "What next?").
+    private func reveal() {
+        guard let itemId = model.revealing else { return }
+        if model.listRows.contains(where: { $0.id == itemId }) {
+            if listScrolls, let frame = rowFrames[itemId],
+               frame.minY < rowsViewport.minY || frame.maxY > rowsViewport.maxY {
+                let target = scroller.offset + frame.minY - rowsViewport.minY - 8
+                scroller.offset = min(max(target, 0), scroller.maxOffset)
+            }
+            voiceOverRow = itemId
+        } else if let day = model.timeline, let id = model.revealedBlock,
+                  let block = day.blocks.first(where: { $0.id == id }) {
+            let visible = Int(TimelineMetrics.height) / TimelineMetrics.quarter
+            let quarter = Int(block.block.start.timeIntervalSince(day.start) / 60) / TimelineMetrics.quarter
+            topQuarter = min(max(quarter - 1, 0), max(TimelineMetrics.quarters(day) - visible, 0))
+        }
     }
 
     @ViewBuilder
@@ -716,6 +746,14 @@ struct TodayListView: View {
                     .accessibilityLabel(Text("YouTube import needs an update. Nothing was removed."))
             }
 
+            // What next?'s panel, just above the bottom bar: the menu grows to fit it, so it
+            // covers nothing and no row moves (SPEC "What next?").
+            if whatNext.isOpen {
+                WhatNextPanel(ask: whatNext, model: model)
+                    .padding(.bottom, 6)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { nextPanelHeight = $0 }
+            }
+
             Divider()
 
             // Each icon close to its word, the two buttons further apart (user, 2026-11-23).
@@ -732,6 +770,15 @@ struct TodayListView: View {
                     .accessibilityLabel(Text("Write a note"))
                     .debugFrame("noteButton")
                 Spacer()
+                // What next? (SPEC "What next?"): ✨ just left of the gear, icon only.
+                // While its panel shows it stays to close it, but not once AI is gone.
+                if model.canAskWhatNext || (whatNext.isOpen && model.ai?.isReady == true) {
+                    Button { whatNext.toggle(model) } label: { Image(systemName: "sparkles") }
+                        .help(Text("What next?"))
+                        .accessibilityLabel(Text("What next?"))
+                        .debugFrame("whatNextButton")
+                        .padding(.trailing, -8)   // closer to the gear than the bar's groups
+                }
                 // No "Later (N)" button or ⌘L: Later items are in Goals & Later (SPEC
                 // 2026-11-15).
                 // One click straight to Settings; Quit lives there. The menu closes first,
@@ -758,6 +805,7 @@ struct TodayListView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
         }
+        .background { WhatNextHooks(ask: whatNext, model: model, screen: screen, reveal: reveal) }
         // Above both the list and the timeline, so nothing clips it.
         .overlay(alignment: .topLeading) { liftedCard }
         .onChange(of: rowDragLive) { _, live in
@@ -1466,5 +1514,38 @@ struct RatingDots: View {
                 .accessibilityLabel(Text("Felt \(Self.word(n))"))
             }
         }
+    }
+}
+
+/// What next?'s close paths and the reveal (SPEC "What next?"): the list changing, the
+/// menu closing, the rollover, leaving the list.
+private struct WhatNextHooks: View {
+    let ask: WhatNextAsk
+    let model: AppModel
+    let screen: Screen
+    let reveal: () -> Void
+
+    var body: some View {
+        Color.clear
+            .onChange(of: WhatNextWatch(model)) { ask.update(model) }
+            .onChange(of: model.menuCloses) { ask.close() }
+            .onChange(of: model.today?.day) { ask.close() }
+            .onChange(of: screen) { if screen != .list { ask.close() } }
+            .onDisappear { ask.close() }
+            .onChange(of: model.revealRequests) { reveal() }
+            .accessibilityHidden(true)
+    }
+}
+
+/// What, when it changes, may close or shorten What next?'s panel.
+private struct WhatNextWatch: Equatable {
+    let ready: Bool
+    let focus: Bool
+    let open: Set<UUID>
+
+    @MainActor init(_ model: AppModel) {
+        ready = model.ai?.canSuggestSteps == true
+        focus = model.focus != nil
+        open = model.whatNextOpenIds
     }
 }
