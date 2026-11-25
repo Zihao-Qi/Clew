@@ -9,6 +9,7 @@ source file is always restored, even on error.
 
   python3 -I scripts/mutation-check.py . [first] [last]      # default: all
   python3 -I scripts/mutation-check.py . --patterns           # only check the patterns
+  python3 -I scripts/mutation-check.py . --changed            # only what this branch changed (--list: just name them)
 """
 import json, pathlib, re, subprocess, sys
 
@@ -1026,6 +1027,18 @@ if len(sys.argv) > 2 and sys.argv[2] == "--patterns":
         print(f"{name:28} PATTERN NOT UNIQUE ({count})")
     print(f"{len(M) - len(stale)} of {len(M)} patterns match once")
     sys.exit(1 if stale else 0)
+# --changed: only the entries whose pattern overlaps a line this branch changed.
+if len(sys.argv) > 2 and sys.argv[2] == "--changed":
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+    from mutation_changed import changed_lines, touches
+    lines = changed_lines(repo)
+    M = [m for m in M if touches(repo, m[1], m[2], lines)]
+    print(f"--changed: {len(M)} entries touch this branch's changes", flush=True)
+    if "--list" in sys.argv:   # what would run, without building or testing anything
+        for m in M:
+            print(" ", m[0])
+        sys.exit(0)
+    sys.argv = sys.argv[:2]
 lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0
 hi = int(sys.argv[3]) if len(sys.argv) > 3 else len(M)
 results = []

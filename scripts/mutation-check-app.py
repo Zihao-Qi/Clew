@@ -10,6 +10,7 @@ fast and only checks that every entry still matches its source once.
   python3 -I scripts/mutation-check-app.py .                 # all
   python3 -I scripts/mutation-check-app.py . --only Notes    # names containing "Notes"
   python3 -I scripts/mutation-check-app.py . --patterns
+  python3 -I scripts/mutation-check-app.py . --changed       # only what this branch changed (--list: just name them)
 """
 import pathlib
 import signal
@@ -238,6 +239,17 @@ if "--patterns" in sys.argv:
 signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
 
 only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else ""
+# --changed: only the entries whose pattern overlaps a line this branch changed.
+if "--changed" in sys.argv:
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+    from mutation_changed import changed_lines, touches
+    lines = changed_lines(repo)
+    M = [m for m in M if touches(repo, m[1], m[2], lines)]
+    print(f"--changed: {len(M)} entries touch this branch's changes", flush=True)
+    if "--list" in sys.argv:   # what would run, without building or testing anything
+        for m in M:
+            print(" ", m[0])
+        sys.exit(0)
 survived = 0
 # What fails before anything is broken (a check this Mac cannot pass today) is not a
 # kill: only a failure the mutation adds counts.
