@@ -100,6 +100,7 @@ extension Snapshot {
                 try await Task.sleep(for: .milliseconds(400))
                 guard let panel = box.panelForChecks else { report("the box opens", false); exit(1) }
                 report("the box opens and takes the keyboard", box.isOpen && panel.isKeyWindow)
+                report("writing a note stops the running focus (user, 2026-11-24)", model.focus?.isPaused == true)
                 if let visible = panel.screen?.visibleFrame {
                     report("it opens a quarter of the way down the screen, centred",
                            abs(panel.frame.maxY - (visible.maxY - visible.height / 4)) < 2
@@ -135,23 +136,43 @@ extension Snapshot {
                 report("⇧Return starts a new line", box.state.text == "Call the bank\nabout the card" && box.isOpen)
                 report("the box grows with its lines", panel.frame.height > oneLine + 10)
                 let typed = DebugFrames.frames["noteText"]
+                let during = DebugFrames.frames["noteDuring"]
                 let lineHeight = box.textAndField.map { $0.text.height / 2 } ?? 0
                 try await returnUntilSwept()
                 let swept = sweptNow()
+                let sweptDuring = DebugFrames.frames["sweptDuring\(box.state.bannerShown)"]
+                report("saved, the focus runs again", model.focus?.isPaused == false)
+                report("while the band sweeps, During stays where it was", during != nil && during == sweptDuring)
+                /// The band's width through the sweep and after: it never goes back.
+                var bandWidths: [CGFloat] = []
+                @MainActor func sampleBand(_ ms: Int) async throws {
+                    for _ in 0..<(ms / 40) {
+                        if let w = DebugFrames.frames["band\(box.state.bannerShown)"]?.width { bandWidths.append(w) }
+                        try await Task.sleep(for: .milliseconds(40))
+                    }
+                }
                 print("  typed", typed as Any, "swept", swept as Any)
                 report("while the band sweeps, the text stays the same size and place (user, 2026-11-24)",
                        typed != nil && swept != nil && abs(typed!.minY - swept!.minY) < 1 && abs(typed!.minX - swept!.minX) < 1
                        && abs(typed!.height - swept!.height) < 1)
-                try await Task.sleep(for: .milliseconds(300))
+                try await sampleBand(300)
                 let saved = model.openNotes.first
                 report("Return saves it with the task it was written during",
                        saved?.text == "Call the bank\nabout the card" && saved?.duringItemId == intro
                        && saved?.duringTitle == "Write the intro" && !box.isOpen)
                 report("then the banner: Saved. Back to: the task, with its minutes left",
                        box.isBannerShown && box.bannerText?.hasPrefix("Saved. Back to: Write the intro · ") == true)
-                try await Task.sleep(for: .milliseconds(900))
+                try await sampleBand(880)
                 report("the banner stays after the sweep, settled", box.isBannerShown && box.state.settled)
+                print("  band widths", bandWidths.map { Int($0) })
+                report("the band sweeps across and never goes back (user, 2026-11-24)",
+                       bandWidths.count > 5 && zip(bandWidths, bandWidths.dropFirst()).allSatisfy { $1 >= $0 - 0.5 }
+                       && (bandWidths.last ?? 0) > 400)
                 let title = DebugFrames.frames["savedTitle"], back = DebugFrames.frames["backTo"]
+                let regular = (String(localized: "Saved") as NSString)
+                    .size(withAttributes: [.font: NoteBox.textFont]).width
+                print("  Saved width", title?.width as Any, "regular", regular)
+                report("Saved is not bold", title.map { abs($0.width - regular.rounded(.up)) < 1 || abs($0.width - regular) < 1 } == true)
                 report("Saved and Back to are the typed text's size, one line each",
                        title.map { abs($0.height - lineHeight) < 1.5 } == true && back.map { abs($0.height - lineHeight) < 1.5 } == true)
                 let whole = DebugFrames.frames["noteBanner"]
@@ -170,6 +191,16 @@ extension Snapshot {
                 try await Task.sleep(for: .milliseconds(200))
                 report("Esc closes it and keeps the draft",
                        !box.isOpen && defaults.string(forKey: NoteBox.draftKey) == "   half a thought" && model.openNotes.count == 1)
+                report("closed without saving, the focus runs again", model.focus?.isPaused == false)
+                // A focus already paused stays paused.
+                try clew.pauseFocus()
+                model.refresh()
+                box.open()
+                try await Task.sleep(for: .milliseconds(200))
+                box.close()
+                report("a focus paused before the note stays paused", model.focus?.isPaused == true)
+                try clew.resumeFocus()
+                model.refresh()
                 box.open()
                 try await Task.sleep(for: .milliseconds(300))
                 report("the draft is back when it opens again", box.state.text == "   half a thought")

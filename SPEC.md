@@ -1282,13 +1282,20 @@ stopped daily use, not adding features.
     when the box opened (with Esc too; a click elsewhere already chose an app), and
     the box shows that the thought is safe (*changed* 2026-11-23, *user*: the tinted
     banner looked unlike the app): a band of the accent colour sweeps across the box
-    from left to right (about half a second), settles as a thin accent bar on its left
-    edge (the mark of the block running now on the timeline), and the text becomes
-    "✓ Saved" over "Back to: **Write the intro**" (the ✓ a done task's filled circle).
+    from left to right (about half a second), then fades where it is while a thin
+    accent bar fades in on its left edge (the mark of the block running now on the
+    timeline; *changed* 2026-11-24, *user*: the band shrinking back to the left felt
+    like a failed save), and the text becomes "✓ Saved" over "Back to: **Write the
+    intro**" (the ✓ a done task's filled circle).
     One text size throughout (*changed* 2026-11-24, *user*: the text changed size on
-    Return): while the band sweeps, what was typed stays exactly as it was, in the
-    same size, place and scroll; "Saved" is that size in semibold, "Back to" that size
-    in grey.
+    Return): while the band sweeps, the box stays exactly as it was (what was typed in
+    the same size, place and scroll, and the "During" line under it); "Saved" is that
+    size, not bold; "Back to" that size in grey.
+  - **The focus stops while a note is written** (2026-11-24, *user*): opening the box
+    pauses a running focus (not a break, not one already paused, not one whose time is
+    up), and closing it starts that focus again, saved or not (Return, Esc, or a click
+    elsewhere). A focus that was already paused stays paused; a focus stopped or
+    changed meanwhile is left as it is. The banner still goes by itself.
     It stays about 1.5 seconds after the sweep (*changed* 2026-11-23, *user*: 3 seconds
     was too long), takes no keyboard, then fades; a click on it closes it at once. It
     is exactly the box's size and place.
