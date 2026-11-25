@@ -1022,7 +1022,7 @@ M = [
  ("NT4 done oldest first", C+"Notes.swift", ".sorted { ($0.doneAt ?? .distantPast, $0.id.uuidString) > (", ".sorted { ($0.doneAt ?? .distantPast, $0.id.uuidString) < (", "NoteTests"),
  ("NT5 done note edited", C+"Notes.swift", "            guard note.doneAt == nil else { throw ClewError.notAllowed }   // done notes are not edited\n", "", "NoteTests"),
  ("NT6 not done keeps task", C+"Notes.swift", "                note.taskId = nil\n                note.madeTo = nil\n", "", "NoteTests"),
- ("NT7 task from whole text", C+"Notes.swift", "guard let line = QuickNote.taskTitle(note.text)", "guard let line = Optional(note.text)", "NoteTests"),
+ ("NT7 task from whole text", C+"Notes.swift", ".flatMap({ $0.isEmpty ? nil : $0 }) ?? QuickNote.taskTitle(note.text) else", ".flatMap({ $0.isEmpty ? nil : $0 }) ?? Optional(note.text) else", "NoteTests"),
  ("NT8 note stays open", C+"Notes.swift", "            note.doneAt = now\n            note.taskId = item.id", "            note.taskId = item.id", "NoteTests"),
  ("NT9 always today", C+"Notes.swift", "note.madeTo = place", "note.madeTo = .today", "NoteTests"),
  ("NT10 task made twice", C+"Notes.swift", "guard var note = try w.quickNote(id: id), note.isOpen else", "guard var note = try w.quickNote(id: id) else", "NoteTests"),
@@ -1037,6 +1037,9 @@ M = [
  ("NT19 createdAt editable", S+"Schema.swift", "WHEN NEW.id IS NOT OLD.id OR NEW.createdAt IS NOT OLD.createdAt\n              OR NEW.duringItemId", "WHEN NEW.id IS NOT OLD.id\n              OR NEW.duringItemId", "SQLiteStoreTests"),
  ("NT20 notes deletable", S+"Schema.swift", "            CREATE TRIGGER quickNote_no_delete BEFORE DELETE ON quickNote\n            BEGIN SELECT RAISE(ABORT, 'notes are removed with a tombstone, never deleted'); END;\n", "", "SQLiteStoreTests"),
  ("NT21 deleted notes listed", S+"SQLiteStore.swift", "SELECT * FROM quickNote WHERE deletedAt IS NULL ORDER BY", "SELECT * FROM quickNote ORDER BY", "SQLiteStoreTests"),
+ ("NT22 suggested steps lost", C+"Notes.swift", "                try w.save(Step(id: newID(), taskId: item.id, title: stepTitle, sortKey: Double(n + 1),\n                                createdAt: now, updatedAt: now))\n", "                _ = (n, stepTitle)\n", "NoteTests"),
+ ("NT23 suggested title ignored", C+"Notes.swift", "            guard let line = suggested.map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) })\n                    .flatMap({ $0.isEmpty ? nil : $0 }) ?? QuickNote.taskTitle(note.text) else", "            guard let line = QuickNote.taskTitle(note.text) else", "NoteTests"),
+ ("NT24 steps unchecked", C+"Notes.swift", "        let stepTitles = try steps.map { try Self.validTitle($0) }", "        let stepTitles = steps", "NoteTests"),
 ]
 
 # --patterns: only check that every entry still matches its source exactly once (fast;

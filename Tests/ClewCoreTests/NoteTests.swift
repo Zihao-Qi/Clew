@@ -80,6 +80,28 @@ private func at(_ d: Int, _ h: Int, _ m: Int = 0) -> Date {
         #expect(try clew.today().rows.contains { $0.id == item.id })
     }
 
+    /// SPEC "Notes to tasks": a clicked suggestion makes the task with its title and steps
+    /// in one step, typed by the person; the note is done and remembers it.
+    @Test func aSuggestionMakesTheTaskWithItsTitleAndStepsInOneStep() throws {
+        let n = try clew.addNote("bank card?? call them, then order a new one")
+        let item = try clew.makeTask(fromNote: n.id, in: .later, title: "  Call the bank about the card ",
+                                     steps: ["Call the number on the back", "Order a new card"])
+        #expect(item.title == "Call the bank about the card" && item.titleOrigin == .typed && item.state == .later)
+        let steps = try #require(try clew.steps(taskIds: [item.id])[item.id]).entries.map(\.step)
+        #expect(steps.map(\.title) == ["Call the number on the back", "Order a new card"])
+        #expect(steps[0].sortKey < steps[1].sortKey)
+        let done = try #require(try clew.notes().done.first)
+        #expect(done.id == n.id && done.taskId == item.id && done.madeTo == .later)
+        // A step that cannot be a title refuses the whole thing: nothing is made, the note stays open.
+        let m = try clew.addNote("milk")
+        #expect(throws: ClewError.emptyTitle) { try clew.makeTask(fromNote: m.id, in: .today, title: "Buy milk", steps: [" "]) }
+        #expect(try clew.notes().open.contains { $0.id == m.id })
+        #expect(try !clew.today().rows.contains { $0.item.title == "Buy milk" })
+        // An empty suggested title falls back to the note's first line.
+        let back = try clew.makeTask(fromNote: m.id, in: .today, title: "  ")
+        #expect(back.title == "milk")
+    }
+
     @Test func theNoteShortcutStartsAtOptionCommandPeriodUnlessTheListHasItAndThatChoiceIsKept() throws {
         #expect(try clew.writeNoteShortcut() == .writeNoteDefault)
         // A Mac whose list shortcut is already ⌥⌘.: the note's starts with none, kept.
