@@ -122,7 +122,8 @@ streamed answer in 3.0 s. No helper process, no JavaScript.
   inside it as `response.failed`): usage limit (`subscription_sharing_usage_limit_exceeded`,
   429) shows "ChatGPT usage limit reached · Manage usage" and nothing else is asked
   until the person presses ✨ again; `…_usage_unavailable`, `…_user_unavailable` and
-  503 are the job's plain failure line ("Couldn't suggest steps", "Couldn't choose"); `subscription_sharing_invalid_user` ends the
+  503 are the job's plain failure line ("Couldn't suggest steps", "Couldn't choose",
+  "Couldn't suggest a task", "Couldn't sort your notes"); `subscription_sharing_invalid_user` ends the
   sign-in only after a refresh confirms it; `…_route_not_supported`, `chatpass_v2_…`
   and `invalid_client` are bugs (debug log, plain failure).
 - **OpenAI's interface rules**: a **Continue with ChatGPT** button; the first time the
@@ -161,7 +162,7 @@ address or any page's content.
    so a fetched title cannot carry banned text through. The list lives in
    code with a test per phrase.
 5. On any failure the job returns nothing: the plain behaviour, the job's short
-   failure line ("Couldn't suggest steps. Try again.", "Couldn't choose. Try again.", "Couldn't suggest a task. Try again."), and in a debug build the reason as a code ("tooLong",
+   failure line ("Couldn't suggest steps. Try again.", "Couldn't choose. Try again.", "Couldn't suggest a task. Try again.", "Couldn't sort your notes. Try again."), and in a debug build the reason as a code ("tooLong",
    "banned", "duplicate", "schema"), never any of the answer's text.
 
 ## 6. Jobs
@@ -233,7 +234,8 @@ Settings › AI, edits any, adds their own and deletes any.
   and the job's own output is judged as usual. No extra request. When an answer
   **completes** (`response.completed`), the events it carried count as sent, even if
   nothing in it passes; a cancel, a timeout or a failed request keeps them for the
-  next job. A job whose input carries an untrusted field sends no events (they wait)
+  next job. A job whose input carries an untrusted field or one of the person's notes
+  (SPEC "Notes to tasks") sends no events (they wait)
   and its note change is ignored. A long gap is fine: a note is about the person,
   not one task.
 - **Instructions** every job adds: notes are what Clew knows about the person, to be
@@ -290,7 +292,7 @@ switches. Signing in turns it on. Under it, **Notes** says what may be read from
 person's notes (*user* 2026-11-25: Off, the note you ask about, all your open notes);
 it is a privacy choice, not a job switch (SPEC "Notes to tasks"). **Continue with ChatGPT** (then the account's email,
 **Sign out**, **Manage usage**), the model with "Using ChatGPT plan" (the person
-chooses it, *user*), **Use AI**, and **Memory**: the notes, each with
+chooses it, *user*), **Use AI**, **Notes**, and **Memory**: the notes, each with
 **Edit** and **Delete**, then **Add to memory** and **Forget everything**; it is shown
 whenever Clew is ready (§7) and, in any other state, while any notes are kept.
 Signing out turns Use AI off. The toggle says
@@ -321,7 +323,8 @@ in the Keychain. The full text is in SPEC "Suggest steps", "Memory" and "Notes t
 - Notes (the person's own jottings) are sent only as Settings › AI › Notes allows:
   never (Off), the one note the person presses ✨ on (the default), or all open notes
   (Sort with ✨, and What next?'s context). Using a note is never recorded as activity,
-  and a request that carries a note never changes Memory (its note change is ignored).
+  and a request that carries a note sends no activity (it waits) and never changes
+  Memory (its note change is ignored), like one with an untrusted field (§4, §7).
 - Each job sends only the input it declares (§6) plus the notes and activity (§7).
   Settings › AI says in general what AI does, not each field (*user* 2026-11-22);
   SPEC and this file list them exactly.
