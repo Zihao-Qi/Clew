@@ -39,10 +39,14 @@ anything AI-related, [docs/AGENT.md](docs/AGENT.md) before changing code.
 - Read every commit SHA from real command output; never guess one.
 - Before a commit, compare `git diff --stat` with the files you meant to change (a
   multi-file edit can fail halfway and leave a partial change).
-- Before a PR: `python3 -I scripts/lint.py .` (also in CI) and, for app changes,
-  `scripts/run-app-checks.sh` after a Debug build (also in CI) and the **full**
-  `python3 -I scripts/mutation-check-app.py .` (local only: it rebuilds per mutation;
-  `--only` is for while working, not instead of the full run).
+- Before a PR: `python3 -I scripts/lint.py .` (also in CI); for app changes,
+  `scripts/run-app-checks.sh` after a Debug build (also in CI); and the mutations for
+  what changed: `python3 -I scripts/mutation-check.py . --changed` and
+  `python3 -I scripts/mutation-check-app.py . --changed` (each picks the entries whose
+  code line this branch changed; `--list` names them without running). Add entries for
+  new rules first. A check you weakened or rewrote: also run its entries by name
+  (`--only`). Run only the relevant tests locally (`swift test --filter`,
+  `run-app-checks.sh --only`); CI runs everything (user, 2026-11-25).
 - Run the app's checks only through `scripts/run-app-checks.sh` (`--only CLEW_NOTES_TEST`
   for one), never the Debug binary by hand: it refuses an app older than the sources,
   which is what a failed build leaves behind.
