@@ -1206,11 +1206,11 @@ stopped daily use, not adding features.
     a task with a fetched or imported title carries no text, only that it is a link.
     Unticking drops that tick's unsent events; a new rating replaces an unsent one. At
     most the 20 newest unsent events are kept. Each job's request sends all notes and
-    these events (not one that carries a fetched title or one of the person's notes:
-    then no events, and no note change is kept, see "Notes to tasks"); its answer may add one note, or change or delete one of Clew's own.
+    these events; its answer may add one note, or change or delete one of Clew's own.
     When the answer completes, its events count as sent, even if nothing in it passes;
-    a cancel, a timeout or a failed request keeps them. A task with a fetched or
-    imported title sends no events and keeps no note from that answer. No extra request
+    a cancel, a timeout or a failed request keeps them. A request that carries a
+    fetched or imported title, or one of the person's notes (see "Notes to tasks"),
+    sends no events and keeps no note from that answer. No extra request
     is made. A new or changed note appears in the list at once; the menu shows notes
     only in last week's card (see "What Clew noticed").
   - **Checked before keeping** (Clew's notes only), against the notes as they are when
@@ -1289,7 +1289,7 @@ stopped daily use, not adding features.
     progress, priorities, step counts and blocks, and the open notes it sends, if any)
     that is less than 2 hours old; then nothing is sent. An answer that arrives after the menu closed is kept for the next opening.
     The kept answer lives in memory only (never on disk) and goes with losing ready,
-    the rollover and Forget everything. A background request that fails shows
+    the rollover, Forget everything and lowering Settings › AI › Notes from All. A background request that fails shows
     nothing, except a usage limit: it shows when Next is next pressed (unless a kept
     answer can show instead), and nothing more is asked ahead until then. A sign-in
     OpenAI ended in the background turns Use AI off, so Next goes and Settings › AI
@@ -1402,8 +1402,8 @@ stopped daily use, not adding features.
     action. With All your open notes and 2 or more open notes, **Sort with ✨** sits at
     the top of the page, right-aligned on the title's line ("Suggest tasks for all open
     notes" to VoiceOver). Done notes and a note being edited have neither.
-  - **One request at a time on the page:** while one is under way, ✨, right-click ›
-    Suggest a Task and the VoiceOver action are disabled; Sort with ✨ is dimmed while
+  - **One request at a time on the page:** while one is under way, ✨ and right-click ›
+    Suggest a Task are disabled and the VoiceOver action is left out; Sort with ✨ is dimmed while
     a ✨ runs, and replaced by "Sorting…" and Cancel while Sort runs. Pressing ✨ on a note replaces that note's suggestion (from ✨ or from
     Sort); Sort with ✨ replaces every suggestion shown.
   - **Asking:** for ✨, under the note, a small spinner with **Cancel** (VoiceOver
@@ -1437,13 +1437,13 @@ stopped daily use, not adding features.
     and with leaving the page, the menu closing, the rollover, losing ready or the
     Notes setting no longer allowing it.
   - **Esc:** while editing a note, it cancels editing as before; otherwise it first
-    cancels what is asking or drops any suggestions, thought lines and failure or
-    usage-limit messages shown, staying on the page; with nothing to drop, it goes back
+    cancels what is asking; with nothing asking, it drops any suggestions, thought
+    lines and failure or usage-limit messages shown, staying on the page; with nothing to drop, it goes back
     to the list as before.
   - **VoiceOver:** Settings › AI's picker reads "Notes". Each open note's row has the
-    "Suggest a task" action (disabled while a request is under way). After the row,
-    as elements of their own, its suggestion reads "Suggested task: <title>. <steps,
-    if any>. <reason>", then **Add to Today: <title>**, **Add to Later: <title>** and
+    "Suggest a task" action (left out while a request is under way). After the row,
+    as elements of their own, its suggestion reads "Suggested task for Today: <title>.
+    <steps, if any>. <reason>" ("for Later" when Clew suggests Later), then **Add to Today: <title>**, **Add to Later: <title>** and
     **Not now**; the thought line reads its text and **OK**; a failure reads its text
     (with **Manage ChatGPT usage** and **Not now** for the usage limit). Asking reads
     "Suggesting a task" / "Cancel suggestion", or "Sorting your notes" / "Cancel
@@ -1463,8 +1463,7 @@ stopped daily use, not adding features.
     10 open notes, newest first, their text cut to 200 characters. Never the task a
     note was written during (its title may be a fetched page's). With them: the weekday
     and the time (`HH:mm`), and Clew's notes, but no recent activity: it waits for a
-    request without notes (see "Memory"). A note is the person's own typed text, so nothing is marked
-    untrusted. The instruction: turn the note into one short, concrete task (a verb
+    request without notes (see "Memory"). A note is the person's own typed text, so a note is never marked untrusted. The instruction: turn the note into one short, concrete task (a verb
     first where natural); steps only when the note itself lists them; Today only when
     the note says or clearly means today, else Later; a short, kind reason, never
     pushy; a note that is not a task is a thought; reply in the note's language (for
