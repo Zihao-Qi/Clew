@@ -288,7 +288,9 @@ extension AppModel {
                 + (calendarEvents?.timed ?? []).map { (start: $0.start, end: $0.end) }
             free = WhatNext.freeMinutes(now: now, busy: busy)
         }
-        return WhatNext.input(candidates, at: now, calendar: .current, freeMinutes: free)
+        // With all notes allowed, the open notes too, newest first (SPEC "Notes to tasks").
+        let notes = ai?.notesAccess == .all ? openNotes.map(\.text) : []
+        return WhatNext.input(candidates, at: now, calendar: .current, freeMinutes: free, notes: notes)
     }
 
     /// What the kept answer is for: the open tasks (which ones, and as sent), not the time.
@@ -298,7 +300,8 @@ extension AppModel {
         let made = whatNextRequest(now: now)
         let tasks = String(decoding: (try? encoder.encode(made.input.tasks)) ?? Data(), as: UTF8.self)
         let ids = made.input.tasks.map { made.ids[$0.id]?.uuidString ?? "" }.joined(separator: ",")
-        return ids + "|" + tasks
+        let notes = String(decoding: (try? encoder.encode(made.input.notes)) ?? Data(), as: UTF8.self)
+        return ids + "|" + tasks + "|" + notes
     }
 
     static func end(_ block: TimelineBlock) -> Date {

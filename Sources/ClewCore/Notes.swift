@@ -2,7 +2,7 @@ import ClewDomain
 import Foundation
 
 /// Notes (SPEC "Notes", 2026-11-22): a thought written down mid-task, kept as the
-/// person's own data. Never sent to AI.
+/// person's own data. Sent to AI only as Settings › AI › Notes allows (SPEC "Notes to tasks").
 extension Clew {
     /// Open notes newest first, and done ones most recently done first.
     public func notes() throws -> (open: [QuickNote], done: [QuickNote]) {
@@ -60,15 +60,24 @@ extension Clew {
     /// Make a task: a one-off task in Today or Later titled by the note's first line that
     /// is not empty, as typed (never a link); the note becomes done, in the same write.
     @discardableResult
-    public func makeTask(fromNote id: UUID, in place: QuickNote.MadeTo) throws -> Item {
+    /// `title` and `steps`: a suggestion the person clicked (SPEC "Notes to tasks"), made in
+    /// the same step; without them, the note's first line is the title, as typing it would be.
+    public func makeTask(fromNote id: UUID, in place: QuickNote.MadeTo, title suggested: String? = nil,
+                         steps: [String] = []) throws -> Item {
         let now = clockForQueries.now()
         let day = LocalDay(of: now, in: zonesForQueries.current(), rolloverHour: rolloverHour)
+        let stepTitles = try steps.map { try Self.validTitle($0) }
         return try storeForQueries.write { w in
             guard var note = try w.quickNote(id: id), note.isOpen else { throw ClewError.notAllowed }
-            guard let line = QuickNote.taskTitle(note.text) else { throw ClewError.emptyTitle }
+            guard let line = suggested.map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+                    .flatMap({ $0.isEmpty ? nil : $0 }) ?? QuickNote.taskTitle(note.text) else { throw ClewError.emptyTitle }
             let title = line.count > Self.maxTitleLength ? String(line.prefix(Self.maxTitleLength - 1)) + "…" : line
             let item = try insertNewItem(NewItem(title: title, shape: place == .today ? .today : .later),
                                          source: .user, now: now, day: day, w)
+            for (n, stepTitle) in stepTitles.enumerated() {
+                try w.save(Step(id: newID(), taskId: item.id, title: stepTitle, sortKey: Double(n + 1),
+                                createdAt: now, updatedAt: now))
+            }
             note.doneAt = now
             note.taskId = item.id
             note.madeTo = place

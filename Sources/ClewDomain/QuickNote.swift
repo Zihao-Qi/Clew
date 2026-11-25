@@ -2,7 +2,7 @@ import Foundation
 
 /// A thought the person wrote down mid-task (SPEC "Notes", 2026-11-22). A definition:
 /// its text, done and task change; Delete is a tombstone; when and during what it was
-/// written never change. Never sent to AI.
+/// written never change. Sent to AI only as Settings › AI › Notes allows (SPEC "Notes to tasks").
 public struct QuickNote: Hashable, Sendable, Identifiable, Codable {
     /// Where Make a task put the task, kept with the note (moving the task later does not
     /// change it).

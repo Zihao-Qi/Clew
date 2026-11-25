@@ -55,7 +55,10 @@ final class AppModel {
     private(set) var ai: AIModel?
     #if DEBUG
     /// The debug AI check and render use an AI with recorded answers.
-    func useAI(_ ai: AIModel) { self.ai = ai }
+    func useAI(_ ai: AIModel) {
+        self.ai = ai
+        watchNotesAccess(ai)
+    }
     #endif
     /// The About pane and the opt-in update check (SPEC 2026-11-13); per Mac.
     let updates: Updates
@@ -108,6 +111,17 @@ final class AppModel {
     /// What next?'s pick being shown (SPEC "What next?"): its row in the list, or with no
     /// row its one block on the timeline, highlighted for about a second; `revealRequests`
     /// asks the list (or the block) to scroll and to take VoiceOver.
+    /// Lowering the Notes choice from all drops What next?'s answer and request, which may
+    /// have read the notes (SPEC "Notes to tasks").
+    func watchNotesAccess(_ ai: AIModel) {
+        ai.onNotesAccessChange = { [weak self] old, new in
+            if old == .all, new != .all { self?.whatNext.drop() }
+            self?.notesAccessChanges += 1
+        }
+    }
+    /// Bumped when the Notes choice changes: the Notes page ends what it no longer allows.
+    private(set) var notesAccessChanges = 0
+
     /// What next?'s kept answer and panel, alive across openings of the menu.
     let whatNext = WhatNextAsk()
     private(set) var highlightedRow: UUID?
@@ -148,6 +162,7 @@ final class AppModel {
             self.init(databaseAt: try Self.databaseURL())
             if let clew { browser = BrowserConnection(clew: clew) }
             ai = AIModel()
+            if let ai { watchNotesAccess(ai) }
             calendarSource = EventKitCalendar()
             OpenShortcutHotkey.shared.start()
             try? clew?.settleWriteNoteShortcut()
