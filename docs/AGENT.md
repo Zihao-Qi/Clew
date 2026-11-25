@@ -171,6 +171,7 @@ address or any page's content.
 | **Suggest steps** | Add Step… and Details' Steps (SPEC "Suggest steps") | asks for 3–5 to-do items of 2–5 words, the first a 2-minute start; keeps up to 5 that pass (1–80 characters, no repeats) | AI-1 |
 | **Evening line** | the 21:00 summary | one line ≤ 120 characters naming something done | AI-2 |
 | **Fits today** | Goals & Later | ≤ 3 items with a free slot on today's timeline and a reason ≤ 80 | AI-3 |
+| **Notes to tasks** | ✨ on a note, Sort with ✨ on the Notes page (SPEC "Notes to tasks"), as Settings › AI › Notes allows | a title ≤ 80, Today or Later, a reason ≤ 80, 0–5 steps only when the note lists them; for Sort, one per note id | AI-5 |
 | **What next?** | Next in the list's bottom bar, asked ahead when the menu opens (SPEC "What next?") | 1–3 picks from Today's open tasks, each an id and a reason ≤ 80, the first shown as the pick | AI-4 |
 | *every job* | its own place | may also return one note (§7) | AI-M |
 | What Clew noticed | last week's card | no request: shows Clew's unanswered notes, True / Not really (§7) | AI-N |
@@ -313,6 +314,9 @@ in the Keychain. The full text is in SPEC "Suggest steps" and "Memory".
 - Off by default; nothing is sent until the person signs in (which turns Use AI on)
   and a job runs: when they ask for suggestions, and What next? when the menu opens
   with something new (asked ahead, at most once per change or every 2 hours).
+- Notes (the person's own jottings) are sent only as Settings › AI › Notes allows:
+  never (Off), the one note the person presses ✨ on (the default), or all open notes
+  (Sort with ✨, and What next?'s context). Using a note is never recorded as activity.
 - Each job sends only the input it declares (§6) plus the notes and activity (§7).
   Settings › AI says in general what AI does, not each field (*user* 2026-11-22);
   SPEC and this file list them exactly.
@@ -369,6 +373,10 @@ first jobs have earned their place.
   felt slow): only when Today's open tasks changed or the kept answer is 2 hours old,
   kept in memory only. Its button is **Next** in the bar's left group. Emotional
   support is not a feature of its own: at most a subtle part of how Clew talks, later.
+- **2026-11-25 (*user*)**: Notes to tasks (AI-5): a three-way **Notes** setting (Off;
+  the note you ask about, the default; all your open notes); one click makes the task
+  with its steps when the note lists them; Sort with ✨ and What next? reading notes
+  only with all notes allowed; nothing about notes is recorded as activity.
 - Superseded 2026-11-22: the bundled `clew-agent` helper, Codex OAuth reuse, the
   monthly token cap (the plan's own limits apply), the Gateway's `AgentOutput` records
   for AI-1 (Suggest steps keeps nothing; memory notes have their own file, §7).
