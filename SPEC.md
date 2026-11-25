@@ -134,7 +134,7 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
 
 - **Daruma goals and badges.** Paint one eye when a counted goal starts and the
   second when it's finished. Levels come from lifetime totals.
-- Opt-in AI help beyond Suggest steps and Memory: an evening line, "fits today" from Goals & Later,
+- Opt-in AI help beyond Suggest steps, Memory and What next?: an evening line, "fits today" from Goals & Later,
   a reader (see docs/AGENT.md, v2 2026-11-22).
 - Help turning notes into tasks with AI (see "Notes": suggestions to choose from only).
 - Sync with Dayflow (its local JSON API: `GET /api/day`, `PATCH /api/tasks/:id`).
@@ -1107,15 +1107,16 @@ stopped daily use, not adding features.
     model (the plan's list, the first by default; the person chooses), and one toggle,
     **Use AI** (*changed* 2026-11-22, *user*: it replaces the switch **Suggest steps**;
     on means every AI job and Memory, off means none; signing in turns it on). Its line
-    says in general what it does, not each field sent (*user*): "Clew suggests steps
-    and remembers how you work, using your ChatGPT plan." Below it, **Memory** (see
+    says in general what it does, not each field sent (*user*): "Clew suggests steps,
+    helps you choose what's next and remembers how you work, using your ChatGPT plan."
+    (*changed* 2026-11-25 for What next?) Below it, **Memory** (see
     "Memory"). The
     first time the person signs in, Settings shows once "You're using your ChatGPT
     plan" with **Got it** (OpenAI's rule). Declined plan permission: "Clew can't use
     your ChatGPT plan yet" with **Continue with ChatGPT** to ask again; a plan OpenAI
     says is not eligible: "AI isn't available on this ChatGPT plan." Signed out, one line
-    says what AI does: "Clew can suggest small steps for a task and remember how you
-    work, using your ChatGPT plan. Nothing is sent until you sign in and ask. Clew works fully without it." While the
+    says what AI does: "Clew can suggest small steps for a task, help you choose what's
+    next and remember how you work, using your ChatGPT plan. Nothing is sent until you sign in and ask. Clew works fully without it." While the
     browser is open: "Waiting for the browser…" with **Cancel**; the browser's page after
     signing in says "You can close this tab and go back to Clew." A failed sign-in says
     "Couldn't sign in. Try again." (or that it was cancelled in the browser, or that
@@ -1258,6 +1259,72 @@ stopped daily use, not adding features.
     note).
   - No request is made to show them; nothing is sent when answering (the answer goes
     with the next job's request).
+
+- **What next? (AI-4, 2026-11-25, *user*).** For the moment the person opens the list
+  and cannot choose: one tap shows one task to do now with a short reason, and two
+  others to choose from. Choosing only, no typing (docs/AGENT.md §1.3).
+  - **The button:** ✨ (`sparkles`, as Suggest steps) in the list's bottom bar, just
+    left of the Settings gear, icon only; hover and VoiceOver: "What next?". It shows
+    only while AI is ready (see "Memory"), no focus or break is running, and Today
+    has at least 2 **open tasks**: rows on Today (not Goals & Later) not done today,
+    a goal not yet reached. If any of these stops being true while it is asked or
+    shown, it closes (a request still running is cancelled).
+  - **Asking:** a small panel opens just above the bottom bar, over the list's end,
+    with "Choosing…", a small spinner and **Cancel**; ✨ shows a spinner. At most 30
+    seconds. Cancel, Esc, ✨ again, the menu closing, leaving the list (Add, details,
+    Settings), the rollover and losing ready close it and cancel the request; nothing
+    appears later. Each ✨ is one request; an answer is never kept for a later tap.
+  - **The answer** replaces "Choosing…":
+
+    ```
+     Write the intro                    ▶ Focus
+     Short, and mornings suit writing
+     Or: Reply to Anna · Pay rent
+                                      Not now
+    ```
+
+    The pick's title (one line, cut with …) and **▶ Focus** on the first line, its
+    reason under it in secondary text, then "Or:" and up to 2 other open tasks, then
+    **Not now**. **▶ Focus** starts a 25-minute focus on the pick, as Focus › 25 min in
+    its right-click menu, and closes the panel. **Clicking the pick's title** closes the
+    panel, scrolls the list to its row and highlights the row briefly (the accent at
+    low opacity for about a second; at once with Reduce Motion). **Clicking another
+    task** makes it the pick, with its own reason, and the old pick takes its place
+    under "Or:". **Not now**, Esc and ✨ close it. Nothing is ticked, moved or
+    reordered: only ▶ Focus changes anything, and only when pressed.
+  - **While it shows:** a task shown that stops being open (ticked, deleted, moved to
+    Goals & Later) leaves the panel; if it was the pick, the first other becomes the
+    pick; with none left the panel closes. The menu closing, leaving the list, the
+    rollover, losing ready, or a focus starting elsewhere close it.
+  - **VoiceOver:** ✨ "What next?"; the panel reads "Suggested: <title>. <reason>",
+    then **Focus 25 minutes on <title>**, "Go to <title>", each other "Choose
+    <title>", and **Not now**. Esc closes it.
+  - **What is sent:** up to 30 open tasks in the list's order (priorities first), each
+    with a short id for this request (t1…t30), its title (a fetched or imported title
+    marked untrusted, docs/AGENT.md §4), its kind (once, habit, or goal with its
+    progress, "1 of 3"), whether it is a priority, its steps as "2 of 5 done" (never
+    their names), and its block's start on today's timeline if it has one; the
+    weekday and the time now (`HH:mm`); with the timeline on, the minutes free until
+    the next block or calendar event today (never an event's title); and the notes and
+    recent activity (see "Memory"). The instruction: choose what to do now, from these
+    only, with a short, kind reason in the tasks' language.
+  - **Checked before showing** (docs/AGENT.md §5): 1 to 3 picks, each an id from this
+    request's tasks, no repeats; each reason trimmed, 1–80 characters, one line, no
+    banned words (a phrase the pick's own typed title carries is allowed, a fetched
+    one's is not). A pick that fails is dropped and the next moves up; none left is a
+    failure.
+  - **When it fails:** in the panel, "Couldn't choose. Try again." with **Not now**,
+    for 5 seconds, then the panel closes; no retry by itself. Usage limit: "ChatGPT
+    usage limit reached · Manage usage" until Not now. A sign-in OpenAI has ended: Use
+    AI turns off and Settings › AI says "Sign in again". Offline or no answer in 30
+    seconds: "Couldn't choose. Try again."
+  - **Remembered** (see "Memory"): ▶ Focus or the title on a pick is activity
+    `nextChosen` (`"how": "focus"` or `"open"`, `"other": true` when the person had
+    made another task the pick), with the task as other events carry it (its title
+    only if typed, else `"link": true`); Not now, Esc and ✨ on an answer are
+    `nextDismissed` (no task). Cancel while asking, failures and closings the person
+    did not choose (the menu closing, the rollover, …) record nothing.
+  - **Kept:** nothing; the answer lives only while the panel shows.
 
 - **Notes (2026-11-22, *user*).** A thought that comes up in the middle of a task is
   written down in seconds and kept, so the fear of forgetting it does not pull the

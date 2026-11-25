@@ -171,6 +171,7 @@ address or any page's content.
 | **Suggest steps** | Add Step… and Details' Steps (SPEC "Suggest steps") | asks for 3–5 to-do items of 2–5 words, the first a 2-minute start; keeps up to 5 that pass (1–80 characters, no repeats) | AI-1 |
 | **Evening line** | the 21:00 summary | one line ≤ 120 characters naming something done | AI-2 |
 | **Fits today** | Goals & Later | ≤ 3 items with a free slot on today's timeline and a reason ≤ 80 | AI-3 |
+| **What next?** | ✨ in the list's bottom bar (SPEC "What next?") | 1–3 picks from Today's open tasks, each an id and a reason ≤ 80, the first shown as the pick | AI-4 |
 | *every job* | its own place | may also return one note (§7) | AI-M |
 | What Clew noticed | last week's card | no request: shows Clew's unanswered notes, True / Not really (§7) | AI-N |
 | Reader | later | §11 | later |
@@ -208,6 +209,8 @@ Settings › AI, edits any, adds their own and deletes any.
   scan, are not recorded); a rating (1–5); focus time ended (minutes); a step added
   from a suggestion; suggestions dismissed (how many); a step added from a suggestion
   deleted later; a note confirmed or rejected in "What Clew noticed" (its line, no
+  task); What next?'s pick taken (`nextChosen`: `"how"` focus or open, `"other"` when
+  the person chose another of its tasks) or its answer dismissed (`nextDismissed`, no
   task). An event names its task's title, and a step event its step's name,
   only for a task whose title the person typed. For a task with a fetched or imported
   title it carries no text at all, only `"link": true` (§4: text the person did not
@@ -299,14 +302,16 @@ in the Keychain. The full text is in SPEC "Suggest steps" and "Memory".
   the failure code, the note change's kind or its failure code, and OpenAI's request id. Never tokens, codes, ID token hints or any
   text sent or received. It is how prompts are tuned.
 - **Evals**: fixed inputs with expected *properties* (Suggest steps: 3–5 items, under
-  the caps, the first short, none repeating an existing step, no banned words), run
+  the caps, the first short, none repeating an existing step, no banned words; What
+  next?: 1–3 picks, each one of the given ids, no repeats, reasons under the cap, no
+  banned words, in the tasks' language), run
   against the live model on request and against recorded answers in CI. Each must fail
   against a deliberately broken prompt or validator (AGENTS.md rule 1).
 
 ## 10. Privacy
 
 - Off by default; nothing is sent until the person signs in (which turns Use AI on)
-  and a job runs (for now, only when they ask for suggestions).
+  and a job runs (for now, only when they ask for suggestions or press What next?).
 - Each job sends only the input it declares (§6) plus the notes and activity (§7).
   Settings › AI says in general what AI does, not each field (*user* 2026-11-22);
   SPEC and this file list them exactly.
@@ -355,6 +360,10 @@ first jobs have earned their place.
 - **2026-11-22 (*user*)**: the evening line (AI-2) is not built for now; next is
   "What Clew noticed" (AI-N, §7): Clew's unanswered notes in last week's card with
   True / Not really, no request.
+- **2026-11-25 (*user*)**: What next? (AI-4) is next: ✨ beside the Settings gear,
+  one pick with a reason and up to 2 others, ▶ Focus for 25 minutes, the pick's title
+  scrolls to its row; nothing changes without ▶ Focus. It reads Today's open tasks,
+  the time, the free minutes on today's timeline (never an event's title) and memory.
 - Superseded 2026-11-22: the bundled `clew-agent` helper, Codex OAuth reuse, the
   monthly token cap (the plan's own limits apply), the Gateway's `AgentOutput` records
   for AI-1 (Suggest steps keeps nothing; memory notes have their own file, §7).
