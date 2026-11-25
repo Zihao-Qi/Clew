@@ -209,8 +209,8 @@ Settings › AI, edits any, adds their own and deletes any.
   scan, are not recorded); a rating (1–5); focus time ended (minutes); a step added
   from a suggestion; suggestions dismissed (how many); a step added from a suggestion
   deleted later; a note confirmed or rejected in "What Clew noticed" (its line, no
-  task); What next?'s pick taken (`nextChosen`: `"how"` focus or open, `"other"` when
-  the person chose another of its tasks) or its answer dismissed (`nextDismissed`, no
+  task); What next?'s pick taken (`nextChosen`: `"how"` focus or open, `"other": true`
+  when the task chosen was not the answer's first pick) or its answer dismissed (`nextDismissed`, no
   task). An event names its task's title, and a step event its step's name,
   only for a task whose title the person typed. For a task with a fetched or imported
   title it carries no text at all, only `"link": true` (§4: text the person did not

@@ -1282,9 +1282,9 @@ stopped daily use, not adding features.
     behind it, see "While it shows").
   - **Asking:** the panel shows "Choosing…" with a small spinner and **Cancel**; ✨
     stays as it is (one spinner). At most 30 seconds. Cancel, Esc, ✨, the menu
-    closing, leaving the list (Add, details, Settings), the rollover, losing ready, a
-    focus timer starting, and open tasks dropping below 2 close it and cancel the
-    request; nothing appears later. Each ✨ is one request; an answer is never kept
+    closing, leaving the list (Add, details, Settings), the rollover, losing ready
+    (other than this request's own ended sign-in, below), a focus timer starting, and
+    open tasks dropping below 2 close it and cancel the request; nothing appears later. Each ✨ is one request; an answer is never kept
     for a later tap. VoiceOver: "Choosing what's next", **Cancel** ("Cancel What
     next?").
   - **The answer** replaces "Choosing…":
@@ -1301,37 +1301,41 @@ stopped daily use, not adding features.
     tasks (none: no "Or:" line), then **Not now**. The pick's title and the others are
     plain text that shows it can be clicked on hover (underline, pointing hand).
     - **▶ Focus 25 min** starts a 25-minute focus on the pick, as Focus › 25 min in its
-      right-click menu, and closes the panel.
+      right-click menu, and closes the panel. A task off the list only because all its
+      open steps are on the timeline (no block of its own) has no ▶ Focus here: its
+      timer would have no row to show it; its title still goes to it.
     - **The pick's title** closes the panel and scrolls to the task: its row in the
       list, highlighted briefly (the accent at low opacity for about a second; at once
       with Reduce Motion); for a task with no row because it is on the timeline, its
-      next block today that has not ended (its own or a step's), highlighted the same
-      way.
+      next block today that has not ended (its own or a step's), or its latest block
+      today if all have ended, highlighted the same way.
     - **Another task** becomes the pick, with its own reason; the old pick takes its
       place under "Or:".
     - **Not now**, Esc and ✨ close it.
 
     Nothing is ticked, moved or reordered: only ▶ Focus changes anything, and only
     when pressed.
-  - **While it shows:** a task shown that stops being open (ticked, a goal reached,
+  - **While it shows:** a task shown (or in the answer when it arrives) that stops being open (ticked, a goal reached,
     deleted, moved to Goals & Later) leaves the panel; if it was the pick, the first
-    other becomes the pick; with none left the panel closes (fewer than 2 open tasks
+    other becomes the pick; with none left the panel closes quietly (not a failure) (fewer than 2 open tasks
     on Today does not close it while a shown task is open). The menu closing, leaving
-    the list, the rollover, losing ready or a focus timer starting close it.
+    the list, the rollover, losing ready (except the ended sign-in message below) or a
+    focus timer starting close it.
   - **VoiceOver:** ✨ "What next?"; the answer reads "Suggested: <title>. <reason>",
     then **Focus 25 minutes on <title>**, "Go to <title>" (moves VoiceOver to the row
     or block), each other "Choose <title>", and **Not now**. Esc closes it. A failure
     is read as its text.
-  - **What is sent:** up to 30 open tasks in the list's order (priorities first, then
-    tasks on the timeline by start), each with a short id for this request (t1…t30),
+  - **What is sent:** up to 30 open tasks in Today's order (priorities first, as in
+    the list, wherever a task is placed), each with a short id for this request (t1…t30),
     its title (a fetched title marked untrusted, docs/AGENT.md §4), its kind (once,
     link, habit, or goal with its progress, "1 of 3"), whether it is a priority, its
     steps as "2 of 5 done" (never their names), and, while the timeline is on, the
     start (`HH:mm`) of its next block today that has not ended (its own or a step's);
     the weekday and the time now (`HH:mm`); while the timeline is on, the whole
-    minutes free from now until the next block that has not ended or the next timed
-    event in a shown calendar today (0 if one is under way, left out if none remain;
-    all-day events and unticked calendars do not count; never an event's title); and
+    minutes free from now until the next block that has not ended or, when calendar
+    events are shown, the next timed event on the timeline today (0 if one is under
+    way, left out if none remain; all-day and declined events and unticked calendars'
+    events do not count; never an event's title); and
     the notes and recent activity (see "Memory"). If any task sent has a fetched
     title, no activity is sent (it waits) and a note change in the answer is ignored
     (docs/AGENT.md §4, §7). The instruction: choose what to do now, from these only,
@@ -1347,7 +1351,7 @@ stopped daily use, not adding features.
     Usage limit: "ChatGPT usage limit reached" with **Manage usage**
     (chatgpt.com/settings/usage, which also closes the panel) and **Not now**, until
     closed. A sign-in OpenAI has ended: "OpenAI ended Clew's sign-in. Sign in again in
-    Settings › AI." for 5 seconds, then the panel closes; Use AI turns off (✨ goes) and
+    Settings › AI." with **Not now** for 5 seconds, then the panel closes; Use AI turns off (✨ goes) and
     Settings › AI says "Sign in again". Offline or no answer in 30 seconds: "Couldn't
     choose. Try again." Esc closes any of these.
   - **Remembered** (see "Memory"): ▶ Focus or the title on a pick is activity
