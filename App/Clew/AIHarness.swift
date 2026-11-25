@@ -16,6 +16,8 @@ final class RecordedAI: HTTPTransport, @unchecked Sendable {
     private(set) var lastInput: [String: Any] = [:]
 
     func reply(_ status: Int, _ lines: [String]) { lock.withLock { replies.append((status, lines)) } }
+    /// Drops replies no request took (a cancelled one may never ask).
+    func clearReplies() { lock.withLock { replies.removeAll() } }
     static func picks(_ picks: [(String, String)], note: [String: Any]? = nil) -> [String] {
         answer(["picks": picks.map { ["id": $0.0, "reason": $0.1] }, "note": note ?? NSNull()])
     }
@@ -480,9 +482,13 @@ extension Snapshot {
         try await until { !ahead.isAsking }
         let quiet = ahead.state == .idle
         let asked429 = transport.asked
+        model.menuClosed()
+        model.menuOpened(onList: true)
+        let notAgain = transport.asked == asked429 && !ahead.isAsking
         ahead.toggle(model)
         report("a background usage limit is silent, then shows when Next is pressed",
                quiet && ahead.state == .usageLimit && transport.asked == asked429)
+        report("…and nothing more is asked ahead until then", notAgain)
         ahead.close()
         transport.reply(200, RecordedAI.picks([("t1", "A")]))
         ahead.toggle(model)   // the failure was shown once: Next asks again
@@ -514,6 +520,106 @@ extension Snapshot {
         report("nothing asked ahead while a focus timer exists", transport.asked == focusAsked && !ahead.isAsking)
         try clew.stopFocus()
         model.refresh()
+        // Only on the list, where Next is.
+        ahead.drop()
+        let offList = transport.asked
+        model.menuClosed()
+        model.menuOpened(onList: false)
+        report("nothing asked ahead when the menu opens on another page", transport.asked == offList && !ahead.isAsking)
+        // Closing the menu closes the panel at once.
+        transport.reply(200, RecordedAI.picks([("t1", "A")]))
+        ahead.toggle(model)
+        try await until { ahead.state != .asking }
+        model.menuClosed()
+        report("closing the menu closes the panel at once", ahead.state == .idle)
+        // All the kept picks closed (two tasks still open): Next asks now.
+        if let row = model.row(intro) { model.tap(row) }
+        let allClosed = transport.asked
+        transport.reply(200, RecordedAI.picks([("t1", "C")]))
+        ahead.toggle(model)
+        let waiting = ahead.state == .asking
+        try await until { transport.asked > allClosed }
+        report("every kept pick closed: Next asks now", waiting && transport.asked == allClosed + 1)
+        try await until { ahead.state != .asking }
+        ahead.close()
+        if let row = model.row(intro) { model.tap(row) }
+        // Other background failures are silent; Next then asks now.
+        ahead.drop()
+        transport.reply(200, RecordedAI.picks([("t9", "Not a task")]))
+        ahead.askAhead(model)
+        try await until { !ahead.isAsking }
+        let silent = ahead.state == .idle
+        let afterBad = transport.asked
+        transport.reply(200, RecordedAI.picks([("t1", "A")]))
+        ahead.toggle(model)
+        let askingNow = ahead.state == .asking
+        try await until { transport.asked > afterBad }
+        report("a background failure is silent; Next asks now", silent && askingNow && transport.asked == afterBad + 1)
+        try await until { ahead.state != .asking }
+        ahead.close()
+        // Forget everything: a waiting panel is never left on Choosing…, and the kept answer goes.
+        ahead.drop()
+        transport.reply(200, RecordedAI.picks([("t1", "A")]))
+        ahead.toggle(model)
+        aheadAI.forgetEverything()
+        try await until { ahead.state == .asking && ahead.isAsking }
+        try await until { !ahead.isAsking }
+        try await Task.sleep(for: .milliseconds(100))
+        report("Forget everything while asking: the panel closes, nothing kept", ahead.state == .idle && ahead.kept == nil)
+        // A request from before Forget everything is not waited for: Next asks anew.
+        ahead.drop()
+        transport.reply(200, RecordedAI.picks([("t1", "Old")]))
+        transport.reply(200, RecordedAI.picks([("t1", "New")]))
+        ahead.toggle(model)
+        aheadAI.forgetEverything()
+        ahead.close()
+        ahead.toggle(model)
+        try await until { ahead.state != .asking }
+        report("after Forget everything, Next asks anew instead of waiting for the old answer", {
+            if case .shown = ahead.state { return true } else { return false } }())
+        ahead.close()
+        transport.clearReplies()
+        // A usage limit met in the background goes with losing ready, like the kept answer.
+        ahead.drop()
+        transport.reply(429, [#"{"error":{"code":"subscription_sharing_usage_limit_exceeded"}}"#])
+        ahead.askAhead(model)
+        try await until { !ahead.isAsking }
+        let limited = ahead.usageLimited
+        aheadAI.useAI = false
+        ahead.update(model)
+        aheadAI.useAI = true
+        report("losing ready clears a background usage limit", limited && !ahead.usageLimited)
+        // A sign-in ended in the background: Next goes; nothing lingers for the next sign-in.
+        ahead.drop()
+        transport.reply(200, [#"data: {"type":"response.failed","response":{"error":{"code":"subscription_sharing_invalid_user"}}}"#])
+        ahead.askAhead(model)
+        try await until { !ahead.isAsking }
+        ahead.update(model)
+        report("a sign-in ended in the background: Next goes, nothing kept or waiting",
+               !model.canAskWhatNext && ahead.state == .idle && ahead.kept == nil && !ahead.usageLimited)
+
+        // The rollover drops the kept answer (a clock of its own).
+        final class Movable: Clock, @unchecked Sendable {
+            var date = Date()
+            func now() -> Date { date }
+        }
+        let clock = Movable()
+        let days = Clew(store: try SQLiteStore.inMemory(), clock: clock, zones: SystemTimeZone())
+        try days.closeCalendarPrompt()
+        try days.setTimelineShown(false)
+        for title in ["Write the intro", "Reply to Anna"] { _ = try days.addItem(NewItem(title: title, shape: .today)) }
+        let daysModel = AppModel(clew: days, notify: false)
+        let t3 = RecordedAI()
+        let ai3 = testAI(MemorySession.signedIn(), t3, "next-days")
+        daysModel.useAI(ai3)
+        await ai3.refreshModels()
+        t3.reply(200, RecordedAI.picks([("t1", "A")]))
+        daysModel.whatNext.askAhead(daysModel)
+        try await until { !daysModel.whatNext.isAsking }
+        let hadKept = daysModel.whatNext.kept != nil
+        clock.date = clock.date.addingTimeInterval(86_400)
+        daysModel.refresh()
+        report("the rollover drops the kept answer", hadKept && daysModel.whatNext.kept == nil)
 
         // A fetched title: sent marked untrusted, and then no record is sent.
         let other = Clew(store: try SQLiteStore.inMemory(), clock: SystemClock(), zones: SystemTimeZone())

@@ -20,7 +20,10 @@ struct SystemTimeZone: TimeZoneSource {
 /// ClewCore command, and every value shown comes from a ClewCore query.
 @MainActor @Observable
 final class AppModel {
-    private(set) var today: TodayList?
+    private(set) var today: TodayList? {
+        // The rollover drops What next?'s kept answer, on any screen (review).
+        didSet { if oldValue?.day != today?.day, oldValue != nil { whatNext.drop() } }
+    }
     /// How much of each video on today's list was watched (0–1), from Watch Later.
     private(set) var watched: [UUID: Double] = [:]
     /// Imported lists (YouTube Watch Later), shown below the tasks.
@@ -414,8 +417,8 @@ final class AppModel {
         // The one refresh of an opening, on any screen: the menu shows today as it is
         // now (SPEC 2026-11-19). Blocks settle first, so a Sunday block that ended counts.
         refresh()
-        // What next? is asked ahead, so Next shows its answer at once (SPEC "What next?").
-        whatNext.askAhead(self)
+        // What next? is asked ahead on the list, where Next is, so it shows at once.
+        if onList { whatNext.askAhead(self) }
         guard onList, let clew else { return }
         guard let due = try? clew.weekCardDue() else { return }
         let notes = ai.map { $0.isReady ? Memory.noticed($0.memory.notes) : [] } ?? []
@@ -444,6 +447,7 @@ final class AppModel {
     func menuClosed() {
         menuSessionOpen = false
         menuCloses += 1
+        whatNext.close()   // at once, so a late answer never lands in an open panel (review)
         renamingStep = nil
         closeWeekCard()
         // A refusal line never greets the next opening or the next day (SPEC 2026-11-17).

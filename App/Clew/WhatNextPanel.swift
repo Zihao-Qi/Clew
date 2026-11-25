@@ -32,10 +32,13 @@ final class WhatNextAsk {
 
     private(set) var state: State = .idle
     @ObservationIgnored private(set) var kept: Kept?
-    /// A background failure the person sees when they press Next.
-    @ObservationIgnored private var keptFailure: State?
+    /// A usage limit met in the background: shown when Next is pressed, and nothing more
+    /// is asked ahead until then (docs/AGENT.md §3: nothing else until the person asks).
+    @ObservationIgnored private(set) var usageLimited = false
     @ObservationIgnored private var request: Task<Void, Never>?
     @ObservationIgnored private(set) var requestKey: String?
+    /// The ready period the request under way was sent in.
+    @ObservationIgnored private var requestAIGeneration: Int?
     @ObservationIgnored private var requestGeneration = 0
     @ObservationIgnored private var panelGeneration = 0
     #if DEBUG
@@ -50,11 +53,16 @@ final class WhatNextAsk {
 
     /// The menu opened: ask in the background unless the kept answer still fits.
     func askAhead(_ model: AppModel, now: Date = Date()) {
-        guard model.canAskWhatNext else { return }
-        let key = model.whatNextKey()
+        guard model.canAskWhatNext, !usageLimited else { return }
+        let key = model.whatNextKey(now: now)
         if let kept = usable(model, now: now), kept.key == key { return }
-        if request != nil, requestKey == key { return }
+        if requestFits(model), requestKey == key { return }
         start(model, key: key, now: now)
+    }
+
+    /// A request under way from this ready period (not one Forget everything made stale).
+    private func requestFits(_ model: AppModel) -> Bool {
+        request != nil && requestAIGeneration == model.ai?.generation
     }
 
     /// The kept answer, if it is from today, this ready period and less than 2 hours old.
@@ -72,24 +80,31 @@ final class WhatNextAsk {
         let generation = ai.generation
         let day = model.today?.day
         requestKey = key
+        requestAIGeneration = generation
         let made = model.whatNextRequest(now: now)
         request = Task {
             let result = await ai.whatNext(made.input, job: WhatNext(ids: made.ids, titles: made.titles))
             guard mine == requestGeneration else { return }
             request = nil
             requestKey = nil
-            // This request's own ended sign-in still shows, though it ended ready (SPEC).
+            requestAIGeneration = nil
+            // This request's own ended sign-in shows in a waiting panel, though it ended
+            // ready; in the background it shows nothing (Next goes; Settings › AI says it).
             if case .failure(let failure) = result, failure.provider == .signInEnded {
-                if state == .asking { landed(model, result) } else { keptFailure = .signInEnded }
+                if state == .asking { landed(model, result) }
                 return
             }
-            guard generation == ai.generation else { return }   // ready was lost meanwhile
+            guard generation == ai.generation else {
+                // Ready was lost or everything forgotten meanwhile: never left waiting.
+                if state == .asking { close() }
+                return
+            }
             switch result {
             case .success(let picks):
                 kept = Kept(key: key, day: day, generation: generation, at: now, picks: picks)
-                keptFailure = nil
-            case .failure(let failure) where failure.provider == .usageLimit: keptFailure = .usageLimit
-            case .failure(let failure) where failure.provider == .signInEnded: keptFailure = .signInEnded
+                usageLimited = false
+            case .failure(let failure) where failure.provider == .usageLimit:
+                usageLimited = state != .asking   // a waiting panel shows it now
             case .failure: break   // silent in the background
             }
             if state == .asking { landed(model, result) }
@@ -98,7 +113,6 @@ final class WhatNextAsk {
 
     /// A request finished while the panel waits for it.
     private func landed(_ model: AppModel, _ result: Result<[WhatNext.Pick], JobFailure>) {
-        keptFailure = nil
         switch result {
         case .success(let picks):
             // Tasks ticked meanwhile leave; none left closes quietly (not a failure).
@@ -131,13 +145,12 @@ final class WhatNextAsk {
                 return
             }
         }
-        if let failure = keptFailure {
-            keptFailure = nil
-            state = failure
-            if failure == .signInEnded { closeLater() }
+        if usageLimited {
+            usageLimited = false   // shown once; the next press asks again
+            state = .usageLimit
             return
         }
-        if request == nil { start(model, key: model.whatNextKey(), now: now) }
+        if !requestFits(model) { start(model, key: model.whatNextKey(now: now), now: now) }
         state = .asking
     }
 
@@ -168,8 +181,9 @@ final class WhatNextAsk {
         request?.cancel()
         request = nil
         requestKey = nil
+        requestAIGeneration = nil
         kept = nil
-        keptFailure = nil
+        usageLimited = false
         close()
     }
 
@@ -206,7 +220,7 @@ final class WhatNextAsk {
         let ready = model.ai?.canSuggestSteps == true
         // A request that ended the sign-in is let land, so its message shows (SPEC).
         let landing = model.ai?.ended == true && request != nil
-        if !ready, !landing, state != .signInEnded, kept != nil || request != nil { drop() }
+        if !ready, !landing, state != .signInEnded, kept != nil || request != nil || usageLimited { drop() }
         switch state {
         case .idle:
             break
@@ -272,12 +286,14 @@ extension AppModel {
         return WhatNext.input(candidates, at: now, calendar: .current, freeMinutes: free)
     }
 
-    /// What the kept answer is for: the open tasks as sent, without the time.
-    func whatNextKey() -> String {
+    /// What the kept answer is for: the open tasks (which ones, and as sent), not the time.
+    func whatNextKey(now: Date = Date()) -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        let tasks = whatNextRequest().input.tasks
-        return String(decoding: (try? encoder.encode(tasks)) ?? Data(), as: UTF8.self)
+        let made = whatNextRequest(now: now)
+        let tasks = String(decoding: (try? encoder.encode(made.input.tasks)) ?? Data(), as: UTF8.self)
+        let ids = made.input.tasks.map { made.ids[$0.id]?.uuidString ?? "" }.joined(separator: ",")
+        return ids + "|" + tasks
     }
 
     static func end(_ block: TimelineBlock) -> Date {

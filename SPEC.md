@@ -1284,13 +1284,16 @@ stopped daily use, not adding features.
     work as usual and leave it open (a row may be ticked meanwhile, see "While it
     shows").
   - **Asked ahead** (*changed* 2026-11-25, *user*: pressing it felt slow): when the
-    menu opens and Next would show, Clew asks in the background, unless it already
-    has an answer for the same open tasks (the same tasks, titles, kinds, progress,
-    priorities, step counts and blocks) that is less than 2 hours old; then nothing is
-    sent. An answer that arrives after the menu closed is kept for the next opening.
+    menu opens on the list and Next would show, Clew asks in the background, unless
+    it already has an answer for the same open tasks (the same tasks, titles, kinds,
+    progress, priorities, step counts and blocks) that is less than 2 hours old; then
+    nothing is sent. An answer that arrives after the menu closed is kept for the next opening.
     The kept answer lives in memory only (never on disk) and goes with losing ready,
     the rollover and Forget everything. A background request that fails shows
-    nothing; a usage limit or an ended sign-in shows when Next is pressed.
+    nothing, except a usage limit: it shows when Next is next pressed (unless a kept
+    answer can show instead), and nothing more is asked ahead until then. A sign-in
+    OpenAI ended in the background turns Use AI off, so Next goes and Settings › AI
+    says "Sign in again".
   - **Pressing Next** shows the kept answer at once, without the tasks no longer
     open (ticked, deleted, moved); if none are left, or there is no answer, it asks
     now. While a request is under way (asked ahead or now) the panel shows
@@ -1325,7 +1328,7 @@ stopped daily use, not adding features.
       today if all have ended, highlighted the same way.
     - **Another task** becomes the pick, with its own reason; the old pick takes its
       place under "Or:".
-    - **Not now**, Esc and ✨ close it.
+    - **Not now**, Esc and Next close it.
 
     Nothing is ticked, moved or reordered: only ▶ Focus changes anything, and only
     when pressed.
