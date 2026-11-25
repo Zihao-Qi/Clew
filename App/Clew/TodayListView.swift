@@ -1516,8 +1516,8 @@ struct RatingDots: View {
     }
 }
 
-/// What next?'s close paths and the reveal (SPEC "What next?"): the list changing, the
-/// menu closing, the rollover, leaving the list.
+/// What next?'s close paths and the reveal (SPEC "What next?"): the list changing and
+/// leaving it. The menu closing and the rollover are the model's (AppModel).
 private struct WhatNextHooks: View {
     let ask: WhatNextAsk
     let model: AppModel
@@ -1527,8 +1527,6 @@ private struct WhatNextHooks: View {
     var body: some View {
         Color.clear
             .onChange(of: WhatNextWatch(model)) { ask.update(model) }
-            .onChange(of: model.menuCloses) { ask.close() }
-            .onChange(of: model.today?.day) { ask.drop() }   // the rollover drops the kept answer
             .onChange(of: screen) { if screen != .list { ask.close() } }
             .onDisappear { ask.close() }
             .onChange(of: model.revealRequests) { reveal() }

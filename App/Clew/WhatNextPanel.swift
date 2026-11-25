@@ -32,9 +32,13 @@ final class WhatNextAsk {
 
     private(set) var state: State = .idle
     @ObservationIgnored private(set) var kept: Kept?
-    /// A usage limit met in the background: shown when Next is pressed, and nothing more
-    /// is asked ahead until then (docs/AGENT.md §3: nothing else until the person asks).
-    @ObservationIgnored private(set) var usageLimited = false
+    /// A usage limit met in the background, in the ready period it was met in: shown when
+    /// Next is pressed, and nothing more is asked ahead until then (docs/AGENT.md §3).
+    @ObservationIgnored private var usageLimitedIn: Int?
+    var usageLimited: Bool { usageLimitedIn != nil }
+    private func isUsageLimited(_ model: AppModel) -> Bool {
+        usageLimitedIn != nil && usageLimitedIn == model.ai?.generation
+    }
     @ObservationIgnored private var request: Task<Void, Never>?
     @ObservationIgnored private(set) var requestKey: String?
     /// The ready period the request under way was sent in.
@@ -53,7 +57,7 @@ final class WhatNextAsk {
 
     /// The menu opened: ask in the background unless the kept answer still fits.
     func askAhead(_ model: AppModel, now: Date = Date()) {
-        guard model.canAskWhatNext, !usageLimited else { return }
+        guard model.canAskWhatNext, !isUsageLimited(model) else { return }
         let key = model.whatNextKey(now: now)
         if let kept = usable(model, now: now), kept.key == key { return }
         if requestFits(model), requestKey == key { return }
@@ -102,9 +106,9 @@ final class WhatNextAsk {
             switch result {
             case .success(let picks):
                 kept = Kept(key: key, day: day, generation: generation, at: now, picks: picks)
-                usageLimited = false
+                usageLimitedIn = nil
             case .failure(let failure) where failure.provider == .usageLimit:
-                usageLimited = state != .asking   // a waiting panel shows it now
+                usageLimitedIn = state != .asking ? generation : nil   // a waiting panel shows it now
             case .failure: break   // silent in the background
             }
             if state == .asking { landed(model, result) }
@@ -145,11 +149,12 @@ final class WhatNextAsk {
                 return
             }
         }
-        if usageLimited {
-            usageLimited = false   // shown once; the next press asks again
+        if isUsageLimited(model) {
+            usageLimitedIn = nil   // shown once; the next press asks again
             state = .usageLimit
             return
         }
+        usageLimitedIn = nil   // from an earlier ready period: forgotten
         if !requestFits(model) { start(model, key: model.whatNextKey(now: now), now: now) }
         state = .asking
     }
@@ -183,7 +188,7 @@ final class WhatNextAsk {
         requestKey = nil
         requestAIGeneration = nil
         kept = nil
-        usageLimited = false
+        usageLimitedIn = nil
         close()
     }
 

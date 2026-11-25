@@ -585,10 +585,15 @@ extension Snapshot {
         ahead.askAhead(model)
         try await until { !ahead.isAsking }
         let limited = ahead.usageLimited
-        aheadAI.useAI = false
-        ahead.update(model)
+        aheadAI.useAI = false   // nothing tells the panel (the list may not be showing)
         aheadAI.useAI = true
-        report("losing ready clears a background usage limit", limited && !ahead.usageLimited)
+        let afterLimit = transport.asked
+        transport.reply(200, RecordedAI.picks([("t1", "A")]))
+        model.menuClosed()
+        model.menuOpened(onList: true)
+        try await until { !ahead.isAsking }
+        report("a background usage limit goes with the ready period: asked ahead again after it",
+               limited && transport.asked == afterLimit + 1)
         // A sign-in ended in the background: Next goes; nothing lingers for the next sign-in.
         ahead.drop()
         transport.reply(200, [#"data: {"type":"response.failed","response":{"error":{"code":"subscription_sharing_invalid_user"}}}"#])
