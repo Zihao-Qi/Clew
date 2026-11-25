@@ -122,7 +122,7 @@ def check_switches(files: dict[str, str]) -> list[str]:
     listed = files.get(SWITCHES_FILE)
     if listed is None:
         return [f"{SWITCHES_FILE}: missing (the Debug build's list of known switches)"]
-    known = set(SWITCH.findall(listed))
+    known = set(SWITCH.findall("\n".join(code(line) for line in listed.splitlines())))
     found = []
     for path, text in files.items():
         if path == SWITCHES_FILE or path.endswith("lint.py") or path.endswith(".md"):
@@ -348,6 +348,7 @@ def self_test() -> int:
         ("switches known", check_switches({SWITCHES_FILE: '"CLEW_A", "CLEW_B"', "App/Clew/X.swift": 'env["CLEW_B"]',
                                            "ci.yml": "CLEW_A=1"}), 0),
         ("switches no list", check_switches({"App/Clew/X.swift": "x"}), 1),
+        ("switches commented out", check_switches({SWITCHES_FILE: '"CLEW_A"\n// "CLEW_B"', "App/Clew/X.swift": 'env["CLEW_B"]'}), 1),
         ("waits frame after sleep", check_waits({"App/Clew/XHarness.swift":
             "try await Task.sleep(for: .milliseconds(120))\nlet f = DebugFrames.frames[\"a\"]\n"}), 1),
         ("waits after a blank line", check_waits({"App/Clew/XHarness.swift":
