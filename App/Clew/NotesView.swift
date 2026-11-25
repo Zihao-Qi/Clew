@@ -1,3 +1,4 @@
+import ClewAI
 import ClewCore
 import ClewDomain
 import SwiftUI
@@ -17,22 +18,50 @@ struct NotesView: View {
     @State private var hoveredDone = false
     @State private var draft = ""
     @State private var listHeight: CGFloat = 0
+    /// Notes to tasks (SPEC "Notes to tasks"): one request at a time, and what shows.
+    @State private var asks = NoteTaskAsk()
+    @State private var lastAccess: AIModel.NotesAccess?
     private static let maxListHeight: CGFloat = 380
+
+    private var canSuggest: Bool { model.ai?.canSuggestFromNotes == true }
+    private var canSort: Bool { canSuggest && model.ai?.notesAccess == .all && model.openNotes.count >= 2 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Button(action: onBack) { Label("Today", systemImage: "chevron.left") }
                 .buttonStyle(.borderless)
-                .keyboardShortcut(editing == nil ? .cancelAction : nil)
+                .keyboardShortcut(editing == nil && !asks.hasAnything ? .cancelAction : nil)
                 .accessibilityLabel(Text("Back"))
-            Text("Notes").font(.headline).accessibilityAddTraits(.isHeader)
+            HStack(alignment: .firstTextBaseline) {
+                Text("Notes").font(.headline).accessibilityAddTraits(.isHeader)
+                Spacer()
+                sortControl
+            }
+            if let failure = asks.sortFailure {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    if failure == .usageLimit {
+                        Text("ChatGPT usage limit reached").foregroundStyle(.secondary)
+                        Link("Manage usage", destination: ChatGPT.usageURL)
+                            .buttonStyle(.link)
+                            .accessibilityLabel(Text("Manage ChatGPT usage"))
+                    } else {
+                        Text("Couldn't sort your notes. Try again.").foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Not now") { asks.dismissSortFailure() }.buttonStyle(.borderless)
+                }
+                .font(.callout)
+            }
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     if model.openNotes.isEmpty {
                         Text(emptyText).font(.callout).foregroundStyle(.secondary)
                     }
-                    ForEach(model.openNotes) { note in openRow(note) }
+                    ForEach(model.openNotes) { note in
+                        openRow(note)
+                        NoteTaskRow(note: note, ask: asks, model: model)
+                    }
                     if !model.doneNotes.isEmpty {
                         Button {
                             withAnimation(.easeOut(duration: 0.15)) { showsDone.toggle() }
@@ -84,21 +113,70 @@ struct NotesView: View {
                 .frame(width: 0, height: 0)
                 .disabled(hovered == nil || editing != nil)
                 .accessibilityHidden(true)
+            // Esc first cancels what is asking, then drops what shows; then it goes back.
+            Button("Escape") { _ = asks.escape() }
+                .keyboardShortcut(editing == nil && asks.hasAnything ? .cancelAction : nil)
+                .opacity(0)
+                .frame(width: 0, height: 0)
+                .accessibilityHidden(true)
         }
         .debugFrame("notesPage")
         // A note that left (done, deleted, made a task, folded away) is no longer under
         // the pointer or being edited (review).
         .onChange(of: model.openNotes.map(\.id)) { reconcile() }
+        .onChange(of: model.openNotes.map(\.text)) { asks.update(model) }
+        .onChange(of: model.ai?.canSuggestFromNotes) { asks.update(model) }
+        .onChange(of: model.notesAccessChanges) { accessChanged() }
+        .onChange(of: model.menuCloses) { asks.dropAll() }
+        .onChange(of: model.today?.day) { asks.dropAll() }
+        .onAppear { lastAccess = model.ai?.notesAccess }
         .onChange(of: model.doneNotes.map(\.id)) { reconcile() }
         .onChange(of: showsDone) { reconcile() }
-        .onDisappear { model.lastDeletedNote = nil }
+        .onDisappear {
+            model.lastDeletedNote = nil
+            asks.dropAll()
+        }
     }
 
     private func stillShown(_ id: UUID, done: Bool) -> Bool {
         done ? showsDone && model.doneNotes.contains { $0.id == id } : model.openNotes.contains { $0.id == id }
     }
 
+    /// The Notes choice changed: lowered, what it no longer allows ends at once.
+    private func accessChanged() {
+        let now = model.ai?.notesAccess
+        let rank: (AIModel.NotesAccess?) -> Int = { [.off: 0, .one: 1, .all: 2][$0 ?? .off] ?? 0 }
+        if rank(now) < rank(lastAccess) { asks.dropAll() }
+        lastAccess = now
+        asks.update(model)
+    }
+
+    /// Sort with ✨, or while it runs "Sorting…" and Cancel (SPEC "Notes to tasks").
+    @ViewBuilder
+    private var sortControl: some View {
+        if asks.asking == .sort {
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text("Sorting…").font(.caption).foregroundStyle(.secondary)
+                Button("Cancel") { asks.cancel() }
+                    .buttonStyle(.borderless)
+                    .font(.caption)
+                    .accessibilityLabel(Text("Cancel sorting"))
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(Text("Sorting your notes"))
+        } else if canSort {
+            Button { asks.sort(model: model) } label: { Label("Sort with ✨", systemImage: "sparkles").labelStyle(.titleOnly) }
+                .buttonStyle(.borderless)
+                .font(.caption)
+                .disabled(asks.isBusy)
+                .accessibilityLabel(Text("Suggest tasks for all open notes"))
+                .debugFrame("notesSort")
+        }
+    }
+
     private func reconcile() {
+        asks.update(model)
         if let h = hovered, !stillShown(h, done: hoveredDone) { hovered = nil }
         if let e = editing, !model.openNotes.contains(where: { $0.id == e }) { editing = nil }
     }
@@ -139,6 +217,16 @@ struct NotesView: View {
                 }
                 Text(verbatim: NoteTime.caption(note)).font(.caption).foregroundStyle(.secondary).lineLimit(2)
             }
+            // While the pointer is on it: ✨ suggests a task (SPEC "Notes to tasks").
+            if hovered == note.id, editing == nil, canSuggest {
+                Button { asks.ask(note, model: model) } label: { Image(systemName: "sparkles") }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
+                    .disabled(asks.isBusy)
+                    .help(Text("Suggest a task"))
+                    .accessibilityLabel(Text("Suggest a task for this note"))
+                    .debugFrame("noteSuggest:\(note.id)")
+            }
             // While the pointer is on it: one click makes it a task in Today.
             if hovered == note.id, editing == nil {
                 Button { model.makeTask(fromNote: note.id, in: .today) } label: { Text("→ Today") }
@@ -156,6 +244,9 @@ struct NotesView: View {
         .contextMenu {
             Button("Add to Today") { model.makeTask(fromNote: note.id, in: .today) }
             Button("Add to Later") { model.makeTask(fromNote: note.id, in: .later) }
+            if canSuggest {
+                Button("Suggest a Task") { asks.ask(note, model: model) }.disabled(asks.isBusy)
+            }
             Button("Edit") { startEditing(note) }
             Divider()
             Button("Delete", role: .destructive) { model.deleteNote(note.id) }
@@ -165,6 +256,9 @@ struct NotesView: View {
         .accessibilityLabel(editing == note.id ? Text("Edit note") : Text(verbatim: "\(note.text), \(NoteTime.caption(note))"))
         .accessibilityActions {
             Button("Edit") { startEditing(note) }
+            if canSuggest, !asks.isBusy {
+                Button("Suggest a task") { asks.ask(note, model: model) }
+            }
             Button("Add to Today") { model.makeTask(fromNote: note.id, in: .today) }
             Button("Add to Later") { model.makeTask(fromNote: note.id, in: .later) }
             Button("Done") { model.setNoteDone(note.id, true) }
@@ -224,6 +318,7 @@ struct NotesView: View {
 
     private func startEditing(_ note: QuickNote) {
         guard editing != note.id else { return }
+        asks.editing(note.id)   // its request stops, what shows under it goes
         // Another note being edited saves first, as a click elsewhere would (review).
         if let other = editing, let open = model.openNotes.first(where: { $0.id == other }) {
             finishEditing(open, save: true)

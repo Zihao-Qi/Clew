@@ -114,7 +114,7 @@ struct AISettings: View {
                     Text(message).font(.callout).foregroundStyle(.secondary)
                 }
             } footer: {
-                Text("Clew can suggest small steps for a task, help you choose what's next and remember how you work, using your ChatGPT plan. Nothing is sent until you sign in. Clew works fully without it.")
+                Text("Clew can suggest small steps for a task, help you choose what's next, turn notes into tasks and remember how you work, using your ChatGPT plan. Nothing is sent until you sign in. Clew works fully without it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -179,13 +179,28 @@ struct AISettings: View {
                     Toggle(isOn: Binding(get: { ai.useAI }, set: { ai.useAI = $0 })) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Use AI")
-                            Text("Clew suggests steps, helps you choose what's next and remembers how you work, using your ChatGPT plan.")
+                            Text("Clew suggests steps, helps you choose what's next, turns notes into tasks and remembers how you work, using your ChatGPT plan.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                     }
                     .disabled(ai.signingOut)
                     .accessibilityLabel(Text("Use AI"))
+                    // What Clew may read from your notes (SPEC "Notes to tasks").
+                    Picker(selection: Binding(get: { ai.notesAccess }, set: { ai.notesAccess = $0 })) {
+                        Text("Off").tag(AIModel.NotesAccess.off)
+                        Text("The note you ask about").tag(AIModel.NotesAccess.one)
+                        Text("All your open notes").tag(AIModel.NotesAccess.all)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Notes")
+                            Text("Off: Clew never reads your notes. The note you ask about: only the note you press ✨ on. All your open notes: also to sort them and to help choose what's next.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .disabled(!ai.useAI || ai.signingOut)
+                    .accessibilityLabel(Text("Notes"))
                 }
             }
             if let message = ai.message {

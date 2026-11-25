@@ -252,6 +252,7 @@ extension Snapshot {
                 losing.useAI = false
                 report("losing ready removes the section and the notes-only card", had && !lost.showsWeekCard)
                 try await whatNextChecks(report)
+                try await notesToTasksChecks(report)
             } catch {
                 report("setup: \(error)", false)
             }
@@ -696,6 +697,174 @@ extension Snapshot {
                request.input.tasks.first?.block == WhatNext.hhmm(start, .current) && request.input.freeMinutes == 60)
     }
 
+    /// Notes to tasks (SPEC "Notes to tasks"): the Notes choice, ✨ on a note, the
+    /// suggestion and its one click, Sort with ✨, what closes them, and that notes never
+    /// shape Memory.
+    @MainActor static func notesToTasksChecks(_ report: (String, Bool) -> Void) async throws {
+        let clew = Clew(store: try SQLiteStore.inMemory(), clock: SystemClock(), zones: SystemTimeZone())
+        try clew.closeCalendarPrompt()
+        try clew.setTimelineShown(false)
+        _ = try clew.addItem(NewItem(title: "Write the intro", shape: .today))
+        _ = try clew.addItem(NewItem(title: "Reply to Anna", shape: .today))
+        let bank = try clew.addNote("bank card?? call them, then order a new one").id
+        let quote = try clew.addNote("a nice quote").id
+        let model = AppModel(clew: clew, notify: false)
+        let transport = RecordedAI()
+        let ai = testAI(MemorySession.signedIn(), transport, "notes-tasks")
+        model.useAI(ai)
+        await ai.refreshModels()
+        model.refresh()
+        func until(_ done: @escaping () -> Bool) async throws {
+            for _ in 0..<100 where !done() { try await Task.sleep(for: .milliseconds(20)) }
+        }
+        struct Missing: Error {}
+        func need<T>(_ value: T?) throws -> T {
+            guard let value else { throw Missing() }
+            return value
+        }
+        func task(_ title: String, today: Bool = false, steps: [String] = [], id: String? = nil) -> [String: Any] {
+            var item: [String: Any] = ["kind": "task", "title": title, "where": today ? "today" : "later",
+                                       "reason": "Errands fit the afternoon", "steps": steps]
+            if let id { item["id"] = id }
+            return item
+        }
+        let thought: [String: Any] = ["kind": "thought", "title": NSNull(), "where": NSNull(), "reason": NSNull(), "steps": []]
+        report("the Notes choice starts at the note you ask about", ai.notesAccess == .one && ai.canSuggestFromNotes)
+        ai.notesAccess = .off
+        report("Off: no ✨ on notes", !ai.canSuggestFromNotes)
+        ai.notesAccess = .one
+
+        // ✨ on a note: that note only, no activity; the suggestion; one click.
+        let ask = NoteTaskAsk()
+        ai.record(.taskTicked, task: "Earlier", typed: true)
+        var note = try need(model.openNotes.first { $0.id == bank })
+        transport.reply(200, RecordedAI.answer(task("Call the bank about the card", today: true,
+                                                    steps: ["Call the number on the back", "Order a new card"])))
+        ask.ask(note, model: model)
+        report("✨ asks: a spinner under the note", ask.asking == .one(bank))
+        let busy = transport.asked
+        if let other = model.openNotes.first(where: { $0.id == quote }) { ask.ask(other, model: model) }
+        try await until { ask.asking == nil }
+        report("one request at a time: a second ✨ is ignored while one runs", transport.asked == busy + 1)
+        report("it sends that note's text and nothing else of the notes",
+               transport.lastInput["note"] as? String == "bank card?? call them, then order a new one"
+               && transport.lastInput["notes"] == nil && transport.lastInput["tasks"] == nil)
+        report("…with no recent activity (notes never shape Memory)",
+               ((transport.lastInput["memory"] as? [String: Any])?["activity"] as? [Any])?.isEmpty == true
+               && ai.memory.activity.events.count == 1)
+        report("the suggestion shows under its note", ask.shown[bank] == .suggestion(.task(
+            title: "Call the bank about the card", today: true, reason: "Errands fit the afternoon",
+            steps: ["Call the number on the back", "Order a new card"])))
+        ask.add(bank, today: true, model: model)
+        let made = model.today?.rows.first { $0.item.title == "Call the bank about the card" }
+        report("Add to Today makes the task with its steps in one click; the note is done",
+               made != nil && model.allSteps(of: made!.id).map(\.step.title) == ["Call the number on the back", "Order a new card"]
+               && model.doneNotes.first { $0.id == bank }?.madeTo == .today && ask.shown[bank] == nil)
+        report("…and nothing about it is recorded", ai.memory.activity.events.count == 1)
+
+        // A thought; Not now; a failure; usage limit.
+        note = try need(model.openNotes.first { $0.id == quote })
+        transport.reply(200, RecordedAI.answer(thought))
+        ask.ask(note, model: model)
+        try await until { ask.asking == nil }
+        report("a note that is not a task: the thought line", ask.shown[quote] == .suggestion(.thought))
+        ask.dismiss(quote)
+        report("OK drops it; the note stays open", ask.shown[quote] == nil && model.openNotes.contains { $0.id == quote })
+        transport.reply(200, RecordedAI.answer(task("A\nB")))
+        ask.ask(note, model: model)
+        try await until { ask.asking == nil }
+        report("nothing that passes: Couldn't suggest a task", ask.shown[quote] == .failed)
+        transport.reply(429, [#"{"error":{"code":"subscription_sharing_usage_limit_exceeded"}}"#])
+        ask.ask(note, model: model)
+        try await until { ask.asking == nil }
+        report("usage limit under the note", ask.shown[quote] == .usageLimit)
+        ask.dismiss(quote)
+
+        // Editing a note stops its request; Esc cancels first, then drops.
+        transport.reply(200, RecordedAI.answer(task("Late")))
+        ask.ask(note, model: model)
+        ask.editing(quote)
+        try await Task.sleep(for: .milliseconds(300))
+        report("editing the note stops its request: nothing appears later", ask.asking == nil && ask.shown[quote] == nil)
+        transport.clearReplies()
+        transport.reply(200, RecordedAI.answer(task("Keep it")))
+        ask.ask(note, model: model)
+        let escAsking = ask.escape() && ask.asking == nil
+        try await Task.sleep(for: .milliseconds(300))
+        transport.clearReplies()
+        transport.reply(200, RecordedAI.answer(task("Keep it")))
+        ask.ask(note, model: model)
+        try await until { ask.asking == nil }
+        let escShown = ask.escape() && ask.shown.isEmpty
+        report("Esc cancels asking first, then drops what shows, then goes back", escAsking && escShown && !ask.escape())
+
+        // Sort with ✨: all open notes, with All; each note its own; a changed note gets none.
+        let milk = try clew.addNote("milk, eggs").id
+        let third = try clew.addNote("plan the trip: book the hotel, then the train").id
+        model.refresh()
+        report("no Sort with the note you ask about", { ask.sort(model: model); return ask.asking == nil }())
+        ai.notesAccess = .all
+        // The ids follow the order Sort sends (the page's, newest first); notes made in the
+        // same second may come in either order, so the answer is built from it.
+        let order = model.openNotes.map(\.id)
+        func q(_ id: UUID) -> String { "q\((order.firstIndex(of: id) ?? 98) + 1)" }
+        transport.reply(200, RecordedAI.answer(["notes": [task("Plan the trip", steps: ["Book the hotel", "Book the train"], id: q(third)),
+                                                          task("Buy milk and eggs", today: true, id: q(milk)),
+                                                          thought.merging(["id": q(quote)]) { $1 }]]))
+        let orderTexts = model.openNotes.map(\.text)
+        ask.sort(model: model)
+        report("Sort asks: Sorting…", ask.asking == .sort)
+        try clew.editNote(id: milk, text: "milk, eggs, bread")   // changed while sorting
+        model.refresh()
+        try await until { ask.asking == nil }
+        let sent = transport.lastInput["notes"] as? [[String: Any]]
+        report("Sort sends every open note with short ids, in the page's order (newest first)",
+               sent?.map { $0["id"] as? String } == ["q1", "q2", "q3"] && sent?.map { $0["text"] as? String } == orderTexts)
+        report("each note gets its own; a note changed meanwhile gets none",
+               ask.shown[third] == .suggestion(.task(title: "Plan the trip", today: false, reason: "Errands fit the afternoon",
+                                                       steps: ["Book the hotel", "Book the train"]))
+               && ask.shown[milk] == nil && ask.shown[quote] == .suggestion(.thought))
+        model.setNoteDone(third, true)
+        ask.update(model)
+        report("a note marked done loses its suggestion", ask.shown[third] == nil)
+
+        // What next? reads notes only with All; lowering drops its kept answer.
+        let withNotes = model.whatNextRequest()
+        report("What next? carries the open notes with All", withNotes.input.notes.count == model.openNotes.count)
+        transport.reply(200, RecordedAI.picks([("t1", "A")]))
+        model.whatNext.askAhead(model)
+        try await until { !model.whatNext.isAsking }
+        let hadKept = model.whatNext.kept != nil
+        ai.notesAccess = .one
+        report("lowered from All: What next?'s kept answer goes, and it sends no notes",
+               hadKept && model.whatNext.kept == nil && model.whatNextRequest().input.notes.isEmpty)
+        // Lowering stops Sort; Off drops everything.
+        ai.notesAccess = .all
+        transport.reply(200, RecordedAI.answer(["notes": [task("X", id: "q1")]]))
+        ask.sort(model: model)
+        ai.notesAccess = .one
+        ask.update(model)
+        report("lowered from All while sorting: Sort stops", ask.asking == nil)
+        transport.clearReplies()
+        transport.reply(200, RecordedAI.answer(thought))
+        if let n = model.openNotes.first { ask.ask(n, model: model) }
+        try await until { ask.asking == nil }
+        ai.notesAccess = .off
+        ask.update(model)
+        report("Off: every suggestion goes", ask.shown.isEmpty && ask.asking == nil)
+        ai.notesAccess = .one
+        // An ended sign-in: everything goes, what showed under other notes too.
+        transport.reply(200, RecordedAI.answer(thought))
+        let shownBefore = try need(model.openNotes.first)
+        ask.ask(shownBefore, model: model)
+        try await until { ask.asking == nil }
+        let hadShown = !ask.shown.isEmpty
+        transport.reply(200, [#"data: {"type":"response.failed","response":{"error":{"code":"subscription_sharing_invalid_user"}}}"#])
+        if let n = model.openNotes.last { ask.ask(n, model: model) }
+        try await until { ask.asking == nil }
+        report("a sign-in OpenAI ended: ✨ and every suggestion go", hadShown && ask.shown.isEmpty && !ai.canSuggestFromNotes)
+    }
+
     /// `CLEW_AI_RENDER=1`: Settings › AI signed out, signed in (with the one-time note),
     /// without the plan permission, and after OpenAI ended the sign-in; Add Step…'s line
     /// with suggestions, thinking, a failure and the usage limit; the details with
@@ -802,6 +971,36 @@ extension Snapshot {
                     }
                 }
                 WhatNextAsk.preset = nil
+                model.whatNext.close()
+                // Notes to tasks (SPEC "Notes to tasks"): the Notes page with a suggestion, a
+                // thought and a failure; Sort while it runs and its usage limit.
+                let bankNote = try clew.addNote("bank card?? call them, then order a new one").id
+                let quoteNote = try clew.addNote("“Small steps, every day.”").id
+                let milkNote = try clew.addNote("milk").id
+                ai.notesAccess = .all
+                model.refresh()
+                let noteStates: [(String, @MainActor (NoteTaskAsk) -> Void)] = [
+                    ("shown", { $0.showForRender([
+                        bankNote: .suggestion(.task(title: "Call the bank about the card", today: true,
+                                                    reason: "Quick errands fit the morning",
+                                                    steps: ["Find the card's last 4 digits", "Call the number on the back",
+                                                            "Order a new card"])),
+                        quoteNote: .suggestion(.thought), milkNote: .failed]) }),
+                    ("sorting", { $0.showForRender([:], asking: .sort) }),
+                    ("limit", { $0.showForRender([:], sortFailure: .usageLimit) }),
+                ]
+                for (name, preset) in noteStates {
+                    NoteTaskAsk.preset = preset
+                    for (look, appearance) in looks {
+                        render(RootView(model: model, screen: .notes), appearance: appearance,
+                               to: dir.appendingPathComponent("ai-notes-\(name)-\(look).png"))
+                    }
+                }
+                NoteTaskAsk.preset = nil
+                for (look, appearance) in looks {
+                    render(AISettings(ai: ai).formStyleGrouped().frame(width: 550), appearance: appearance,
+                           to: dir.appendingPathComponent("ai-settings-notes-choice-\(look).png"))
+                }
                 exit(0)
             } catch {
                 print("render failed:", error)

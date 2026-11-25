@@ -41,6 +41,24 @@ final class AIModel {
         get { access(keyPath: \.notEligible); return prefs.bool(forKey: Key.notEligible) }
         set { withMutation(keyPath: \.notEligible) { prefs.set(newValue, forKey: Key.notEligible) }; readyChanged() }
     }
+    /// What Clew may read from the person's notes (SPEC "Notes to tasks", *user*): a privacy
+    /// choice, not a job switch. The note you ask about by default.
+    enum NotesAccess: String, CaseIterable {
+        case off, one, all
+    }
+    var notesAccess: NotesAccess {
+        get { access(keyPath: \.notesAccess); return prefs.string(forKey: Key.notesAccess).flatMap(NotesAccess.init) ?? .one }
+        set {
+            let old = notesAccess
+            withMutation(keyPath: \.notesAccess) { prefs.set(newValue.rawValue, forKey: Key.notesAccess) }
+            if old != newValue { onNotesAccessChange?(old, newValue) }
+        }
+    }
+    /// Told when the Notes choice changes, so what it no longer allows ends at once.
+    @ObservationIgnored var onNotesAccessChange: ((NotesAccess, NotesAccess) -> Void)?
+    /// ✨ on a note: ready with a model and notes not off.
+    var canSuggestFromNotes: Bool { canSuggestSteps && notesAccess != .off }
+
     /// OpenAI's rule: the first time, "You're using your ChatGPT plan" until Got it.
     var planNoteSeen: Bool {
         get { access(keyPath: \.planNoteSeen); return prefs.bool(forKey: Key.gotIt) }
@@ -57,7 +75,7 @@ final class AIModel {
         static let clientId = "ai.clientId", hostId = "ai.hostId", model = "ai.model"
         /// Kept from AI-1's Suggest steps switch, so the setting carries over.
         static let useAI = "ai.suggestSteps", gotIt = "ai.planNoteSeen", notEligible = "ai.notEligible"
-        static let noSchema = "ai.noSchemaModels", ended = "ai.ended"
+        static let noSchema = "ai.noSchemaModels", ended = "ai.ended", notesAccess = "ai.notesAccess"
     }
 
     @ObservationIgnored let prefs: UserDefaults
@@ -251,6 +269,15 @@ final class AIModel {
         await run(SuggestSteps(), input: input)
     }
 
+    /// Notes to tasks (SPEC "Notes to tasks"): one note's suggestion, or each open note's.
+    func noteToTask(_ input: NoteToTask.Input) async -> Result<NoteSuggestion, JobFailure> {
+        await run(NoteToTask(), input: input, timeout: .seconds(30))
+    }
+
+    func sortNotes(_ input: SortNotes.Input, job: SortNotes) async -> Result<[UUID: NoteSuggestion], JobFailure> {
+        await run(job, input: input, timeout: .seconds(60))
+    }
+
     /// What next? (SPEC "What next?"): picks from Today's open tasks. Never kept.
     func whatNext(_ input: WhatNext.Input, job: WhatNext) async -> Result<[WhatNext.Pick], JobFailure> {
         await run(job, input: input)
@@ -258,13 +285,13 @@ final class AIModel {
 
     /// One job with the notes and recent activity; a failure that ends the sign-in or
     /// the plan's permission is handled here.
-    private func run<J: Job>(_ job: J, input: J.Input) async -> Result<J.Output, JobFailure> {
+    private func run<J: Job>(_ job: J, input: J.Input, timeout: Duration = .seconds(30)) async -> Result<J.Output, JobFailure> {
         guard canSuggestSteps, let model else { return .failure(JobFailure(provider: .notSignedIn)) }
         let log = self.log
         let mine = jobGeneration
         let context = MemoryContext(notes: memory.notes, events: memory.activity.newestFirst)
         let run = await Agent.run(job, input: input, memory: context, model: model,
-                                  provider: provider) { record in
+                                  provider: provider, timeout: timeout) { record in
             #if DEBUG
             log.debug("job=\(record.job, privacy: .public) model=\(record.model, privacy: .public) bytes=\(record.inputBytes) seconds=\(record.seconds, format: .fixed(precision: 1)) outcome=\(record.outcome, privacy: .public) note=\(record.note ?? "-", privacy: .public) request=\(record.requestId ?? "-", privacy: .public)")
             #endif
