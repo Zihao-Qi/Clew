@@ -2,7 +2,7 @@ import ClewDomain
 import Foundation
 
 /// Notes (SPEC "Notes", 2026-11-22): a thought written down mid-task, kept as the
-/// person's own data. Never sent to AI.
+/// person's own data. Sent to AI only as Settings › AI › Notes allows (SPEC "Notes to tasks").
 extension Clew {
     /// Open notes newest first, and done ones most recently done first.
     public func notes() throws -> (open: [QuickNote], done: [QuickNote]) {

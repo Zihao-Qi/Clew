@@ -28,6 +28,12 @@ final class NoteTaskAsk {
     @ObservationIgnored private var sent: [UUID: String] = [:]
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var generation = 0
+    /// Each failure's own token: its 5 seconds are its own, whatever else is asked (review).
+    @ObservationIgnored private var failures = 0
+    @ObservationIgnored private var failedWith: [UUID: Int] = [:]
+    @ObservationIgnored private var sortFailedWith = 0
+    /// The note being edited: Sort's answer does not land under it (review).
+    @ObservationIgnored private(set) var editingNote: UUID?
     #if DEBUG
     /// The debug render's state for every new page.
     static var preset: (@MainActor (NoteTaskAsk) -> Void)?
@@ -49,7 +55,8 @@ final class NoteTaskAsk {
         guard let ai = model.ai, ai.canSuggestFromNotes, asking == nil, note.isOpen else { return }
         let input = NoteToTask.Input(note: note.text, at: Date(), calendar: .current)
         shown[note.id] = nil
-        let mine = begin(.one(note.id), sent: [note.id: note.text])
+        sent[note.id] = note.text   // the others' stay, for what shows under them (review)
+        let mine = begin(.one(note.id), sent: sent)
         task = Task {
             let result = await ai.noteToTask(input)
             guard mine == generation, !Task.isCancelled else { return }
@@ -63,7 +70,10 @@ final class NoteTaskAsk {
                 dropAll()   // ready is gone: ✨ and everything go
             case .failure:
                 shown[note.id] = .failed
-                clearLater { if $0.shown[note.id] == .failed { $0.shown[note.id] = nil } }
+                failures += 1
+                failedWith[note.id] = failures
+                let token = failures
+                clearLater { if $0.failedWith[note.id] == token, $0.shown[note.id] == .failed { $0.shown[note.id] = nil } }
             }
         }
     }
@@ -84,7 +94,7 @@ final class NoteTaskAsk {
             switch result {
             case .success(let suggestions):
                 var count = 0
-                for (id, suggestion) in suggestions where stillAsSent(id, model) {
+                for (id, suggestion) in suggestions where stillAsSent(id, model) && id != editingNote {
                     shown[id] = .suggestion(suggestion)
                     count += 1
                 }
@@ -99,7 +109,10 @@ final class NoteTaskAsk {
                 dropAll()
             case .failure:
                 sortFailure = .failed
-                clearLater { if $0.sortFailure == .failed { $0.sortFailure = nil } }
+                failures += 1
+                sortFailedWith = failures
+                let token = failures
+                clearLater { if $0.sortFailedWith == token, $0.sortFailure == .failed { $0.sortFailure = nil } }
             }
         }
     }
@@ -118,10 +131,9 @@ final class NoteTaskAsk {
     }
 
     private func clearLater(_ clear: @escaping @MainActor (NoteTaskAsk) -> Void) {
-        let mine = generation
         Task {
             try? await Task.sleep(for: .seconds(5))
-            if mine == generation { clear(self) }
+            clear(self)
         }
     }
 
@@ -163,9 +175,12 @@ final class NoteTaskAsk {
 
     /// A note being edited: its request stops and what shows under it goes.
     func editing(_ id: UUID) {
+        editingNote = id
         if asking == .one(id) { cancel() }
         shown[id] = nil
     }
+
+    func doneEditing() { editingNote = nil }
 
     /// Keeps the page in step: a note done, deleted, made a task or changed loses what
     /// shows under it (and its request); ✨ not allowed any more drops everything.
@@ -246,8 +261,14 @@ struct NoteTaskRow: View {
             .padding(.top, 2)
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(today ? Text("Suggested task for Today: \(title). \(steps.joined(separator: ", ")). \(reason)")
-                                  : Text("Suggested task for Later: \(title). \(steps.joined(separator: ", ")). \(reason)"))
+        .accessibilityLabel(spoken(title: title, today: today, reason: reason, steps: steps))
+    }
+
+    /// "Suggested task for Today: <title>. <steps, if any>. <reason>" (no empty part).
+    private func spoken(title: String, today: Bool, reason: String, steps: [String]) -> Text {
+        let head = today ? Text("Suggested task for Today: \(title).") : Text("Suggested task for Later: \(title).")
+        let middle = steps.isEmpty ? Text(verbatim: "") : Text(verbatim: " " + steps.joined(separator: ", ") + ".")
+        return head + middle + Text(verbatim: " " + reason)
     }
 
     @ViewBuilder
@@ -261,16 +282,31 @@ struct NoteTaskRow: View {
         }
     }
 
+    /// The text (it may wrap), then the link if any and Not now: never cut (review).
     private func failure(_ text: Text, usage: Bool = false) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            text.foregroundStyle(.secondary)
-            if usage {
-                Link("Manage usage", destination: ChatGPT.usageURL)
-                    .buttonStyle(.link)
-                    .accessibilityLabel(Text("Manage ChatGPT usage"))
+        NoteTaskFailure(text: text, usage: usage) { ask.dismiss(note.id) }
+    }
+}
+
+/// A failure under a note or at the top of the page.
+struct NoteTaskFailure: View {
+    let text: Text
+    let usage: Bool
+    let dismiss: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            text.foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 10) {
+                if usage {
+                    Link("Manage usage", destination: ChatGPT.usageURL)
+                        .buttonStyle(.link)
+                        .accessibilityLabel(Text("Manage ChatGPT usage"))
+                }
+                Spacer()
+                Button("Not now", action: dismiss).buttonStyle(.borderless)
             }
-            Spacer()
-            Button("Not now") { ask.dismiss(note.id) }
         }
+        .debugFrame("noteTaskFailure")
     }
 }

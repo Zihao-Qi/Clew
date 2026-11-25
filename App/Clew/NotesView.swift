@@ -38,19 +38,10 @@ struct NotesView: View {
                 sortControl
             }
             if let failure = asks.sortFailure {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    if failure == .usageLimit {
-                        Text("ChatGPT usage limit reached").foregroundStyle(.secondary)
-                        Link("Manage usage", destination: ChatGPT.usageURL)
-                            .buttonStyle(.link)
-                            .accessibilityLabel(Text("Manage ChatGPT usage"))
-                    } else {
-                        Text("Couldn't sort your notes. Try again.").foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Button("Not now") { asks.dismissSortFailure() }.buttonStyle(.borderless)
-                }
-                .font(.callout)
+                NoteTaskFailure(text: failure == .usageLimit ? Text("ChatGPT usage limit reached")
+                                                             : Text("Couldn't sort your notes. Try again."),
+                                usage: failure == .usageLimit) { asks.dismissSortFailure() }
+                    .font(.callout)
             }
 
             ScrollView {
@@ -244,7 +235,7 @@ struct NotesView: View {
         .contextMenu {
             Button("Add to Today") { model.makeTask(fromNote: note.id, in: .today) }
             Button("Add to Later") { model.makeTask(fromNote: note.id, in: .later) }
-            if canSuggest {
+            if canSuggest, editing != note.id {
                 Button("Suggest a Task") { asks.ask(note, model: model) }.disabled(asks.isBusy)
             }
             Button("Edit") { startEditing(note) }
@@ -256,7 +247,7 @@ struct NotesView: View {
         .accessibilityLabel(editing == note.id ? Text("Edit note") : Text(verbatim: "\(note.text), \(NoteTime.caption(note))"))
         .accessibilityActions {
             Button("Edit") { startEditing(note) }
-            if canSuggest, !asks.isBusy {
+            if canSuggest, !asks.isBusy, editing != note.id {
                 Button("Suggest a task") { asks.ask(note, model: model) }
             }
             Button("Add to Today") { model.makeTask(fromNote: note.id, in: .today) }
@@ -332,6 +323,7 @@ struct NotesView: View {
     private func finishEditing(_ note: QuickNote, save: Bool) {
         guard editing == note.id else { return }
         editing = nil
+        asks.doneEditing()
         if save, draft != note.text { model.editNote(note.id, draft) }
     }
 }

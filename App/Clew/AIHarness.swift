@@ -786,6 +786,7 @@ extension Snapshot {
         ask.editing(quote)
         try await Task.sleep(for: .milliseconds(300))
         report("editing the note stops its request: nothing appears later", ask.asking == nil && ask.shown[quote] == nil)
+        ask.doneEditing()
         transport.clearReplies()
         transport.reply(200, RecordedAI.answer(task("Keep it")))
         ask.ask(note, model: model)
@@ -827,6 +828,68 @@ extension Snapshot {
         model.setNoteDone(third, true)
         ask.update(model)
         report("a note marked done loses its suggestion", ask.shown[third] == nil)
+
+        // A suggestion's note edited after another note was asked: it still goes (review).
+        ask.dropAll()
+        transport.clearReplies()
+        let a = try need(model.openNotes.first { $0.id == quote })
+        transport.reply(200, RecordedAI.answer(thought))
+        ask.ask(a, model: model)
+        try await until { ask.asking == nil }
+        let b = try need(model.openNotes.first { $0.id != quote })
+        transport.reply(200, RecordedAI.answer(thought))
+        ask.ask(b, model: model)
+        try await until { ask.asking == nil }
+        try clew.editNote(id: quote, text: "“Small steps, every day.” (Anon)")
+        model.refresh()
+        ask.update(model)
+        report("a note edited elsewhere loses its suggestion, though another note was asked after it",
+               ask.shown[quote] == nil && ask.shown[b.id] != nil)
+        // A failure's 5 seconds are its own, whatever is asked after it (review).
+        ask.dropAll()
+        let c = try need(model.openNotes.first { $0.id == quote })
+        transport.reply(200, RecordedAI.answer(task("A\nB")))
+        ask.ask(c, model: model)
+        try await until { ask.asking == nil }
+        let failedFirst = ask.shown[quote] == .failed
+        transport.reply(200, RecordedAI.answer(thought))
+        ask.ask(b, model: model)
+        try await until { ask.asking == nil }
+        for _ in 0..<70 where ask.shown[quote] == .failed { try await Task.sleep(for: .milliseconds(100)) }
+        report("a failure under a note goes after 5 seconds, though another note was asked meanwhile",
+               failedFirst && ask.shown[quote] == nil)
+        // Sort's own failures, at the top.
+        ask.dropAll()
+        transport.reply(200, RecordedAI.answer(["notes": [task("A\nB", id: "q1")]]))
+        ask.sort(model: model)
+        try await until { ask.asking == nil }
+        let sortFailed = ask.sortFailure == .failed
+        transport.reply(429, [#"{"error":{"code":"subscription_sharing_usage_limit_exceeded"}}"#])
+        ask.sort(model: model)
+        try await until { ask.asking == nil }
+        report("Sort's failure and usage limit show at the top", sortFailed && ask.sortFailure == .usageLimit)
+        ask.dismissSortFailure()
+        // A note being edited gets nothing from Sort.
+        let order2 = model.openNotes.map(\.id)
+        transport.reply(200, RecordedAI.answer(["notes": order2.enumerated().map { thought.merging(["id": "q\($0.offset + 1)"]) { $1 } }]))
+        ask.sort(model: model)
+        ask.editing(order2[0])
+        try await until { ask.asking == nil }
+        ask.doneEditing()
+        report("Sort's answer does not land under a note being edited",
+               ask.shown[order2[0]] == nil && ask.shown[order2[1]] == .suggestion(.thought))
+        // What next?'s kept answer is for these notes too, with All.
+        let keyBefore = model.whatNextKey()
+        try clew.editNote(id: quote, text: "“Small steps.”")
+        model.refresh()
+        let keyAfter = model.whatNextKey()
+        ai.notesAccess = .one
+        let keyOne = model.whatNextKey()
+        try clew.editNote(id: quote, text: "“Small steps, again.”")
+        model.refresh()
+        report("with All, a changed note changes What next?'s key; with one note it does not",
+               keyBefore != keyAfter && keyOne == model.whatNextKey())
+        ai.notesAccess = .all
 
         // What next? reads notes only with All; lowering drops its kept answer.
         let withNotes = model.whatNextRequest()
