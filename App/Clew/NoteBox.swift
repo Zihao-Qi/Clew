@@ -83,6 +83,7 @@ final class NoteBox: NSObject, NSWindowDelegate {
             return
         }
         state.context = model?.noteContext()
+        watchQuit()
         pauseFocusForNote()
         state.text = Self.defaults.string(forKey: Self.draftKey) ?? ""
         state.focusRequest += 1
@@ -135,6 +136,21 @@ final class NoteBox: NSObject, NSWindowDelegate {
 
     /// The focus this box paused: started again when the box closes (saved or not).
     private var pausedFocus: (item: UUID, started: Date)?
+    private var quitObserver: NSObjectProtocol?
+
+    /// Quitting with the box open keeps the draft and starts the focus again (review:
+    /// it stayed paused; the panel's resign-key comes too late then).
+    private func watchQuit() {
+        guard quitObserver == nil else { return }
+        quitObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.panel?.isVisible == true else { return }
+                self.keepDraft()
+                self.resumeFocusAfterNote()
+            }
+        }
+    }
 
     /// A running focus (not a break, not one already paused, its time not up) stops.
     private func pauseFocusForNote() {

@@ -1291,11 +1291,6 @@ stopped daily use, not adding features.
     Return): while the band sweeps, the box stays exactly as it was (what was typed in
     the same size, place and scroll, and the "During" line under it); "Saved" is that
     size, not bold; "Back to" that size in grey.
-  - **The focus stops while a note is written** (2026-11-24, *user*): opening the box
-    pauses a running focus (not a break, not one already paused, not one whose time is
-    up), and closing it starts that focus again, saved or not (Return, Esc, or a click
-    elsewhere). A focus that was already paused stays paused; a focus stopped or
-    changed meanwhile is left as it is. The banner still goes by itself.
     It stays about 1.5 seconds after the sweep (*changed* 2026-11-23, *user*: 3 seconds
     was too long), takes no keyboard, then fades; a click on it closes it at once. It
     is exactly the box's size and place.
@@ -1308,6 +1303,11 @@ stopped daily use, not adding features.
     names "Prepare the talk - Speech notes"; of several, the one that started last,
     then a task's own block before a step's, then the list's order and the steps'
     order; else none, and the banner reads "Saved."
+  - **The focus stops while a note is written** (2026-11-24, *user*): opening the box
+    pauses a running focus (not a break, not one already paused, not one whose time is
+    up), and closing it starts that focus again, saved or not (Return, Esc, a click
+    elsewhere, or quitting Clew). A focus that was already paused stays paused; a focus stopped or
+    changed meanwhile is left as it is. The banner still goes by itself.
   - **What a note keeps:** its text; when it was written; and the task it was written
     during (the same choice as above): which task and its title then. That title never
     changes afterwards, even if the task is renamed or deleted. Notes are the person's
