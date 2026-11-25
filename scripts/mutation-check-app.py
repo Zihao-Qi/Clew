@@ -238,7 +238,11 @@ if "--patterns" in sys.argv:
 # A SIGTERM restores the sources and rebuilds too, as Ctrl-C does.
 signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
 
-only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else ""
+_i = sys.argv.index("--only") if "--only" in sys.argv else -1
+only = sys.argv[_i + 1] if 0 <= _i < len(sys.argv) - 1 and not sys.argv[_i + 1].startswith("--") else ""
+if _i >= 0 and not only:
+    sys.exit("FAIL: --only needs a name")
+M = [m for m in M if not only or only in m[0]]
 # --changed: only the entries whose pattern overlaps a line this branch changed.
 if "--changed" in sys.argv:
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -246,10 +250,12 @@ if "--changed" in sys.argv:
     lines = changed_lines(repo)
     M = [m for m in M if touches(repo, m[1], m[2], lines)]
     print(f"--changed: {len(M)} entries touch this branch's changes", flush=True)
-    if "--list" in sys.argv:   # what would run, without building or testing anything
-        for m in M:
-            print(" ", m[0])
-        sys.exit(0)
+if "--list" in sys.argv:   # what would run, without building or testing anything
+    for m in M:
+        print(" ", m[0])
+    sys.exit(0)
+if not M:
+    sys.exit(0)   # nothing to break: no builds
 survived = 0
 # What fails before anything is broken (a check this Mac cannot pass today) is not a
 # kill: only a failure the mutation adds counts.

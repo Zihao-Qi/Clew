@@ -10,6 +10,7 @@ source file is always restored, even on error.
   python3 -I scripts/mutation-check.py . [first] [last]      # default: all
   python3 -I scripts/mutation-check.py . --patterns           # only check the patterns
   python3 -I scripts/mutation-check.py . --changed            # only what this branch changed (--list: just name them)
+  python3 -I scripts/mutation-check.py . --only AG7            # names containing "AG7"
 """
 import json, pathlib, re, subprocess, sys
 
@@ -1027,20 +1028,32 @@ if len(sys.argv) > 2 and sys.argv[2] == "--patterns":
         print(f"{name:28} PATTERN NOT UNIQUE ({count})")
     print(f"{len(M) - len(stale)} of {len(M)} patterns match once")
     sys.exit(1 if stale else 0)
-# --changed: only the entries whose pattern overlaps a line this branch changed.
-if len(sys.argv) > 2 and sys.argv[2] == "--changed":
+# Choosing entries: --only NAME (a part of the name), --changed (only what this branch
+# changed), --list (name them and stop), then an optional first and last index.
+args = sys.argv[2:]
+if "--only" in args:
+    i = args.index("--only")
+    if i + 1 >= len(args):
+        sys.exit("FAIL: --only needs a name")
+    only = args.pop(i + 1)
+    args.pop(i)
+    M = [m for m in M if only in m[0]]
+if "--changed" in args:
+    args.remove("--changed")
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
     from mutation_changed import changed_lines, touches
     lines = changed_lines(repo)
     M = [m for m in M if touches(repo, m[1], m[2], lines)]
     print(f"--changed: {len(M)} entries touch this branch's changes", flush=True)
-    if "--list" in sys.argv:   # what would run, without building or testing anything
-        for m in M:
-            print(" ", m[0])
-        sys.exit(0)
-    sys.argv = sys.argv[:2]
-lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0
-hi = int(sys.argv[3]) if len(sys.argv) > 3 else len(M)
+if "--list" in args:   # what would run, without testing anything
+    args.remove("--list")
+    for m in M:
+        print(" ", m[0])
+    sys.exit(0)
+if any(not a.isdigit() for a in args):
+    sys.exit(f"FAIL: unknown arguments {args}")
+lo = int(args[0]) if args else 0
+hi = int(args[1]) if len(args) > 1 else len(M)
 results = []
 for name, path, old, new, flt in M[lo:hi]:
     f = repo / path
