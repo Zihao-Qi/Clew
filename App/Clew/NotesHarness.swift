@@ -364,7 +364,7 @@ extension Snapshot {
                 report("one line: the text stays the same size and place too",
                        short != nil && short == shortSwept)
                 try await Task.sleep(for: .milliseconds(800))
-                let slim = DebugFrames.frames["noteBanner"], slimTitle = DebugFrames.frames["savedTitle"]
+                let slim = DebugFrames.frames["noteBanner"], slimTitle = DebugFrames.frames["savedTitle"]   // waited: 800 ms past the sweep's settle (470 + 250 ms)
                 report("… and Saved fits the slim banner", slim != nil && slimTitle.map { slim!.contains($0) } == true)
                 report("the banner takes exactly the box's frame", box.bannerFrame == boxFrame)
                 box.closeBanner()

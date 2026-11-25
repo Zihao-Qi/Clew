@@ -9,6 +9,7 @@ struct ClewApp: App {
 
     init() {
         #if DEBUG
+        DebugSwitches.refuseUnknown()
         if ProcessInfo.processInfo.environment["CLEW_SHORTCUT_SMOKE"] != nil {
             _model = State(initialValue: ShortcutSmokeTest.model())
             return

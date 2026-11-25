@@ -177,6 +177,14 @@ address or any page's content.
 
 Zero-tick days keep the hand-written lines (shipped), never a model's.
 
+**A new job's SPEC entry** says, each under its own heading: where and when it shows;
+every way it closes or is cancelled; exactly what is sent; what is checked; every
+failure's text (offline, timeout, usage limit, ended sign-in); VoiceOver; what is
+remembered (§7); what is kept. And it updates the shared lists in the same change: this
+table, §7's events, §10, SPEC's local data (§8) and Memory events, and any promise it
+changes (e.g. the calendar's "never sent"). (2026-11-25: What next?'s first draft missed
+most of these and three of the lists.)
+
 ## 7. Memory (AI-M, *user* 2026-11-22)
 
 Clew keeps **notes** about the person, so every job's answer fits them better and the

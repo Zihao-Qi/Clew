@@ -40,6 +40,10 @@ anything AI-related, [docs/AGENT.md](docs/AGENT.md) before changing code.
 - Before a commit, compare `git diff --stat` with the files you meant to change (a
   multi-file edit can fail halfway and leave a partial change).
 - Before a PR: `python3 -I scripts/lint.py .` (also in CI) and, for app changes,
-  `scripts/run-app-checks.sh` after a Debug build (also in CI) and
-  `python3 -I scripts/mutation-check-app.py .` (local only: it rebuilds per mutation).
+  `scripts/run-app-checks.sh` after a Debug build (also in CI) and the **full**
+  `python3 -I scripts/mutation-check-app.py .` (local only: it rebuilds per mutation;
+  `--only` is for while working, not instead of the full run).
+- Run the app's checks only through `scripts/run-app-checks.sh` (`--only CLEW_NOTES_TEST`
+  for one), never the Debug binary by hand: it refuses an app older than the sources,
+  which is what a failed build leaves behind.
 - Keep agent replies short (≤ 20 lines) unless asked; long output scrolls away.
