@@ -125,7 +125,12 @@ struct NotesView: View {
             if let now { asks.editing(now) } else { asks.doneEditing() }
         }
         .onChange(of: model.today?.day) { asks.dropAll() }
-        .onAppear { lastAccess = model.ai?.notesAccess }
+        .onAppear {
+            lastAccess = model.ai?.notesAccess
+            #if DEBUG
+            DebugFrames.hoverNote = { hovered = $0; hoveredDone = false }
+            #endif
+        }
         .onChange(of: model.doneNotes.map(\.id)) { reconcile() }
         .onChange(of: showsDone) { reconcile() }
         .onDisappear {
@@ -213,24 +218,24 @@ struct NotesView: View {
                 }
                 Text(verbatim: NoteTime.caption(note)).font(.caption).foregroundStyle(.secondary).lineLimit(2)
             }
-            // While the pointer is on it: ✨ suggests a task (SPEC "Notes to tasks").
-            if hovered == note.id, editing == nil, canSuggest {
+            // While the pointer is on it: ✨ suggests a task (SPEC "Notes to tasks"), and one
+            // click makes it a task in Today. Always laid out, shown only then: hovering never
+            // narrows the text or moves the rows (user, 2026-11-26).
+            let showsActions = hovered == note.id && editing == nil
+            if canSuggest {
                 Button { asks.ask(note, model: model) } label: { Image(systemName: "sparkles") }
                     .buttonStyle(.borderless)
                     .foregroundStyle(.secondary)
                     .disabled(asks.isBusy)
                     .help(Text("Suggest a task"))
                     .accessibilityLabel(Text("Suggest a task for this note"))
-                    .debugFrame("noteSuggest:\(note.id)")
+                    .hoverOnly(showsActions, key: "noteSuggest:\(note.id)")
             }
-            // While the pointer is on it: one click makes it a task in Today.
-            if hovered == note.id, editing == nil {
-                Button { model.makeTask(fromNote: note.id, in: .today) } label: { Text("→ Today") }
-                    .buttonStyle(.borderless)
-                    .font(.caption)
-                    .accessibilityLabel(Text("Add to Today"))
-                    .debugFrame("noteToday:\(note.id)")
-            }
+            Button { model.makeTask(fromNote: note.id, in: .today) } label: { Text("→ Today") }
+                .buttonStyle(.borderless)
+                .font(.caption)
+                .accessibilityLabel(Text("Add to Today"))
+                .hoverOnly(showsActions, key: "noteToday:\(note.id)")
         }
         .padding(.vertical, 3)
         .contentShape(Rectangle())
@@ -410,5 +415,16 @@ struct BarLabel: View {
             Image(systemName: icon)
             title
         }
+    }
+}
+
+private extension View {
+    /// Shown only while `shown`, but always taking its place; hidden, it can't be clicked and
+    /// VoiceOver skips it (the row's own actions cover it). Its debug frame only while shown.
+    func hoverOnly(_ shown: Bool, key: String) -> some View {
+        opacity(shown ? 1 : 0)
+            .allowsHitTesting(shown)
+            .accessibilityHidden(!shown)
+            .background { if shown { Color.clear.debugFrame(key) } }
     }
 }

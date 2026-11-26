@@ -411,6 +411,34 @@ extension Snapshot {
                 box.state.text = ""
                 box.close()
 
+                // Hovering a note shows ✨ and → Today without moving anything (user, 2026-11-26):
+                // its text keeps its frame, and so does the note under it.
+                let below = try clew.addNote("Look up train times for the trip on Saturday")
+                let top = try clew.addNote("Call the bank about the card and ask about the new one before Friday")
+                model.refresh()
+                let page = NSHostingView(rootView: RootView(model: model, screen: .notes))
+                let pageWindow = NSWindow(contentRect: NSRect(x: -10_000, y: -10_000, width: 340, height: 600),
+                                          styleMask: [.borderless], backing: .buffered, defer: false)
+                pageWindow.contentView = page
+                pageWindow.orderFrontRegardless()
+                @MainActor func texts() -> [CGRect?] { [DebugFrames.frames["note:\(top.id)"], DebugFrames.frames["note:\(below.id)"]] }
+                @MainActor func within(_ ms: Int, _ done: () -> Bool) async throws {
+                    for _ in 0..<(ms / 20) where !done() { try await Task.sleep(for: .milliseconds(20)) }
+                }
+                try await within(2000) { texts().allSatisfy { $0 != nil } }
+                let still = texts()
+                DebugFrames.hoverNote?(top.id)
+                try await within(2000) { DebugFrames.frames["noteToday:\(top.id)"] != nil }
+                try await within(500) { texts() != still }   // waited: any move would show within 500 ms
+                let hovering = texts(), today = DebugFrames.frames["noteToday:\(top.id)"]
+                print("  notes before hover", still, "hovering", hovering, "→ Today", today as Any)
+                report("hovering a note shows → Today and moves no text",
+                       today != nil && still.allSatisfy { $0 != nil } && still == hovering)
+                DebugFrames.hoverNote?(nil)
+                try await within(2000) { DebugFrames.frames["noteToday:\(top.id)"] == nil }
+                report("… and it goes when the pointer leaves", DebugFrames.frames["noteToday:\(top.id)"] == nil)
+                pageWindow.orderOut(nil)
+
                 report("the two shortcuts never clash",
                        model.setWriteNoteShortcut(.default) == "Already used to open the list."
                        && model.setOpenListShortcut(.writeNoteDefault) == "Already used to write a note.")

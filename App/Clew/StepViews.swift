@@ -402,6 +402,8 @@ private struct StepFrames: PreferenceKey {
     static var addStep: ((UUID) -> Void)?
     /// The pointer over a step, as hovering does (posted events do not move it).
     static var hoverStep: ((UUID?) -> Void)?
+    /// The pointer over an open note on the Notes page, as hovering does.
+    static var hoverNote: ((UUID?) -> Void)?
     #endif
 }
 
