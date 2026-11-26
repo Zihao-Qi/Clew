@@ -1319,8 +1319,8 @@ stopped daily use, not adding features.
          default.
       6. **Fits the free time** (`fits`): it has open steps, and their size (open steps
          × **10 minutes**) is at most the whole minutes free. **Free**: from now until
-         the next block that counts here (above: no done step's, and none of a task
-         that is done) that has not ended or, with
+         the next block of an open task (above; never a done step's) that has not
+         ended or, with
          calendar events shown, the next timed event today, whichever is first (0
          while one is under way; nothing left today: not known, so nothing fits).
          All-day and declined events and unticked calendars' events do not count. A
@@ -1340,8 +1340,9 @@ stopped daily use, not adding features.
     3. "2 of 4 steps done"
     4. "You marked it important"
     5. "A good time of day for it"
-    6. "Its 2 steps left fit before 15:00" (one: "Its last step fits before 15:00";
-       the open steps only; the time is when the free time ends)
+    6. "Its 2 steps fit before 15:00" (one: "Its step fits before 15:00"; under the
+       default order a task here has no step done, as Started takes those; the time is
+       when the free time ends)
     7. "On your list for today" (Gemini: "Next in your list" was false under "Or:")
     - Planned for later: "On your timeline at 18:00"
   - **The rules as data:** the rules Clew uses are one value with this form:
