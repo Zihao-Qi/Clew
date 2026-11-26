@@ -1308,27 +1308,27 @@ stopped daily use, not adding features.
          start ≤ now < its end).
       2. **Starting soon** (`blockSoon`): its next block starts after now and at most
          **15 minutes** (900 seconds) from now.
-      3. **Started** (`started`): it has steps, at least one done and one open; or a
-         counted goal with progress in its current round and nothing added today (one
-         added today already counts it as done for today, see "Item kinds").
+      3. **Started** (`started`): it has steps, at least one done and one open. Goals
+         do not count (Gemini: a long goal, 120 of 500, would come first every day).
       4. **Important** (`important`): marked as a priority.
       5. **A good time for it** (`hint`): any of a hint's words is a whole word of its
          title (words split at anything not a letter or digit; ignoring case and
-         accents), and now is within the hint's hours (`from` inclusive, `to`
+         accents, by Unicode rules, not the Mac's language), and now is within the hint's hours (`from` inclusive, `to`
          exclusive; `from` after `to` runs across midnight). Only a title the person
          typed (never a fetched or imported one, docs/AGENT.md §4). No hints by
          default.
       6. **Fits the free time** (`fits`): it has open steps, and their size (open steps
          × **10 minutes**) is at most the whole minutes free. **Free**: from now until
-         the next block (of an open task or an open step) that has not ended or, with
+         the next block that counts here (above: no done step's, and none of a task
+         that is done) that has not ended or, with
          calendar events shown, the next timed event today, whichever is first (0
          while one is under way; nothing left today: not known, so nothing fits).
          All-day and declined events and unticked calendars' events do not count. A
          task without steps has no size Clew could know, so it never "fits" (Gemini: a
          guessed 15 minutes let an unchunked task claim to fit).
       7. **In your list's order** (`listOrder`): every other task.
-    - **Order:** by the rule's place (planned last); within a rule, `blockNow` by its
-      earliest block under way, `blockSoon` and planned by their next block's start
+    - **Order:** by the rule's place (planned last); within a rule, `blockNow` by the
+      start of its earliest block under way, `blockSoon` and planned by their next block's start
       (earliest first), `fits` by size (smallest first), the others not at all; then
       Today's order (which is total). The first is the pick and the next two the others
       ("Or:"). With 2 open tasks there is one other. Every open task gets exactly one
@@ -1337,12 +1337,12 @@ stopped daily use, not adding features.
     and never pushy, urgent or guilt-inducing; each is true whenever shown:
     1. "It's on your timeline now"
     2. "On your timeline at 15:00" (the block's start, in the Mac's time format)
-    3. "2 of 4 steps done"; a goal: its progress as its row shows it, "10 of 30 so far"
+    3. "2 of 4 steps done"
     4. "You marked it important"
     5. "A good time of day for it"
-    6. "Its 2 steps fit before 15:00" (one step: "Its step fits before 15:00"; the
-       time is when the free time ends)
-    7. "Next in your list"
+    6. "Its 2 steps left fit before 15:00" (one: "Its last step fits before 15:00";
+       the open steps only; the time is when the free time ends)
+    7. "On your list for today" (Gemini: "Next in your list" was false under "Or:")
     - Planned for later: "On your timeline at 18:00"
   - **The rules as data:** the rules Clew uses are one value with this form:
 
