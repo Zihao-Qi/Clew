@@ -385,7 +385,7 @@ first jobs have earned their place.
 - **2026-11-26 (*user*)**: What next? chooses by **fixed rules on this Mac**, not by a
   job: the instruction left the weighing to the model, so picks varied; rules are
   instant, free, send nothing and choose the same way each time. Flat rules first
-  (SPEC "What next?": eight in order, one value with a checked form); later the AI may
+  (SPEC "What next?": six in order, then the list's order, then tasks planned for later; one value with a checked form); later the AI may
   suggest changes to that value from the person's choices, shown for them to accept,
   and conditional orders (a restricted CP-net) only if the choices show the need.
   The What next? job, asking ahead and What next? reading notes are gone.

@@ -1296,65 +1296,69 @@ stopped daily use, not adding features.
     close the panel.
   - **The rules** (*user* 2026-11-26: flat rules first; conditional ones only if the
     person's choices show the need). A task's **blocks** here are those of the task and
-    of its open steps (a done step's block does not count), today, while the timeline
-    is on (with it off, no rule sees blocks). Each open task takes the **first** rule
-    it meets, in this order (the default):
-    1. **On the timeline now** (`blockNow`): one of its blocks is under way (its start
-       ≤ now < its end).
-    2. **Starting soon** (`blockSoon`): none under way, and its next block starts after
-       now and at most **15 minutes** from now.
-    3. **Planned for later** (`planned`): its next block starts later today. The
-       person chose when to do it, so the rules below never move it ahead (Gemini:
-       an important task placed at 18:00 must not be picked at 10:00).
-    4. **Started** (`started`): it has steps, at least one done and one open; or a goal
-       with progress in its current round (or week) and nothing added today (a goal
-       counted today is already done for today, SPEC "Goals").
-    5. **Important** (`important`): marked as a priority.
-    6. **A good time for it** (`hint`): any of a hint's words is a whole word of its
-       title (words split at anything not a letter or digit; ignoring case and
-       accents), and now is within the hint's hours (`from` inclusive, `to` exclusive;
-       `from` after `to` runs across midnight). Only a title the person typed (never a
-       fetched or imported one, docs/AGENT.md §4). No hints by default.
-    7. **Fits the free time** (`fits`): the whole minutes free are known and its size
-       fits in them. **Free** here: from now until the next block (of an open task or
-       an open step) that has not ended or, with calendar events shown, the next timed
-       event today, whichever is first (0 while one is under way, so nothing fits;
-       nothing left today: not known, so nothing fits). All-day and declined events and
-       unticked calendars' events do not count. Its **size**: its open steps × **10
-       minutes**, or **15 minutes** without open steps (a habit, a goal, a link, a task
-       without steps).
-    8. **In your list's order** (`listOrder`): every other task.
-
-    The tasks are then ordered by their rule's place; within a rule, `blockNow`,
-    `blockSoon` and `planned` by the start of the block that matched (earliest first),
-    `fits` by size (smallest first), the others not at all; then Today's order (which
-    is total). The first is the pick and the next two the others ("Or:"). With 2 open
-    tasks there is one other. A task's size never orders `listOrder` (Gemini: sorting
-    by a guessed size would put an unchunked task before one split into steps).
+    of its open steps (a done step's block does not count), today, and only while the
+    timeline is on: with it off, no rule sees blocks, events or free time.
+    - **Planned for later** first takes out every task with no block under way whose
+      next block starts more than the soon window (below) from now: the person chose
+      when to do it, so no other rule picks it now (Gemini: an important task placed at
+      18:00 must not be picked at 10:00). These come **last**, after every other task.
+    - Every other open task takes the **first** of these rules it meets, in this order
+      (the default):
+      1. **On the timeline now** (`blockNow`): one of its blocks is under way (its
+         start ≤ now < its end).
+      2. **Starting soon** (`blockSoon`): its next block starts after now and at most
+         **15 minutes** (900 seconds) from now.
+      3. **Started** (`started`): it has steps, at least one done and one open; or a
+         counted goal with progress in its current round and nothing added today (one
+         added today already counts it as done for today, see "Item kinds").
+      4. **Important** (`important`): marked as a priority.
+      5. **A good time for it** (`hint`): any of a hint's words is a whole word of its
+         title (words split at anything not a letter or digit; ignoring case and
+         accents), and now is within the hint's hours (`from` inclusive, `to`
+         exclusive; `from` after `to` runs across midnight). Only a title the person
+         typed (never a fetched or imported one, docs/AGENT.md §4). No hints by
+         default.
+      6. **Fits the free time** (`fits`): it has open steps, and their size (open steps
+         × **10 minutes**) is at most the whole minutes free. **Free**: from now until
+         the next block (of an open task or an open step) that has not ended or, with
+         calendar events shown, the next timed event today, whichever is first (0
+         while one is under way; nothing left today: not known, so nothing fits).
+         All-day and declined events and unticked calendars' events do not count. A
+         task without steps has no size Clew could know, so it never "fits" (Gemini: a
+         guessed 15 minutes let an unchunked task claim to fit).
+      7. **In your list's order** (`listOrder`): every other task.
+    - **Order:** by the rule's place (planned last); within a rule, `blockNow` by its
+      earliest block under way, `blockSoon` and planned by their next block's start
+      (earliest first), `fits` by size (smallest first), the others not at all; then
+      Today's order (which is total). The first is the pick and the next two the others
+      ("Or:"). With 2 open tasks there is one other. Every open task gets exactly one
+      place, so with 2 or more there is always a pick and an other.
   - **Reasons:** each task's reason comes from its rule, in the String Catalog, kind
     and never pushy, urgent or guilt-inducing; each is true whenever shown:
     1. "It's on your timeline now"
     2. "On your timeline at 15:00" (the block's start, in the Mac's time format)
-    3. "On your timeline at 18:00" (as 2)
-    4. "2 of 4 steps done"; a goal: its progress as its row shows it, "10 of 30 so far"
-    5. "You marked it important"
-    6. "A good time of day for it"
-    7. "Fits before 15:00" (the start of what ends the free time)
-    8. "Next in your list"
+    3. "2 of 4 steps done"; a goal: its progress as its row shows it, "10 of 30 so far"
+    4. "You marked it important"
+    5. "A good time of day for it"
+    6. "Its 2 steps fit before 15:00" (one step: "Its step fits before 15:00"; the
+       time is when the free time ends)
+    7. "Next in your list"
+    - Planned for later: "On your timeline at 18:00"
   - **The rules as data:** the rules Clew uses are one value with this form:
 
     ```json
-    {"order": ["blockNow", "blockSoon", "planned", "started", "important", "hint", "fits", "listOrder"],
-     "soonMinutes": 15, "minutesPerStep": 10, "minutesNoSteps": 15,
+    {"order": ["blockNow", "blockSoon", "started", "important", "hint", "fits"],
+     "soonMinutes": 15, "minutesPerStep": 10,
      "hints": [{"words": ["write", "draft"], "from": "06:00", "to": "12:00"}]}
     ```
 
-    Accepted only when it has exactly these five keys and: `order` names exactly these
-    8 rules, each once, with `listOrder` last (it takes every task left);
-    `soonMinutes` 5–60, `minutesPerStep` 5–30, `minutesNoSteps` 5–60, whole numbers;
-    at most 10 hints, each with 1–5 words, each word 1–30 letters or digits only
-    (nothing else, so one word); `from` and `to` valid times `00:00`–`23:59`, not equal.
-    Anything else is refused whole and the defaults stay. In this step only the
+    `listOrder` always comes after these and planned tasks after it, so neither is in
+    `order`. Accepted only when it has exactly these four keys and: `order` names
+    exactly these 6 rules, each once; `soonMinutes` 5–60 and `minutesPerStep` 5–30,
+    whole numbers; at most 10 hints, each with exactly the keys `words`, `from` and
+    `to`: 1–5 words, each 1–30 letters or digits only (so one word); `from` and `to`
+    each exactly `HH:mm` (two digits, a colon, two digits) from `00:00` to `23:59`, not
+    equal. Anything else is refused whole and the defaults stay. In this step only the
     defaults above are used and nothing changes them; the value exists so a later step
     can offer changes (the AI's, accepted by the person) and **Reset**. Choosing is
     pure: the time, the time zone, the tasks, the blocks, the events and the rules are
