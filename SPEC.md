@@ -1361,7 +1361,9 @@ stopped daily use, not adding features.
     each exactly `HH:mm` (two digits, a colon, two digits) from `00:00` to `23:59`, not
     equal. Anything else is refused whole and the defaults stay. In this step only the
     defaults above are used and nothing changes them; the value exists so a later step
-    can offer changes (the AI's, accepted by the person) and **Reset**. Choosing is
+    can offer changes (the AI's, accepted by the person) and **Reset**; that step must
+    recheck the reasons for other orders (Fits after a step is done; Starting soon
+    before On the timeline now). Choosing is
     pure: the time, the time zone, the tasks, the blocks, the events and the rules are
     given to it (AGENTS.md rule 5).
   - **The answer:**
