@@ -122,7 +122,7 @@ streamed answer in 3.0 s. No helper process, no JavaScript.
   inside it as `response.failed`): usage limit (`subscription_sharing_usage_limit_exceeded`,
   429) shows "ChatGPT usage limit reached · Manage usage" and nothing else is asked
   until the person presses ✨ again; `…_usage_unavailable`, `…_user_unavailable` and
-  503 are the job's plain failure line ("Couldn't suggest steps", "Couldn't choose",
+  503 are the job's plain failure line ("Couldn't suggest steps",
   "Couldn't suggest a task", "Couldn't sort your notes"); `subscription_sharing_invalid_user` ends the
   sign-in only after a refresh confirms it; `…_route_not_supported`, `chatpass_v2_…`
   and `invalid_client` are bugs (debug log, plain failure).
@@ -162,7 +162,7 @@ address or any page's content.
    so a fetched title cannot carry banned text through. The list lives in
    code with a test per phrase.
 5. On any failure the job returns nothing: the plain behaviour, the job's short
-   failure line ("Couldn't suggest steps. Try again.", "Couldn't choose. Try again.", "Couldn't suggest a task. Try again.", "Couldn't sort your notes. Try again."), and in a debug build the reason as a code ("tooLong",
+   failure line ("Couldn't suggest steps. Try again.", "Couldn't suggest a task. Try again.", "Couldn't sort your notes. Try again."), and in a debug build the reason as a code ("tooLong",
    "banned", "duplicate", "schema"), never any of the answer's text.
 
 ## 6. Jobs
@@ -306,9 +306,7 @@ in the Keychain. The full text is in SPEC "Suggest steps", "Memory" and "Notes t
   the failure code, the note change's kind or its failure code, and OpenAI's request id. Never tokens, codes, ID token hints or any
   text sent or received. It is how prompts are tuned.
 - **Evals**: fixed inputs with expected *properties* (Suggest steps: 3–5 items, under
-  the caps, the first short, none repeating an existing step, no banned words; What
-  next?: 1–3 picks, each one of the given ids, no repeats, reasons under the cap, no
-  banned words, in the tasks' language; Notes to tasks: a task or a thought, steps
+  the caps, the first short, none repeating an existing step, no banned words; Notes to tasks: a task or a thought, steps
   only for a note that lists them, Later unless the note means today, no banned
   words, in the note's language), run
   against the live model on request and against recorded answers in CI. Each must fail
@@ -387,7 +385,7 @@ first jobs have earned their place.
 - **2026-11-26 (*user*)**: What next? chooses by **fixed rules on this Mac**, not by a
   job: the instruction left the weighing to the model, so picks varied; rules are
   instant, free, send nothing and choose the same way each time. Flat rules first
-  (SPEC "What next?": seven in order, one value with a checked form); later the AI may
+  (SPEC "What next?": eight in order, one value with a checked form); later the AI may
   suggest changes to that value from the person's choices, shown for them to accept,
   and conditional orders (a restricted CP-net) only if the choices show the need.
   The What next? job, asking ahead and What next? reading notes are gone.
