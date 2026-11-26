@@ -173,7 +173,6 @@ address or any page's content.
 | **Evening line** | the 21:00 summary | one line ≤ 120 characters naming something done | AI-2 |
 | **Fits today** | Goals & Later | ≤ 3 items with a free slot on today's timeline and a reason ≤ 80 | AI-3 |
 | **Notes to tasks** | ✨ on a note, Sort with ✨ on the Notes page (SPEC "Notes to tasks"), as Settings › AI › Notes allows | a task (a title ≤ 80, Today or Later, a reason ≤ 80, 0–5 steps only when the note lists them) or a thought; for Sort, one per note id (q1…q20) | AI-5 |
-| **What next?** | Next in the list's bottom bar, asked ahead when the menu opens (SPEC "What next?") | 1–3 picks from Today's open tasks, each an id and a reason ≤ 80, the first shown as the pick | AI-4 |
 | *every job* | its own place | may also return one note (§7) | AI-M |
 | What Clew noticed | last week's card | no request: shows Clew's unanswered notes, True / Not really (§7) | AI-N |
 | Reader | later | §11 | later |
@@ -318,11 +317,11 @@ in the Keychain. The full text is in SPEC "Suggest steps", "Memory" and "Notes t
 ## 10. Privacy
 
 - Off by default; nothing is sent until the person signs in (which turns Use AI on)
-  and a job runs: when they ask for suggestions, and What next? when the menu opens
-  with something new (asked ahead, at most once per change or every 2 hours).
+  and a job runs: when they ask for suggestions. (What next? sends nothing since
+  2026-11-26: it chooses by rules on this Mac, SPEC "What next?".)
 - Notes (the person's own jottings) are sent only as Settings › AI › Notes allows:
   never (Off), the one note the person presses ✨ on (the default), or all open notes
-  (Sort with ✨, and What next?'s context). Using a note is never recorded as activity,
+  (Sort with ✨). Using a note is never recorded as activity,
   and a request that carries a note sends no activity (it waits) and never changes
   Memory (its note change is ignored), like one with an untrusted field (§4, §7).
 - Each job sends only the input it declares (§6) plus the notes and activity (§7).
@@ -385,6 +384,13 @@ first jobs have earned their place.
   the note you ask about, the default; all your open notes); one click makes the task
   with its steps when the note lists them; Sort with ✨ and What next? reading notes
   only with all notes allowed; nothing about notes is recorded as activity.
+- **2026-11-26 (*user*)**: What next? chooses by **fixed rules on this Mac**, not by a
+  job: the instruction left the weighing to the model, so picks varied; rules are
+  instant, free, send nothing and choose the same way each time. Flat rules first
+  (SPEC "What next?": seven in order, one value with a checked form); later the AI may
+  suggest changes to that value from the person's choices, shown for them to accept,
+  and conditional orders (a restricted CP-net) only if the choices show the need.
+  The What next? job, asking ahead and What next? reading notes are gone.
 - Superseded 2026-11-22: the bundled `clew-agent` helper, Codex OAuth reuse, the
   monthly token cap (the plan's own limits apply), the Gateway's `AgentOutput` records
   for AI-1 (Suggest steps keeps nothing; memory notes have their own file, §7).

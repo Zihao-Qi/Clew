@@ -100,9 +100,9 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
    Settings › About (off by default, 2026-11-13), Clew also asks GitHub once a day
    whether a newer release exists (see "About and updates"). Only while signed in to
    ChatGPT in Settings › AI with **Use AI** on (2026-11-22), Clew sends what "Suggest
-   steps", "What next?", "Notes to tasks" and "Memory" list to OpenAI, when the person
-   asks for suggestions, and when the menu opens with something new for What next?
-   (asked ahead, 2026-11-25); notes only as Settings › AI › Notes allows.
+   steps", "Notes to tasks" and "Memory" list to OpenAI, when the person asks for
+   suggestions; notes only as Settings › AI › Notes allows. (What next? sends nothing
+   since 2026-11-26: it chooses by rules on this Mac.)
 9. **Launch at login** (`SMAppService`), toggled in a small Settings window.
 10. **Task details.** Double-clicking a row opens its details (*changed* 2026-11-21,
     *user*: a click unfolds a task with steps; see "Steps in a task"); so does
@@ -136,7 +136,7 @@ done means a good day. Visible progress ("10 of 30") makes finishing satisfying.
 
 - **Daruma goals and badges.** Paint one eye when a counted goal starts and the
   second when it's finished. Levels come from lifetime totals.
-- Opt-in AI help beyond Suggest steps, Memory, What next? and Notes to tasks: an evening line, "fits today" from Goals & Later,
+- Opt-in AI help beyond Suggest steps, Memory and Notes to tasks: an evening line, "fits today" from Goals & Later,
   a reader (see docs/AGENT.md, v2 2026-11-22).
 - Sync with Dayflow (its local JSON API: `GET /api/day`, `PATCH /api/tasks/:id`).
 - iPhone, iCloud sync, Obsidian export.
@@ -879,8 +879,8 @@ stopped daily use, not adding features.
     Calendar** (Google, iCloud, Exchange too, once added in System Settings › Internet
     Accounts); Settings › Calendar lists them with checkboxes, and Clew remembers only
     the ones unticked, so a new calendar shows by default. Events are read live: never
-    saved or exported, and never sent anywhere, except that What next? sends the
-    minutes free before the next one (never its title; *changed* 2026-11-25, *user*). Clew writes to a calendar only when you change an
+    saved or exported, and never sent anywhere (*changed* 2026-11-26: What next? no
+    longer sends the minutes free; it chooses on this Mac). Clew writes to a calendar only when you change an
     event on the timeline (below).
     Access is asked only when "Show your calendar" on the timeline (or in Settings) is
     clicked; without it the timeline works with tasks alone. "Show your calendar" sits at
@@ -1110,15 +1110,16 @@ stopped daily use, not adding features.
     **Use AI** (*changed* 2026-11-22, *user*: it replaces the switch **Suggest steps**;
     on means every AI job and Memory, off means none; signing in turns it on). Its line
     says in general what it does, not each field sent (*user*): "Clew suggests steps,
-    helps you choose what's next, turns notes into tasks and remembers how you work,
-    using your ChatGPT plan." (*changed* 2026-11-25 for What next? and Notes to tasks) Below it, **Notes** (see "Notes to tasks")
+    turns notes into tasks and remembers how you work, using your ChatGPT plan."
+    (*changed* 2026-11-26: What next? chooses by rules, without AI) Below it, **Notes** (see "Notes to tasks")
     and **Memory** (see "Memory"). The
     first time the person signs in, Settings shows once "You're using your ChatGPT
     plan" with **Got it** (OpenAI's rule). Declined plan permission: "Clew can't use
     your ChatGPT plan yet" with **Continue with ChatGPT** to ask again; a plan OpenAI
     says is not eligible: "AI isn't available on this ChatGPT plan." Signed out, one line
-    says what AI does: "Clew can suggest small steps for a task, help you choose what's
-    next, turn notes into tasks and remember how you work, using your ChatGPT plan. Nothing is sent until you sign in. Clew works fully without it." (*changed* 2026-11-25: What next? asks ahead.) While the
+    says what AI does: "Clew can suggest small steps for a task, turn notes into tasks
+    and remember how you work, using your ChatGPT plan. Nothing is sent until you sign
+    in. Clew works fully without it." (*changed* 2026-11-26: What next? chooses by rules.) While the
     browser is open: "Waiting for the browser…" with **Cancel**; the browser's page after
     signing in says "You can close this tab and go back to Clew." A failed sign-in says
     "Couldn't sign in. Try again." (or that it was cancelled in the browser, or that
@@ -1264,51 +1265,93 @@ stopped daily use, not adding features.
   - No request is made to show them; nothing is sent when answering (the answer goes
     with the next job's request).
 
-- **What next? (AI-4, 2026-11-25, *user*; Gemini Neon review).** For the moment the
-  person opens the list and cannot choose: one tap shows one task to do now with a
-  short reason, and up to two others to choose from. Choosing only, no typing
-  (docs/AGENT.md §1.3).
+- **What next? (AI-4, 2026-11-25; by rules, *changed* 2026-11-26, *user*; Gemini Neon
+  review).** For the moment the person opens the list and cannot choose: one tap shows
+  one task to do now with a short reason, and up to two others to choose from.
+  Choosing only, no typing (docs/AGENT.md §1.3). **Chosen by fixed rules on this Mac,
+  not by AI** (*changed* 2026-11-26, *user*: the instruction left the weighing to the
+  model, so the same list could give different picks; rules are instant, use no
+  ChatGPT usage, send nothing and choose the same way every time). Later the AI may
+  suggest changes to the rules for the person to accept (not in this step; see "The
+  rules as data").
   - **Open tasks:** rows on Today (not Goals & Later) that still need something today,
     as for Notes: a task or habit not done today; a goal not yet reached (a +1 today
     leaves it open). Tasks placed on the timeline count too.
   - **The button:** **Next** (*changed* 2026-11-25, *user*: it was ✨ beside the gear),
     in the bottom bar's left group after Add and Note, in their style: an icon
     (`signpost.right`) and the word; hover and VoiceOver: "What next?". It shows only
-    while AI is ready with a model (see "Memory"), no focus timer exists (none
-    running, paused, at Time's up, or on a break), and Today has at least 2 open
-    tasks; being last in its group, its coming and going moves neither Add nor Note.
-    Pressing it while its panel shows closes the panel.
+    while no focus timer exists (none running, paused, at Time's up, or on a break)
+    and Today has at least 2 open tasks, **with or without AI** (*changed* 2026-11-26:
+    nothing is asked); being last in its group, its coming and going moves neither Add
+    nor Note. Pressing it while its panel shows closes the panel.
   - **The panel** sits just above the bottom bar, as wide as the list, on a faint
     card: the menu grows to fit it, so it covers nothing and no row moves (a panel
     over the list let the rows show through its text). Clicks elsewhere in the menu
     work as usual and leave it open (a row may be ticked meanwhile, see "While it
     shows").
-  - **Asked ahead** (*changed* 2026-11-25, *user*: pressing it felt slow): when the
-    menu opens on the list and Next would show, Clew asks in the background, unless
-    it already has an answer for the same open tasks (the same tasks, titles, kinds,
-    progress, priorities, step counts and blocks, and the open notes it sends, if any)
-    that is less than 2 hours old; then nothing is sent. An answer that arrives after the menu closed is kept for the next opening.
-    The kept answer lives in memory only (never on disk) and goes with losing ready,
-    the rollover, Forget everything and lowering Settings › AI › Notes from All. A background request that fails shows
-    nothing, except a usage limit: it shows when Next is next pressed (unless a kept
-    answer can show instead), and nothing more is asked ahead until then. A sign-in
-    OpenAI ended in the background turns Use AI off, so Next goes and Settings › AI
-    says "Sign in again".
-  - **Pressing Next** shows the kept answer at once, without the tasks no longer
-    open (ticked, deleted, moved); if none are left, or there is no answer, it asks
-    now. While a request is under way (asked ahead or now) the panel shows
-    "Choosing…" with a small spinner and **Cancel**, and the answer fills in when it
-    arrives. At most 30 seconds. Cancel, Esc, Next, the menu closing, leaving the
-    list (Add, details, Settings), the rollover, losing ready (other than this
-    request's own ended sign-in, below), a focus timer starting, and open tasks
-    dropping below 2 close the panel; a request still under way finishes into the
-    kept answer (losing ready and the rollover drop it). VoiceOver: "Choosing what's
-    next", **Cancel** ("Cancel What next?").
-  - **The answer** replaces "Choosing…":
+  - **Pressing Next** chooses at once from the open tasks as they are now, by the rules
+    below, and shows the answer: no request, no waiting, no failure. Nothing is kept
+    between presses: each press chooses afresh. Next, Not now, Esc, the menu closing,
+    leaving the list (Add, details, Settings), the rollover and a focus timer starting
+    close the panel.
+  - **The rules** (*user* 2026-11-26: flat rules first; conditional ones only if the
+    person's choices show the need). Each open task takes the **first** rule it meets,
+    in this order (the default):
+    1. **On the timeline now** (`blockNow`): while the timeline is on, one of its blocks
+       today (its own or a step's) is under way (started, not ended).
+    2. **Starting soon** (`blockSoon`): its next block today that has not started starts
+       within **15 minutes**.
+    3. **Started** (`started`): it has steps, at least one done and one open; or a goal
+       with some progress today, not yet reached.
+    4. **Important** (`important`): marked as a priority.
+    5. **A good time for it** (`hint`): a hint's words appear in its title, as whole
+       words, ignoring case and accents, and now is within the hint's hours. Only a
+       title the person typed (never a fetched or imported one, docs/AGENT.md §4). No
+       hints by default.
+    6. **Fits the free time** (`fits`): while the timeline is on and the minutes free
+       are known (as defined for the timeline: until the next block that has not ended
+       or, with calendar events shown, the next timed event today; 0 while one is under
+       way, none when nothing remains), its **size** fits in them. Its size: its open
+       steps × **10 minutes**, or **15 minutes** without open steps (a habit, a goal, a
+       link, a task without steps).
+    7. **Small** (`small`): every other task.
+
+    The tasks are then ordered by their rule's place; within a rule, blocks by their
+    start (earliest first), the others by size (smallest first); then Today's order.
+    The first is the pick and the next two the others ("Or:"). With 2 open tasks there
+    is one other.
+  - **Reasons:** each task's reason comes from its rule, in the String Catalog, kind
+    and never pushy, urgent or guilt-inducing:
+    1. "It's on your timeline now"
+    2. "On your timeline at 15:00" (the block's start, in the Mac's time format)
+    3. "2 of 4 steps done"; a goal: "1 of 3 done today"
+    4. "You marked it important"
+    5. "A good time of day for it"
+    6. "Fits the 40 minutes you have free"
+    7. "A small one to start with" when its size is 15 minutes or less; else "Start
+       with one step"
+  - **The rules as data:** the rules Clew uses are one value with this form:
+
+    ```json
+    {"order": ["blockNow", "blockSoon", "started", "important", "hint", "fits", "small"],
+     "soonMinutes": 15, "minutesPerStep": 10, "minutesNoSteps": 15,
+     "hints": [{"words": ["write", "draft"], "from": "06:00", "to": "12:00"}]}
+    ```
+
+    Accepted only when: `order` names exactly these 7 rules, each once, with `small`
+    last (it takes every task left); `soonMinutes` 5–60, `minutesPerStep` 5–30,
+    `minutesNoSteps` 5–60, whole numbers; at most 10 hints, each with 1–5 words of
+    1–30 characters, no line break, and `from` before `to` (`HH:mm`, the same day).
+    Anything else is refused whole and the defaults stay. In this step only the
+    defaults above are used and nothing changes them; the value exists so a later step
+    can offer changes (the AI's, accepted by the person) and **Reset**. Choosing is
+    pure: the time, the time zone, the tasks, the blocks and the minutes free are
+    given to it (AGENTS.md rule 5).
+  - **The answer:**
 
     ```
      Write the intro                ▶ Focus 25 min
-     Short, and mornings suit writing
+     2 of 4 steps done
      Or: Reply to Anna · Pay rent
                                           Not now
     ```
@@ -1332,53 +1375,27 @@ stopped daily use, not adding features.
 
     Nothing is ticked, moved or reordered: only ▶ Focus changes anything, and only
     when pressed.
-  - **While it shows:** a task shown (or in the answer when it arrives) that stops being open (ticked, a goal reached,
-    deleted, moved to Goals & Later) leaves the panel; if it was the pick, the first
-    other becomes the pick; with none left the panel closes quietly (not a failure) (fewer than 2 open tasks
+  - **While it shows** the answer is not chosen again (it never jumps under the
+    pointer): a task shown that stops being open (ticked, a goal reached, deleted,
+    moved to Goals & Later) leaves the panel; if it was the pick, the first other
+    becomes the pick; with none left the panel closes quietly (fewer than 2 open tasks
     on Today does not close it while a shown task is open). The menu closing, leaving
-    the list, the rollover, losing ready (except the ended sign-in message below) or a
-    focus timer starting close it.
-  - **VoiceOver:** Next reads "What next?"; the answer reads "Suggested: <title>. <reason>",
-    then **Focus 25 minutes on <title>**, "Go to <title>" (moves VoiceOver to the row
-    or block), each other "Choose <title>", and **Not now**. Esc closes it. A failure
-    is read as its text.
-  - **What is sent:** up to 30 open tasks in Today's order (priorities first, as in
-    the list, wherever a task is placed), each with a short id for this request (t1…t30),
-    its title (a fetched title marked untrusted, docs/AGENT.md §4), its kind (once,
-    link, habit, or goal with its progress, "1 of 3"), whether it is a priority, its
-    steps as "2 of 5 done" (never their names), and, while the timeline is on, the
-    start (`HH:mm`) of its next block today that has not ended (its own or a step's);
-    the weekday and the time now (`HH:mm`); while the timeline is on, the whole
-    minutes free from now until the next block that has not ended or, when calendar
-    events are shown, the next timed event on the timeline today (0 if one is under
-    way, left out if none remain; all-day and declined events and unticked calendars'
-    events do not count; never an event's title); with Settings › AI › Notes on All
-    your open notes, up to 20 open notes (see "Notes to tasks"); and
-    the notes and recent activity (see "Memory"). If any task sent has a fetched
-    title, or any open note is sent (see "Notes to tasks"), no activity is sent (it
-    waits) and a note change in the answer is ignored (docs/AGENT.md §4, §7). The instruction: choose what to do now, from these only,
-    with a short, kind reason in the tasks' language, never pushy, urgent or
-    guilt-inducing.
-  - **Checked before showing** (docs/AGENT.md §5): picks taken in order, at most 3
-    kept: each an id from this request's tasks, not repeated; each reason trimmed,
-    1–80 characters, no line break (refused, not joined), no banned words (a phrase
-    the pick's own typed title carries is allowed, a fetched one's is not). A pick
-    that fails is dropped and the next moves up; none left is a failure.
-  - **When it fails:** the panel shows "Couldn't choose. Try again." with **Not now**
-    for 5 seconds, then closes; no retry by itself (Next asks again once it has closed).
-    Usage limit: "ChatGPT usage limit reached" with **Manage usage**
-    (chatgpt.com/settings/usage, which also closes the panel) and **Not now**, until
-    closed. A sign-in OpenAI has ended: "OpenAI ended Clew's sign-in. Sign in again in
-    Settings › AI." with **Not now** for 5 seconds, then the panel closes; Use AI turns off (Next goes) and
-    Settings › AI says "Sign in again". Offline or no answer in 30 seconds: "Couldn't
-    choose. Try again." Esc closes any of these.
-  - **Remembered** (see "Memory"): ▶ Focus or the title on a pick is activity
-    `nextChosen` (`"how": "focus"` or `"open"`; `"other": true` when the task chosen
-    was not the answer's first pick), with the task as other events carry it (its
-    title only if typed, else `"link": true`); Not now, Esc and Next on an answer are
-    `nextDismissed` (no task). Cancel while asking, failures, and closings the person
-    did not choose (the menu closing, the rollover, a task leaving, …) record nothing.
-  - **Kept:** the last answer, in memory only, as above; nothing on disk.
+    the list, the rollover or a focus timer starting close it.
+  - **VoiceOver:** Next reads "What next?"; the answer reads "Suggested: <title>.
+    <reason>", then **Focus 25 minutes on <title>**, "Go to <title>" (moves VoiceOver
+    to the row or block), each other "Choose <title>", and **Not now**. Esc closes it.
+  - **Sent:** nothing, to anyone (*changed* 2026-11-26): no tasks, no notes, no
+    minutes free.
+  - **Remembered** (see "Memory"; only while AI is ready, as all activity): ▶ Focus or
+    the title on a pick is activity `nextChosen` (`"how": "focus"` or `"open"`;
+    `"other": true` when the task chosen was not the first pick), with the task as
+    other events carry it (its title only if typed, else `"link": true`); Not now, Esc
+    and Next on an answer are `nextDismissed` (no task). Closings the person did not
+    choose (the menu closing, the rollover, a task leaving, …) record nothing.
+  - **Kept:** nothing.
+  - **Gone with the rules** (*changed* 2026-11-26): the request and its checks, asking
+    ahead and the kept answer, "Choosing…" and Cancel, the failures and the usage
+    limit, and What next? reading notes with Settings › AI › Notes on All.
 
 - **Notes to tasks (AI-5, 2026-11-25, *user*; Gemini Neon review).** A note written in a
   hurry ("bank card??") becomes a clear task in one click: Clew suggests the task,
@@ -1388,13 +1405,12 @@ stopped daily use, not adding features.
     signed in with plan permission and eligible; dimmed while Use AI is off), **Notes**
     with three choices: **Off** (no ✨ on the Notes page; no note is ever sent), **The
     note you ask about** (the default: ✨ on a note sends that one note, nothing else)
-    and **All your open notes** (also **Sort with ✨**, and What next? may read them,
-    below). Its line: "Off: Clew never reads your notes. The note you ask about: only
-    the note you press ✨ on. All your open notes: also to sort them and to help
-    choose what's next." Kept in this Mac's preferences with the other AI settings,
+    and **All your open notes** (also **Sort with ✨**, below). Its line: "Off: Clew
+    never reads your notes. The note you ask about: only the note you press ✨ on. All
+    your open notes: also to sort them." (*changed* 2026-11-26: What next? reads no
+    notes.) Kept in this Mac's preferences with the other AI settings,
     never in Clew's data. Changing it (or losing ready) ends what it no longer allows
-    at once: a request under way is cancelled and suggestions shown go; lowered from
-    All, any What next? request under way and its kept answer are dropped too.
+    at once: a request under way is cancelled and suggestions shown go.
   - **Where and when:** on the Notes page, only while AI is ready with a model (see
     "Memory") and Notes is not Off. Each open note's row shows **✨** on hover beside
     **→ Today** ("Suggest a task", VoiceOver "Suggest a task for this note"), its
@@ -1452,16 +1468,9 @@ stopped daily use, not adding features.
   - **Sort with ✨** fills each open note's place with its own suggestion (or the
     thought line) at once; each is accepted or dropped on its own, and the rest stay.
     Notes the answer leaves out, or that changed meanwhile, get nothing.
-  - **What next? with All your open notes:** its request also carries up to 20 open
-    notes (below), so a note can shape a pick's reason ("you noted the bank call");
-    picks are still only Today's tasks. Those notes are part of what decides whether
-    the kept answer still fits (see "What next?"). With the other choices What next?
-    sends no note.
   - **What is sent:** for ✨ on a note: that note's text (all of it, up to its 1,000
     characters); for Sort: every open note (up to 20, newest first) with a short id for
-    this request (q1…q20) and its text; for What next? with All your open notes: up to
-    20 open notes, newest first (as Sort; *user* 2026-11-25: 10 could miss older
-    ones), their text cut to 200 characters. Never the task a
+    this request (q1…q20) and its text. Never the task a
     note was written during (its title may be a fetched page's). With them: the weekday
     and the time (`HH:mm`), and Clew's notes, but no recent activity: it waits for a
     request without notes (see "Memory"). A note is the person's own typed text, so a note is never marked untrusted. The instruction: turn the note into one short, concrete task (a verb
@@ -1491,7 +1500,7 @@ stopped daily use, not adding features.
     Sort asks again.
   - **Remembered:** nothing about notes: turning a note into a task, dropping a
     suggestion, a thought line or sorting is never recorded as AI activity. And a
-    request that carries a note (✨, Sort, or What next? when it sends any open note)
+    request that carries a note (✨ or Sort)
     sends no recent activity (it waits) and ignores the note change in its answer, so
     notes never shape Memory.
   - **Kept:** nothing; suggestions live only while shown.
