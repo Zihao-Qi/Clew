@@ -419,11 +419,13 @@ struct BarLabel: View {
 }
 
 private extension View {
-    /// Shown only while `shown`, but always taking its place; hidden, it can't be clicked and
-    /// VoiceOver skips it (the row's own actions cover it). Its debug frame only while shown.
+    /// Shown only while `shown`, but always taking its place; hidden, it can't be clicked or
+    /// reached with Tab, and VoiceOver skips it (the row's own actions cover it). Its debug
+    /// frame only while shown.
     func hoverOnly(_ shown: Bool, key: String) -> some View {
         opacity(shown ? 1 : 0)
             .allowsHitTesting(shown)
+            .disabled(!shown)
             .accessibilityHidden(!shown)
             .background { if shown { Color.clear.debugFrame(key) } }
     }
